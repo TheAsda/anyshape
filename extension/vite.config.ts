@@ -8,6 +8,7 @@ export default defineConfig({
   root: __dirname,
   plugins: [react() as PluginOption],
   publicDir: 'public',
+  base: '',
   build: {
     outDir: 'dist',
     emptyOutDir: true,
