@@ -27,6 +27,7 @@ export default defineConfig({
     },
   },
   resolve: {
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
     alias: {
       'devtools-protocol/background': resolve(__dirname, '../node_modules/devtools-protocol/dist/background.js'),
       'devtools-protocol/content-script': resolve(__dirname, '../node_modules/devtools-protocol/dist/content-script.js'),
