@@ -1,0 +1,1 @@
+chrome.devtools.panels.create('Form Library DevTools', '', 'panel.html');

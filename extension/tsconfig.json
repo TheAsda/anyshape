@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2024",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "types": ["chrome"],
+    "esModuleInterop": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "**/*"
+  ],
+  "exclude": ["node_modules"]
+}
