@@ -30,14 +30,28 @@ export function useRegister<Valid, Raw = Valid | undefined>(
     [store, specId],
   );
 
-  const getSnapshot = useCallback(
-    () => ({
-      value: store.get(specId) as Raw,
-      error: store.getError(specId),
-      isTouched: store.isTouched(specId),
-    }),
-    [store, specId],
-  );
+  const cachedRef = useRef<{ value: Raw; error: string | null; isTouched: boolean }>({
+    value: undefined as Raw,
+    error: null,
+    isTouched: false,
+  });
+
+  const getSnapshot = useCallback(() => {
+    const value = store.get(specId) as Raw;
+    const error = store.getError(specId);
+    const isTouched = store.isTouched(specId);
+    const prev = cachedRef.current;
+    if (
+      prev.value === value &&
+      prev.error === error &&
+      prev.isTouched === isTouched
+    ) {
+      return prev;
+    }
+    const next = { value, error, isTouched };
+    cachedRef.current = next;
+    return next;
+  }, [store, specId]);
 
   const getServerSnapshot = useCallback(
     () => ({

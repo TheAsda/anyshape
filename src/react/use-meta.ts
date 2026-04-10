@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback, useEffect } from 'react';
+import { useSyncExternalStore, useCallback, useEffect, useRef } from 'react';
 import { useFormContext } from './context.js';
 import type { MetaSpec } from '../specs/meta.js';
 
@@ -16,10 +16,17 @@ export function useMeta<Value>(spec: MetaSpec<Value>): UseMetaReturn<Value> {
     [store, specId],
   );
 
-  const getSnapshot = useCallback(
-    () => ({ value: store.get(specId) as Value | undefined }),
-    [store, specId],
-  );
+  const cachedRef = useRef<{ value: Value | undefined }>({ value: undefined });
+
+  const getSnapshot = useCallback(() => {
+    const value = store.get(specId) as Value | undefined;
+    if (cachedRef.current.value === value) {
+      return cachedRef.current;
+    }
+    const next = { value };
+    cachedRef.current = next;
+    return next;
+  }, [store, specId]);
 
   const getServerSnapshot = useCallback(
     () => ({ value: undefined as Value | undefined }),
