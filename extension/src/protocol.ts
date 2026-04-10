@@ -20,6 +20,11 @@ export const formDevtoolsProtocol = defineProtocol({
     payload: undefined as any,
     direction: 'panel->page',
   }),
+
+  requestState: defineMessage({
+    payload: undefined as any,
+    direction: 'panel->page',
+  }),
 });
 
 export type FormDevtoolsProtocol = typeof formDevtoolsProtocol;
@@ -31,6 +36,7 @@ export interface FormRegisteredPayload {
 
 export interface FormStateChangedPayload {
   formId: string;
+  specTree: Record<string, unknown>;
   values: Record<string, unknown>;
   errors: Record<string, string | null>;
   touched: Record<string, boolean>;
