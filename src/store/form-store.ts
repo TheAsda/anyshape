@@ -262,6 +262,7 @@ export class FormStore {
   }
 
   getDevtoolsSnapshot(): {
+    specTree: Record<string, unknown>;
     values: Record<string, unknown>;
     errors: Record<string, string | null>;
     touched: Record<string, boolean>;
@@ -278,7 +279,7 @@ export class FormStore {
       if (this.mounted.has(id)) mounted.push(id);
     }
 
-    return { values: this.values, errors, touched, mounted };
+    return { specTree: this.getSpecTree(), values: this.values, errors, touched, mounted };
   }
 
   getSpecTree(): Record<string, unknown> {

@@ -13,6 +13,7 @@ export const formDevtoolsProtocol = defineProtocol({
   formStateChanged: defineMessage({
     payload: z.object({
       formId: z.string(),
+      specTree: z.record(z.string(), z.unknown()),
       values: z.record(z.string(), z.unknown()),
       errors: z.record(z.string(), z.union([z.string(), z.null()])),
       touched: z.record(z.string(), z.boolean()),
@@ -36,6 +37,11 @@ export const formDevtoolsProtocol = defineProtocol({
     payload: z.object({
       formId: z.string(),
     }),
+    direction: 'panel->page',
+  }),
+
+  requestState: defineMessage({
+    payload: z.object({}),
     direction: 'panel->page',
   }),
 });

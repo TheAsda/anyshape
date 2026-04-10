@@ -35,6 +35,7 @@ const EMPTY_FORM_STATE: FormState = {
 };
 
 const tabId = chrome.devtools.inspectedWindow.tabId;
+console.log('[PANEL] Panel loading, tabId:', tabId);
 const transport = new PanelTransport(tabId);
 
 function PanelContent() {
@@ -48,7 +49,11 @@ function PanelContent() {
   const seqRef = useRef(0);
 
   useEffect(() => {
+    console.log('[PANEL] Registering handlers, connection:', !!connection);
+    connection.send('requestState', {});
+
     connection.handle('formRegistered', (payload: FormRegisteredPayload) => {
+      console.log('[PANEL] formReceived — formId:', payload.formId, 'specTree keys:', Object.keys(payload.specTree));
       setForms((prev) => ({
         ...prev,
         [payload.formId]: {
@@ -62,16 +67,26 @@ function PanelContent() {
     connection.handle(
       'formStateChanged',
       (payload: FormStateChangedPayload) => {
-        setForms((prev) => ({
-          ...prev,
-          [payload.formId]: {
-            ...(prev[payload.formId] ?? { specTree: {} }),
-            values: payload.values,
-            errors: payload.errors,
-            touched: payload.touched,
-            mounted: payload.mounted,
-          },
-        }));
+        console.log('[PANEL] formStateChanged — formId:', payload.formId,
+          'specTree keys:', Object.keys(payload.specTree).length,
+          'values keys:', Object.keys(payload.values).length);
+        setForms((prev) => {
+          const existing = prev[payload.formId];
+          const next = {
+            ...prev,
+            [payload.formId]: {
+              specTree: Object.keys(payload.specTree).length > 0
+                ? payload.specTree
+                : existing?.specTree ?? {},
+              values: payload.values,
+              errors: payload.errors,
+              touched: payload.touched,
+              mounted: payload.mounted,
+            },
+          };
+          return next;
+        });
+        setSelectedFormId((prev) => prev ?? payload.formId);
       },
     );
 
@@ -139,8 +154,15 @@ function PanelContent() {
 }
 
 export function PanelApp() {
+  console.log('[PANEL] PanelApp render, DevToolsProvider wrapping...');
   return (
-    <DevToolsProvider protocol={formDevtoolsProtocol} transport={transport}>
+    <DevToolsProvider
+      protocol={formDevtoolsProtocol}
+      transport={transport}
+      config={{
+        onError: (err) => console.error('[PANEL] Connection error:', err),
+      }}
+    >
       <PanelContent />
     </DevToolsProvider>
   );
