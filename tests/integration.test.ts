@@ -247,7 +247,7 @@ describe('Integration: DevTools snapshot after mutations', () => {
     // Initial snapshot
     let snap = store.getDevtoolsSnapshot();
     assert.equal(snap.values.name, 'Alice');
-    assert.equal(snap.values.address.city, 'Boston');
+    assert.equal((snap.values.address as Record<string, unknown>).city, 'Boston');
     assert.deepEqual(snap.mounted, []);
     assert.equal(snap.errors[emailSpec.id], null);
 
