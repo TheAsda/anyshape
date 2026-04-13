@@ -1,47 +1,47 @@
-/**
- * Minimal functional lens module.
- * Standalone — no dependencies on other project modules.
- *
- * Referential equality on unchanged paths is CRITICAL for useSyncExternalStore.
- */
+export class Lens<S = unknown, A = S> {
+  private readonly _get: (source: S) => A;
+  private readonly _set: (source: S, value: A) => S;
 
-export interface Lens<S, A> {
-  get(source: S): A;
-  set(value: A, source: S): S;
-}
+  constructor(
+    get: (source: S) => A = (s) => s as unknown as A,
+    set: (source: S, value: A) => S = (s) => s,
+  ) {
+    this._get = get;
+    this._set = set;
+  }
 
-function lens<S, A>(get: (source: S) => A, set: (value: A, source: S) => S): Lens<S, A> {
-  return { get, set };
-}
+  get(source: S): A {
+    return this._get(source);
+  }
 
-export const Lens = {
-  prop<K extends string>(key: K): Lens<Record<string, unknown>, unknown> {
-    return lens(
-      (source) => source[key],
-      (value, source) => ({ ...source, [key]: value }),
+  set(source: S, value: A): S {
+    return this._set(source, value);
+  }
+
+  prop<K extends string>(key: K): Lens<S, unknown> {
+    return new Lens<S, unknown>(
+      (source) => (this._get(source) as Record<string, unknown>)[key],
+      (source, value) =>
+        this._set(
+          source,
+          {
+            ...(this._get(source) as Record<string, unknown>),
+            [key]: value,
+          } as A,
+        ),
     );
-  },
+  }
 
-  index(n: number): Lens<unknown[], unknown> {
-    return lens(
-      (source) => source[n],
-      (value, source) => {
-        const copy = [...source];
+  index(n: number): Lens<S, unknown> {
+    return new Lens<S, unknown>(
+      (source) => (this._get(source) as unknown[])[n],
+      (source, value) => {
+        const arr = this._get(source) as unknown[];
+        const copy = [...arr];
         while (copy.length <= n) copy.push(undefined);
         copy[n] = value;
-        return copy;
+        return this._set(source, copy as A);
       },
     );
-  },
-
-  compose<S, A, B>(outer: Lens<S, A>, inner: Lens<A, B>): Lens<S, B> {
-    return lens(
-      (source) => inner.get(outer.get(source)),
-      (value, source) => {
-        const outerVal = outer.get(source);
-        const newOuterVal = inner.set(value, outerVal);
-        return outer.set(newOuterVal, source);
-      },
-    );
-  },
-} as const;
+  }
+}
