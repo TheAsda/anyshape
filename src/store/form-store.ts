@@ -235,7 +235,7 @@ export class FormStore {
     if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
     return {
       path: entry.path,
-      kind: entry.spec.kind,
+      kind: entry.spec._kind,
       mountRequired: entry.spec.mountRequired,
     };
   }
@@ -268,7 +268,7 @@ export class FormStore {
       if (!entry) continue;
       tree[entry.path] = {
         id: entry.spec.id,
-        kind: entry.spec.kind,
+        kind: entry.spec._kind,
         mountRequired: entry.spec.mountRequired,
       };
     }
@@ -371,7 +371,7 @@ export class FormStore {
 
       this.treeOrder.push(spec);
 
-      if (spec.kind === 'object') {
+      if (spec._kind === 'object') {
         const objChildren = (spec as unknown as { children: Record<string, BaseSpec> }).children;
         this.walkSpecTree(objChildren, path, lens);
       }
@@ -390,7 +390,7 @@ export class FormStore {
         key in initialData &&
         (initialData as Record<string, unknown>)[key] !== undefined;
 
-      if (spec.kind === 'object') {
+      if (spec._kind === 'object') {
         const objChildren = (spec as unknown as { children: Record<string, BaseSpec> }).children;
         result[key] = this.buildInitialValues(
           objChildren,
@@ -398,7 +398,7 @@ export class FormStore {
             ? ((initialData as Record<string, unknown>)[key] as Record<string, unknown>)
             : undefined,
         );
-      } else if (spec.kind === 'field') {
+      } else if (spec._kind === 'field') {
         const dv = (spec as unknown as { defaultValue?: unknown }).defaultValue;
         result[key] = hasInit
           ? (initialData as Record<string, unknown>)[key]
@@ -416,7 +416,7 @@ export class FormStore {
   }
 
   private getDescendants(spec: BaseSpec): BaseSpec[] {
-    if (spec.kind === 'object') {
+    if (spec._kind === 'object') {
       const children = (spec as unknown as { children: Record<string, BaseSpec> }).children;
       const out: BaseSpec[] = [];
       for (const child of Object.values(children)) {

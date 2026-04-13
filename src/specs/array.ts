@@ -1,49 +1,26 @@
+import type { BaseSpec, ValidatableSpecOptions } from './base.js';
 import { ValidatableSpec } from './base.js';
-import type { BaseSpec } from './base.js';
-import type { ZodType } from 'zod/v4';
-type ArrayValid<I extends BaseSpec> = I extends ValidatableSpec<infer V, infer _R> ? V[] : unknown[];
-type ArrayRaw<I extends BaseSpec> = I extends ValidatableSpec<infer _V, infer R> ? R[] : unknown[];
-type ForwardedChildren<I extends BaseSpec> = I extends { children: infer C extends Record<string, BaseSpec> } ? C : {};
 
-class ArraySpecClass<I extends BaseSpec> extends ValidatableSpec<
+type ArrayValid<I extends BaseSpec> =
+  I extends BaseSpec<infer V> ? V[] : unknown[];
+
+type ArrayRaw<I extends BaseSpec> =
+  I extends ValidatableSpec<infer _V, infer R> ? R[] : unknown[];
+
+export interface ArraySpecOptions<
+  I extends BaseSpec,
+> extends ValidatableSpecOptions<ArrayValid<I>, ArrayRaw<I>> {}
+
+export class ArraySpec<I extends BaseSpec> extends ValidatableSpec<
   ArrayValid<I>,
   ArrayRaw<I>
 > {
-  readonly kind = 'array' as const;
+  readonly _kind = 'array' as const;
 
-  private readonly _itemSpecValue: I;
+  readonly item: I;
 
-  get itemSpec(): I {
-    return this._itemSpecValue;
-  }
-
-  constructor(
-    itemSpec: I,
-    config?: { id?: string; mountRequired?: boolean; schema?: ZodType<ArrayValid<I>, ArrayRaw<I>> },
-  ) {
+  constructor(itemSpec: I, config?: ArraySpecOptions<I>) {
     super(config);
-    this._itemSpecValue = itemSpec;
-
-    if ('children' in itemSpec) {
-      const objSpec = itemSpec as unknown as { children: Record<string, BaseSpec> };
-      for (const key of Object.keys(objSpec.children)) {
-        Object.defineProperty(this, key, {
-          get: () => objSpec.children[key],
-          enumerable: false,
-          configurable: true,
-        });
-      }
-    }
+    this.item = itemSpec;
   }
 }
-
-type ArraySpecInstance<I extends BaseSpec> = ArraySpecClass<I> & ForwardedChildren<I>;
-
-export interface ArraySpec {
-  new <I extends BaseSpec>(
-    itemSpec: I,
-    config?: { id?: string; mountRequired?: boolean; schema?: unknown },
-  ): ArraySpecInstance<I>;
-}
-
-export const ArraySpec: ArraySpec = ArraySpecClass as unknown as ArraySpec;

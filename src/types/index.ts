@@ -7,11 +7,12 @@ import type { ZodType } from 'zod/v4';
  * Arrays remain arrays but their element types are made deeply partial.
  * Primitives pass through unchanged.
  */
-export type DeepPartial<T> = T extends Array<infer U>
-  ? Array<DeepPartial<U>>
-  : T extends object
-    ? { [K in keyof T]?: DeepPartial<T[K]> }
-    : T;
+export type DeepPartial<T> =
+  T extends Array<infer U>
+    ? Array<DeepPartial<U>>
+    : T extends object
+      ? { [K in keyof T]?: DeepPartial<T[K]> }
+      : T;
 
 // ─── Spec Kind ────────────────────────────────────────────────────────────────
 
@@ -46,20 +47,6 @@ export interface MetaSpecLike<Value> {
   readonly _value: Value;
 }
 
-// ─── FieldConfig ──────────────────────────────────────────────────────────────
-
-/**
- * Configuration options for a FieldSpec.
- * The `schema` generic is now typed as `ZodType<Valid, Raw>` to provide better
- * type safety while remaining optional.
- */
-export interface FieldConfig<Valid, Raw> {
-  schema?: ZodType<Valid, Raw>;
-  defaultValue?: Raw;
-  keepOnUnmount?: boolean;
-  alwaysValidate?: boolean;
-}
-
 // ─── InferForm ────────────────────────────────────────────────────────────────
 
 /**
@@ -71,17 +58,18 @@ export interface FieldConfig<Valid, Raw> {
  * - ObjectSpecLike<Children>  → { [K in keyof Children]: InferForm<Children[K]> }
  * - Plain object (form def)   → mapped recursively, all fields required
  */
-export type InferForm<T> = T extends FieldSpecLike<infer Valid, infer _Raw>
-  ? Valid
-  : T extends MetaSpecLike<infer Value>
-    ? Value
-    : T extends ArraySpecLike<infer Item>
-      ? Array<InferForm<Item>>
-      : T extends ObjectSpecLike<infer Children>
-        ? { [K in keyof Children]: InferForm<Children[K]> }
-        : T extends Record<string, unknown>
-          ? { [K in keyof T]: InferForm<T[K]> }
-          : never;
+export type InferForm<T> =
+  T extends FieldSpecLike<infer Valid, infer _Raw>
+    ? Valid
+    : T extends MetaSpecLike<infer Value>
+      ? Value
+      : T extends ArraySpecLike<infer Item>
+        ? Array<InferForm<Item>>
+        : T extends ObjectSpecLike<infer Children>
+          ? { [K in keyof Children]: InferForm<Children[K]> }
+          : T extends Record<string, unknown>
+            ? { [K in keyof T]: InferForm<T[K]> }
+            : never;
 
 // ─── InferFormRaw ─────────────────────────────────────────────────────────────
 
@@ -94,14 +82,15 @@ export type InferForm<T> = T extends FieldSpecLike<infer Valid, infer _Raw>
  * - ObjectSpecLike<Children>  → { [K in keyof Children]: InferFormRaw<Children[K]> }
  * - Plain object (form def)   → mapped recursively, all fields required
  */
-export type InferFormRaw<T> = T extends FieldSpecLike<infer _Valid, infer Raw>
-  ? Raw
-  : T extends MetaSpecLike<infer Value>
-    ? Value
-    : T extends ArraySpecLike<infer Item>
-      ? Array<InferFormRaw<Item>>
-      : T extends ObjectSpecLike<infer Children>
-        ? { [K in keyof Children]: InferFormRaw<Children[K]> }
-        : T extends Record<string, unknown>
-          ? { [K in keyof T]: InferFormRaw<T[K]> }
-          : never;
+export type InferFormRaw<T> =
+  T extends FieldSpecLike<infer _Valid, infer Raw>
+    ? Raw
+    : T extends MetaSpecLike<infer Value>
+      ? Value
+      : T extends ArraySpecLike<infer Item>
+        ? Array<InferFormRaw<Item>>
+        : T extends ObjectSpecLike<infer Children>
+          ? { [K in keyof Children]: InferFormRaw<Children[K]> }
+          : T extends Record<string, unknown>
+            ? { [K in keyof T]: InferFormRaw<T[K]> }
+            : never;

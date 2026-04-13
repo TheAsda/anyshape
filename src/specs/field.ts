@@ -1,17 +1,25 @@
-import type { FieldConfig } from '../types/index.js';
-import { ValidatableSpec } from './base.js';
+import { ValidatableSpec, ValidatableSpecOptions } from './base.js';
+
+export interface FieldSpecOptions<
+  Valid,
+  Raw = Valid | undefined,
+> extends ValidatableSpecOptions<Valid, Raw> {
+  keepOnUnmount?: boolean;
+  alwaysValidate?: boolean;
+  defaultValue?: Raw;
+}
 
 export class FieldSpec<Valid, Raw = Valid | undefined> extends ValidatableSpec<
   Valid,
   Raw
 > {
-  readonly kind = 'field' as const;
+  readonly _kind = 'field' as const;
 
-  defaultValue?: Raw;
-  keepOnUnmount: boolean;
-  alwaysValidate: boolean;
+  readonly defaultValue?: Raw;
+  readonly keepOnUnmount: boolean;
+  readonly alwaysValidate: boolean;
 
-  constructor(config?: FieldConfig<Valid, Raw> & { id?: string; mountRequired?: boolean }) {
+  constructor(config?: FieldSpecOptions<Valid, Raw>) {
     super(config);
     this.defaultValue = config?.defaultValue;
     this.keepOnUnmount = config?.keepOnUnmount ?? false;

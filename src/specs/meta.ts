@@ -1,9 +1,11 @@
-import { BaseSpec } from './base.js';
+import { BaseSpec, BaseSpecOptions } from './base.js';
 
-export class MetaSpec<Value> extends BaseSpec {
-  readonly kind = 'meta' as const;
+export interface MetaSpecOptions extends BaseSpecOptions {}
 
-  constructor(config?: { id?: string }) {
+export class MetaSpec<Value> extends BaseSpec<Value> {
+  readonly _kind = 'meta' as const;
+
+  constructor(config?: MetaSpecOptions) {
     super(config);
   }
 }

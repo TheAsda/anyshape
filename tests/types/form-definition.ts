@@ -26,7 +26,7 @@ expectType<TypeEqual<typeof myForm.customer.code, FieldSpec<string, string | und
 
 // ── 3. Array wrapping an object: kind is 'array' ─────────────────────────
 
-expectType<TypeEqual<typeof myForm.applications.kind, 'array'>>(true);
+expectType<TypeEqual<typeof myForm.applications._kind, 'array'>>(true);
 
 // ── 4. ArraySpec forwards ObjectSpec children as named accessors ──────────
 
@@ -35,7 +35,7 @@ expectType<TypeEqual<typeof myForm.applications.score, FieldSpec<number, number 
 
 // ── 5. Primitive array: kind is 'array' ───────────────────────────────────
 
-expectType<TypeEqual<typeof myForm.tags.kind, 'array'>>(true);
+expectType<TypeEqual<typeof myForm.tags._kind, 'array'>>(true);
 
 // ── 6. MetaSpec resolves with its Value type parameter ───────────────────
 

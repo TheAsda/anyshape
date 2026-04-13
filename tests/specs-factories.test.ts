@@ -9,7 +9,7 @@ import { MetaSpec } from '../src/specs/meta.js';
 describe('field() factory', () => {
   it('creates a FieldSpec with kind="field"', () => {
     const f = field<string>();
-    assert.equal(f.kind, 'field');
+    assert.equal(f._kind, 'field');
     assert.ok(f instanceof FieldSpec);
   });
 
@@ -36,7 +36,7 @@ describe('object() factory', () => {
     const obj = object({ name: nameField });
     assert.ok(obj instanceof ObjectSpec);
     assert.strictEqual(obj.name, nameField);
-    assert.equal(obj.kind, 'object');
+    assert.equal(obj._kind, 'object');
   });
 
   it('sets _parent on children', () => {
@@ -50,7 +50,7 @@ describe('array() factory', () => {
   it('creates an ArraySpec with kind="array"', () => {
     const arr = array(field<string>());
     assert.ok(arr instanceof ArraySpec);
-    assert.equal(arr.kind, 'array');
+    assert.equal(arr._kind, 'array');
   });
 
   it('exposes itemSpec', () => {
@@ -72,7 +72,7 @@ describe('meta() factory', () => {
   it('creates a MetaSpec with kind="meta"', () => {
     const m = meta<{ loaded: boolean }>();
     assert.ok(m instanceof MetaSpec);
-    assert.equal(m.kind, 'meta');
+    assert.equal(m._kind, 'meta');
   });
 
   it('creates specs with unique ids', () => {
@@ -105,34 +105,34 @@ describe('form() factory — dot-path traversal', () => {
 
   it('top-level field is a FieldSpec', () => {
     assert.ok(myForm.name instanceof FieldSpec);
-    assert.equal(myForm.name.kind, 'field');
+    assert.equal(myForm.name._kind, 'field');
   });
 
   it('nested ObjectSpec is accessible and has kind="object"', () => {
     assert.ok(myForm.customer instanceof ObjectSpec);
-    assert.equal(myForm.customer.kind, 'object');
+    assert.equal(myForm.customer._kind, 'object');
   });
 
   it('nested child via dot-path is a FieldSpec', () => {
     assert.ok(myForm.customer.code instanceof FieldSpec);
-    assert.equal(myForm.customer.code.kind, 'field');
+    assert.equal(myForm.customer.code._kind, 'field');
   });
 
   it('ArraySpec forwards children from ObjectSpec item', () => {
     assert.ok(myForm.applications instanceof ArraySpec);
     assert.ok(myForm.applications.appId instanceof FieldSpec);
     assert.ok(myForm.applications.score instanceof FieldSpec);
-    assert.equal(myForm.applications.appId.kind, 'field');
+    assert.equal(myForm.applications.appId._kind, 'field');
   });
 
   it('primitive array is an ArraySpec', () => {
     assert.ok(myForm.tags instanceof ArraySpec);
-    assert.equal(myForm.tags.kind, 'array');
+    assert.equal(myForm.tags._kind, 'array');
   });
 
   it('MetaSpec is accessible', () => {
     assert.ok(myForm.extra instanceof MetaSpec);
-    assert.equal(myForm.extra.kind, 'meta');
+    assert.equal(myForm.extra._kind, 'meta');
   });
 
   it('every spec has a unique id', () => {
