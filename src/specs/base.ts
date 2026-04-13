@@ -1,29 +1,32 @@
 import type { SpecKind } from '../types/index.js';
 import type { ZodType } from 'zod/v4';
 
-export abstract class BaseSpec {
-  readonly id: string;
-  mountRequired: boolean;
-  abstract readonly kind: SpecKind;
+export interface BaseSpecOptions {
+  id?: string;
+  mountRequired?: boolean;
+}
 
-  _parent?: BaseSpec;
+export abstract class BaseSpec<Value = unknown> {
+  abstract readonly _kind: SpecKind;
+  readonly id: string;
+  readonly mountRequired: boolean;
 
   private static _counter = 0;
 
-  constructor(config?: { id?: string; mountRequired?: boolean }) {
+  constructor(config?: BaseSpecOptions) {
     this.id = config?.id ?? `spec_${BaseSpec._counter++}`;
     this.mountRequired = config?.mountRequired ?? true;
   }
 }
 
-export abstract class ValidatableSpec<Valid, Raw = Valid> extends BaseSpec {
-  _schema?: ZodType<Valid, Raw>;
+export interface ValidatableSpecOptions<Valid, Raw> extends BaseSpecOptions {
+  schema: ZodType<Valid, Raw>;
+}
 
-  constructor(config?: {
-    id?: string;
-    mountRequired?: boolean;
-    schema?: ZodType<Valid, Raw>;
-  }) {
+export abstract class ValidatableSpec<Valid, Raw> extends BaseSpec<Valid> {
+  _schema?: ZodType<Valid>;
+
+  constructor(config?: ValidatableSpecOptions<Valid, Raw>) {
     super(config);
     this._schema = config?.schema;
   }

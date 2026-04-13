@@ -5,7 +5,7 @@ import { z } from 'zod/v4';
 
 describe('BaseSpec', () => {
   it('auto-generates unique ids', () => {
-    class TestSpec extends BaseSpec { readonly kind = 'field' as const; }
+    class TestSpec extends BaseSpec { readonly _kind = 'field' as const; }
     const a = new TestSpec();
     const b = new TestSpec();
     assert.ok(a.id.startsWith('spec_'));
@@ -14,13 +14,13 @@ describe('BaseSpec', () => {
   });
 
   it('defaults mountRequired to true', () => {
-    class TestSpec extends BaseSpec { readonly kind = 'field' as const; }
+    class TestSpec extends BaseSpec { readonly _kind = 'field' as const; }
     const spec = new TestSpec();
     assert.equal(spec.mountRequired, true);
   });
 
   it('accepts custom id and mountRequired', () => {
-    class TestSpec extends BaseSpec { readonly kind = 'field' as const; }
+    class TestSpec extends BaseSpec { readonly _kind = 'field' as const; }
     const spec = new TestSpec({ id: 'my-id', mountRequired: false });
     assert.equal(spec.id, 'my-id');
     assert.equal(spec.mountRequired, false);
@@ -30,7 +30,7 @@ describe('BaseSpec', () => {
 describe('FieldSpec', () => {
   it('has kind="field"', () => {
     const field = new FieldSpec<string>();
-    assert.equal(field.kind, 'field');
+    assert.equal(field._kind, 'field');
   });
 
   it('defaults keepOnUnmount and alwaysValidate to false', () => {
@@ -59,7 +59,7 @@ describe('FieldSpec', () => {
 describe('MetaSpec', () => {
   it('has kind="meta"', () => {
     const meta = new MetaSpec<boolean>();
-    assert.equal(meta.kind, 'meta');
+    assert.equal(meta._kind, 'meta');
   });
 
   it('does not have _schema property', () => {
@@ -76,7 +76,7 @@ describe('MetaSpec', () => {
 
 describe('ValidatableSpec', () => {
   it('schema is optional', () => {
-    class TestValidatable extends ValidatableSpec<string> { readonly kind = 'field' as const; }
+    class TestValidatable extends ValidatableSpec<string> { readonly _kind = 'field' as const; }
     const spec = new TestValidatable();
     assert.equal(spec._schema, undefined);
   });
@@ -104,7 +104,7 @@ describe('ObjectSpec', () => {
 
   it('has kind="object"', () => {
     const obj = new ObjectSpec({ x: new FieldSpec<number>() });
-    assert.equal(obj.kind, 'object');
+    assert.equal(obj._kind, 'object');
   });
 });
 
@@ -136,7 +136,7 @@ describe('ArraySpec', () => {
 
   it('has kind="array"', () => {
     const arr = new ArraySpec(new FieldSpec<string>());
-    assert.equal(arr.kind, 'array');
+    assert.equal(arr._kind, 'array');
   });
 });
 
