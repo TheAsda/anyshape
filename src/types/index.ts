@@ -1,3 +1,5 @@
+import type { ZodType } from 'zod/v4';
+
 // ─── Utility Types ────────────────────────────────────────────────────────────
 
 /**
@@ -48,12 +50,11 @@ export interface MetaSpecLike<Value> {
 
 /**
  * Configuration options for a FieldSpec.
- * The `schema` generic is intentionally unconstrained here to avoid importing
- * from zod at the type level. The actual FieldSpec class (T4) will constrain it
- * to `z.ZodType<Valid, Raw>`.
+ * The `schema` generic is now typed as `ZodType<Valid, Raw>` to provide better
+ * type safety while remaining optional.
  */
 export interface FieldConfig<Valid, Raw> {
-  schema?: unknown;
+  schema?: ZodType<Valid, Raw>;
   defaultValue?: Raw;
   keepOnUnmount?: boolean;
   alwaysValidate?: boolean;

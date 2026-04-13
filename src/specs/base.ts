@@ -1,4 +1,5 @@
 import type { SpecKind } from '../types/index.js';
+import type { ZodType } from 'zod/v4';
 
 export abstract class BaseSpec {
   readonly id: string;
@@ -16,12 +17,12 @@ export abstract class BaseSpec {
 }
 
 export abstract class ValidatableSpec<Valid, Raw = Valid> extends BaseSpec {
-  _schema?: unknown;
+  _schema?: ZodType<Valid, Raw>;
 
   constructor(config?: {
     id?: string;
     mountRequired?: boolean;
-    schema?: unknown;
+    schema?: ZodType<Valid, Raw>;
   }) {
     super(config);
     this._schema = config?.schema;

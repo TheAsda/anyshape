@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { FieldSpec, MetaSpec, ObjectSpec, ArraySpec, BaseSpec, ValidatableSpec } from '../src/specs/index.js';
+import { z } from 'zod/v4';
 
 describe('BaseSpec', () => {
   it('auto-generates unique ids', () => {
@@ -49,9 +50,9 @@ describe('FieldSpec', () => {
   });
 
   it('accepts a schema', () => {
-    const fakeSchema = { _def: 'FakeZodSchema' };
-    const field = new FieldSpec<string>({ schema: fakeSchema });
-    assert.deepEqual(field._schema, fakeSchema);
+    const testSchema = z.string();
+    const field = new FieldSpec<string>({ schema: testSchema });
+    assert.deepEqual(field._schema, testSchema);
   });
 });
 

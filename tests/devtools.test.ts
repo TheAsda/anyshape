@@ -5,6 +5,7 @@ import { FieldSpec } from '../src/specs/field.js';
 import { ObjectSpec } from '../src/specs/object.js';
 import { formDevtoolsProtocol } from '../src/devtools/protocol.js';
 import { FormDevtools } from '../src/devtools/form-devtools.js';
+import { z } from 'zod/v4';
 
 function createTestSpecs() {
   const nameSpec = new FieldSpec<string>({ id: 'name', mountRequired: false });
@@ -57,25 +58,24 @@ describe('Protocol definition', () => {
 });
 
 describe('FormStore accessor methods', () => {
-  it('getSpecIds returns spec IDs in tree order', () => {
+  it('getSpecs returns spec objects in tree order', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    const ids = store.getSpecIds();
-    assert.deepEqual(ids, [
-      specs.nameSpec.id,
-      specs.emailSpec.id,
-      specs.addressSpec.id,
-      specs.citySpec.id,
-      specs.zipSpec.id,
-    ]);
+    const result = store.getSpecs();
+    assert.equal(result.length, 5);
+    assert.strictEqual(result[0], specs.nameSpec);
+    assert.strictEqual(result[1], specs.emailSpec);
+    assert.strictEqual(result[2], specs.addressSpec);
+    assert.strictEqual(result[3], specs.citySpec);
+    assert.strictEqual(result[4], specs.zipSpec);
   });
 
   it('getSpecInfo returns correct data for a field spec', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    const info = store.getSpecInfo(specs.nameSpec.id);
+    const info = store.getSpecInfo(specs.nameSpec);
     assert.deepEqual(info, { path: 'name', kind: 'field', mountRequired: false });
   });
 
@@ -83,15 +83,8 @@ describe('FormStore accessor methods', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    const info = store.getSpecInfo(specs.addressSpec.id);
+    const info = store.getSpecInfo(specs.addressSpec);
     assert.deepEqual(info, { path: 'address', kind: 'object', mountRequired: false });
-  });
-
-  it('getSpecInfo returns null for unknown spec ID', () => {
-    const specs = createTestSpecs();
-    const store = createStore(specs);
-
-    assert.equal(store.getSpecInfo('nonexistent'), null);
   });
 
   it('getSpecTree returns correct structure', () => {
@@ -155,8 +148,8 @@ describe('FormStore getDevtoolsSnapshot', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    store.mount(specs.nameSpec.id);
-    store.mount(specs.citySpec.id);
+    store.mount(specs.nameSpec);
+    store.mount(specs.citySpec);
     const snap = store.getDevtoolsSnapshot();
     assert.deepEqual(snap.mounted, [specs.nameSpec.id, specs.citySpec.id]);
   });
@@ -165,13 +158,13 @@ describe('FormStore getDevtoolsSnapshot', () => {
     const passwordSpec = new FieldSpec<string>({
       id: 'password',
       mountRequired: false,
-      schema: { safeParse: (v: unknown) => typeof v === 'string' && v.length > 0 ? { success: true } : { success: false, error: { issues: [{ message: 'Required' }] } } },
+      schema: z.string().min(1),
     });
     const store = new FormStore({ password: passwordSpec });
 
-    store.validateSpec(passwordSpec.id);
+    store.validateSpec(passwordSpec);
     const snap = store.getDevtoolsSnapshot();
-    assert.equal(snap.errors[passwordSpec.id], 'Required');
+    assert.match(snap.errors[passwordSpec.id]!, /string/);
   });
 });
 
