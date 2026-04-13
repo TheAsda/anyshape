@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { FormStore } from '../src/store/form-store.js';
 import { FieldSpec } from '../src/specs/field.js';
 import { ObjectSpec } from '../src/specs/object.js';
+import type { BaseSpec } from '../src/specs/base.js';
 import { z } from 'zod';
 
 function createTestSpecs() {
@@ -74,15 +75,6 @@ describe('Construction', () => {
     assert.equal(vals.name, 'Bob');
     assert.deepEqual(vals.address, { city: 'NYC', zip: '10001' });
   });
-
-  it('get accepts dot-path string', () => {
-    const specs = createTestSpecs();
-    const store = createStore(specs, { name: 'Carol', address: { city: 'LA', zip: '90001' }, password: 'p', confirm: 'p' });
-
-    assert.equal(store.get('name'), 'Carol');
-    assert.equal(store.get('address.city'), 'LA');
-    assert.equal(store.get('address.zip'), '90001');
-  });
 });
 
 // ── Get / Set ─────────────────────────────────────────────────────────────
@@ -119,23 +111,15 @@ describe('Get / Set', () => {
     assert.equal(store.get(specs.zipSpec), 'Z');
   });
 
-  it('set accepts dot-path string', () => {
-    const specs = createTestSpecs();
-    const store = createStore(specs);
-
-    store.set('name', 'Eve');
-    assert.equal(store.get('name'), 'Eve');
-  });
-
   it('set with noTouch skips touched marking', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
     store.set(specs.nameSpec, 'X', { noTouch: true });
-    assert.equal(store.isTouched(specs.nameSpec.id), false);
+    assert.equal(store.isTouched(specs.nameSpec), false);
 
     store.set(specs.nameSpec, 'Y');
-    assert.equal(store.isTouched(specs.nameSpec.id), true);
+    assert.equal(store.isTouched(specs.nameSpec), true);
   });
 
   it('set with noValidate clears error', () => {
@@ -143,10 +127,10 @@ describe('Get / Set', () => {
     const store = createStore(specs);
 
     store.set(specs.passwordSpec, '');
-    assert.ok(store.getError(specs.passwordSpec.id));
+    assert.ok(store.getError(specs.passwordSpec));
 
     store.set(specs.passwordSpec, '', { noValidate: true });
-    assert.equal(store.getError(specs.passwordSpec.id), null);
+    assert.equal(store.getError(specs.passwordSpec), null);
   });
 });
 
@@ -170,10 +154,10 @@ describe('Reset', () => {
     const store = createStore(specs);
 
     store.set(specs.nameSpec, 'X');
-    assert.equal(store.isTouched(specs.nameSpec.id), true);
+    assert.equal(store.isTouched(specs.nameSpec), true);
 
     store.reset();
-    assert.equal(store.isTouched(specs.nameSpec.id), false);
+    assert.equal(store.isTouched(specs.nameSpec), false);
   });
 
   it('reset clears errors', () => {
@@ -181,10 +165,10 @@ describe('Reset', () => {
     const store = createStore(specs);
 
     store.set(specs.passwordSpec, '');
-    assert.ok(store.getError(specs.passwordSpec.id));
+    assert.ok(store.getError(specs.passwordSpec));
 
     store.reset();
-    assert.equal(store.getError(specs.passwordSpec.id), null);
+    assert.equal(store.getError(specs.passwordSpec), null);
   });
 
   it('resets a subtree by spec', () => {
@@ -197,8 +181,8 @@ describe('Reset', () => {
 
     assert.equal(store.get(specs.citySpec), 'X');
     assert.equal(store.get(specs.nameSpec), 'B');
-    assert.equal(store.isTouched(specs.citySpec.id), false);
-    assert.equal(store.isTouched(specs.nameSpec.id), true);
+    assert.equal(store.isTouched(specs.citySpec), false);
+    assert.equal(store.isTouched(specs.nameSpec), true);
   });
 
   it('reset subtree clears descendant errors', () => {
@@ -208,8 +192,8 @@ describe('Reset', () => {
     store.validateTree();
     store.reset(specs.addressSpec);
 
-    assert.equal(store.getError(specs.citySpec.id), null);
-    assert.equal(store.getError(specs.zipSpec.id), null);
+    assert.equal(store.getError(specs.citySpec), null);
+    assert.equal(store.getError(specs.zipSpec), null);
   });
 });
 
@@ -220,7 +204,7 @@ describe('Notifications', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
     let count = 0;
-    store.subscribe(specs.nameSpec.id, () => count++);
+    store.subscribe(specs.nameSpec, () => count++);
 
     store.set(specs.nameSpec, 'X');
 
@@ -232,9 +216,9 @@ describe('Notifications', () => {
     const store = createStore(specs);
     const fired: string[] = [];
 
-    store.subscribe(specs.nameSpec.id, () => fired.push('name'));
-    store.subscribe(specs.citySpec.id, () => fired.push('city'));
-    store.subscribe(specs.addressSpec.id, () => fired.push('address'));
+    store.subscribe(specs.nameSpec, () => fired.push('name'));
+    store.subscribe(specs.citySpec, () => fired.push('city'));
+    store.subscribe(specs.addressSpec, () => fired.push('address'));
 
     store.set(specs.citySpec, 'LA');
 
@@ -245,7 +229,7 @@ describe('Notifications', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
     let count = 0;
-    const unsub = store.subscribe(specs.nameSpec.id, () => count++);
+    const unsub = store.subscribe(specs.nameSpec, () => count++);
 
     store.set(specs.nameSpec, 'A');
     unsub();
@@ -259,10 +243,10 @@ describe('Notifications', () => {
     const store = createStore(specs, { name: 'A', address: { city: 'X', zip: 'Z' }, password: 'p', confirm: 'p' });
     const fired: string[] = [];
 
-    store.subscribe(specs.addressSpec.id, () => fired.push('address'));
-    store.subscribe(specs.citySpec.id, () => fired.push('city'));
-    store.subscribe(specs.zipSpec.id, () => fired.push('zip'));
-    store.subscribe(specs.nameSpec.id, () => fired.push('name'));
+    store.subscribe(specs.addressSpec, () => fired.push('address'));
+    store.subscribe(specs.citySpec, () => fired.push('city'));
+    store.subscribe(specs.zipSpec, () => fired.push('zip'));
+    store.subscribe(specs.nameSpec, () => fired.push('name'));
 
     store.reset(specs.addressSpec);
 
@@ -281,8 +265,8 @@ describe('Notifications', () => {
     let nameCount = 0;
     let cityCount = 0;
 
-    store.subscribe(specs.nameSpec.id, () => nameCount++);
-    store.subscribe(specs.citySpec.id, () => cityCount++);
+    store.subscribe(specs.nameSpec, () => nameCount++);
+    store.subscribe(specs.citySpec, () => cityCount++);
 
     store.reset();
 
@@ -300,7 +284,7 @@ describe('Validation', () => {
 
     store.set(specs.passwordSpec, 'secret');
 
-    assert.equal(store.getError(specs.passwordSpec.id), null);
+    assert.equal(store.getError(specs.passwordSpec), null);
   });
 
   it('invalid value sets error message', () => {
@@ -309,7 +293,7 @@ describe('Validation', () => {
 
     store.set(specs.passwordSpec, '');
 
-    assert.equal(store.getError(specs.passwordSpec.id), 'Password required');
+    assert.equal(store.getError(specs.passwordSpec), 'Password required');
   });
 
   it('schema override takes precedence', () => {
@@ -317,31 +301,31 @@ describe('Validation', () => {
     const store = createStore(specs);
 
     const longerSchema = z.string().min(5, 'At least 5 chars');
-    store.setSchema(specs.passwordSpec.id, longerSchema);
+    store.setSchema(specs.passwordSpec, longerSchema);
 
     store.set(specs.passwordSpec, 'abc');
-    assert.equal(store.getError(specs.passwordSpec.id), 'At least 5 chars');
+    assert.equal(store.getError(specs.passwordSpec), 'At least 5 chars');
 
     store.set(specs.passwordSpec, 'abcde');
-    assert.equal(store.getError(specs.passwordSpec.id), null);
+    assert.equal(store.getError(specs.passwordSpec), null);
   });
 
   it('removeSchema reverts to spec default schema', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    store.setSchema(specs.passwordSpec.id, z.string().min(5, '5+'));
-    store.removeSchema(specs.passwordSpec.id);
+    store.setSchema(specs.passwordSpec, z.string().min(5, '5+'));
+    store.removeSchema(specs.passwordSpec);
 
     store.set(specs.passwordSpec, 'abc');
-    assert.equal(store.getError(specs.passwordSpec.id), null);
+    assert.equal(store.getError(specs.passwordSpec), null);
   });
 
   it('validateSpec without schema returns success', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    const result = store.validateSpec(specs.nameSpec.id);
+    const result = store.validateSpec(specs.nameSpec);
     assert.equal(result.success, true);
     assert.equal(result.error, null);
   });
@@ -355,17 +339,17 @@ describe('Validation', () => {
 
     const result = store.validateTree();
     assert.equal(result.success, false);
-    assert.ok(result.errors.get(specs.passwordSpec.id));
-    assert.ok(result.errors.get(specs.confirmSpec.id));
+    assert.ok(result.errors.get(specs.passwordSpec));
+    assert.ok(result.errors.get(specs.confirmSpec));
   });
 
-  it('validateTree with specId validates subtree only', () => {
+  it('validateTree with spec validates subtree only', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    const result = store.validateTree(specs.addressSpec.id);
+    const result = store.validateTree(specs.addressSpec);
     assert.equal(result.success, true);
-    assert.equal(result.errors.has(specs.passwordSpec.id), false);
+    assert.equal(result.errors.has(specs.passwordSpec), false);
   });
 });
 
@@ -376,7 +360,7 @@ describe('Touched state', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    assert.equal(store.isTouched(specs.nameSpec.id), false);
+    assert.equal(store.isTouched(specs.nameSpec), false);
   });
 
   it('set marks as touched', () => {
@@ -385,7 +369,7 @@ describe('Touched state', () => {
 
     store.set(specs.nameSpec, 'X');
 
-    assert.equal(store.isTouched(specs.nameSpec.id), true);
+    assert.equal(store.isTouched(specs.nameSpec), true);
   });
 
   it('reset clears touched', () => {
@@ -395,7 +379,7 @@ describe('Touched state', () => {
     store.set(specs.nameSpec, 'X');
     store.reset();
 
-    assert.equal(store.isTouched(specs.nameSpec.id), false);
+    assert.equal(store.isTouched(specs.nameSpec), false);
   });
 });
 
@@ -406,39 +390,39 @@ describe('Mount tracking', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    assert.equal(store.isMounted(specs.nameSpec.id), false);
-    store.mount(specs.nameSpec.id);
-    assert.equal(store.isMounted(specs.nameSpec.id), true);
+    assert.equal(store.isMounted(specs.nameSpec), false);
+    store.mount(specs.nameSpec);
+    assert.equal(store.isMounted(specs.nameSpec), true);
   });
 
   it('double mount throws', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    store.mount(specs.nameSpec.id);
-    assert.throws(() => store.mount(specs.nameSpec.id));
+    store.mount(specs.nameSpec);
+    assert.throws(() => store.mount(specs.nameSpec));
   });
 
   it('unmount clears value when keepOnUnmount is false', () => {
     const field = new FieldSpec<string>({ id: 'f', defaultValue: 'init' });
     const store = new FormStore({ field });
-    store.mount(field.id);
+    store.mount(field);
     store.set(field, 'changed');
 
-    store.unmount(field.id);
+    store.unmount(field);
 
     assert.equal(store.get(field), 'init');
-    assert.equal(store.isTouched(field.id), false);
-    assert.equal(store.getError(field.id), null);
+    assert.equal(store.isTouched(field), false);
+    assert.equal(store.getError(field), null);
   });
 
   it('unmount preserves value when keepOnUnmount is true', () => {
     const field = new FieldSpec<string>({ id: 'f', keepOnUnmount: true });
     const store = new FormStore({ field }, { field: 'original' });
-    store.mount(field.id);
+    store.mount(field);
     store.set(field, 'changed');
 
-    store.unmount(field.id);
+    store.unmount(field);
 
     assert.equal(store.get(field), 'changed');
   });
@@ -446,10 +430,10 @@ describe('Mount tracking', () => {
   it('unmount with keepValue=true preserves regardless of keepOnUnmount', () => {
     const field = new FieldSpec<string>({ id: 'f', keepOnUnmount: false });
     const store = new FormStore({ field }, { field: 'original' });
-    store.mount(field.id);
+    store.mount(field);
     store.set(field, 'changed');
 
-    store.unmount(field.id, true);
+    store.unmount(field, true);
 
     assert.equal(store.get(field), 'changed');
   });
@@ -462,12 +446,12 @@ describe('Submit', () => {
     const specs = createTestSpecs();
     const store = createStore(specs, { name: 'A', address: { city: 'X', zip: 'Z' }, password: 'p', confirm: 'p' });
 
-    store.mount(specs.nameSpec.id);
-    store.mount(specs.addressSpec.id);
-    store.mount(specs.citySpec.id);
-    store.mount(specs.zipSpec.id);
-    store.mount(specs.passwordSpec.id);
-    store.mount(specs.confirmSpec.id);
+    store.mount(specs.nameSpec);
+    store.mount(specs.addressSpec);
+    store.mount(specs.citySpec);
+    store.mount(specs.zipSpec);
+    store.mount(specs.passwordSpec);
+    store.mount(specs.confirmSpec);
 
     let received: Record<string, unknown> | undefined;
     const result = store.submit((vals) => { received = vals; });
@@ -481,12 +465,12 @@ describe('Submit', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    store.mount(specs.nameSpec.id);
-    store.mount(specs.addressSpec.id);
-    store.mount(specs.citySpec.id);
-    store.mount(specs.zipSpec.id);
-    store.mount(specs.passwordSpec.id);
-    store.mount(specs.confirmSpec.id);
+    store.mount(specs.nameSpec);
+    store.mount(specs.addressSpec);
+    store.mount(specs.citySpec);
+    store.mount(specs.zipSpec);
+    store.mount(specs.passwordSpec);
+    store.mount(specs.confirmSpec);
 
     let invalidCalled = false;
     const result = store.submit(
@@ -503,14 +487,14 @@ describe('Submit', () => {
     const store = createStore(specs);
 
     let focused = false;
-    store.setRef(specs.passwordSpec.id, { focus: () => { focused = true; } } as unknown as HTMLElement);
+    store.setRef(specs.passwordSpec, { focus: () => { focused = true; } } as unknown as HTMLElement);
 
-    store.mount(specs.nameSpec.id);
-    store.mount(specs.addressSpec.id);
-    store.mount(specs.citySpec.id);
-    store.mount(specs.zipSpec.id);
-    store.mount(specs.passwordSpec.id);
-    store.mount(specs.confirmSpec.id);
+    store.mount(specs.nameSpec);
+    store.mount(specs.addressSpec);
+    store.mount(specs.citySpec);
+    store.mount(specs.zipSpec);
+    store.mount(specs.passwordSpec);
+    store.mount(specs.confirmSpec);
 
     store.submit(() => {}, () => {});
 
@@ -529,21 +513,21 @@ describe('Submit', () => {
     const specs = createTestSpecs();
     const store = createStore(specs);
 
-    store.mount(specs.nameSpec.id);
-    store.mount(specs.addressSpec.id);
-    store.mount(specs.citySpec.id);
-    store.mount(specs.zipSpec.id);
-    store.mount(specs.passwordSpec.id);
-    store.mount(specs.confirmSpec.id);
+    store.mount(specs.nameSpec);
+    store.mount(specs.addressSpec);
+    store.mount(specs.citySpec);
+    store.mount(specs.zipSpec);
+    store.mount(specs.passwordSpec);
+    store.mount(specs.confirmSpec);
 
-    let receivedErrors: Map<string, string | null> | undefined;
+    let receivedErrors: Map<BaseSpec, string | null> | undefined;
     store.submit(
       () => {},
       (errs) => { receivedErrors = errs; },
     );
 
     assert.ok(receivedErrors);
-    assert.ok(receivedErrors!.get(specs.passwordSpec.id));
-    assert.ok(receivedErrors!.get(specs.confirmSpec.id));
+    assert.ok(receivedErrors!.get(specs.passwordSpec));
+    assert.ok(receivedErrors!.get(specs.confirmSpec));
   });
 });

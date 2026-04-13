@@ -31,9 +31,9 @@ describe('Integration: Full form lifecycle', () => {
     assert.equal(store.get(ageSpec), 18);
 
     // Mount all
-    store.mount(nameSpec.id);
-    store.mount(emailSpec.id);
-    store.mount(ageSpec.id);
+    store.mount(nameSpec);
+    store.mount(emailSpec);
+    store.mount(ageSpec);
 
     // Set new values
     store.set(nameSpec, 'Bob');
@@ -71,13 +71,13 @@ describe('Integration: Full form lifecycle', () => {
     });
     const store = new FormStore({ email: emailSpec });
 
-    store.mount(emailSpec.id);
+    store.mount(emailSpec);
     store.set(emailSpec, 'not-an-email');
 
     let invalidCalled = false;
     const result = store.submit(() => {}, (errs) => {
       invalidCalled = true;
-      assert.ok(errs.get(emailSpec.id));
+      assert.ok(errs.get(emailSpec));
     });
 
     assert.equal(result, false);
@@ -105,10 +105,6 @@ describe('Integration: Nested form with objects', () => {
       },
     );
 
-    // Dot-path get
-    assert.equal(store.get('address.city'), 'Boston');
-    assert.equal(store.get('address.zip'), '02101');
-
     // Spec-based get
     assert.equal(store.get(citySpec), 'Boston');
 
@@ -117,8 +113,8 @@ describe('Integration: Nested form with objects', () => {
     assert.equal(store.get(citySpec), 'NYC');
     assert.equal(store.get(streetSpec), '123 Main'); // sibling preserved
 
-    // Set via dot-path
-    store.set('address.zip', '10001');
+    // Set via spec
+    store.set(zipSpec, '10001');
     assert.equal(store.get(zipSpec), '10001');
 
     // getValues reflects everything
@@ -141,9 +137,9 @@ describe('Integration: Notification with parent-child', () => {
     );
 
     const fired: string[] = [];
-    store.subscribe(addressSpec.id, () => fired.push('address'));
-    store.subscribe(citySpec.id, () => fired.push('city'));
-    store.subscribe(nameSpec.id, () => fired.push('name'));
+    store.subscribe(addressSpec, () => fired.push('address'));
+    store.subscribe(citySpec, () => fired.push('city'));
+    store.subscribe(nameSpec, () => fired.push('name'));
 
     store.set(citySpec, 'LA');
 
@@ -159,7 +155,7 @@ describe('Integration: Notification with parent-child', () => {
     );
 
     let parentCount = 0;
-    store.subscribe(addressSpec.id, () => parentCount++);
+    store.subscribe(addressSpec, () => parentCount++);
 
     store.set(citySpec, 'Y');
     assert.equal(parentCount, 1);
@@ -187,16 +183,16 @@ describe('Integration: Reset restores initial state', () => {
 
     assert.equal(store.get(nameSpec), 'Changed');
     assert.equal(store.get(citySpec), 'NYC');
-    assert.equal(store.isTouched(nameSpec.id), true);
-    assert.equal(store.isTouched(citySpec.id), true);
+    assert.equal(store.isTouched(nameSpec), true);
+    assert.equal(store.isTouched(citySpec), true);
 
     // Full reset
     store.reset();
 
     assert.equal(store.get(nameSpec), 'Original');
     assert.equal(store.get(citySpec), 'Boston');
-    assert.equal(store.isTouched(nameSpec.id), false);
-    assert.equal(store.isTouched(citySpec.id), false);
+    assert.equal(store.isTouched(nameSpec), false);
+    assert.equal(store.isTouched(citySpec), false);
   });
 
   it('subtree reset only resets that subtree', () => {
@@ -215,8 +211,8 @@ describe('Integration: Reset restores initial state', () => {
 
     assert.equal(store.get(nameSpec), 'B'); // untouched
     assert.equal(store.get(citySpec), 'X'); // reset
-    assert.equal(store.isTouched(nameSpec.id), true);
-    assert.equal(store.isTouched(citySpec.id), false);
+    assert.equal(store.isTouched(nameSpec), true);
+    assert.equal(store.isTouched(citySpec), false);
   });
 });
 
@@ -252,8 +248,8 @@ describe('Integration: DevTools snapshot after mutations', () => {
     assert.equal(snap.errors[emailSpec.id], null);
 
     // Mount some fields
-    store.mount(nameSpec.id);
-    store.mount(citySpec.id);
+    store.mount(nameSpec);
+    store.mount(citySpec);
 
     // Set values + trigger validation error
     store.set(nameSpec, 'Bob');
@@ -298,7 +294,7 @@ describe('Integration: Mount tracking gates submit', () => {
     assert.equal(result, false);
 
     // Now mount
-    store.mount(nameSpec.id);
+    store.mount(nameSpec);
     const result2 = store.submit((vals) => {
       assert.equal(vals.name, 'Alice');
     });
@@ -337,12 +333,10 @@ describe('Edge case: Deeply nested objects (3+ levels)', () => {
 
     // Get at depth
     assert.equal(store.get(codeSpec), 'ABC');
-    assert.equal(store.get('outer.middle.inner.code'), 'ABC');
 
     // Set at depth
     store.set(codeSpec, 'XYZ');
     assert.equal(store.get(codeSpec), 'XYZ');
-    assert.equal(store.get('outer.middle.inner.code'), 'XYZ');
 
     // getValues
     const vals = store.getValues();
@@ -351,11 +345,11 @@ describe('Edge case: Deeply nested objects (3+ levels)', () => {
 
     // Notifications propagate up through all levels
     const fired: string[] = [];
-    store.subscribe(outerSpec.id, () => fired.push('outer'));
-    store.subscribe(middleSpec.id, () => fired.push('middle'));
-    store.subscribe(innerSpec.id, () => fired.push('inner'));
-    store.subscribe(codeSpec.id, () => fired.push('code'));
-    store.subscribe(nameSpec.id, () => fired.push('name'));
+    store.subscribe(outerSpec, () => fired.push('outer'));
+    store.subscribe(middleSpec, () => fired.push('middle'));
+    store.subscribe(innerSpec, () => fired.push('inner'));
+    store.subscribe(codeSpec, () => fired.push('code'));
+    store.subscribe(nameSpec, () => fired.push('name'));
 
     store.set(codeSpec, 'NEW');
 
@@ -395,16 +389,16 @@ describe('Edge case: Multiple sequential set operations', () => {
     const store = new FormStore({ f });
 
     store.set(f, 'a', { noTouch: true });
-    assert.equal(store.isTouched(f.id), false);
+    assert.equal(store.isTouched(f), false);
     assert.equal(store.get(f), 'a');
 
     store.set(f, 'b');
-    assert.equal(store.isTouched(f.id), true);
+    assert.equal(store.isTouched(f), true);
     assert.equal(store.get(f), 'b');
 
     // Reset and verify
     store.reset();
     assert.equal(store.get(f), undefined);
-    assert.equal(store.isTouched(f.id), false);
+    assert.equal(store.isTouched(f), false);
   });
 });

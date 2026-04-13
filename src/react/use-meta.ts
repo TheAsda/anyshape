@@ -9,24 +9,23 @@ interface UseMetaReturn<Value> {
 
 export function useMeta<Value>(spec: MetaSpec<Value>): UseMetaReturn<Value> {
   const { store } = useFormContext();
-  const specId = spec.id;
 
   const subscribe = useCallback(
-    (listener: () => void) => store.subscribe(specId, listener),
-    [store, specId],
+    (listener: () => void) => store.subscribe(spec, listener),
+    [store, spec],
   );
 
   const cachedRef = useRef<{ value: Value | undefined }>({ value: undefined });
 
   const getSnapshot = useCallback(() => {
-    const value = store.get(specId) as Value | undefined;
+    const value = store.get(spec) as Value | undefined;
     if (cachedRef.current.value === value) {
       return cachedRef.current;
     }
     const next = { value };
     cachedRef.current = next;
     return next;
-  }, [store, specId]);
+  }, [store, spec]);
 
   const getServerSnapshot = useCallback(
     () => ({ value: undefined as Value | undefined }),
@@ -37,17 +36,17 @@ export function useMeta<Value>(spec: MetaSpec<Value>): UseMetaReturn<Value> {
 
   const setValue = useCallback(
     (value: Value) => {
-      store.set(specId, value, { noValidate: true, noTouch: true });
+      store.set(spec, value, { noValidate: true, noTouch: true });
     },
-    [store, specId],
+    [store, spec],
   );
 
   useEffect(() => {
-    store.mount(specId);
+    store.mount(spec);
     return () => {
-      store.unmount(specId);
+      store.unmount(spec);
     };
-  }, [store, specId]);
+  }, [store, spec]);
 
   return { value: state.value, setValue };
 }

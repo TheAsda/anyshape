@@ -1,5 +1,6 @@
 import { ValidatableSpec } from './base.js';
 import type { BaseSpec } from './base.js';
+import type { ZodType } from 'zod/v4';
 
 type ObjectValid<C extends Record<string, BaseSpec>> = {
   [K in keyof C]: C[K] extends ValidatableSpec<infer V, infer _R> ? V : unknown;
@@ -18,7 +19,7 @@ class ObjectSpecClass<C extends Record<string, BaseSpec>> extends ValidatableSpe
 
   constructor(
     children: C,
-    config?: { id?: string; mountRequired?: boolean; schema?: unknown },
+    config?: { id?: string; mountRequired?: boolean; schema?: ZodType<ObjectValid<C>, ObjectRaw<C>> },
   ) {
     super(config);
     this.children = children;

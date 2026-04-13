@@ -22,12 +22,11 @@ export function useRegister<Valid, Raw = Valid | undefined>(
   options?: { schema?: unknown; defaultValue?: Raw },
 ): UseRegisterReturn<Raw> {
   const { store } = useFormContext();
-  const specId = spec.id;
   const mountedRef = useRef(false);
 
   const subscribe = useCallback(
-    (listener: () => void) => store.subscribe(specId, listener),
-    [store, specId],
+    (listener: () => void) => store.subscribe(spec, listener),
+    [store, spec],
   );
 
   const cachedRef = useRef<{ value: Raw; error: string | null; isTouched: boolean }>({
@@ -37,9 +36,9 @@ export function useRegister<Valid, Raw = Valid | undefined>(
   });
 
   const getSnapshot = useCallback(() => {
-    const value = store.get(specId) as Raw;
-    const error = store.getError(specId);
-    const isTouched = store.isTouched(specId);
+    const value = store.get(spec) as Raw;
+    const error = store.getError(spec);
+    const isTouched = store.isTouched(spec);
     const prev = cachedRef.current;
     if (
       prev.value === value &&
@@ -51,7 +50,7 @@ export function useRegister<Valid, Raw = Valid | undefined>(
     const next = { value, error, isTouched };
     cachedRef.current = next;
     return next;
-  }, [store, specId]);
+  }, [store, spec]);
 
   const getServerSnapshot = useCallback(
     () => ({
@@ -87,21 +86,21 @@ export function useRegister<Valid, Raw = Valid | undefined>(
       } else {
         value = valueOrEvent;
       }
-      store.set(specId, value, opts);
+      store.set(spec, value, opts);
     },
-    [store, specId],
+    [store, spec],
   );
 
   const setRef = useCallback(
     (element: HTMLElement | null) => {
-      store.setRef(specId, element);
+      store.setRef(spec, element);
     },
-    [store, specId],
+    [store, spec],
   );
 
   const reset = useCallback(
-    () => store.reset(specId),
-    [store, specId],
+    () => store.reset(spec),
+    [store, spec],
   );
 
   // StrictMode double-effect guard: skip re-mounting on second effect call
@@ -109,31 +108,31 @@ export function useRegister<Valid, Raw = Valid | undefined>(
     if (mountedRef.current) return;
     mountedRef.current = true;
 
-    const currentValue = store.get(specId);
+    const currentValue = store.get(spec);
     if (currentValue === undefined && options?.defaultValue !== undefined) {
-      store.set(specId, options.defaultValue, { noValidate: true, noTouch: true });
+      store.set(spec, options.defaultValue, { noValidate: true, noTouch: true });
     }
 
     if (options?.schema) {
-      store.setSchema(specId, options.schema);
+      store.setSchema(spec, options.schema);
     }
 
-    store.mount(specId);
+    store.mount(spec);
 
     return () => {
-      store.unmount(specId, spec.keepOnUnmount);
+      store.unmount(spec, spec.keepOnUnmount);
       if (options?.schema) {
-        store.removeSchema(specId);
+        store.removeSchema(spec);
       }
-      store.setRef(specId, null);
+      store.setRef(spec, null);
       mountedRef.current = false;
     };
-  }, [store, specId]); // Deliberately excludes options to prevent re-mounting
+  }, [store, spec]); // Deliberately excludes options to prevent re-mounting
 
   // alwaysValidate: re-runs validation on every render
   useEffect(() => {
     if (spec.alwaysValidate) {
-      store.validateSpec(specId);
+      store.validateSpec(spec);
     }
   });
 

@@ -28,17 +28,14 @@ function isZodLike(schema: unknown): schema is ZodLike {
 
 export class FormStore {
   private values: Record<string, unknown>;
-  private errors: Map<string, string | null>;
-  private touched: Map<string, boolean>;
-  private mounted: Set<string>;
-  private schemaOverrides: Map<string, unknown>;
-  private domRefs: Map<string, HTMLElement | null>;
-  private listeners: Map<string, Set<() => void>>;
-  private specRegistry: Map<string, SpecEntry>;
-  private pathToSpecId: Map<string, string>;
-  private parentMap: Map<string, string | null>;
-  private childrenMap: Map<string, string[]>;
-  private treeOrder: string[];
+  private errors: WeakMap<BaseSpec, string | null>;
+  private touched: WeakMap<BaseSpec, boolean>;
+  private mounted: WeakSet<BaseSpec>;
+  private schemaOverrides: WeakMap<BaseSpec, unknown>;
+  private domRefs: WeakMap<BaseSpec, HTMLElement | null>;
+  private listeners: WeakMap<BaseSpec, Set<() => void>>;
+  private specRegistry: WeakMap<BaseSpec, SpecEntry>;
+  private treeOrder: BaseSpec[];
   private initialValues: Record<string, unknown>;
 
   constructor(
@@ -46,108 +43,90 @@ export class FormStore {
     initialData?: Record<string, unknown>,
   ) {
     this.values = {};
-    this.errors = new Map();
-    this.touched = new Map();
-    this.mounted = new Set();
-    this.schemaOverrides = new Map();
-    this.domRefs = new Map();
-    this.listeners = new Map();
-    this.specRegistry = new Map();
-    this.pathToSpecId = new Map();
-    this.parentMap = new Map();
-    this.childrenMap = new Map();
+    this.errors = new WeakMap();
+    this.touched = new WeakMap();
+    this.mounted = new WeakSet();
+    this.schemaOverrides = new WeakMap();
+    this.domRefs = new WeakMap();
+    this.listeners = new WeakMap();
+    this.specRegistry = new WeakMap();
     this.treeOrder = [];
 
-    this.walkSpecTree(formDefinition, '', null as LensT<unknown, unknown> | null, null);
+    this.walkSpecTree(formDefinition, '', null);
     this.values = this.buildInitialValues(formDefinition, initialData);
     this.initialValues = this.deepClone(this.values);
   }
 
-  get(pathOrSpec: string | BaseSpec): unknown {
-    if (typeof pathOrSpec === 'string') {
-      const specId = this.pathToSpecId.get(pathOrSpec);
-      if (specId) {
-        const entry = this.specRegistry.get(specId);
-        if (entry) return entry.lens.get(this.values);
-      }
-      let current: unknown = this.values;
-      for (const seg of pathOrSpec.split('.')) {
-        if (current == null || typeof current !== 'object') return undefined;
-        current = (current as Record<string, unknown>)[seg];
-      }
-      return current;
-    }
-    const entry = this.specRegistry.get(pathOrSpec.id);
-    if (!entry) throw new Error(`Unknown spec: ${pathOrSpec.id}`);
+  get(spec: BaseSpec): unknown {
+    const entry = this.specRegistry.get(spec);
+    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
     return entry.lens.get(this.values);
   }
 
   set(
-    pathOrSpec: string | BaseSpec,
+    spec: BaseSpec,
     value: unknown,
     options?: { noValidate?: boolean; noTouch?: boolean },
   ): void {
-    const specId = this.resolveSpecId(pathOrSpec);
-    const entry = this.specRegistry.get(specId);
-    if (!entry) throw new Error(`Unknown spec: ${specId}`);
+    const entry = this.specRegistry.get(spec);
+    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
 
     this.values = entry.lens.set(value, this.values) as Record<string, unknown>;
 
     if (!options?.noTouch) {
-      this.touched.set(specId, true);
+      this.touched.set(spec, true);
     }
 
     if (options?.noValidate) {
-      this.errors.set(specId, null);
+      this.errors.set(spec, null);
     } else {
-      this.validateSpec(specId);
+      this.validateSpec(spec);
     }
 
-    this.notifyValueChanged(specId);
+    this.notifyValueChanged(spec);
   }
 
-  reset(pathOrSpec?: string | BaseSpec): void {
-    if (pathOrSpec === undefined) {
+  reset(spec?: BaseSpec): void {
+    if (spec === undefined) {
       this.values = this.deepClone(this.initialValues);
-      this.errors.clear();
-      this.touched.clear();
+      this.errors = new WeakMap();
+      this.touched = new WeakMap();
       this.notifyAllListeners();
       return;
     }
 
-    const specId = this.resolveSpecId(pathOrSpec);
-    const entry = this.specRegistry.get(specId);
-    if (!entry) throw new Error(`Unknown spec: ${specId}`);
+    const entry = this.specRegistry.get(spec);
+    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
 
     const initialVal = entry.lens.get(this.initialValues);
     this.values = entry.lens.set(initialVal, this.values) as Record<string, unknown>;
 
-    const ids = [specId, ...this.getDescendants(specId)];
-    for (const id of ids) {
-      this.touched.delete(id);
-      this.errors.set(id, null);
+    const specs = [spec, ...this.getDescendants(spec)];
+    for (const s of specs) {
+      this.touched.delete(s);
+      this.errors.set(s, null);
     }
 
-    this.notifyReset(specId);
+    this.notifyReset(spec);
   }
 
   getValues(): Record<string, unknown> {
     return this.values;
   }
 
-  getError(specId: string): string | null {
-    return this.errors.get(specId) ?? null;
+  getError(spec: BaseSpec): string | null {
+    return this.errors.get(spec) ?? null;
   }
 
-  isTouched(specId: string): boolean {
-    return this.touched.get(specId) === true;
+  isTouched(spec: BaseSpec): boolean {
+    return this.touched.get(spec) === true;
   }
 
-  subscribe(specId: string, listener: () => void): () => void {
-    let set = this.listeners.get(specId);
+  subscribe(spec: BaseSpec, listener: () => void): () => void {
+    let set = this.listeners.get(spec);
     if (!set) {
       set = new Set();
-      this.listeners.set(specId, set);
+      this.listeners.set(spec, set);
     }
     set.add(listener);
     return () => {
@@ -155,25 +134,25 @@ export class FormStore {
     };
   }
 
-  setSchema(specId: string, schema: unknown): void {
-    this.schemaOverrides.set(specId, schema);
+  setSchema(spec: BaseSpec, schema: unknown): void {
+    this.schemaOverrides.set(spec, schema);
   }
 
-  removeSchema(specId: string): void {
-    this.schemaOverrides.delete(specId);
+  removeSchema(spec: BaseSpec): void {
+    this.schemaOverrides.delete(spec);
   }
 
-  validateSpec(specId: string): { success: boolean; error: string | null } {
-    const entry = this.specRegistry.get(specId);
-    if (!entry) throw new Error(`Unknown spec: ${specId}`);
+  validateSpec(spec: BaseSpec): { success: boolean; error: string | null } {
+    const entry = this.specRegistry.get(spec);
+    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
 
     const schema =
-      this.schemaOverrides.get(specId) ??
+      this.schemaOverrides.get(spec) ??
       (entry.spec as unknown as Record<string, unknown>)._schema ??
       null;
 
     if (!isZodLike(schema)) {
-      this.errors.set(specId, null);
+      this.errors.set(spec, null);
       return { success: true, error: null };
     }
 
@@ -181,45 +160,45 @@ export class FormStore {
     const result = schema.safeParse(value);
 
     if (result.success) {
-      this.errors.set(specId, null);
+      this.errors.set(spec, null);
       return { success: true, error: null };
     }
 
     const message = result.error?.issues?.[0]?.message ?? 'Validation failed';
-    this.errors.set(specId, message);
+    this.errors.set(spec, message);
     return { success: false, error: message };
   }
 
   validateTree(
-    specId?: string,
-  ): { success: boolean; errors: Map<string, string | null> } {
-    const ids = specId
-      ? [specId, ...this.getDescendants(specId)]
+    spec?: BaseSpec,
+  ): { success: boolean; errors: Map<BaseSpec, string | null> } {
+    const specs = spec
+      ? [spec, ...this.getDescendants(spec)]
       : this.treeOrder;
 
     let allOk = true;
-    const errors = new Map<string, string | null>();
+    const errors = new Map<BaseSpec, string | null>();
 
-    for (const id of ids) {
-      const r = this.validateSpec(id);
-      errors.set(id, r.error);
+    for (const s of specs) {
+      const r = this.validateSpec(s);
+      errors.set(s, r.error);
       if (!r.success) allOk = false;
     }
 
     return { success: allOk, errors };
   }
 
-  mount(specId: string): void {
-    if (this.mounted.has(specId)) {
-      throw new Error(`Spec ${specId} is already mounted`);
+  mount(spec: BaseSpec): void {
+    if (this.mounted.has(spec)) {
+      throw new Error(`Spec ${spec.id} is already mounted`);
     }
-    this.mounted.add(specId);
+    this.mounted.add(spec);
   }
 
-  unmount(specId: string, keepValue?: boolean): void {
-    this.mounted.delete(specId);
+  unmount(spec: BaseSpec, keepValue?: boolean): void {
+    this.mounted.delete(spec);
 
-    const entry = this.specRegistry.get(specId);
+    const entry = this.specRegistry.get(spec);
     if (!entry) return;
 
     const specAny = entry.spec as unknown as Record<string, unknown>;
@@ -234,26 +213,26 @@ export class FormStore {
         dv !== undefined ? dv : undefined,
         this.values,
       ) as Record<string, unknown>;
-      this.touched.delete(specId);
-      this.errors.set(specId, null);
+      this.touched.delete(spec);
+      this.errors.set(spec, null);
     }
   }
 
-  isMounted(specId: string): boolean {
-    return this.mounted.has(specId);
+  isMounted(spec: BaseSpec): boolean {
+    return this.mounted.has(spec);
   }
 
-  setRef(specId: string, element: HTMLElement | null): void {
-    this.domRefs.set(specId, element);
+  setRef(spec: BaseSpec, element: HTMLElement | null): void {
+    this.domRefs.set(spec, element);
   }
 
-  getSpecIds(): string[] {
+  getSpecs(): BaseSpec[] {
     return [...this.treeOrder];
   }
 
-  getSpecInfo(specId: string): { path: string; kind: string; mountRequired: boolean } | null {
-    const entry = this.specRegistry.get(specId);
-    if (!entry) return null;
+  getSpecInfo(spec: BaseSpec): { path: string; kind: string; mountRequired: boolean } {
+    const entry = this.specRegistry.get(spec);
+    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
     return {
       path: entry.path,
       kind: entry.spec.kind,
@@ -272,11 +251,11 @@ export class FormStore {
     const touched: Record<string, boolean> = {};
     const mounted: string[] = [];
 
-    for (const id of this.treeOrder) {
-      const err = this.errors.get(id);
-      errors[id] = err ?? null;
-      touched[id] = this.touched.get(id) === true;
-      if (this.mounted.has(id)) mounted.push(id);
+    for (const spec of this.treeOrder) {
+      const err = this.errors.get(spec);
+      errors[spec.id] = err ?? null;
+      touched[spec.id] = this.touched.get(spec) === true;
+      if (this.mounted.has(spec)) mounted.push(spec.id);
     }
 
     return { specTree: this.getSpecTree(), values: this.values, errors, touched, mounted };
@@ -284,8 +263,8 @@ export class FormStore {
 
   getSpecTree(): Record<string, unknown> {
     const tree: Record<string, unknown> = {};
-    for (const id of this.treeOrder) {
-      const entry = this.specRegistry.get(id);
+    for (const spec of this.treeOrder) {
+      const entry = this.specRegistry.get(spec);
       if (!entry) continue;
       tree[entry.path] = {
         id: entry.spec.id,
@@ -298,22 +277,22 @@ export class FormStore {
 
   submit(
     onValid: (values: Record<string, unknown>) => void,
-    onInvalid?: (errors: Map<string, string | null>) => void,
+    onInvalid?: (errors: Map<BaseSpec, string | null>) => void,
   ): boolean {
     const vr = this.validateTree();
 
-    const unmounted: string[] = [];
-    for (const [id, entry] of this.specRegistry) {
-      if (entry.spec.mountRequired && !this.mounted.has(id)) {
-        unmounted.push(id);
+    const unmounted: BaseSpec[] = [];
+    for (const spec of this.treeOrder) {
+      if (spec.mountRequired && !this.mounted.has(spec)) {
+        unmounted.push(spec);
       }
     }
 
     if (!vr.success || unmounted.length > 0) {
-      for (const id of this.treeOrder) {
-        const err = this.errors.get(id);
+      for (const spec of this.treeOrder) {
+        const err = this.errors.get(spec);
         if (err) {
-          const ref = this.domRefs.get(id);
+          const ref = this.domRefs.get(spec);
           if (ref && typeof ref.focus === 'function') {
             ref.focus();
           }
@@ -329,59 +308,50 @@ export class FormStore {
     return true;
   }
 
-  private resolveSpecId(pathOrSpec: string | BaseSpec): string {
-    if (typeof pathOrSpec === 'string') {
-      const id = this.pathToSpecId.get(pathOrSpec);
-      if (id) return id;
-      throw new Error(`Unknown path: ${pathOrSpec}`);
-    }
-    return pathOrSpec.id;
-  }
+  private notifyValueChanged(spec: BaseSpec): void {
+    this.fireListeners(spec);
 
-  private notifyValueChanged(specId: string): void {
-    this.fireListeners(specId);
-
-    let ancestor = this.parentMap.get(specId);
-    while (ancestor != null) {
+    let ancestor = spec._parent;
+    while (ancestor) {
       this.validateSpec(ancestor);
       this.fireListeners(ancestor);
-      ancestor = this.parentMap.get(ancestor) ?? null;
+      ancestor = ancestor._parent;
     }
   }
 
-  private notifyReset(specId: string): void {
-    const notified = new Set<string>();
+  private notifyReset(spec: BaseSpec): void {
+    const notified = new Set<BaseSpec>();
 
-    this.fireListeners(specId);
-    notified.add(specId);
+    this.fireListeners(spec);
+    notified.add(spec);
 
-    for (const descId of this.getDescendants(specId)) {
-      if (!notified.has(descId)) {
-        this.fireListeners(descId);
-        notified.add(descId);
+    for (const desc of this.getDescendants(spec)) {
+      if (!notified.has(desc)) {
+        this.fireListeners(desc);
+        notified.add(desc);
       }
     }
 
-    let ancestor = this.parentMap.get(specId);
-    while (ancestor != null) {
+    let ancestor = spec._parent;
+    while (ancestor) {
       if (!notified.has(ancestor)) {
         this.fireListeners(ancestor);
         notified.add(ancestor);
       }
-      ancestor = this.parentMap.get(ancestor) ?? null;
+      ancestor = ancestor._parent;
     }
   }
 
-  private fireListeners(specId: string): void {
-    const set = this.listeners.get(specId);
+  private fireListeners(spec: BaseSpec): void {
+    const set = this.listeners.get(spec);
     if (set) {
       for (const fn of set) fn();
     }
   }
 
   private notifyAllListeners(): void {
-    for (const specId of this.treeOrder) {
-      this.fireListeners(specId);
+    for (const spec of this.treeOrder) {
+      this.fireListeners(spec);
     }
   }
 
@@ -389,7 +359,6 @@ export class FormStore {
     children: Record<string, BaseSpec>,
     pathPrefix: string,
     parentLens: LensT<unknown, unknown> | null,
-    parentSpecId: string | null,
   ): void {
     for (const [key, spec] of Object.entries(children)) {
       const path = pathPrefix ? `${pathPrefix}.${key}` : key;
@@ -398,27 +367,13 @@ export class FormStore {
           ? Lens.compose(parentLens, Lens.prop(key))
           : Lens.prop(key);
 
-      this.specRegistry.set(spec.id, { lens, path, spec });
-      this.pathToSpecId.set(path, spec.id);
+      this.specRegistry.set(spec, { lens, path, spec });
 
-      this.parentMap.set(spec.id, parentSpecId);
-      if (!this.childrenMap.has(spec.id)) {
-        this.childrenMap.set(spec.id, []);
-      }
-      if (parentSpecId != null) {
-        let sibs = this.childrenMap.get(parentSpecId);
-        if (!sibs) {
-          sibs = [];
-          this.childrenMap.set(parentSpecId, sibs);
-        }
-        sibs.push(spec.id);
-      }
-
-      this.treeOrder.push(spec.id);
+      this.treeOrder.push(spec);
 
       if (spec.kind === 'object') {
         const objChildren = (spec as unknown as { children: Record<string, BaseSpec> }).children;
-        this.walkSpecTree(objChildren, path, lens, spec.id);
+        this.walkSpecTree(objChildren, path, lens);
       }
     }
   }
@@ -460,20 +415,23 @@ export class FormStore {
     return result;
   }
 
-  private getDescendants(specId: string): string[] {
-    const kids = this.childrenMap.get(specId) ?? [];
-    const out: string[] = [];
-    for (const kid of kids) {
-      out.push(kid);
-      out.push(...this.getDescendants(kid));
+  private getDescendants(spec: BaseSpec): BaseSpec[] {
+    if (spec.kind === 'object') {
+      const children = (spec as unknown as { children: Record<string, BaseSpec> }).children;
+      const out: BaseSpec[] = [];
+      for (const child of Object.values(children)) {
+        out.push(child);
+        out.push(...this.getDescendants(child));
+      }
+      return out;
     }
-    return out;
+    return [];
   }
 
-  private collectErrors(): Map<string, string | null> {
-    const map = new Map<string, string | null>();
-    for (const id of this.treeOrder) {
-      map.set(id, this.errors.get(id) ?? null);
+  private collectErrors(): Map<BaseSpec, string | null> {
+    const map = new Map<BaseSpec, string | null>();
+    for (const spec of this.treeOrder) {
+      map.set(spec, this.errors.get(spec) ?? null);
     }
     return map;
   }

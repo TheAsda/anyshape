@@ -1,5 +1,6 @@
 import { ValidatableSpec } from './base.js';
 import type { BaseSpec } from './base.js';
+import type { ZodType } from 'zod/v4';
 type ArrayValid<I extends BaseSpec> = I extends ValidatableSpec<infer V, infer _R> ? V[] : unknown[];
 type ArrayRaw<I extends BaseSpec> = I extends ValidatableSpec<infer _V, infer R> ? R[] : unknown[];
 type ForwardedChildren<I extends BaseSpec> = I extends { children: infer C extends Record<string, BaseSpec> } ? C : {};
@@ -18,7 +19,7 @@ class ArraySpecClass<I extends BaseSpec> extends ValidatableSpec<
 
   constructor(
     itemSpec: I,
-    config?: { id?: string; mountRequired?: boolean; schema?: unknown },
+    config?: { id?: string; mountRequired?: boolean; schema?: ZodType<ArrayValid<I>, ArrayRaw<I>> },
   ) {
     super(config);
     this._itemSpecValue = itemSpec;
