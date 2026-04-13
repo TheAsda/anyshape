@@ -1,29 +1,14 @@
+import { ZodType } from 'zod/v4';
 import { Lens } from '../lens/index.js';
-import type { Lens as LensT } from '../lens/index.js';
-import type { BaseSpec } from '../specs/base.js';
+import { ValidatableSpec, type BaseSpec } from '../specs/base.js';
+import { LensStore } from './lens-store.js';
+import { ObjectSpec, ObjectSpecChildren } from '../specs/object.js';
+import { FieldSpec } from '../specs/field.js';
 
-interface SpecEntry {
-  lens: LensT<unknown, unknown>;
+interface LensEntry {
+  lens: Lens<Record<string, unknown>, unknown>;
   path: string;
   spec: BaseSpec;
-}
-
-interface SafeParseResult {
-  success: boolean;
-  data?: unknown;
-  error?: { issues: Array<{ message: string }> };
-}
-
-interface ZodLike {
-  safeParse(value: unknown): SafeParseResult;
-}
-
-function isZodLike(schema: unknown): schema is ZodLike {
-  return (
-    typeof schema === 'object' &&
-    schema !== null &&
-    typeof (schema as Record<string, unknown>).safeParse === 'function'
-  );
 }
 
 export class FormStore {
@@ -31,17 +16,15 @@ export class FormStore {
   private errors: WeakMap<BaseSpec, string | null>;
   private touched: WeakMap<BaseSpec, boolean>;
   private mounted: WeakSet<BaseSpec>;
-  private schemaOverrides: WeakMap<BaseSpec, unknown>;
+  private schemaOverrides: WeakMap<BaseSpec, ZodType>;
   private domRefs: WeakMap<BaseSpec, HTMLElement | null>;
   private listeners: WeakMap<BaseSpec, Set<() => void>>;
-  private specRegistry: WeakMap<BaseSpec, SpecEntry>;
-  private treeOrder: BaseSpec[];
+  private lenses: LensStore;
+  private parents: WeakMap<BaseSpec, BaseSpec | null>;
   private initialValues: Record<string, unknown>;
+  private formSpecs: BaseSpec[];
 
-  constructor(
-    formDefinition: Record<string, BaseSpec>,
-    initialData?: Record<string, unknown>,
-  ) {
+  constructor(form: ObjectSpec, initialData?: Record<string, unknown>) {
     this.values = {};
     this.errors = new WeakMap();
     this.touched = new WeakMap();
@@ -49,18 +32,18 @@ export class FormStore {
     this.schemaOverrides = new WeakMap();
     this.domRefs = new WeakMap();
     this.listeners = new WeakMap();
-    this.specRegistry = new WeakMap();
-    this.treeOrder = [];
+    this.lenses = new LensStore(form);
+    this.parents = new WeakMap();
+    this.formSpecs = [];
 
-    this.walkSpecTree(formDefinition, '', null);
-    this.values = this.buildInitialValues(formDefinition, initialData);
+    this.buildParentsTree(form, null);
+    this.fillFormSpecs(form);
+    this.values = this.buildInitialValues(form, initialData);
     this.initialValues = this.deepClone(this.values);
   }
 
   get(spec: BaseSpec): unknown {
-    const entry = this.specRegistry.get(spec);
-    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
-    return entry.lens.get(this.values);
+    return this.lenses.get(spec).get(this.values);
   }
 
   set(
@@ -68,10 +51,10 @@ export class FormStore {
     value: unknown,
     options?: { noValidate?: boolean; noTouch?: boolean },
   ): void {
-    const entry = this.specRegistry.get(spec);
-    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
-
-    this.values = entry.lens.set(value, this.values) as Record<string, unknown>;
+    this.values = this.lenses.get(spec).set(value, this.values) as Record<
+      string,
+      unknown
+    >;
 
     if (!options?.noTouch) {
       this.touched.set(spec, true);
@@ -95,11 +78,10 @@ export class FormStore {
       return;
     }
 
-    const entry = this.specRegistry.get(spec);
-    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
+    const lens = this.lenses.get(spec);
 
-    const initialVal = entry.lens.get(this.initialValues);
-    this.values = entry.lens.set(initialVal, this.values) as Record<string, unknown>;
+    const initialVal = lens.get(this.initialValues);
+    this.values = lens.set(initialVal, this.values) as Record<string, unknown>;
 
     const specs = [spec, ...this.getDescendants(spec)];
     for (const s of specs) {
@@ -134,29 +116,30 @@ export class FormStore {
     };
   }
 
-  setSchema(spec: BaseSpec, schema: unknown): void {
+  //#region schema
+  setSchema(spec: BaseSpec, schema: ZodType): void {
     this.schemaOverrides.set(spec, schema);
   }
 
   removeSchema(spec: BaseSpec): void {
     this.schemaOverrides.delete(spec);
   }
+  //#endregion
 
   validateSpec(spec: BaseSpec): { success: boolean; error: string | null } {
-    const entry = this.specRegistry.get(spec);
-    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
+    const lens = this.lenses.get(spec);
+    if (!lens) throw new Error(`Unknown spec: ${spec.id}`);
 
     const schema =
       this.schemaOverrides.get(spec) ??
-      (entry.spec as unknown as Record<string, unknown>)._schema ??
-      null;
+      (spec instanceof ValidatableSpec ? spec._schema : null);
 
-    if (!isZodLike(schema)) {
+    if (!schema) {
       this.errors.set(spec, null);
       return { success: true, error: null };
     }
 
-    const value = entry.lens.get(this.values);
+    const value = lens.get(this.values);
     const result = schema.safeParse(value);
 
     if (result.success) {
@@ -169,12 +152,11 @@ export class FormStore {
     return { success: false, error: message };
   }
 
-  validateTree(
-    spec?: BaseSpec,
-  ): { success: boolean; errors: Map<BaseSpec, string | null> } {
-    const specs = spec
-      ? [spec, ...this.getDescendants(spec)]
-      : this.treeOrder;
+  validateTree(spec?: BaseSpec): {
+    success: boolean;
+    errors: Map<BaseSpec, string | null>;
+  } {
+    const specs = spec ? [spec, ...this.getDescendants(spec)] : this.treeOrder;
 
     let allOk = true;
     const errors = new Map<BaseSpec, string | null>();
@@ -198,21 +180,15 @@ export class FormStore {
   unmount(spec: BaseSpec, keepValue?: boolean): void {
     this.mounted.delete(spec);
 
-    const entry = this.specRegistry.get(spec);
-    if (!entry) return;
-
-    const specAny = entry.spec as unknown as Record<string, unknown>;
     const shouldKeep =
-      keepValue ??
-      (specAny.keepOnUnmount as boolean) ??
-      false;
+      keepValue ?? (spec instanceof FieldSpec ? spec.keepOnUnmount : false);
 
     if (!shouldKeep) {
-      const dv = specAny.defaultValue;
-      this.values = entry.lens.set(
-        dv !== undefined ? dv : undefined,
-        this.values,
-      ) as Record<string, unknown>;
+      const defaultValue =
+        spec instanceof FieldSpec ? spec.defaultValue : undefined;
+      this.values = this.lenses
+        .get(spec)
+        .set(defaultValue, this.values) as Record<string, unknown>;
       this.touched.delete(spec);
       this.errors.set(spec, null);
     }
@@ -226,17 +202,15 @@ export class FormStore {
     this.domRefs.set(spec, element);
   }
 
-  getSpecs(): BaseSpec[] {
-    return [...this.treeOrder];
-  }
-
-  getSpecInfo(spec: BaseSpec): { path: string; kind: string; mountRequired: boolean } {
-    const entry = this.specRegistry.get(spec);
-    if (!entry) throw new Error(`Unknown spec: ${spec.id}`);
+  getSpecInfo(spec: BaseSpec): {
+    id: string;
+    kind: string;
+    mountRequired: boolean;
+  } {
     return {
-      path: entry.path,
-      kind: entry.spec._kind,
-      mountRequired: entry.spec.mountRequired,
+      id: spec.id,
+      kind: spec._kind,
+      mountRequired: spec.mountRequired,
     };
   }
 
@@ -258,13 +232,19 @@ export class FormStore {
       if (this.mounted.has(spec)) mounted.push(spec.id);
     }
 
-    return { specTree: this.getSpecTree(), values: this.values, errors, touched, mounted };
+    return {
+      specTree: this.getSpecTree(),
+      values: this.values,
+      errors,
+      touched,
+      mounted,
+    };
   }
 
   getSpecTree(): Record<string, unknown> {
     const tree: Record<string, unknown> = {};
     for (const spec of this.treeOrder) {
-      const entry = this.specRegistry.get(spec);
+      const entry = this.lenses.get(spec);
       if (!entry) continue;
       tree[entry.path] = {
         id: entry.spec.id,
@@ -311,11 +291,11 @@ export class FormStore {
   private notifyValueChanged(spec: BaseSpec): void {
     this.fireListeners(spec);
 
-    let ancestor = spec._parent;
+    let ancestor = this.parents.get(spec) ?? null;
     while (ancestor) {
       this.validateSpec(ancestor);
       this.fireListeners(ancestor);
-      ancestor = ancestor._parent;
+      ancestor = this.parents.get(ancestor) ?? null;
     }
   }
 
@@ -332,13 +312,13 @@ export class FormStore {
       }
     }
 
-    let ancestor = spec._parent;
+    let ancestor = this.parents.get(spec) ?? null;
     while (ancestor) {
       if (!notified.has(ancestor)) {
         this.fireListeners(ancestor);
         notified.add(ancestor);
       }
-      ancestor = ancestor._parent;
+      ancestor = this.parents.get(ancestor) ?? null;
     }
   }
 
@@ -350,33 +330,38 @@ export class FormStore {
   }
 
   private notifyAllListeners(): void {
-    for (const spec of this.treeOrder) {
+    for (const spec of this.formSpecs) {
       this.fireListeners(spec);
     }
   }
 
-  private walkSpecTree(
-    children: Record<string, BaseSpec>,
-    pathPrefix: string,
-    parentLens: LensT<unknown, unknown> | null,
+  //#region init
+  private buildParentsTree(
+    spec: ObjectSpec,
+    parentSpec: BaseSpec | null,
   ): void {
-    for (const [key, spec] of Object.entries(children)) {
-      const path = pathPrefix ? `${pathPrefix}.${key}` : key;
-      const lens =
-        parentLens != null
-          ? Lens.compose(parentLens, Lens.prop(key))
-          : Lens.prop(key);
+    for (const s of Object.values(spec.children as ObjectSpecChildren)) {
+      this.parents.set(s, parentSpec);
 
-      this.specRegistry.set(spec, { lens, path, spec });
-
-      this.treeOrder.push(spec);
-
-      if (spec._kind === 'object') {
-        const objChildren = (spec as unknown as { children: Record<string, BaseSpec> }).children;
-        this.walkSpecTree(objChildren, path, lens);
+      if (s instanceof ObjectSpec) {
+        this.buildParentsTree(s, spec);
       }
     }
   }
+
+  private fillFormSpecs(spec: BaseSpec) {
+    this.formSpecs.push(spec);
+    switch (true) {
+      case spec instanceof ObjectSpec:
+        Object.values(spec.children as ObjectSpecChildren).forEach((child) =>
+          this.fillFormSpecs(child),
+        );
+        break;
+      // TODO: handle array
+    }
+  }
+
+  //#endregion
 
   private buildInitialValues(
     children: Record<string, BaseSpec>,
@@ -391,11 +376,16 @@ export class FormStore {
         (initialData as Record<string, unknown>)[key] !== undefined;
 
       if (spec._kind === 'object') {
-        const objChildren = (spec as unknown as { children: Record<string, BaseSpec> }).children;
+        const objChildren = (
+          spec as unknown as { children: Record<string, BaseSpec> }
+        ).children;
         result[key] = this.buildInitialValues(
           objChildren,
           hasInit
-            ? ((initialData as Record<string, unknown>)[key] as Record<string, unknown>)
+            ? ((initialData as Record<string, unknown>)[key] as Record<
+                string,
+                unknown
+              >)
             : undefined,
         );
       } else if (spec._kind === 'field') {
@@ -417,7 +407,9 @@ export class FormStore {
 
   private getDescendants(spec: BaseSpec): BaseSpec[] {
     if (spec._kind === 'object') {
-      const children = (spec as unknown as { children: Record<string, BaseSpec> }).children;
+      const children = (
+        spec as unknown as { children: Record<string, BaseSpec> }
+      ).children;
       const out: BaseSpec[] = [];
       for (const child of Object.values(children)) {
         out.push(child);
