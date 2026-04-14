@@ -1,5 +1,5 @@
 import { Lens } from '../lens';
-import { BaseSpec, ObjectSpec } from '../specs';
+import { ArraySpec, BaseSpec, ObjectSpec } from '../specs';
 import { ObjectSpecChildren } from '../specs/object';
 
 export class LensStore {
@@ -18,6 +18,13 @@ export class LensStore {
           spec.children as ObjectSpecChildren,
         )) {
           this.walkSpec(child, parentLens.prop(key));
+        }
+        break;
+      case spec instanceof ArraySpec:
+        for (const [key, child] of Object.entries(
+          spec.item.children as ObjectSpecChildren,
+        )) {
+          this.walkSpec(child, parentLens.index(0).prop(key));
         }
         break;
     }
