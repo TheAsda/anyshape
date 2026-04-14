@@ -3,7 +3,9 @@ import { Lens } from '../lens/index.js';
 import { ValidatableSpec, type BaseSpec } from '../specs/base.js';
 import { LensStore } from './lens-store.js';
 import { ObjectSpec, ObjectSpecChildren } from '../specs/object.js';
+import { ArraySpec } from '../specs/array.js';
 import { FieldSpec } from '../specs/field.js';
+import type { ArrayStore } from './array-store.js';
 
 interface LensEntry {
   lens: Lens<Record<string, unknown>, unknown>;
@@ -23,6 +25,11 @@ export class FormStore {
   private parents: WeakMap<BaseSpec, BaseSpec | null>;
   private initialValues: Record<string, unknown>;
   private formSpecs: BaseSpec[];
+  private arrayStores: Map<ArraySpec<ObjectSpec<ObjectSpecChildren>>, ArrayStore>;
+
+  private get treeOrder(): BaseSpec[] {
+    return this.formSpecs;
+  }
 
   constructor(form: ObjectSpec, initialData?: Record<string, unknown>) {
     this.values = {};
@@ -35,10 +42,11 @@ export class FormStore {
     this.lenses = new LensStore(form);
     this.parents = new WeakMap();
     this.formSpecs = [];
+    this.arrayStores = new Map();
 
     this.buildParentsTree(form, null);
     this.fillFormSpecs(form);
-    this.values = this.buildInitialValues(form, initialData);
+    this.values = this.buildInitialValues(form.children, initialData);
     this.initialValues = this.deepClone(this.values);
   }
 
@@ -51,7 +59,7 @@ export class FormStore {
     value: unknown,
     options?: { noValidate?: boolean; noTouch?: boolean },
   ): void {
-    this.values = this.lenses.get(spec).set(value, this.values) as Record<
+    this.values = this.lenses.get(spec).set(this.values, value) as Record<
       string,
       unknown
     >;
@@ -74,6 +82,9 @@ export class FormStore {
       this.values = this.deepClone(this.initialValues);
       this.errors = new WeakMap();
       this.touched = new WeakMap();
+      for (const arrayStore of this.arrayStores.values()) {
+        arrayStore.reset();
+      }
       this.notifyAllListeners();
       return;
     }
@@ -81,7 +92,7 @@ export class FormStore {
     const lens = this.lenses.get(spec);
 
     const initialVal = lens.get(this.initialValues);
-    this.values = lens.set(initialVal, this.values) as Record<string, unknown>;
+    this.values = lens.set(this.values, initialVal) as Record<string, unknown>;
 
     const specs = [spec, ...this.getDescendants(spec)];
     for (const s of specs) {
@@ -188,7 +199,7 @@ export class FormStore {
         spec instanceof FieldSpec ? spec.defaultValue : undefined;
       this.values = this.lenses
         .get(spec)
-        .set(defaultValue, this.values) as Record<string, unknown>;
+        .set(this.values, defaultValue) as Record<string, unknown>;
       this.touched.delete(spec);
       this.errors.set(spec, null);
     }
@@ -196,6 +207,14 @@ export class FormStore {
 
   isMounted(spec: BaseSpec): boolean {
     return this.mounted.has(spec);
+  }
+
+  registerArrayStore(arraySpec: ArraySpec<ObjectSpec<ObjectSpecChildren>>, store: ArrayStore): void {
+    this.arrayStores.set(arraySpec, store);
+  }
+
+  unregisterArrayStore(arraySpec: ArraySpec<ObjectSpec<ObjectSpecChildren>>): void {
+    this.arrayStores.delete(arraySpec);
   }
 
   setRef(spec: BaseSpec, element: HTMLElement | null): void {
@@ -261,6 +280,12 @@ export class FormStore {
   ): boolean {
     const vr = this.validateTree();
 
+    let arrayValidationOk = true;
+    for (const arrayStore of this.arrayStores.values()) {
+      const ar = arrayStore.validateTree();
+      if (!ar.success) arrayValidationOk = false;
+    }
+
     const unmounted: BaseSpec[] = [];
     for (const spec of this.treeOrder) {
       if (spec.mountRequired && !this.mounted.has(spec)) {
@@ -268,7 +293,7 @@ export class FormStore {
       }
     }
 
-    if (!vr.success || unmounted.length > 0) {
+    if (!vr.success || !arrayValidationOk || unmounted.length > 0) {
       for (const spec of this.treeOrder) {
         const err = this.errors.get(spec);
         if (err) {
@@ -346,6 +371,11 @@ export class FormStore {
       if (s instanceof ObjectSpec) {
         this.buildParentsTree(s, spec);
       }
+
+      if (s instanceof ArraySpec) {
+        this.parents.set(s.item, s);
+        this.buildParentsTree(s.item, s);
+      }
     }
   }
 
@@ -357,7 +387,9 @@ export class FormStore {
           this.fillFormSpecs(child),
         );
         break;
-      // TODO: handle array
+      case spec instanceof ArraySpec:
+        this.fillFormSpecs(spec.item);
+        break;
     }
   }
 
@@ -395,6 +427,11 @@ export class FormStore {
           : dv !== undefined
             ? dv
             : undefined;
+      } else if (spec._kind === 'array') {
+        const arrSpec = spec as unknown as { defaultValue?: unknown[] };
+        result[key] = hasInit
+          ? (initialData as Record<string, unknown>)[key]
+          : (arrSpec.defaultValue ?? []);
       } else {
         result[key] = hasInit
           ? (initialData as Record<string, unknown>)[key]
@@ -412,6 +449,19 @@ export class FormStore {
       ).children;
       const out: BaseSpec[] = [];
       for (const child of Object.values(children)) {
+        out.push(child);
+        out.push(...this.getDescendants(child));
+      }
+      return out;
+    }
+    if (spec._kind === 'array') {
+      const arrSpec = spec as unknown as ArraySpec<
+        ObjectSpec<ObjectSpecChildren>
+      >;
+      const out: BaseSpec[] = [arrSpec.item];
+      for (const child of Object.values(
+        arrSpec.item.children as ObjectSpecChildren,
+      )) {
         out.push(child);
         out.push(...this.getDescendants(child));
       }

@@ -1,6 +1,7 @@
-import { useSyncExternalStore, useCallback, useEffect, useRef } from 'react';
+import { useSyncExternalStore, useCallback, useEffect, useRef, useContext } from 'react';
 import type { ChangeEvent } from 'react';
 import { useFormContext } from './context.js';
+import { ArrayItemContext } from './array-item-context.js';
 import type { FieldSpec } from '../specs/field.js';
 
 interface UseRegisterReturn<Raw> {
@@ -24,9 +25,19 @@ export function useRegister<Valid, Raw = Valid | undefined>(
   const { store } = useFormContext();
   const mountedRef = useRef(false);
 
+  const arrayCtx = useContext(ArrayItemContext);
+  const isItemScoped =
+    arrayCtx !== null &&
+    Object.values(arrayCtx.arraySpec.item.children).includes(spec);
+
   const subscribe = useCallback(
-    (listener: () => void) => store.subscribe(spec, listener),
-    [store, spec],
+    (listener: () => void) => {
+      if (isItemScoped) {
+        return arrayCtx!.arrayStore.subscribe(listener);
+      }
+      return store.subscribe(spec, listener);
+    },
+    [store, spec, isItemScoped, arrayCtx],
   );
 
   const cachedRef = useRef<{ value: Raw; error: string | null; isTouched: boolean }>({
@@ -36,6 +47,22 @@ export function useRegister<Valid, Raw = Valid | undefined>(
   });
 
   const getSnapshot = useCallback(() => {
+    if (isItemScoped) {
+      const value = arrayCtx!.arrayStore.get(spec, arrayCtx!.itemId) as Raw;
+      const error = arrayCtx!.arrayStore.getItemFieldError(arrayCtx!.itemId, spec);
+      const isTouched = false;
+      const prev = cachedRef.current;
+      if (
+        prev.value === value &&
+        prev.error === error &&
+        prev.isTouched === isTouched
+      ) {
+        return prev;
+      }
+      const next = { value, error, isTouched };
+      cachedRef.current = next;
+      return next;
+    }
     const value = store.get(spec) as Raw;
     const error = store.getError(spec);
     const isTouched = store.isTouched(spec);
@@ -50,7 +77,7 @@ export function useRegister<Valid, Raw = Valid | undefined>(
     const next = { value, error, isTouched };
     cachedRef.current = next;
     return next;
-  }, [store, spec]);
+  }, [store, spec, isItemScoped, arrayCtx]);
 
   const getServerSnapshot = useCallback(
     () => ({
@@ -86,25 +113,36 @@ export function useRegister<Valid, Raw = Valid | undefined>(
       } else {
         value = valueOrEvent;
       }
-      store.set(spec, value, opts);
+      if (isItemScoped) {
+        arrayCtx!.arrayStore.set(spec, arrayCtx!.itemId, value);
+      } else {
+        store.set(spec, value, opts);
+      }
     },
-    [store, spec],
+    [store, spec, isItemScoped, arrayCtx],
   );
 
   const setRef = useCallback(
     (element: HTMLElement | null) => {
-      store.setRef(spec, element);
+      if (!isItemScoped) {
+        store.setRef(spec, element);
+      }
     },
-    [store, spec],
+    [store, spec, isItemScoped],
   );
 
   const reset = useCallback(
-    () => store.reset(spec),
-    [store, spec],
+    () => {
+      if (!isItemScoped) {
+        store.reset(spec);
+      }
+    },
+    [store, spec, isItemScoped],
   );
 
   // StrictMode double-effect guard: skip re-mounting on second effect call
   useEffect(() => {
+    if (isItemScoped) return;
     if (mountedRef.current) return;
     mountedRef.current = true;
 
@@ -131,6 +169,7 @@ export function useRegister<Valid, Raw = Valid | undefined>(
 
   // alwaysValidate: re-runs validation on every render
   useEffect(() => {
+    if (isItemScoped) return;
     if (spec.alwaysValidate) {
       store.validateSpec(spec);
     }

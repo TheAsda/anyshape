@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { useForm } from 'form-lib/react';
 import { useRegister } from 'form-lib/react';
 import { useMeta } from 'form-lib/react';
+import { useArray } from 'form-lib/react';
+import { ArrayItemProvider } from 'form-lib/react';
 import { FormDevtools } from 'form-lib/devtools';
 import { appForm } from './form-definition';
 import './app.css';
@@ -176,50 +178,48 @@ function TagsSection() {
 }
 
 function ItemsSection() {
-  const { value, onChange } = useRegister(appForm.items as never);
-  const items: Array<{ name: string; quantity: number | string }> = Array.isArray(value) ? value : [];
-
-  const addItem = useCallback(() => {
-    onChange([...items, { name: '', quantity: '' }]);
-  }, [items, onChange]);
-
-  const updateItem = useCallback((index: number, field: 'name' | 'quantity', val: string) => {
-    const updated = items.map((item, i) => {
-      if (i !== index) return item;
-      return { ...item, [field]: val };
-    });
-    onChange(updated);
-  }, [items, onChange]);
-
-  const removeItem = useCallback((index: number) => {
-    onChange(items.filter((_, i) => i !== index));
-  }, [items, onChange]);
+  const { items, append, remove, arrayStore } = useArray({ spec: appForm.items });
 
   return (
     <section className="section">
       <h2 className="section-title">Items <span className="badge">ArraySpec</span></h2>
       {items.length === 0 && <p className="empty">No items yet. Click "Add Item" to start.</p>}
       {items.map((item, index) => (
-        <div key={index} className="item-row">
-          <span className="item-number">{index + 1}</span>
-          <input
-            className="input"
-            value={item.name}
-            onChange={(e) => updateItem(index, 'name', e.target.value)}
-            placeholder="Item name"
-          />
-          <input
-            className="input input-small"
-            value={item.quantity}
-            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-            placeholder="Qty"
-            type="number"
-          />
-          <button type="button" className="btn btn-remove" onClick={() => removeItem(index)}>×</button>
-        </div>
+        <ArrayItemProvider key={item.id} arrayStore={arrayStore} itemId={item.id} arraySpec={appForm.items}>
+          <ItemRow index={index} onRemove={() => remove(item.id)} />
+        </ArrayItemProvider>
       ))}
-      <button type="button" className="btn btn-secondary" onClick={addItem}>+ Add Item</button>
+      <button type="button" className="btn btn-secondary" onClick={() => append()}>+ Add Item</button>
     </section>
+  );
+}
+
+function ItemRow({ index, onRemove }: { index: number; onRemove: () => void }) {
+  const { value: name, onChange: onNameChange } = useRegister(
+    appForm.items.item.children.name as Parameters<typeof useRegister>[0]
+  );
+  const { value: quantity, onChange: onQtyChange } = useRegister(
+    appForm.items.item.children.quantity as Parameters<typeof useRegister>[0]
+  );
+
+  return (
+    <div className="item-row">
+      <span className="item-number">{index + 1}</span>
+      <input
+        className="input"
+        value={(name as string) ?? ''}
+        onChange={onNameChange}
+        placeholder="Item name"
+      />
+      <input
+        className="input input-small"
+        value={(quantity as string) ?? ''}
+        onChange={onQtyChange}
+        placeholder="Qty"
+        type="number"
+      />
+      <button type="button" className="btn btn-remove" onClick={onRemove}>×</button>
+    </div>
   );
 }
 

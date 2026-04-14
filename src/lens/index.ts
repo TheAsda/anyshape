@@ -4,7 +4,7 @@ export class Lens<S = unknown, A = S> {
 
   constructor(
     get: (source: S) => A = (s) => s as unknown as A,
-    set: (source: S, value: A) => S = (s) => s,
+    set: (source: S, value: A) => S = (_s, v) => v,
   ) {
     this._get = get;
     this._set = set;
