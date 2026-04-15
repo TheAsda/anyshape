@@ -322,7 +322,20 @@ export class FormStore {
     return this.arrayStates.get(arraySpec);
   }
 
-  private generateId(): string {
+  getArrayData(arraySpec: ArraySpec): unknown[] {
+    return (this.lenses.get(arraySpec).get(this.values) as unknown[]) ?? [];
+  }
+
+  setArrayData(arraySpec: ArraySpec, data: unknown[]): void {
+    this.values = this.lenses.get(arraySpec).set(data, this.values) as Record<string, unknown>;
+    this.notifyValueChanged(arraySpec);
+  }
+
+  setArrayState(arraySpec: ArraySpec, state: ArrayState): void {
+    this.arrayStates.set(arraySpec, state);
+  }
+
+  generateId(): string {
     return `item_${this.idCounter++}`;
   }
 
