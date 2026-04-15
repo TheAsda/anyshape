@@ -24,6 +24,8 @@ export class FormStore {
   private errors: WeakMap<BaseSpec, Map<string, string | null>>;
   private schemaOverrides: WeakMap<BaseSpec, ZodType>;
   private listeners: WeakMap<BaseSpec, Set<() => void>>;
+  private mounted: WeakSet<BaseSpec>;
+  private domRefs: WeakMap<BaseSpec, HTMLElement | null>;
 
   constructor(form: ObjectSpec, initialData?: Record<string, unknown>) {
     this.formSpec = form;
@@ -40,6 +42,8 @@ export class FormStore {
     this.errors = new WeakMap();
     this.schemaOverrides = new WeakMap();
     this.listeners = new WeakMap();
+    this.mounted = new WeakSet();
+    this.domRefs = new WeakMap();
 
     this.buildParentsTree(form, null);
     this.computeAllStaticDefaults(form);
@@ -219,6 +223,95 @@ export class FormStore {
         set.delete(listener);
       }
     };
+  }
+
+  mount(spec: BaseSpec): void {
+    if (this.mounted.has(spec)) {
+      throw new Error(`Spec ${spec.id} is already mounted`);
+    }
+    this.mounted.add(spec);
+  }
+
+  unmount(spec: BaseSpec, keepValue?: boolean): void {
+    this.mounted.delete(spec);
+
+    const shouldKeep =
+      keepValue ?? (spec instanceof FieldSpec ? spec.keepOnUnmount : false);
+
+    if (!shouldKeep) {
+      const defaultValue = this.staticDefaults.get(spec);
+      this.values = this.lenses
+        .get(spec)
+        .set(defaultValue, this.values) as Record<string, unknown>;
+      this.touched.delete(spec);
+      const errorMap = this.errors.get(spec);
+      if (errorMap) {
+        errorMap.clear();
+      }
+    }
+  }
+
+  isMounted(spec: BaseSpec): boolean {
+    return this.mounted.has(spec);
+  }
+
+  setRef(spec: BaseSpec, element: HTMLElement | null): void {
+    this.domRefs.set(spec, element);
+  }
+
+  getRef(spec: BaseSpec): HTMLElement | null {
+    return this.domRefs.get(spec) ?? null;
+  }
+
+  submit(
+    onValid: (values: Record<string, unknown>) => void,
+    onInvalid?: (errors: Map<BaseSpec, string | null>) => void,
+  ): boolean {
+    this.validateTree();
+
+    const allSpecs = this.collectTreeSpecs(this.formSpec);
+    for (const s of allSpecs) {
+      if (s === this.formSpec) continue;
+      if (s.mountRequired && !this.mounted.has(s)) {
+        const errors = this.collectErrors();
+        this.tryFocusFirstError(errors);
+        onInvalid?.(errors);
+        return false;
+      }
+    }
+
+    const errors = this.collectErrors();
+    const hasErrors = Array.from(errors.values()).some((e) => e !== null);
+
+    if (hasErrors) {
+      this.tryFocusFirstError(errors);
+      onInvalid?.(errors);
+      return false;
+    }
+
+    onValid(this.getValues());
+    return true;
+  }
+
+  private collectErrors(): Map<BaseSpec, string | null> {
+    const result = new Map<BaseSpec, string | null>();
+    const allSpecs = this.collectTreeSpecs(this.formSpec);
+    for (const s of allSpecs) {
+      result.set(s, this.getError(s));
+    }
+    return result;
+  }
+
+  private tryFocusFirstError(errors: Map<BaseSpec, string | null>): void {
+    for (const [spec, error] of errors) {
+      if (error !== null) {
+        const ref = this.domRefs.get(spec);
+        if (ref && typeof ref.focus === 'function') {
+          ref.focus();
+        }
+        return;
+      }
+    }
   }
 
   getStaticDefault(spec: BaseSpec): unknown {
