@@ -1,31 +1,29 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ValuesStore,
+  FormDataStore,
   ObjectStore,
   ArrayStore,
 } from '../src/store/form-data-store.js';
 import { Lens } from '../src/lens/index.js';
+import type { LensImpl } from '../src/lens/index.js';
 
 describe('ValuesStore', () => {
   it('starts with empty values', () => {
-    const store = new ValuesStore();
+    const store = new FormDataStore();
     assert.deepStrictEqual(store.getValues(), {});
   });
 
   it('stores and retrieves a value via lens', () => {
-    const store = new ValuesStore();
-    const lens = new Lens<Record<string, unknown>, string>();
+    const store = new FormDataStore();
+    const lens = Lens.identity<Record<string, unknown>>();
     store.set(lens, 'hello');
     assert.strictEqual(store.get(lens), 'hello');
   });
 
   it('set is immutable — each set produces new root', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<
-      Record<string, unknown>,
-      Record<string, unknown>
-    >();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const propLens = rootLens.prop('x');
 
     store.set(propLens, 'first');
@@ -40,19 +38,16 @@ describe('ValuesStore', () => {
   });
 
   it('get on unset key returns undefined', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<
-      Record<string, unknown>,
-      Record<string, unknown>
-    >();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     assert.strictEqual(store.get(rootLens.prop('missing')), undefined);
   });
 });
 
 describe('ObjectStore', () => {
   function createRootObjectStore() {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     return new ObjectStore(store, rootLens);
   }
 
@@ -158,8 +153,8 @@ describe('ObjectStore', () => {
 
 describe('ArrayStore', () => {
   it('scopeIndex auto-creates empty object at new index', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const obj = new ObjectStore(store, rootLens);
     const arr = obj.scopeArray('items');
 
@@ -169,8 +164,8 @@ describe('ArrayStore', () => {
   });
 
   it('scopeIndex returns ObjectStore for existing object', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const obj = new ObjectStore(store, rootLens);
     obj.set('items', [{ existing: 'value' }]);
     const arr = obj.scopeArray('items');
@@ -182,8 +177,8 @@ describe('ArrayStore', () => {
   });
 
   it('scopeIndex throws on string element', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     // Manually set array with string — bypass scopeArray validation
     const arrLens = rootLens.prop('arr');
     store.set(arrLens, ['not-object']);
@@ -196,8 +191,8 @@ describe('ArrayStore', () => {
   });
 
   it('scopeIndex throws on null element', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const obj = new ObjectStore(store, rootLens);
     // Manually set array with null — bypass scopeArray validation
     const arrLens = rootLens.prop('arr');
@@ -208,8 +203,8 @@ describe('ArrayStore', () => {
   });
 
   it('scopeIndex throws on number element', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const obj = new ObjectStore(store, rootLens);
     // Manually set array with number — bypass scopeArray validation
     const arrLens = rootLens.prop('arr');
@@ -225,8 +220,8 @@ describe('ArrayStore', () => {
 
 describe('Integration (nested scoping)', () => {
   it('object → array → index → object round-trip', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const obj = new ObjectStore(store, rootLens);
 
     const users = obj.scopeArray('users');
@@ -246,8 +241,8 @@ describe('Integration (nested scoping)', () => {
   });
 
   it('deeply nested object → object → array → index', () => {
-    const store = new ValuesStore();
-    const rootLens = new Lens<Record<string, unknown>, unknown>();
+    const store = new FormDataStore();
+    const rootLens = Lens.identity<Record<string, unknown>>();
     const root = new ObjectStore(store, rootLens);
 
     const company = root.scopeObject('company');

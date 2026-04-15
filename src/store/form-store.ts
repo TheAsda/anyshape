@@ -6,6 +6,7 @@ import { ObjectSpec, ObjectSpecChildren } from '../specs/object.js';
 import { ArraySpec } from '../specs/array.js';
 import { FieldSpec } from '../specs/field.js';
 import type { ArrayStore } from './array-store.js';
+import { FormDataStore } from './form-data-store.js';
 
 interface LensEntry {
   lens: Lens<Record<string, unknown>, unknown>;
@@ -14,7 +15,7 @@ interface LensEntry {
 }
 
 export class FormStore {
-  private values: Record<string, unknown>;
+  private store: FormDataStore;
   private errors: WeakMap<BaseSpec, string | null>;
   private touched: WeakMap<BaseSpec, boolean>;
   private mounted: WeakSet<BaseSpec>;
@@ -23,16 +24,19 @@ export class FormStore {
   private listeners: WeakMap<BaseSpec, Set<() => void>>;
   private lenses: LensStore;
   private parents: WeakMap<BaseSpec, BaseSpec | null>;
-  private initialValues: Record<string, unknown>;
+  // private initialValues: Record<string, unknown>;
   private formSpecs: BaseSpec[];
-  private arrayStores: Map<ArraySpec<ObjectSpec<ObjectSpecChildren>>, ArrayStore>;
+  private arrayStores: Map<
+    ArraySpec<ObjectSpec<ObjectSpecChildren>>,
+    ArrayStore
+  >;
 
   private get treeOrder(): BaseSpec[] {
     return this.formSpecs;
   }
 
   constructor(form: ObjectSpec, initialData?: Record<string, unknown>) {
-    this.values = {};
+    this.store = new FormDataStore();
     this.errors = new WeakMap();
     this.touched = new WeakMap();
     this.mounted = new WeakSet();
@@ -46,12 +50,10 @@ export class FormStore {
 
     this.buildParentsTree(form, null);
     this.fillFormSpecs(form);
-    this.values = this.buildInitialValues(form.children, initialData);
-    this.initialValues = this.deepClone(this.values);
   }
 
   get(spec: BaseSpec): unknown {
-    return this.lenses.get(spec).get(this.values);
+    return this.lenses.get(spec);
   }
 
   set(
@@ -209,11 +211,16 @@ export class FormStore {
     return this.mounted.has(spec);
   }
 
-  registerArrayStore(arraySpec: ArraySpec<ObjectSpec<ObjectSpecChildren>>, store: ArrayStore): void {
+  registerArrayStore(
+    arraySpec: ArraySpec<ObjectSpec<ObjectSpecChildren>>,
+    store: ArrayStore,
+  ): void {
     this.arrayStores.set(arraySpec, store);
   }
 
-  unregisterArrayStore(arraySpec: ArraySpec<ObjectSpec<ObjectSpecChildren>>): void {
+  unregisterArrayStore(
+    arraySpec: ArraySpec<ObjectSpec<ObjectSpecChildren>>,
+  ): void {
     this.arrayStores.delete(arraySpec);
   }
 
@@ -395,52 +402,52 @@ export class FormStore {
 
   //#endregion
 
-  private buildInitialValues(
-    children: Record<string, BaseSpec>,
-    initialData: Record<string, unknown> | undefined,
-  ): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+  // private buildInitialValues(
+  //   children: Record<string, BaseSpec>,
+  //   initialData: Record<string, unknown> | undefined,
+  // ): Record<string, unknown> {
+  //   const result: Record<string, unknown> = {};
 
-    for (const [key, spec] of Object.entries(children)) {
-      const hasInit =
-        initialData != null &&
-        key in initialData &&
-        (initialData as Record<string, unknown>)[key] !== undefined;
+  //   for (const [key, spec] of Object.entries(children)) {
+  //     const hasInit =
+  //       initialData != null &&
+  //       key in initialData &&
+  //       (initialData as Record<string, unknown>)[key] !== undefined;
 
-      if (spec._kind === 'object') {
-        const objChildren = (
-          spec as unknown as { children: Record<string, BaseSpec> }
-        ).children;
-        result[key] = this.buildInitialValues(
-          objChildren,
-          hasInit
-            ? ((initialData as Record<string, unknown>)[key] as Record<
-                string,
-                unknown
-              >)
-            : undefined,
-        );
-      } else if (spec._kind === 'field') {
-        const dv = (spec as unknown as { defaultValue?: unknown }).defaultValue;
-        result[key] = hasInit
-          ? (initialData as Record<string, unknown>)[key]
-          : dv !== undefined
-            ? dv
-            : undefined;
-      } else if (spec._kind === 'array') {
-        const arrSpec = spec as unknown as { defaultValue?: unknown[] };
-        result[key] = hasInit
-          ? (initialData as Record<string, unknown>)[key]
-          : (arrSpec.defaultValue ?? []);
-      } else {
-        result[key] = hasInit
-          ? (initialData as Record<string, unknown>)[key]
-          : undefined;
-      }
-    }
+  //     if (spec._kind === 'object') {
+  //       const objChildren = (
+  //         spec as unknown as { children: Record<string, BaseSpec> }
+  //       ).children;
+  //       result[key] = this.buildInitialValues(
+  //         objChildren,
+  //         hasInit
+  //           ? ((initialData as Record<string, unknown>)[key] as Record<
+  //               string,
+  //               unknown
+  //             >)
+  //           : undefined,
+  //       );
+  //     } else if (spec._kind === 'field') {
+  //       const dv = (spec as unknown as { defaultValue?: unknown }).defaultValue;
+  //       result[key] = hasInit
+  //         ? (initialData as Record<string, unknown>)[key]
+  //         : dv !== undefined
+  //           ? dv
+  //           : undefined;
+  //     } else if (spec._kind === 'array') {
+  //       const arrSpec = spec as unknown as { defaultValue?: unknown[] };
+  //       result[key] = hasInit
+  //         ? (initialData as Record<string, unknown>)[key]
+  //         : (arrSpec.defaultValue ?? []);
+  //     } else {
+  //       result[key] = hasInit
+  //         ? (initialData as Record<string, unknown>)[key]
+  //         : undefined;
+  //     }
+  //   }
 
-    return result;
-  }
+  //   return result;
+  // }
 
   private getDescendants(spec: BaseSpec): BaseSpec[] {
     if (spec._kind === 'object') {
