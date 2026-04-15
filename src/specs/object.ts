@@ -13,16 +13,20 @@ type ObjectRaw<C extends ObjectSpecChildren> = {
 
 export interface ObjectSpecOptions<
   C extends ObjectSpecChildren,
-> extends ValidatableSpecOptions<ObjectValid<C>, ObjectRaw<C>> {}
+> extends ValidatableSpecOptions<ObjectValid<C>, ObjectRaw<C>> {
+  defaultValue?: ObjectRaw<C>;
+}
 
 export class ObjectSpec<
   C extends ObjectSpecChildren = ObjectSpecChildren,
 > extends ValidatableSpec<ObjectValid<C>, ObjectRaw<C>> {
   readonly _kind = 'object' as const;
   readonly children: C;
+  readonly defaultValue?: ObjectRaw<C>;
 
   constructor(children: C, config?: ObjectSpecOptions<C>) {
     super(config);
     this.children = children;
+    this.defaultValue = config?.defaultValue;
   }
 }
