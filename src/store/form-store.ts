@@ -1,8 +1,9 @@
 import { LensStore } from './lens-store.js';
-import { BaseSpec } from '../specs/base.js';
+import { BaseSpec, ValidatableSpec } from '../specs/base.js';
 import { type ObjectSpecChildren, ObjectSpec } from '../specs/object.js';
 import { ArraySpec } from '../specs/array.js';
 import { FieldSpec } from '../specs/field.js';
+import type { ZodType } from 'zod/v4';
 
 export interface ArrayState {
   items: Array<{ id: string; index: number }>;
@@ -20,6 +21,9 @@ export class FormStore {
   private touched: WeakSet<BaseSpec>;
   private containingArray: WeakMap<BaseSpec, ArraySpec>;
   private idCounter: number;
+  private errors: WeakMap<BaseSpec, Map<string, string | null>>;
+  private schemaOverrides: WeakMap<BaseSpec, ZodType>;
+  private listeners: WeakMap<BaseSpec, Set<() => void>>;
 
   constructor(form: ObjectSpec, initialData?: Record<string, unknown>) {
     this.formSpec = form;
@@ -33,6 +37,9 @@ export class FormStore {
     this.touched = new WeakSet();
     this.containingArray = new WeakMap();
     this.idCounter = 0;
+    this.errors = new WeakMap();
+    this.schemaOverrides = new WeakMap();
+    this.listeners = new WeakMap();
 
     this.buildParentsTree(form, null);
     this.computeAllStaticDefaults(form);
@@ -105,6 +112,8 @@ export class FormStore {
     if (!options?.noTouch) {
       this.touched.add(spec);
     }
+
+    this.notifyValueChanged(spec);
   }
 
   getValues(): Record<string, unknown> {
@@ -116,6 +125,7 @@ export class FormStore {
       this.values = this.deepClone(this.initialValues);
       this.arrayStates = this.cloneArrayStates(this.initialArrayStates);
       this.touched = new WeakSet();
+      this.notifyReset(this.formSpec);
       return;
     }
 
@@ -123,10 +133,92 @@ export class FormStore {
     const initialVal = lens.get(this.initialValues);
     this.values = lens.set(initialVal, this.values) as Record<string, unknown>;
     this.clearTouchedSubtree(spec);
+    this.notifyReset(spec);
   }
 
   isTouched(spec: BaseSpec): boolean {
     return this.touched.has(spec);
+  }
+
+  validateSpec(
+    spec: BaseSpec,
+    itemId?: string,
+  ): { success: boolean; error: string | null } {
+    const schema =
+      this.schemaOverrides.get(spec) ??
+      (spec instanceof ValidatableSpec ? spec._schema : undefined);
+
+    if (!schema) {
+      const errorMap = this.getOrCreateErrorMap(spec);
+      errorMap.set(itemId ?? '', null);
+      return { success: true, error: null };
+    }
+
+    const value = this.get(spec, itemId ? { itemId } : undefined);
+    const result = schema.safeParse(value);
+
+    const errorMap = this.getOrCreateErrorMap(spec);
+    if (result.success) {
+      errorMap.set(itemId ?? '', null);
+      return { success: true, error: null };
+    }
+
+    const message =
+      (result.error as { issues?: Array<{ message?: string }> })
+        ?.issues?.[0]?.message ?? 'Validation failed';
+    errorMap.set(itemId ?? '', message);
+    return { success: false, error: message };
+  }
+
+  validateTree(
+    spec?: BaseSpec,
+    itemId?: string,
+  ): { success: boolean; errors: Map<BaseSpec, string | null> } {
+    const allErrors = new Map<BaseSpec, string | null>();
+
+    let specsToValidate: BaseSpec[];
+    if (!spec) {
+      specsToValidate = this.collectTreeSpecs(this.formSpec);
+    } else {
+      specsToValidate = [spec, ...this.collectDescendants(spec)];
+    }
+
+    for (const s of specsToValidate) {
+      this.validateSpec(s, itemId);
+      allErrors.set(s, this.getError(s, itemId));
+    }
+
+    const success = Array.from(allErrors.values()).every((e) => e === null);
+    return { success, errors: allErrors };
+  }
+
+  getError(spec: BaseSpec, itemId?: string): string | null {
+    const errorMap = this.errors.get(spec);
+    if (!errorMap) return null;
+    return errorMap.get(itemId ?? '') ?? null;
+  }
+
+  setSchema(spec: BaseSpec, schema: ZodType): void {
+    this.schemaOverrides.set(spec, schema);
+  }
+
+  removeSchema(spec: BaseSpec): void {
+    this.schemaOverrides.delete(spec);
+  }
+
+  subscribe(spec: BaseSpec, listener: () => void): () => void {
+    let listenerSet = this.listeners.get(spec);
+    if (!listenerSet) {
+      listenerSet = new Set();
+      this.listeners.set(spec, listenerSet);
+    }
+    listenerSet.add(listener);
+    return () => {
+      const set = this.listeners.get(spec);
+      if (set) {
+        set.delete(listener);
+      }
+    };
   }
 
   getStaticDefault(spec: BaseSpec): unknown {
@@ -139,6 +231,77 @@ export class FormStore {
 
   private generateId(): string {
     return `item_${this.idCounter++}`;
+  }
+
+  private getOrCreateErrorMap(spec: BaseSpec): Map<string, string | null> {
+    let errorMap = this.errors.get(spec);
+    if (!errorMap) {
+      errorMap = new Map();
+      this.errors.set(spec, errorMap);
+    }
+    return errorMap;
+  }
+
+  private collectTreeSpecs(spec: BaseSpec): BaseSpec[] {
+    return [spec, ...this.collectDescendants(spec)];
+  }
+
+  private collectDescendants(spec: BaseSpec): BaseSpec[] {
+    const result: BaseSpec[] = [];
+    if (spec instanceof ObjectSpec) {
+      for (const child of Object.values(
+        spec.children as ObjectSpecChildren,
+      )) {
+        result.push(child);
+        result.push(...this.collectDescendants(child));
+      }
+    } else if (spec instanceof ArraySpec) {
+      result.push(spec.item);
+      result.push(...this.collectDescendants(spec.item));
+    }
+    return result;
+  }
+
+  private notifyValueChanged(spec: BaseSpec): void {
+    this.fireListeners(spec);
+    let current: BaseSpec | null | undefined = this.parents.get(spec);
+    while (current !== null && current !== undefined) {
+      this.fireListeners(current);
+      current = this.parents.get(current);
+    }
+  }
+
+  private notifyReset(spec: BaseSpec): void {
+    const notified = new Set<BaseSpec>();
+
+    this.fireListeners(spec);
+    notified.add(spec);
+
+    const descendants = this.collectDescendants(spec);
+    for (const d of descendants) {
+      if (!notified.has(d)) {
+        this.fireListeners(d);
+        notified.add(d);
+      }
+    }
+
+    let current: BaseSpec | null | undefined = this.parents.get(spec);
+    while (current !== null && current !== undefined) {
+      if (!notified.has(current)) {
+        this.fireListeners(current);
+        notified.add(current);
+      }
+      current = this.parents.get(current);
+    }
+  }
+
+  private fireListeners(spec: BaseSpec): void {
+    const listenerSet = this.listeners.get(spec);
+    if (listenerSet) {
+      for (const listener of listenerSet) {
+        listener();
+      }
+    }
   }
 
   private findContainingArray(spec: BaseSpec): ArraySpec | undefined {
