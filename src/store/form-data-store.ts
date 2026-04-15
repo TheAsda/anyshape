@@ -1,11 +1,11 @@
-import { Lens } from '../lens';
+import { LensImpl } from '../lens';
 
 type StoreValues = Record<string, unknown>;
 
 export class ObjectStore {
-  private store: ValuesStore;
-  private parentLens: Lens<StoreValues, unknown>;
-  constructor(store: ValuesStore, parentLens: Lens<StoreValues, unknown>) {
+  private store: FormDataStore;
+  private parentLens: LensImpl<StoreValues, unknown>;
+  constructor(store: FormDataStore, parentLens: LensImpl<StoreValues, unknown>) {
     this.store = store;
     this.parentLens = parentLens;
   }
@@ -49,9 +49,9 @@ export class ObjectStore {
 }
 
 export class ArrayStore {
-  private store: ValuesStore;
-  private parentLens: Lens<StoreValues, unknown>;
-  constructor(store: ValuesStore, parentLens: Lens<StoreValues, unknown>) {
+  private store: FormDataStore;
+  private parentLens: LensImpl<StoreValues, unknown>;
+  constructor(store: FormDataStore, parentLens: LensImpl<StoreValues, unknown>) {
     this.store = store;
     this.parentLens = parentLens;
   }
@@ -72,18 +72,18 @@ export class ArrayStore {
   }
 }
 
-export class ValuesStore {
+export class FormDataStore {
   private values: StoreValues;
 
   constructor() {
     this.values = {};
   }
 
-  set<Value>(lens: Lens<StoreValues, Value>, value: Value) {
-    this.values = lens.set(this.values, value);
+  set<Value>(lens: LensImpl<StoreValues, Value>, value: Value) {
+    this.values = lens.set(value, this.values);
   }
 
-  get<Value>(lens: Lens<StoreValues, Value>): Value {
+  get<Value>(lens: LensImpl<StoreValues, Value>): Value {
     return lens.get(this.values);
   }
 
