@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { field, object, form } from '../src/specs/factories.js';
+import { field, object, form, array } from '../src/specs/factories.js';
 import { FormStore } from '../src/store/form-store.js';
 import { ScopedStore } from '../src/store/scoped-store.js';
 import { ObjectSpec } from '../src/specs/object.js';
@@ -448,16 +448,17 @@ describe('ScopedStore — subscribe delegates to FormStore', () => {
   });
 });
 
-describe('ScopedStore — scopeArray throws', () => {
-  it('scopeArray throws not implemented', () => {
+describe('ScopedStore — scopeArray validates ownership', () => {
+  it('scopeArray throws for non-owned spec', () => {
     const nameSpec = field<string>();
+    const otherArraySpec = array(object({ name: field<string>() }));
     const spec = form({ name: nameSpec });
     const store = new FormStore(spec);
     const rootScope = new ScopedStore(store, spec, null);
 
     assert.throws(
-      () => rootScope.scopeArray({} as never),
-      /not yet implemented/,
+      () => rootScope.scopeArray(otherArraySpec),
+      /not owned by this scope/,
     );
   });
 });

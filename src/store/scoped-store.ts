@@ -2,6 +2,19 @@ import { BaseSpec } from '../specs/base.js';
 import { ObjectSpec } from '../specs/object.js';
 import { ArraySpec } from '../specs/array.js';
 import { FormStore } from './form-store.js';
+import type { ArrayScopedStore } from './array-scoped-store.js';
+
+type ArrayScopedStoreCtor = new (
+  formStore: FormStore,
+  arraySpec: ArraySpec,
+  parentScope: ScopedStore,
+) => ArrayScopedStore;
+
+let _arrayScopedStoreCtor: ArrayScopedStoreCtor | null = null;
+
+export function _registerArrayScopedStore(ctor: ArrayScopedStoreCtor): void {
+  _arrayScopedStoreCtor = ctor;
+}
 
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -24,10 +37,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 export class ScopedStore {
-  private formStore: FormStore;
-  private scopeSpec: ObjectSpec;
-  private parentScope: ScopedStore | null;
-  private ownedFields: Set<BaseSpec>;
+  protected formStore: FormStore;
+  protected scopeSpec: ObjectSpec;
+  protected parentScope: ScopedStore | null;
+  protected ownedFields: Set<BaseSpec>;
 
   constructor(
     formStore: FormStore,
@@ -122,7 +135,15 @@ export class ScopedStore {
     return new ScopedStore(this.formStore, childObjectSpec, this);
   }
 
-  scopeArray(childArraySpec: ArraySpec): never {
-    throw new Error('ArrayScopedStore is not yet implemented');
+  scopeArray(childArraySpec: ArraySpec): ArrayScopedStore {
+    if (!this.ownedFields.has(childArraySpec)) {
+      throw new Error(
+        `Cannot scope array ${childArraySpec.id}: not owned by this scope`,
+      );
+    }
+    if (!_arrayScopedStoreCtor) {
+      throw new Error('ArrayScopedStore not registered');
+    }
+    return new _arrayScopedStoreCtor(this.formStore, childArraySpec, this);
   }
 }
