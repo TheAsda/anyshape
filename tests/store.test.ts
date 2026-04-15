@@ -502,3 +502,221 @@ describe('staticDefaults map', () => {
     assert.deepEqual(store.getStaticDefault(itemsSpec), [{ name: 'A' }]);
   });
 });
+
+describe('Validation — validateSpec', () => {
+  it('valid value passes validation', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.set(nameSpec, 'hello');
+    const result = store.validateSpec(nameSpec);
+
+    assert.equal(result.success, true);
+    assert.equal(result.error, null);
+    assert.equal(store.getError(nameSpec), null);
+  });
+
+  it('invalid value sets error message', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.set(nameSpec, '');
+    const result = store.validateSpec(nameSpec);
+
+    assert.equal(result.success, false);
+    assert.ok(result.error);
+    assert.equal(store.getError(nameSpec), result.error);
+  });
+
+  it('spec without schema always passes', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.set(nameSpec, 'anything');
+    const result = store.validateSpec(nameSpec);
+
+    assert.equal(result.success, true);
+    assert.equal(result.error, null);
+  });
+});
+
+describe('Validation — schema overrides', () => {
+  it('schema override takes precedence over spec schema', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.setSchema(nameSpec, z.string().min(5));
+    store.set(nameSpec, 'ab');
+
+    const result = store.validateSpec(nameSpec);
+    assert.equal(result.success, false);
+    assert.ok(result.error);
+  });
+
+  it('removeSchema restores original spec schema', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.setSchema(nameSpec, z.string().min(5));
+    store.removeSchema(nameSpec);
+    store.set(nameSpec, 'ab');
+
+    const result = store.validateSpec(nameSpec);
+    assert.equal(result.success, true);
+    assert.equal(result.error, null);
+  });
+});
+
+describe('Validation — validateTree', () => {
+  it('validates all specs when no spec provided', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const emailSpec = field<string>({ schema: z.string().email() });
+    const spec = form({ name: nameSpec, email: emailSpec });
+    const store = new FormStore(spec);
+
+    store.set(nameSpec, 'Alice');
+    store.set(emailSpec, 'invalid');
+
+    const result = store.validateTree();
+    assert.equal(result.success, false);
+    assert.ok(result.errors.get(emailSpec));
+    assert.equal(result.errors.get(nameSpec), null);
+  });
+
+  it('validates spec + descendants when spec provided', () => {
+    const citySpec = field<string>({ schema: z.string().min(1) });
+    const zipSpec = field<string>({ schema: z.string().length(5) });
+    const addressSpec = object({ city: citySpec, zip: zipSpec });
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec, address: addressSpec });
+    const store = new FormStore(spec);
+
+    store.set(citySpec, '');
+    store.set(zipSpec, '1234');
+
+    const result = store.validateTree(addressSpec);
+    assert.equal(result.success, false);
+    assert.ok(result.errors.has(citySpec));
+    assert.ok(result.errors.has(zipSpec));
+    assert.ok(!result.errors.has(nameSpec));
+  });
+});
+
+describe('Notifications — subscribe', () => {
+  it('value change fires self listener', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    let callCount = 0;
+    store.subscribe(nameSpec, () => { callCount++; });
+
+    store.set(nameSpec, 'hello');
+    assert.equal(callCount, 1);
+  });
+
+  it('value change fires ancestor listeners', () => {
+    const citySpec = field<string>();
+    const addressSpec = object({ city: citySpec });
+    const spec = form({ name: addressSpec });
+    const store = new FormStore(spec);
+
+    let childCalls = 0;
+    let parentCalls = 0;
+    let rootCalls = 0;
+    store.subscribe(citySpec, () => { childCalls++; });
+    store.subscribe(addressSpec, () => { parentCalls++; });
+    store.subscribe(spec, () => { rootCalls++; });
+
+    store.set(citySpec, 'NYC');
+    assert.equal(childCalls, 1);
+    assert.equal(parentCalls, 1);
+    assert.equal(rootCalls, 1);
+  });
+
+  it('value change does NOT fire sibling listeners', () => {
+    const nameSpec = field<string>();
+    const emailSpec = field<string>();
+    const spec = form({ name: nameSpec, email: emailSpec });
+    const store = new FormStore(spec);
+
+    let siblingCalls = 0;
+    store.subscribe(emailSpec, () => { siblingCalls++; });
+
+    store.set(nameSpec, 'Alice');
+    assert.equal(siblingCalls, 0);
+  });
+
+  it('unsubscribe stops notifications', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    let callCount = 0;
+    const unsub = store.subscribe(nameSpec, () => { callCount++; });
+
+    store.set(nameSpec, 'first');
+    assert.equal(callCount, 1);
+
+    unsub();
+    store.set(nameSpec, 'second');
+    assert.equal(callCount, 1);
+  });
+});
+
+describe('Notifications — reset', () => {
+  it('full reset fires all listeners', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec, { name: 'init' });
+
+    let rootCalls = 0;
+    let childCalls = 0;
+    store.subscribe(spec, () => { rootCalls++; });
+    store.subscribe(nameSpec, () => { childCalls++; });
+
+    store.set(nameSpec, 'changed');
+    assert.equal(rootCalls, 1);
+    assert.equal(childCalls, 1);
+
+    store.reset();
+    assert.equal(rootCalls, 2);
+    assert.equal(childCalls, 2);
+  });
+
+  it('subtree reset fires self + descendants + ancestors (deduplicated)', () => {
+    const citySpec = field<string>();
+    const zipSpec = field<string>();
+    const addressSpec = object({ city: citySpec, zip: zipSpec });
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec, address: addressSpec });
+    const store = new FormStore(spec, {
+      name: 'A',
+      address: { city: 'X', zip: '00000' },
+    });
+
+    let rootCalls = 0;
+    let addressCalls = 0;
+    let cityCalls = 0;
+    let zipCalls = 0;
+    let nameCalls = 0;
+    store.subscribe(spec, () => { rootCalls++; });
+    store.subscribe(addressSpec, () => { addressCalls++; });
+    store.subscribe(citySpec, () => { cityCalls++; });
+    store.subscribe(zipSpec, () => { zipCalls++; });
+    store.subscribe(nameSpec, () => { nameCalls++; });
+
+    store.reset(addressSpec);
+
+    assert.equal(rootCalls, 1);
+    assert.equal(addressCalls, 1);
+    assert.equal(cityCalls, 1);
+    assert.equal(zipCalls, 1);
+    assert.equal(nameCalls, 0);
+  });
+});
