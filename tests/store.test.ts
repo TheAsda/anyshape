@@ -720,3 +720,179 @@ describe('Notifications — reset', () => {
     assert.equal(nameCalls, 0);
   });
 });
+
+describe('Mount/Unmount lifecycle', () => {
+  it('mount/unmount resets value to static default and clears touched', () => {
+    const nameSpec = field<string>({ defaultValue: 'default' });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, 'changed');
+    assert.equal(store.get(nameSpec), 'changed');
+    assert.equal(store.isTouched(nameSpec), true);
+    assert.equal(store.isMounted(nameSpec), true);
+
+    store.unmount(nameSpec);
+    assert.equal(store.get(nameSpec), 'default');
+    assert.equal(store.isTouched(nameSpec), false);
+    assert.equal(store.isMounted(nameSpec), false);
+  });
+
+  it('unmount clears mountRequired:false field entirely (static default is undefined)', () => {
+    const nameSpec = field<string>({ defaultValue: 'hello' });
+    const optSpec = field<string>({ mountRequired: false });
+    const spec = form({ name: nameSpec, optional: optSpec });
+    const store = new FormStore(spec);
+
+    store.mount(optSpec);
+    store.set(optSpec, 'set-value');
+    assert.equal(store.get(optSpec), 'set-value');
+
+    store.unmount(optSpec);
+    assert.equal(store.get(optSpec), undefined);
+  });
+
+  it('unmount with keepOnUnmount preserves value', () => {
+    const nameSpec = field<string>({ keepOnUnmount: true, defaultValue: 'default' });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, 'preserved');
+    store.unmount(nameSpec);
+    assert.equal(store.get(nameSpec), 'preserved');
+  });
+
+  it('unmount with explicit keepValue=true preserves value', () => {
+    const nameSpec = field<string>({ defaultValue: 'default' });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, 'kept');
+    store.unmount(nameSpec, true);
+    assert.equal(store.get(nameSpec), 'kept');
+  });
+
+  it('mount throws if already mounted', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    assert.throws(() => store.mount(nameSpec), /already mounted/);
+  });
+
+  it('unmount clears error for spec', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, '');
+    store.validateSpec(nameSpec);
+    assert.ok(store.getError(nameSpec));
+
+    store.unmount(nameSpec);
+    assert.equal(store.getError(nameSpec), null);
+  });
+});
+
+describe('Submit', () => {
+  it('calls onValid when all mounted and valid', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, 'Alice');
+
+    let onValidCalled = false;
+    let receivedValues: Record<string, unknown> | undefined;
+    const result = store.submit((values) => {
+      onValidCalled = true;
+      receivedValues = values;
+    });
+
+    assert.equal(result, true);
+    assert.equal(onValidCalled, true);
+    assert.equal(receivedValues!.name, 'Alice');
+  });
+
+  it('calls onInvalid when validation fails', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, '');
+
+    let onInvalidCalled = false;
+    const result = store.submit(
+      () => {},
+      (errors) => {
+        onInvalidCalled = true;
+        assert.ok(errors.get(nameSpec));
+      },
+    );
+
+    assert.equal(result, false);
+    assert.equal(onInvalidCalled, true);
+  });
+
+  it('returns false when mountRequired spec not mounted', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    store.set(nameSpec, 'Alice');
+
+    let onValidCalled = false;
+    const result = store.submit(() => { onValidCalled = true; });
+
+    assert.equal(result, false);
+    assert.equal(onValidCalled, false);
+  });
+
+  it('submit succeeds when mountRequired:false spec is not mounted', () => {
+    const nameSpec = field<string>({ schema: z.string().min(1) });
+    const optSpec = field<string>({ mountRequired: false, defaultValue: 'opt' });
+    const spec = form({ name: nameSpec, optional: optSpec });
+    const store = new FormStore(spec);
+
+    store.mount(nameSpec);
+    store.set(nameSpec, 'Alice');
+
+    let onValidCalled = false;
+    const result = store.submit(() => { onValidCalled = true; });
+
+    assert.equal(result, true);
+    assert.equal(onValidCalled, true);
+  });
+});
+
+describe('DomRef tracking', () => {
+  it('setRef and getRef store and retrieve element', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    assert.equal(store.getRef(nameSpec), null);
+
+    const fakeEl = { focus: () => {} } as unknown as HTMLElement;
+    store.setRef(nameSpec, fakeEl);
+    assert.equal(store.getRef(nameSpec), fakeEl);
+  });
+
+  it('setRef with null clears ref', () => {
+    const nameSpec = field<string>();
+    const spec = form({ name: nameSpec });
+    const store = new FormStore(spec);
+
+    const fakeEl = { focus: () => {} } as unknown as HTMLElement;
+    store.setRef(nameSpec, fakeEl);
+    store.setRef(nameSpec, null);
+    assert.equal(store.getRef(nameSpec), null);
+  });
+});
