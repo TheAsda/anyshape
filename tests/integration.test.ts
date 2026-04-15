@@ -1,404 +1,628 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { FormStore } from '../src/store/form-store.js';
-import { FieldSpec } from '../src/specs/field.js';
-import { ObjectSpec } from '../src/specs/object.js';
 import { z } from 'zod';
+import { field, object, array, form } from '../src/specs/factories.js';
+import { FormStore } from '../src/store/form-store.js';
+import { ScopedStore } from '../src/store/scoped-store.js';
+import { ArrayScopedStore } from '../src/store/array-scoped-store.js';
 
-// ── Integration 1: Full form lifecycle ──────────────────────────────────────
+// Side-effect: registers ArrayScopedStore in ScopedStore's internal registry
+void ArrayScopedStore;
 
-describe('Integration: Full form lifecycle', () => {
-  it('create → mount → set → validate → submit', () => {
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-    const emailSpec = new FieldSpec<string>({
-      id: 'email',
+// ── Scenario 1: Full form lifecycle with nested objects and arrays ──────────
+
+describe('Integration: Full form lifecycle with nested objects and arrays', () => {
+  it('create form → root scope → nested scopes → set values → append array items → validate → submit', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const zipSpec = field<string>();
+    const addressSpec = object({ city: citySpec, zip: zipSpec });
+    const customerSpec = object({ address: addressSpec });
+    const productNameSpec = field<string>({ defaultValue: '' });
+    const qtySpec = field<number>({ defaultValue: 1 });
+    const itemSpec = object({ productName: productNameSpec, qty: qtySpec });
+    const itemsSpec = array(itemSpec);
+
+    const formSpec = form({
+      name: nameSpec,
+      customer: customerSpec,
+      items: itemsSpec,
+    });
+
+    const store = new FormStore(formSpec);
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
+
+    const customerScope = rootScope.scopeObject(customerSpec);
+    customerScope.mount();
+
+    const addressScope = customerScope.scopeObject(addressSpec);
+    addressScope.mount();
+
+    rootScope.set(nameSpec, 'Acme Corp');
+    addressScope.set(citySpec, 'NYC');
+    addressScope.set(zipSpec, '10001');
+
+    const arrayScope = rootScope.scopeArray(itemsSpec);
+    assert.ok(arrayScope instanceof ArrayScopedStore);
+
+    const itemId1 = arrayScope.append({ productName: 'Widget', qty: 5 });
+    const itemId2 = arrayScope.append({ productName: 'Gadget', qty: 10 });
+
+    assert.equal(store.get(nameSpec), 'Acme Corp');
+    assert.equal(store.get(citySpec), 'NYC');
+    assert.equal(store.get(zipSpec), '10001');
+    assert.equal(store.get(productNameSpec, { itemId: itemId1 }), 'Widget');
+    assert.equal(store.get(qtySpec, { itemId: itemId1 }), 5);
+    assert.equal(store.get(productNameSpec, { itemId: itemId2 }), 'Gadget');
+    assert.equal(store.get(qtySpec, { itemId: itemId2 }), 10);
+
+    assert.equal(store.get(nameSpec), 'Acme Corp');
+    assert.equal(store.get(citySpec), 'NYC');
+    assert.equal(store.get(zipSpec), '10001');
+
+    const vals = store.getValues();
+    assert.equal(vals.name, 'Acme Corp');
+
+    const customer = vals.customer as Record<string, unknown>;
+    const address = customer.address as Record<string, unknown>;
+    assert.equal(address.city, 'NYC');
+    assert.equal(address.zip, '10001');
+
+    const items = vals.items as Record<string, unknown>[];
+    assert.equal(items.length, 2);
+    assert.equal(items[0].productName, 'Widget');
+    assert.equal(items[0].qty, 5);
+    assert.equal(items[1].productName, 'Gadget');
+    assert.equal(items[1].qty, 10);
+  });
+});
+
+// ── Scenario 2: Read bubbling across 3 levels of nesting ───────────────────
+
+describe('Integration: Read bubbling across 3 levels of nesting', () => {
+  it('deeply nested scope reads root field through 2 levels', () => {
+    const nameSpec = field<string>({ defaultValue: 'root-name' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const zipSpec = field<string>();
+    const addressSpec = object({ city: citySpec, zip: zipSpec });
+    const customerSpec = object({ address: addressSpec });
+
+    const formSpec = form({ name: nameSpec, customer: customerSpec });
+    const store = new FormStore(formSpec);
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const customerScope = rootScope.scopeObject(customerSpec);
+    const addressScope = customerScope.scopeObject(addressSpec);
+
+    rootScope.mount();
+    rootScope.set(nameSpec, 'Alice');
+
+    assert.equal(addressScope.get(nameSpec), 'Alice');
+    assert.equal(customerScope.get(nameSpec), 'Alice');
+
+    addressScope.mount({ city: 'Boston' });
+    assert.equal(addressScope.get(citySpec), 'Boston');
+  });
+
+  it('3-level nesting reads own fields correctly at each level', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const zipSpec = field<string>({ defaultValue: '' });
+    const addressSpec = object({ city: citySpec, zip: zipSpec });
+    const customerSpec = object({ address: addressSpec });
+    const formSpec = form({ name: nameSpec, customer: customerSpec });
+
+    const store = new FormStore(formSpec, {
+      name: 'root-name',
+      customer: { address: { city: 'NYC', zip: '10001' } },
+    });
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const customerScope = rootScope.scopeObject(customerSpec);
+    const addressScope = customerScope.scopeObject(addressSpec);
+
+    assert.equal(rootScope.get(nameSpec), 'root-name');
+    assert.equal(customerScope.get(nameSpec), 'root-name');
+    assert.equal(addressScope.get(nameSpec), 'root-name');
+
+    assert.equal(addressScope.get(citySpec), 'NYC');
+    assert.equal(addressScope.get(zipSpec), '10001');
+  });
+});
+
+// ── Scenario 3: Array items with scoped access ─────────────────────────────
+
+describe('Integration: Array items with scoped access', () => {
+  it('3 items with independent scoped access have distinct values', () => {
+    const productNameSpec = field<string>({ defaultValue: '' });
+    const qtySpec = field<number>({ defaultValue: 1 });
+    const itemSpec = object({ productName: productNameSpec, qty: qtySpec });
+    const itemsSpec = array(itemSpec);
+    const formSpec = form({ items: itemsSpec });
+
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const arrayScope = rootScope.scopeArray(itemsSpec);
+
+    const id1 = arrayScope.append({ productName: 'Apple', qty: 10 });
+    const id2 = arrayScope.append({ productName: 'Banana', qty: 20 });
+    const id3 = arrayScope.append({ productName: 'Cherry', qty: 30 });
+
+    const scope1 = arrayScope.getItemScope(id1);
+    const scope2 = arrayScope.getItemScope(id2);
+    const scope3 = arrayScope.getItemScope(id3);
+
+    scope1.set(productNameSpec, 'Updated Apple');
+    scope2.set(productNameSpec, 'Updated Banana');
+    scope3.set(productNameSpec, 'Updated Cherry');
+
+    assert.equal(store.get(productNameSpec, { itemId: id1 }), 'Updated Apple');
+    assert.equal(store.get(productNameSpec, { itemId: id2 }), 'Updated Banana');
+    assert.equal(store.get(productNameSpec, { itemId: id3 }), 'Updated Cherry');
+
+    assert.equal(store.get(qtySpec, { itemId: id1 }), 10);
+    assert.equal(store.get(qtySpec, { itemId: id2 }), 20);
+    assert.equal(store.get(qtySpec, { itemId: id3 }), 30);
+
+    const vals = store.getValues();
+    const items = vals.items as Record<string, unknown>[];
+    assert.equal(items[0].productName, 'Updated Apple');
+    assert.equal(items[1].productName, 'Updated Banana');
+    assert.equal(items[2].productName, 'Updated Cherry');
+  });
+
+  it('array item scopes bubble reads to root fields', () => {
+    const rootField = field<string>({ defaultValue: 'root-val' });
+    const nameSpec = field<string>({ defaultValue: '' });
+    const itemSpec = object({ name: nameSpec });
+    const itemsSpec = array(itemSpec);
+    const formSpec = form({ rootField, items: itemsSpec });
+
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const arrayScope = rootScope.scopeArray(itemsSpec);
+
+    const id = arrayScope.append({ name: 'Item1' });
+    const itemScope = arrayScope.getItemScope(id);
+
+    assert.equal(itemScope.get(rootField), 'root-val');
+    assert.equal(itemScope.get(nameSpec), 'Item1');
+  });
+});
+
+// ── Scenario 4: Scope mount/unmount lifecycle with data ────────────────────
+
+describe('Integration: Scope mount/unmount lifecycle with data', () => {
+  it('mount → set → unmount → re-mount cycle', () => {
+    const citySpec = field<string>({ defaultValue: 'default-city' });
+    const zipSpec = field<string>({ defaultValue: '00000' });
+    const addressSpec = object(
+      { city: citySpec, zip: zipSpec },
+      { defaultValue: { city: 'default-city', zip: '00000' } },
+    );
+    const formSpec = form({ address: addressSpec });
+    const store = new FormStore(formSpec);
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const addressScope = rootScope.scopeObject(addressSpec);
+
+    addressScope.mount({ city: 'Boston', zip: '02134' });
+    assert.equal(store.get(citySpec), 'Boston');
+    assert.equal(store.get(zipSpec), '02134');
+    assert.equal(store.isMounted(addressSpec), true);
+
+    addressScope.set(citySpec, 'NYC');
+    assert.equal(store.get(citySpec), 'NYC');
+
+    addressScope.unmount();
+    assert.equal(store.isMounted(addressSpec), false);
+    assert.deepEqual(store.get(addressSpec), { city: 'default-city', zip: '00000' });
+
+    addressScope.mount({ city: 'Chicago', zip: '60601' });
+    assert.equal(store.get(citySpec), 'Chicago');
+    assert.equal(store.get(zipSpec), '60601');
+    assert.equal(store.isMounted(addressSpec), true);
+  });
+
+  it('nested scope unmount only affects that scope', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const zipSpec = field<string>({ defaultValue: '' });
+    const addressSpec = object(
+      { city: citySpec, zip: zipSpec },
+      { defaultValue: { city: '', zip: '' } },
+    );
+    const customerSpec = object({ address: addressSpec });
+    const formSpec = form({ name: nameSpec, customer: customerSpec });
+
+    const store = new FormStore(formSpec, {
+      name: 'Acme',
+      customer: { address: { city: 'Boston', zip: '02134' } },
+    });
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
+
+    const customerScope = rootScope.scopeObject(customerSpec);
+    customerScope.mount();
+
+    const addressScope = customerScope.scopeObject(addressSpec);
+    addressScope.mount();
+
+    addressScope.set(citySpec, 'NYC');
+
+    addressScope.unmount();
+
+    assert.equal(store.isMounted(customerSpec), true);
+    assert.equal(store.isMounted(formSpec), true);
+    assert.equal(store.get(nameSpec), 'Acme');
+    assert.deepEqual(store.get(addressSpec), { city: '', zip: '' });
+  });
+});
+
+// ── Scenario 5: Validation across scope boundaries ─────────────────────────
+
+describe('Integration: Validation across scope boundaries', () => {
+  it('set invalid in child → validate tree from root → fix → error cleared', () => {
+    const nameSpec = field<string>({
+      defaultValue: '',
+      schema: z.string().min(1, 'Name required'),
+    });
+    const citySpec = field<string>({
+      defaultValue: '',
+      schema: z.string().min(1, 'City required'),
+    });
+    const addressSpec = object({ city: citySpec });
+    const formSpec = form({ name: nameSpec, address: addressSpec });
+
+    const store = new FormStore(formSpec);
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
+
+    const addressScope = rootScope.scopeObject(addressSpec);
+    addressScope.mount();
+
+    rootScope.set(nameSpec, 'ValidName');
+    addressScope.set(citySpec, '');
+
+    const vr = store.validateTree();
+    assert.equal(vr.success, false);
+    assert.ok(vr.errors.get(citySpec));
+
+    addressScope.set(citySpec, 'NYC');
+
+    const vr2 = store.validateTree();
+    assert.equal(vr2.success, true);
+    assert.equal(vr2.errors.get(citySpec), null);
+  });
+
+  it('validation with array items across scope boundary', () => {
+    const productNameSpec = field<string>({
+      defaultValue: '',
+      schema: z.string().min(1, 'Product name required'),
+    });
+    const qtySpec = field<number>({
+      defaultValue: 1,
+      schema: z.number().min(1, 'Qty must be >= 1'),
+    });
+    const itemSpec = object({ productName: productNameSpec, qty: qtySpec });
+    const itemsSpec = array(itemSpec);
+    const formSpec = form({ items: itemsSpec });
+
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const arrayScope = rootScope.scopeArray(itemsSpec);
+
+    const id1 = arrayScope.append({ productName: '', qty: 0 });
+    const id2 = arrayScope.append({ productName: 'Valid', qty: 5 });
+
+    const result = arrayScope.validateArray();
+    assert.equal(result.success, false);
+
+    const scope1 = arrayScope.getItemScope(id1);
+    scope1.set(productNameSpec, 'Fixed Product');
+    scope1.set(qtySpec, 3);
+
+    const result2 = arrayScope.validateArray();
+    assert.equal(result2.success, true);
+  });
+});
+
+// ── Scenario 6: Event propagation across scope boundaries ──────────────────
+
+describe('Integration: Event propagation across scope boundaries', () => {
+  it('subscribe to root → set in deeply nested scope → root listener fires', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const zipSpec = field<string>({ defaultValue: '' });
+    const addressSpec = object({ city: citySpec, zip: zipSpec });
+    const customerSpec = object({ address: addressSpec });
+    const formSpec = form({ name: nameSpec, customer: customerSpec });
+
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const customerScope = rootScope.scopeObject(customerSpec);
+    const addressScope = customerScope.scopeObject(addressSpec);
+
+    let rootFired = 0;
+    let customerFired = 0;
+    let addressFired = 0;
+    let cityFired = 0;
+
+    rootScope.subscribe(formSpec, () => rootFired++);
+    rootScope.subscribe(customerSpec, () => customerFired++);
+    rootScope.subscribe(addressSpec, () => addressFired++);
+    rootScope.subscribe(citySpec, () => cityFired++);
+
+    addressScope.set(citySpec, 'NYC');
+
+    assert.equal(cityFired, 1);
+    assert.equal(addressFired, 1);
+    assert.equal(customerFired, 1);
+    assert.equal(rootFired, 1);
+  });
+
+  it('subscribe via scope delegates to FormStore correctly', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const formSpec = form({ name: nameSpec });
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+
+    let fired = false;
+    const unsub = rootScope.subscribe(nameSpec, () => { fired = true; });
+
+    rootScope.set(nameSpec, 'hello');
+    assert.equal(fired, true);
+
+    fired = false;
+    unsub();
+    rootScope.set(nameSpec, 'world');
+    assert.equal(fired, false);
+  });
+
+  it('array item change propagates to root', () => {
+    const rootName = field<string>({ defaultValue: 'root' });
+    const productNameSpec = field<string>({ defaultValue: '' });
+    const itemSpec = object({ productName: productNameSpec });
+    const itemsSpec = array(itemSpec);
+    const formSpec = form({ rootName, items: itemsSpec });
+
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const arrayScope = rootScope.scopeArray(itemsSpec);
+
+    const id = arrayScope.append({ productName: 'Widget' });
+    const itemScope = arrayScope.getItemScope(id);
+
+    let arrayFired = 0;
+    let rootFired = 0;
+    rootScope.subscribe(itemsSpec, () => arrayFired++);
+    rootScope.subscribe(formSpec, () => rootFired++);
+
+    itemScope.set(productNameSpec, 'Updated Widget');
+
+    assert.equal(arrayFired, 1);
+    assert.equal(rootFired, 1);
+  });
+});
+
+// ── Bonus: End-to-end submit with validation ───────────────────────────────
+
+describe('Integration: Submit with validation across scopes and arrays', () => {
+  it('full lifecycle: mount → fill → validate → submit success', () => {
+    const nameSpec = field<string>({
+      defaultValue: '',
+      schema: z.string().min(1, 'Name required'),
+    });
+    const emailSpec = field<string>({
+      defaultValue: '',
       schema: z.string().email('Invalid email'),
     });
-    const ageSpec = new FieldSpec<number>({
-      id: 'age',
-      defaultValue: 18,
-      schema: z.number().min(0, 'Age must be >= 0'),
-    });
 
-    const store = new FormStore(
-      { name: nameSpec, email: emailSpec, age: ageSpec },
-      { name: 'Alice', email: 'alice@example.com' },
-    );
+    const formSpec = form({ name: nameSpec, email: emailSpec });
+    const store = new FormStore(formSpec);
 
-    // Verify initial state
-    assert.equal(store.get(nameSpec), 'Alice');
-    assert.equal(store.get(emailSpec), 'alice@example.com');
-    assert.equal(store.get(ageSpec), 18);
-
-    // Mount all
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
     store.mount(nameSpec);
     store.mount(emailSpec);
-    store.mount(ageSpec);
 
-    // Set new values
-    store.set(nameSpec, 'Bob');
-    store.set(emailSpec, 'bob@test.com');
-    store.set(ageSpec, 25);
+    rootScope.set(nameSpec, 'Acme Corp');
+    rootScope.set(emailSpec, 'acme@example.com');
 
-    assert.equal(store.get(nameSpec), 'Bob');
-    assert.equal(store.get(emailSpec), 'bob@test.com');
-    assert.equal(store.get(ageSpec), 25);
-
-    // Validate tree
     const vr = store.validateTree();
     assert.equal(vr.success, true);
 
-    // Submit
     let submitted = false;
-    let receivedValues: Record<string, unknown> | undefined;
-    const result = store.submit((vals) => {
+    let received: Record<string, unknown> | undefined;
+    const ok = store.submit((vals) => {
       submitted = true;
-      receivedValues = vals;
+      received = vals;
     });
 
-    assert.equal(result, true);
+    assert.equal(ok, true);
     assert.equal(submitted, true);
-    assert.ok(receivedValues);
-    assert.equal(receivedValues!.name, 'Bob');
-    assert.equal(receivedValues!.email, 'bob@test.com');
-    assert.equal(receivedValues!.age, 25);
+    assert.ok(received);
+    assert.equal(received!.name, 'Acme Corp');
+    assert.equal(received!.email, 'acme@example.com');
   });
 
-  it('submit fails with invalid data', () => {
-    const emailSpec = new FieldSpec<string>({
-      id: 'email',
+  it('submit fails with validation errors', () => {
+    const emailSpec = field<string>({
+      defaultValue: '',
       schema: z.string().email('Invalid email'),
     });
-    const store = new FormStore({ email: emailSpec });
+    const formSpec = form({ email: emailSpec });
 
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
     store.mount(emailSpec);
-    store.set(emailSpec, 'not-an-email');
+
+    rootScope.set(emailSpec, 'not-an-email');
 
     let invalidCalled = false;
-    const result = store.submit(() => {}, (errs) => {
-      invalidCalled = true;
-      assert.ok(errs.get(emailSpec));
-    });
+    const ok = store.submit(
+      () => {},
+      () => { invalidCalled = true; },
+    );
 
-    assert.equal(result, false);
+    assert.equal(ok, false);
     assert.equal(invalidCalled, true);
   });
-});
 
-// ── Integration 2: Nested form get/set ──────────────────────────────────────
+  it('submit fails when mountRequired scope not mounted', () => {
+    const nameSpec = field<string>({
+      defaultValue: '',
+      schema: z.string().min(1, 'Required'),
+    });
+    const citySpec = field<string>({ defaultValue: '' });
+    const addressSpec = object({ city: citySpec });
+    const formSpec = form({ name: nameSpec, address: addressSpec });
 
-describe('Integration: Nested form with objects', () => {
-  it('get/set on nested paths works correctly', () => {
-    const streetSpec = new FieldSpec<string>({ id: 'street' });
-    const citySpec = new FieldSpec<string>({ id: 'city' });
-    const zipSpec = new FieldSpec<string>({ id: 'zip' });
-    const addressSpec = new ObjectSpec(
-      { street: streetSpec, city: citySpec, zip: zipSpec },
-      { id: 'address' },
-    );
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-    const store = new FormStore(
-      { name: nameSpec, address: addressSpec },
-      {
-        name: 'Alice',
-        address: { street: '123 Main', city: 'Boston', zip: '02101' },
-      },
-    );
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
 
-    // Spec-based get
-    assert.equal(store.get(citySpec), 'Boston');
+    rootScope.set(nameSpec, 'valid');
 
-    // Set nested via spec
-    store.set(citySpec, 'NYC');
-    assert.equal(store.get(citySpec), 'NYC');
-    assert.equal(store.get(streetSpec), '123 Main'); // sibling preserved
+    let onValidCalled = false;
+    const result = store.submit(() => { onValidCalled = true; });
 
-    // Set via spec
-    store.set(zipSpec, '10001');
-    assert.equal(store.get(zipSpec), '10001');
-
-    // getValues reflects everything
-    const vals = store.getValues();
-    assert.deepEqual(vals.address, { street: '123 Main', city: 'NYC', zip: '10001' });
+    assert.equal(result, false);
+    assert.equal(onValidCalled, false);
   });
 });
 
-// ── Integration 3: Notification integration ─────────────────────────────────
+// ── Bonus: Reset integration with scopes ───────────────────────────────────
 
-describe('Integration: Notification with parent-child', () => {
-  it('changing child notifies parent', () => {
-    const citySpec = new FieldSpec<string>({ id: 'city' });
-    const zipSpec = new FieldSpec<string>({ id: 'zip' });
-    const addressSpec = new ObjectSpec({ city: citySpec, zip: zipSpec }, { id: 'address' });
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-    const store = new FormStore(
-      { name: nameSpec, address: addressSpec },
-      { name: 'A', address: { city: 'X', zip: 'Z' } },
-    );
+describe('Integration: Reset with scoped stores', () => {
+  it('full reset restores initial state across all scopes', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const addressSpec = object({ city: citySpec });
+    const formSpec = form({ name: nameSpec, address: addressSpec });
 
-    const fired: string[] = [];
-    store.subscribe(addressSpec, () => fired.push('address'));
-    store.subscribe(citySpec, () => fired.push('city'));
-    store.subscribe(nameSpec, () => fired.push('name'));
+    const store = new FormStore(formSpec, {
+      name: 'Original',
+      address: { city: 'Boston' },
+    });
 
-    store.set(citySpec, 'LA');
+    const rootScope = new ScopedStore(store, formSpec, null);
+    rootScope.mount();
 
-    assert.deepEqual(fired, ['city', 'address']);
-  });
+    const addressScope = rootScope.scopeObject(addressSpec);
+    addressScope.mount();
 
-  it('subscribe to parent, change child — parent fires', () => {
-    const citySpec = new FieldSpec<string>({ id: 'city' });
-    const addressSpec = new ObjectSpec({ city: citySpec }, { id: 'address' });
-    const store = new FormStore(
-      { address: addressSpec },
-      { address: { city: 'X' } },
-    );
-
-    let parentCount = 0;
-    store.subscribe(addressSpec, () => parentCount++);
-
-    store.set(citySpec, 'Y');
-    assert.equal(parentCount, 1);
-
-    store.set(citySpec, 'Z');
-    assert.equal(parentCount, 2);
-  });
-});
-
-// ── Integration 4: Reset integration ────────────────────────────────────────
-
-describe('Integration: Reset restores initial state', () => {
-  it('set values → reset → back to initial', () => {
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-    const citySpec = new FieldSpec<string>({ id: 'city' });
-    const addressSpec = new ObjectSpec({ city: citySpec }, { id: 'address' });
-    const store = new FormStore(
-      { name: nameSpec, address: addressSpec },
-      { name: 'Original', address: { city: 'Boston' } },
-    );
-
-    // Mutate
-    store.set(nameSpec, 'Changed');
-    store.set(citySpec, 'NYC');
+    rootScope.set(nameSpec, 'Changed');
+    addressScope.set(citySpec, 'NYC');
 
     assert.equal(store.get(nameSpec), 'Changed');
     assert.equal(store.get(citySpec), 'NYC');
-    assert.equal(store.isTouched(nameSpec), true);
-    assert.equal(store.isTouched(citySpec), true);
 
-    // Full reset
     store.reset();
 
     assert.equal(store.get(nameSpec), 'Original');
     assert.equal(store.get(citySpec), 'Boston');
-    assert.equal(store.isTouched(nameSpec), false);
-    assert.equal(store.isTouched(citySpec), false);
   });
 
-  it('subtree reset only resets that subtree', () => {
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-    const citySpec = new FieldSpec<string>({ id: 'city' });
-    const addressSpec = new ObjectSpec({ city: citySpec }, { id: 'address' });
-    const store = new FormStore(
-      { name: nameSpec, address: addressSpec },
-      { name: 'A', address: { city: 'X' } },
-    );
+  it('subtree reset only resets that subtree, accessible through scopes', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const citySpec = field<string>({ defaultValue: '' });
+    const addressSpec = object({ city: citySpec });
+    const formSpec = form({ name: nameSpec, address: addressSpec });
 
-    store.set(nameSpec, 'B');
-    store.set(citySpec, 'Y');
+    const store = new FormStore(formSpec, {
+      name: 'A',
+      address: { city: 'X' },
+    });
+
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const addressScope = rootScope.scopeObject(addressSpec);
+
+    rootScope.set(nameSpec, 'B');
+    addressScope.set(citySpec, 'Y');
 
     store.reset(addressSpec);
 
-    assert.equal(store.get(nameSpec), 'B'); // untouched
-    assert.equal(store.get(citySpec), 'X'); // reset
-    assert.equal(store.isTouched(nameSpec), true);
-    assert.equal(store.isTouched(citySpec), false);
+    assert.equal(rootScope.get(nameSpec), 'B');
+    assert.equal(addressScope.get(citySpec), 'X');
   });
 });
 
-// ── Integration 5: DevTools snapshot ────────────────────────────────────────
+// ── Bonus: Array CRUD lifecycle with scope integration ─────────────────────
 
-describe('Integration: DevTools snapshot after mutations', () => {
-  it('snapshot reflects all state after lifecycle operations', () => {
-    const nameSpec = new FieldSpec<string>({
-      id: 'name',
-      mountRequired: false,
-    });
-    const emailSpec = new FieldSpec<string>({
-      id: 'email',
-      mountRequired: false,
-      schema: z.string().min(1, 'Email required'),
-    });
-    const citySpec = new FieldSpec<string>({ id: 'city', mountRequired: false });
-    const addressSpec = new ObjectSpec(
-      { city: citySpec },
-      { id: 'address', mountRequired: false },
-    );
+describe('Integration: Array CRUD lifecycle with scopes', () => {
+  it('append → read via scope → update via scope → remove → verify', () => {
+    const productNameSpec = field<string>({ defaultValue: '' });
+    const qtySpec = field<number>({ defaultValue: 1 });
+    const itemSpec = object({ productName: productNameSpec, qty: qtySpec });
+    const itemsSpec = array(itemSpec);
+    const formSpec = form({ items: itemsSpec });
 
-    const store = new FormStore(
-      { name: nameSpec, email: emailSpec, address: addressSpec },
-      { name: 'Alice', address: { city: 'Boston' } },
-    );
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const arrayScope = rootScope.scopeArray(itemsSpec);
 
-    // Initial snapshot
-    let snap = store.getDevtoolsSnapshot();
-    assert.equal(snap.values.name, 'Alice');
-    assert.equal((snap.values.address as Record<string, unknown>).city, 'Boston');
-    assert.deepEqual(snap.mounted, []);
-    assert.equal(snap.errors[emailSpec.id], null);
+    const id1 = arrayScope.append({ productName: 'A', qty: 1 });
+    const id2 = arrayScope.append({ productName: 'B', qty: 2 });
 
-    // Mount some fields
-    store.mount(nameSpec);
-    store.mount(citySpec);
+    const scope1 = arrayScope.getItemScope(id1);
+    assert.equal(scope1.get(productNameSpec), 'A');
+    assert.equal(scope1.get(qtySpec), 1);
 
-    // Set values + trigger validation error
-    store.set(nameSpec, 'Bob');
-    store.set(emailSpec, ''); // triggers validation error
+    scope1.set(productNameSpec, 'A-updated');
+    scope1.set(qtySpec, 100);
 
-    snap = store.getDevtoolsSnapshot();
-    assert.equal(snap.values.name, 'Bob');
-    assert.equal(snap.values.email, '');
-    assert.equal(snap.errors[emailSpec.id], 'Email required');
-    assert.equal(snap.touched[nameSpec.id], true);
-    assert.equal(snap.touched[emailSpec.id], true);
-    assert.ok(snap.mounted.includes(nameSpec.id));
-    assert.ok(snap.mounted.includes(citySpec.id));
+    assert.equal(store.get(productNameSpec, { itemId: id1 }), 'A-updated');
+    assert.equal(store.get(qtySpec, { itemId: id1 }), 100);
 
-    // Fix the error
-    store.set(emailSpec, 'bob@test.com');
+    assert.equal(store.get(productNameSpec, { itemId: id2 }), 'B');
+    assert.equal(store.get(qtySpec, { itemId: id2 }), 2);
 
-    snap = store.getDevtoolsSnapshot();
-    assert.equal(snap.errors[emailSpec.id], null);
+    arrayScope.remove(id1);
 
-    // Reset
-    store.reset();
-
-    snap = store.getDevtoolsSnapshot();
-    assert.equal(snap.values.name, 'Alice');
-    assert.equal(snap.values.email, undefined);
-    assert.equal(snap.touched[nameSpec.id], false);
-    assert.ok(snap.mounted.includes(nameSpec.id));
-    assert.ok(snap.mounted.includes(citySpec.id));
-  });
-});
-
-// ── Integration 6: Mount tracking + submit gate ─────────────────────────────
-
-describe('Integration: Mount tracking gates submit', () => {
-  it('submit returns false when mountRequired fields are not mounted', () => {
-    const nameSpec = new FieldSpec<string>({ id: 'name' }); // mountRequired=true
-    const store = new FormStore({ name: nameSpec }, { name: 'Alice' });
-
-    // Not mounted yet
-    const result = store.submit(() => {});
-    assert.equal(result, false);
-
-    // Now mount
-    store.mount(nameSpec);
-    const result2 = store.submit((vals) => {
-      assert.equal(vals.name, 'Alice');
-    });
-    assert.equal(result2, true);
-  });
-});
-
-// ── Edge Case 1: Empty form ─────────────────────────────────────────────────
-
-describe('Edge case: Empty form (no fields)', () => {
-  it('constructs and operates without errors', () => {
-    const store = new FormStore({});
-
-    assert.deepEqual(store.getValues(), {});
-    assert.equal(store.submit(() => {}), true); // no fields to mount or validate
-
-    store.reset(); // should not throw
-    assert.deepEqual(store.getValues(), {});
-  });
-});
-
-// ── Edge Case 2: Deeply nested objects (3+ levels) ──────────────────────────
-
-describe('Edge case: Deeply nested objects (3+ levels)', () => {
-  it('works with 3-level nesting', () => {
-    const codeSpec = new FieldSpec<string>({ id: 'code' });
-    const innerSpec = new ObjectSpec({ code: codeSpec }, { id: 'inner' });
-    const middleSpec = new ObjectSpec({ inner: innerSpec }, { id: 'middle' });
-    const outerSpec = new ObjectSpec({ middle: middleSpec }, { id: 'outer' });
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-
-    const store = new FormStore(
-      { name: nameSpec, outer: outerSpec },
-      { name: 'test', outer: { middle: { inner: { code: 'ABC' } } } },
-    );
-
-    // Get at depth
-    assert.equal(store.get(codeSpec), 'ABC');
-
-    // Set at depth
-    store.set(codeSpec, 'XYZ');
-    assert.equal(store.get(codeSpec), 'XYZ');
-
-    // getValues
-    const vals = store.getValues();
-    assert.equal((vals.outer as any).middle.inner.code, 'XYZ');
-    assert.equal(vals.name, 'test');
-
-    // Notifications propagate up through all levels
-    const fired: string[] = [];
-    store.subscribe(outerSpec, () => fired.push('outer'));
-    store.subscribe(middleSpec, () => fired.push('middle'));
-    store.subscribe(innerSpec, () => fired.push('inner'));
-    store.subscribe(codeSpec, () => fired.push('code'));
-    store.subscribe(nameSpec, () => fired.push('name'));
-
-    store.set(codeSpec, 'NEW');
-
-    assert.deepEqual(fired, ['code', 'inner', 'middle', 'outer']);
-  });
-});
-
-// ── Edge Case 3: Multiple set operations in sequence ────────────────────────
-
-describe('Edge case: Multiple sequential set operations', () => {
-  it('rapid sequential sets maintain consistency', () => {
-    const nameSpec = new FieldSpec<string>({ id: 'name' });
-    const citySpec = new FieldSpec<string>({ id: 'city' });
-    const addressSpec = new ObjectSpec({ city: citySpec }, { id: 'address' });
-    const store = new FormStore(
-      { name: nameSpec, address: addressSpec },
-      { name: '', address: { city: '' } },
-    );
-
-    // Rapid sequential sets
-    for (let i = 0; i < 100; i++) {
-      store.set(nameSpec, `name_${i}`);
-      store.set(citySpec, `city_${i}`);
-    }
-
-    assert.equal(store.get(nameSpec), 'name_99');
-    assert.equal(store.get(citySpec), 'city_99');
-
-    // Values object is consistent
-    const vals = store.getValues();
-    assert.equal(vals.name, 'name_99');
-    assert.equal((vals.address as any).city, 'city_99');
+    const items = arrayScope.getItems();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].id, id2);
+    assert.equal(items[0].index, 0);
   });
 
-  it('set with noTouch then regular set tracks correctly', () => {
-    const f = new FieldSpec<string>({ id: 'f' });
-    const store = new FormStore({ f });
+  it('clear → append → reorder lifecycle', () => {
+    const nameSpec = field<string>({ defaultValue: '' });
+    const itemSpec = object({ name: nameSpec });
+    const itemsSpec = array(itemSpec);
+    const formSpec = form({ items: itemsSpec });
 
-    store.set(f, 'a', { noTouch: true });
-    assert.equal(store.isTouched(f), false);
-    assert.equal(store.get(f), 'a');
+    const store = new FormStore(formSpec);
+    const rootScope = new ScopedStore(store, formSpec, null);
+    const arrayScope = rootScope.scopeArray(itemsSpec);
 
-    store.set(f, 'b');
-    assert.equal(store.isTouched(f), true);
-    assert.equal(store.get(f), 'b');
+    arrayScope.append({ name: 'First' });
+    arrayScope.append({ name: 'Second' });
+    arrayScope.append({ name: 'Third' });
 
-    // Reset and verify
-    store.reset();
-    assert.equal(store.get(f), undefined);
-    assert.equal(store.isTouched(f), false);
+    arrayScope.clear();
+    assert.equal(arrayScope.getItems().length, 0);
+    assert.deepEqual(store.getValues().items, []);
+
+    const idA = arrayScope.append({ name: 'New A' });
+    const idB = arrayScope.append({ name: 'New B' });
+    const idC = arrayScope.append({ name: 'New C' });
+
+    arrayScope.reorder(0, 2);
+
+    const data = store.getValues().items as Record<string, unknown>[];
+    assert.equal(data[0].name, 'New B');
+    assert.equal(data[1].name, 'New C');
+    assert.equal(data[2].name, 'New A');
+
+    const items = arrayScope.getItems();
+    assert.equal(items[0].id, idB);
+    assert.equal(items[1].id, idC);
+    assert.equal(items[2].id, idA);
   });
 });
