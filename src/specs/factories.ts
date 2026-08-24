@@ -17,7 +17,7 @@ export function object<Children extends ObjectSpecChildren>(
   return new ObjectSpec(children, config);
 }
 
-export function array<ItemSpec extends BaseSpec>(
+export function array<ItemSpec extends ObjectSpec>(
   itemSpec: ItemSpec,
   config?: ArraySpecOptions<ItemSpec>,
 ) {
