@@ -31,40 +31,26 @@ describe('field() factory', () => {
 });
 
 describe('object() factory', () => {
-  it('creates an ObjectSpec with named child accessors', () => {
+  it('creates an ObjectSpec with children', () => {
     const nameField = field<string>();
     const obj = object({ name: nameField });
     assert.ok(obj instanceof ObjectSpec);
-    assert.strictEqual(obj.name, nameField);
+    assert.strictEqual(obj.children.name, nameField);
     assert.equal(obj._kind, 'object');
-  });
-
-  it('sets _parent on children', () => {
-    const f = field<string>();
-    const obj = object({ f });
-    assert.strictEqual(f._parent, obj);
   });
 });
 
 describe('array() factory', () => {
   it('creates an ArraySpec with kind="array"', () => {
-    const arr = array(field<string>());
+    const arr = array(object({ value: field<string>() }));
     assert.ok(arr instanceof ArraySpec);
     assert.equal(arr._kind, 'array');
   });
 
-  it('exposes itemSpec', () => {
-    const itemField = field<string>();
-    const arr = array(itemField);
-    assert.strictEqual(arr.itemSpec, itemField);
-  });
-
-  it('forwards ObjectSpec item children as named accessors', () => {
-    const codeField = field<string>();
-    const scoreField = field<number>();
-    const arr = array(object({ code: codeField, score: scoreField }));
-    assert.strictEqual(arr.code, codeField);
-    assert.strictEqual(arr.score, scoreField);
+  it('exposes item', () => {
+    const itemSpec = object({ value: field<string>() });
+    const arr = array(itemSpec);
+    assert.strictEqual(arr.item, itemSpec);
   });
 });
 
@@ -82,71 +68,78 @@ describe('meta() factory', () => {
   });
 });
 
-describe('form() factory — dot-path traversal', () => {
+describe('form() factory', () => {
   const myForm = form({
     name: field<string>(),
     age: field<number>({ defaultValue: 0 }),
     customer: object({
       code: field<string>(),
     }),
-    applications: array(object({ appId: field<string>(), score: field<number>() })),
-    tags: array(field<string>()),
+    applications: array(
+      object({ appId: field<string>(), score: field<number>() }),
+    ),
     extra: meta<{ loaded: boolean }>(),
   });
 
-  it('returns an object with all spec instances accessible', () => {
-    assert.ok('name' in myForm);
-    assert.ok('age' in myForm);
-    assert.ok('customer' in myForm);
-    assert.ok('applications' in myForm);
-    assert.ok('tags' in myForm);
-    assert.ok('extra' in myForm);
+  it('returns an ObjectSpec', () => {
+    assert.ok(myForm instanceof ObjectSpec);
+    assert.equal(myForm._kind, 'object');
   });
 
-  it('top-level field is a FieldSpec', () => {
-    assert.ok(myForm.name instanceof FieldSpec);
-    assert.equal(myForm.name._kind, 'field');
+  it('top-level children are accessible via .children', () => {
+    assert.ok(myForm.children.name instanceof FieldSpec);
+    assert.ok(myForm.children.age instanceof FieldSpec);
+    assert.ok(myForm.children.customer instanceof ObjectSpec);
+    assert.ok(myForm.children.applications instanceof ArraySpec);
+    assert.ok(myForm.children.extra instanceof MetaSpec);
   });
 
-  it('nested ObjectSpec is accessible and has kind="object"', () => {
-    assert.ok(myForm.customer instanceof ObjectSpec);
-    assert.equal(myForm.customer._kind, 'object');
+  it('nested ObjectSpec children are accessible', () => {
+    assert.ok(myForm.children.customer.children.code instanceof FieldSpec);
+    assert.equal(myForm.children.customer.children.code._kind, 'field');
   });
 
-  it('nested child via dot-path is a FieldSpec', () => {
-    assert.ok(myForm.customer.code instanceof FieldSpec);
-    assert.equal(myForm.customer.code._kind, 'field');
+  it('ArraySpec item is an ObjectSpec with children', () => {
+    assert.ok(myForm.children.applications.item instanceof ObjectSpec);
+    assert.ok(
+      myForm.children.applications.item.children.appId instanceof FieldSpec,
+    );
+    assert.ok(
+      myForm.children.applications.item.children.score instanceof FieldSpec,
+    );
   });
 
-  it('ArraySpec forwards children from ObjectSpec item', () => {
-    assert.ok(myForm.applications instanceof ArraySpec);
-    assert.ok(myForm.applications.appId instanceof FieldSpec);
-    assert.ok(myForm.applications.score instanceof FieldSpec);
-    assert.equal(myForm.applications.appId._kind, 'field');
-  });
-
-  it('primitive array is an ArraySpec', () => {
-    assert.ok(myForm.tags instanceof ArraySpec);
-    assert.equal(myForm.tags._kind, 'array');
-  });
-
-  it('MetaSpec is accessible', () => {
-    assert.ok(myForm.extra instanceof MetaSpec);
-    assert.equal(myForm.extra._kind, 'meta');
+  it('assigns path-based ids to children', () => {
+    assert.equal(myForm.children.name.id, 'name');
+    assert.equal(myForm.children.age.id, 'age');
+    assert.equal(myForm.children.customer.id, 'customer');
+    assert.equal(myForm.children.customer.children.code.id, 'customer.code');
+    assert.equal(myForm.children.applications.id, 'applications');
+    assert.equal(myForm.children.applications.item.id, 'applications[]');
+    assert.equal(
+      myForm.children.applications.item.children.appId.id,
+      'applications[].appId',
+    );
+    assert.equal(
+      myForm.children.applications.item.children.score.id,
+      'applications[].score',
+    );
+    assert.equal(myForm.children.extra.id, 'extra');
   });
 
   it('every spec has a unique id', () => {
     const ids = new Set<string>();
     const allSpecs = [
-      myForm.name,
-      myForm.age,
-      myForm.customer,
-      myForm.customer.code,
-      myForm.applications,
-      myForm.applications.appId,
-      myForm.applications.score,
-      myForm.tags,
-      myForm.extra,
+      myForm,
+      myForm.children.name,
+      myForm.children.age,
+      myForm.children.customer,
+      myForm.children.customer.children.code,
+      myForm.children.applications,
+      myForm.children.applications.item,
+      myForm.children.applications.item.children.appId,
+      myForm.children.applications.item.children.score,
+      myForm.children.extra,
     ];
     for (const spec of allSpecs) {
       assert.ok(!ids.has(spec.id), `duplicate id: ${spec.id}`);
@@ -155,6 +148,6 @@ describe('form() factory — dot-path traversal', () => {
   });
 
   it('field with defaultValue stores it', () => {
-    assert.equal(myForm.age.defaultValue, 0);
+    assert.equal(myForm.children.age.defaultValue, 0);
   });
 });

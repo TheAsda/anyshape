@@ -20,7 +20,7 @@ export abstract class BaseSpec<Value = unknown> {
 }
 
 export interface ValidatableSpecOptions<Valid, Raw> extends BaseSpecOptions {
-  schema: ZodType<Valid, Raw>;
+  schema?: ZodType<Valid, Raw>;
 }
 
 export abstract class ValidatableSpec<Valid, Raw> extends BaseSpec<Valid> {
