@@ -1,11 +1,11 @@
-// Run: node scripts/browser-test.mjs src/react/react.test.ts   (types: npx tsc)
 import { createElement as h, act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
   form, object, array, field, createStore, countIn, rule, control, type InferValue, type Origin, type ItemStore,
 } from "../index";
 import { StoreProvider, useStore, useValue, useField, useControl, useArray, fromInput, fromCheckbox, resolveStore } from "./index";
-import { testAsync, runAsyncAndSignal, eq, deepEq, throws } from "../test/harness";
+import "./test-setup";
+import { it, expect } from "vitest";
 
 const shape = form({
   name: field<string>().meta(control()),
@@ -79,7 +79,7 @@ export function typeOnlyChecks() {
 
 // ---------------------------------------------------------------------------
 // useValue
-testAsync("useValue: values, meta keys and counts; only affected components re-render", async () => {
+it("useValue: values, meta keys and counts; only affected components re-render", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
   const c = counter();
   function Name() {
@@ -97,21 +97,21 @@ testAsync("useValue: values, meta keys and counts; only affected components re-r
     return h("span", { id: "errors" }, `${count}:${error ?? "-"}`);
   }
   await mount(h(StoreProvider, { store: s }, h(Name, {}), h(Age, {}), h(Errors, {})));
-  eq(text("name"), "Ann");
-  eq(text("errors"), "0:-");
+  expect(text("name")).toBe("Ann");
+  expect(text("errors")).toBe("0:-");
   c.reset();
 
   await run(() => s.set(shape.name, "Bob"));
-  eq(text("name"), "Bob");
-  deepEq(c.counts, { name: 1 }, "age and errors did not re-render");
+  expect(text("name")).toBe("Bob");
+  expect(c.counts, "age and errors did not re-render").toEqual({ name: 1 });
 
   await run(() => s.set(shape.name, ""));
-  eq(text("errors"), "1:Required");
-  deepEq(c.counts, { name: 2, errors: 1 });
+  expect(text("errors")).toBe("1:Required");
+  expect(c.counts).toEqual({ name: 2, errors: 1 });
   await unmount();
 });
 
-testAsync("hooks subscribe per reference, not to the whole store", async () => {
+it("hooks subscribe per reference, not to the whole store", async () => {
   const s = createStore(shape, initial());
   const calls: number[] = [];
   const original = s.subscribe.bind(s) as (...args: any[]) => () => void;
@@ -126,12 +126,12 @@ testAsync("hooks subscribe per reference, not to the whole store", async () => {
     return null;
   }
   await mount(h(StoreProvider, { store: s }, h(C, {})));
-  eq(calls.length > 0, true);
-  eq(calls.every((n) => n === 2), true, "every subscription names a reference");
+  expect(calls.length > 0).toBe(true);
+  expect(calls.every((n) => n === 2), "every subscription names a reference").toBe(true);
   await unmount();
 });
 
-testAsync("useValue with a selector re-renders only when the result changes", async () => {
+it("useValue with a selector re-renders only when the result changes", async () => {
   const s = createStore(shape, initial());
   const c = counter();
   function Count() {
@@ -149,19 +149,19 @@ testAsync("useValue with a selector re-renders only when the result changes", as
   c.reset();
   const lines = s.substore(shape.lines);
   await run(() => lines.itemAt(0).set(L.qty, 9));
-  deepEq(c.counts, {}, "a row edit changes neither the length nor the skus");
+  expect(c.counts, "a row edit changes neither the length nor the skus").toEqual({});
   await run(() => lines.itemAt(0).set(L.sku, "Z"));
-  deepEq(c.counts, { skus: 1 });
-  eq(text("skus"), "Z,B");
+  expect(c.counts).toEqual({ skus: 1 });
+  expect(text("skus")).toBe("Z,B");
   await run(() => lines.append({ sku: "C" }));
-  eq(text("count"), "3");
-  deepEq(c.counts, { skus: 2, count: 1 });
+  expect(text("count")).toBe("3");
+  expect(c.counts).toEqual({ skus: 2, count: 1 });
   await unmount();
 });
 
 // ---------------------------------------------------------------------------
 // Resolution
-testAsync("row provider: template refs resolve to the row, root refs to the root", async () => {
+it("row provider: template refs resolve to the row, root refs to the root", async () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(1);
   function Row() {
@@ -170,13 +170,13 @@ testAsync("row provider: template refs resolve to the row, root refs to the root
     return h("span", { id: "row" }, `${qty}/${discount}`);
   }
   await mount(h(StoreProvider, { store: s }, h(StoreProvider, { store: row }, h(Row, {}))));
-  eq(text("row"), "2/0.1");
+  expect(text("row")).toBe("2/0.1");
   await run(() => s.set(shape.discount, 0.2));
-  eq(text("row"), "2/0.2");
+  expect(text("row")).toBe("2/0.2");
   await unmount();
 });
 
-testAsync("object substore provider and an explicit store", async () => {
+it("object substore provider and an explicit store", async () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   function Both() {
@@ -186,15 +186,15 @@ testAsync("object substore provider and an explicit store", async () => {
     return h("span", { id: "both" }, `${city}/${name}/${other}`);
   }
   await mount(h(StoreProvider, { store: a }, h(StoreProvider, { store: s.substore(shape.shipping) }, h(Both, {}))));
-  eq(text("both"), "Riga/Ann/B", "the explicit store wins over the provider");
+  expect(text("both"), "the explicit store wins over the provider").toBe("Riga/Ann/B");
   await unmount();
 });
 
-testAsync("resolution errors", async () => {
+it("resolution errors", async () => {
   const s = createStore(shape, initial());
   const other = form({ x: field<string>() });
-  throws(() => resolveStore(s, L.qty), /inside a row that the provided store cannot reach/);
-  throws(() => resolveStore(s, other.x), /not part of this form/);
+  expect(() => resolveStore(s, L.qty)).toThrow(/inside a row that the provided store cannot reach/);
+  expect(() => resolveStore(s, other.x)).toThrow(/not part of this form/);
   let caught: unknown;
   function NoProvider() {
     try {
@@ -205,13 +205,13 @@ testAsync("resolution errors", async () => {
     return null;
   }
   await mount(h(NoProvider, {}));
-  eq(/No store/.test((caught as Error).message), true);
+  expect(/No store/.test((caught as Error).message)).toBe(true);
   await unmount();
 });
 
 // ---------------------------------------------------------------------------
 // useField / useControl
-testAsync("useField: value, onChange (origin user), own meta", async () => {
+it("useField: value, onChange (origin user), own meta", async () => {
   const s = createStore(shape, initial());
   const origins: Origin[][] = [];
   s.react(shape.label, (_n, _p, info) => origins.push([...info.origins]));
@@ -223,19 +223,19 @@ testAsync("useField: value, onChange (origin user), own meta", async () => {
     return h("span", { id: "f" }, `${field.value}:${field.meta.hint}`);
   }
   await mount(h(StoreProvider, { store: s }, h(F, {})));
-  eq(text("f"), "L:tip");
-  deepEq(bare.meta, {});
+  expect(text("f")).toBe("L:tip");
+  expect(bare.meta).toEqual({});
   const first = field.onChange;
   await run(() => field.onChange("M"));
-  eq(text("f"), "M:tip");
-  deepEq(origins, [["user"]]);
-  eq(field.onChange, first, "onChange is stable");
+  expect(text("f")).toBe("M:tip");
+  expect(origins).toEqual([["user"]]);
+  expect(field.onChange, "onChange is stable").toBe(first);
   await run(() => s.set(shape.label.hint, "new"));
-  eq(text("f"), "M:new");
+  expect(text("f")).toBe("M:new");
   await unmount();
 });
 
-testAsync("useControl: state, user writes set touched/dirty, errors", async () => {
+it("useControl: state, user writes set touched/dirty, errors", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
   let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
@@ -243,15 +243,15 @@ testAsync("useControl: state, user writes set touched/dirty, errors", async () =
     return h("span", { id: "c" }, `${c.value}|${c.error ?? "-"}|${c.touched}|${c.dirty}`);
   }
   await mount(h(StoreProvider, { store: s }, h(C, {})));
-  eq(text("c"), "Ann|-|false|false");
+  expect(text("c")).toBe("Ann|-|false|false");
   await run(() => c.onChange("Al"));
-  eq(text("c"), "Al|Too short|true|true");
+  expect(text("c")).toBe("Al|Too short|true|true");
   await run(() => s.reset());
-  eq(text("c"), "Ann|-|false|false");
+  expect(text("c")).toBe("Ann|-|false|false");
   await unmount();
 });
 
-testAsync("focusRef registers the element, focus() and submit use it, unmount clears it", async () => {
+it("focusRef registers the element, focus() and submit use it, unmount clears it", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
   function Input() {
     const c = useControl(shape.name);
@@ -259,16 +259,16 @@ testAsync("focusRef registers the element, focus() and submit use it, unmount cl
   }
   await mount(h(StoreProvider, { store: s }, h(Input, {})));
   const input = document.getElementById("in") as HTMLInputElement;
-  eq(s.get(shape.name.focusTarget), input);
+  expect(s.get(shape.name.focusTarget)).toBe(input);
   await act(async () => void (await s.submit()));
-  eq(document.activeElement, input, "submit focused the first error");
+  expect(document.activeElement, "submit focused the first error").toBe(input);
   await unmount();
-  eq(s.get(shape.name.focusTarget), undefined, "cleared on unmount");
+  expect(s.get(shape.name.focusTarget), "cleared on unmount").toBe(undefined);
 });
 
 // ---------------------------------------------------------------------------
 // Native adapters with real DOM events
-testAsync("fromInput / fromCheckbox with real events; handlers are cached", async () => {
+it("fromInput / fromCheckbox with real events; handlers are cached", async () => {
   const s = createStore(shape, initial());
   let nameOnChange!: (v: string) => void;
   function Inputs() {
@@ -284,18 +284,18 @@ testAsync("fromInput / fromCheckbox with real events; handlers are cached", asyn
   }
   await mount(h(StoreProvider, { store: s }, h(Inputs, {})));
   await run(() => typeInto(document.getElementById("name") as HTMLInputElement, "Zoe"));
-  eq(s.get(shape.name), "Zoe");
-  eq(s.get(shape.name.touched), true, "written as the user");
-  eq((document.getElementById("name") as HTMLInputElement).value, "Zoe");
+  expect(s.get(shape.name)).toBe("Zoe");
+  expect(s.get(shape.name.touched), "written as the user").toBe(true);
+  expect((document.getElementById("name") as HTMLInputElement).value).toBe("Zoe");
   await run(() => (document.getElementById("agree") as HTMLInputElement).click());
-  eq(s.get(shape.agree), true);
-  eq(fromInput(nameOnChange), fromInput(nameOnChange));
+  expect(s.get(shape.agree)).toBe(true);
+  expect(fromInput(nameOnChange)).toBe(fromInput(nameOnChange));
   await unmount();
 });
 
 // ---------------------------------------------------------------------------
 // useArray
-testAsync("useArray: the list re-renders on structure only; a row edit re-renders that row", async () => {
+it("useArray: the list re-renders on structure only; a row edit re-renders that row", async () => {
   const s = createStore(shape, initial());
   const c = counter();
   function Line() {
@@ -316,31 +316,31 @@ testAsync("useArray: the list re-renders on structure only; a row edit re-render
     );
   }
   await mount(h(StoreProvider, { store: s }, h(List, {})));
-  eq(text("list"), "A=1B=2");
+  expect(text("list")).toBe("A=1B=2");
   c.reset();
 
   await run(() => s.substore(shape.lines).itemAt(1).set(L.qty, 7));
-  eq(text("list"), "A=1B=7");
-  deepEq(c.counts, { "row:B": 1 }, "only row B re-rendered");
+  expect(text("list")).toBe("A=1B=7");
+  expect(c.counts, "only row B re-rendered").toEqual({ "row:B": 1 });
 
   const origins: Origin[][] = [];
   s.react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
   await run(() => void lines.append({ sku: "C" }));
-  eq(text("list"), "A=1B=7C=1");
-  deepEq(origins, [["user"]], "helpers write as the user");
+  expect(text("list")).toBe("A=1B=7C=1");
+  expect(origins, "helpers write as the user").toEqual([["user"]]);
   c.reset();
 
   await run(() => lines.move(lines.items[2], 0));
-  eq(text("list"), "C=1A=1B=7");
-  eq(c.counts.list, 1);
-  eq(c.counts.mount, undefined, "no row was remounted: keyed by stableId");
+  expect(text("list")).toBe("C=1A=1B=7");
+  expect(c.counts.list).toBe(1);
+  expect(c.counts.mount, "no row was remounted: keyed by stableId").toBe(undefined);
 
   await run(() => lines.remove(lines.items[1]));
-  eq(text("list"), "C=1B=7");
+  expect(text("list")).toBe("C=1B=7");
   await unmount();
 });
 
-testAsync("useArray inside a row provider resolves nested arrays", async () => {
+it("useArray inside a row provider resolves nested arrays", async () => {
   const f = form({ groups: array(object({ items: array(object({ v: field<string>() })) })) });
   const s = createStore(f, { groups: [{ items: [{ v: "a" }, { v: "b" }] }] });
   const group = s.substore(f.groups).itemAt(0);
@@ -349,8 +349,6 @@ testAsync("useArray inside a row provider resolves nested arrays", async () => {
     return h("span", { id: "n" }, String(items.items.length));
   }
   await mount(h(StoreProvider, { store: group }, h(Items, {})));
-  eq(text("n"), "2");
+  expect(text("n")).toBe("2");
   await unmount();
 });
-
-runAsyncAndSignal("react.test.ts");

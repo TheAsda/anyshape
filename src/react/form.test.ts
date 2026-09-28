@@ -1,4 +1,3 @@
-// Run: node scripts/browser-test.mjs src/react/form.test.ts   (types: npx tsc)
 import { createElement as h, act, useState, StrictMode, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
@@ -6,7 +5,8 @@ import {
   type InferValue, type RootStore,
 } from "../index";
 import { StoreProvider, useForm, useSync, useControl, useValue, fromInput, domOrder } from "./index";
-import { testAsync, runAsyncAndSignal, eq, deepEq } from "../test/harness";
+import "./test-setup";
+import { it, expect } from "vitest";
 
 const shape = form(
   object({
@@ -48,7 +48,7 @@ function captureWarnings() {
 
 // ---------------------------------------------------------------------------
 // useForm
-testAsync("useForm creates the store once; later initialValues are ignored", async () => {
+it("useForm creates the store once; later initialValues are ignored", async () => {
   const stores = new Set<RootStore<typeof shape>>();
   let setTick!: (n: number) => void;
   function App() {
@@ -64,12 +64,12 @@ testAsync("useForm creates the store once; later initialValues are ignored", asy
   await mount(h(App, {}));
   await run(() => setTick(1));
   await run(() => setTick(2));
-  eq(stores.size, 1);
-  eq(text("name"), "n0");
+  expect(stores.size).toBe(1);
+  expect(text("name")).toBe("n0");
   await unmount();
 });
 
-testAsync("useForm passes behaviors and warns when the shape changes", async () => {
+it("useForm passes behaviors and warns when the shape changes", async () => {
   const other = form(object({ name: field<string>().meta(control()) }).meta(submission()));
   const { warnings, restore } = captureWarnings();
   let useOther!: (b: boolean) => void;
@@ -85,14 +85,14 @@ testAsync("useForm passes behaviors and warns when the shape changes", async () 
     return h("span", { id: "err" }, useValue(shape.name.error) ?? "-");
   }
   await mount(h(App, {}));
-  eq(text("err"), "Required");
+  expect(text("err")).toBe("Required");
   await run(() => useOther(true));
   restore();
-  eq(warnings.some((w) => /shape` changed/.test(w)), true);
+  expect(warnings.some((w) => /shape` changed/.test(w))).toBe(true);
   await unmount();
 });
 
-testAsync("values: loading data becomes the baseline; same object keeps edits; a new object reloads", async () => {
+it("values: loading data becomes the baseline; same object keeps edits; a new object reloads", async () => {
   let setData!: (v: Values | undefined) => void;
   let f!: RootStore<typeof shape>;
   function App() {
@@ -106,39 +106,39 @@ testAsync("values: loading data becomes the baseline; same object keeps edits; a
     return h("span", { id: "name" }, `${c.value}|${c.dirty}`);
   }
   await mount(h(App, {}));
-  eq(text("name"), "|false", "loading: initialValues");
+  expect(text("name"), "loading: initialValues").toBe("|false");
 
   const loaded = { ...empty(), name: "Loaded" };
   await run(() => setData(loaded));
-  eq(text("name"), "Loaded|false", "loaded as the baseline: not dirty");
+  expect(text("name"), "loaded as the baseline: not dirty").toBe("Loaded|false");
 
   await run(() => f.set(shape.name, "Edited", { origin: "user" }));
   await run(() => setData(loaded)); // same object: nothing happens
-  eq(text("name"), "Edited|true");
+  expect(text("name")).toBe("Edited|true");
 
   await run(() => f.reset());
-  eq(text("name"), "Loaded|false", "reset returns to the loaded data");
+  expect(text("name"), "reset returns to the loaded data").toBe("Loaded|false");
 
   await run(() => setData({ ...loaded, name: "Refetched" }));
-  eq(text("name"), "Refetched|false");
+  expect(text("name")).toBe("Refetched|false");
   await unmount();
 });
 
-testAsync("values given on the first render are used at creation", async () => {
+it("values given on the first render are used at creation", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty(), { values: { ...empty(), name: "Ready" } });
     return null;
   }
   await mount(h(App, {}));
-  eq(f.get(shape.name), "Ready");
-  eq(f.getInitial(shape.name), "Ready");
+  expect(f.get(shape.name)).toBe("Ready");
+  expect(f.getInitial(shape.name)).toBe("Ready");
   await unmount();
 });
 
 // ---------------------------------------------------------------------------
 // useSync
-testAsync("useSync feeds a limit from React; survives reset; writes only on change", async () => {
+it("useSync feeds a limit from React; survives reset; writes only on change", async () => {
   let f!: RootStore<typeof shape>;
   let setMax!: (n: number | undefined) => void;
   function App() {
@@ -154,7 +154,7 @@ testAsync("useSync feeds a limit from React; survives reset; writes only on chan
     return h("span", { id: "line" }, qty.error ?? "ok");
   }
   await mount(h(App, {}));
-  eq(text("line"), "ok", "no limit while loading");
+  expect(text("line"), "no limit while loading").toBe("ok");
 
   const row = () => f.substore(shape.lines).itemAt(0);
   let writes = 0;
@@ -162,19 +162,19 @@ testAsync("useSync feeds a limit from React; survives reset; writes only on chan
   row().subscribe(L.qty.maxQty, () => writes++);
 
   await run(() => setMax(3));
-  eq(text("line"), "Must be at most 3");
-  eq(writes, 2, "the key changed once and the error count once");
+  expect(text("line")).toBe("Must be at most 3");
+  expect(writes, "the key changed once and the error count once").toBe(2);
 
   await run(() => f.reset());
-  eq(row().get(L.qty.maxQty), 3, "kept by reset");
-  eq(text("line"), "Must be at most 3");
+  expect(row().get(L.qty.maxQty), "kept by reset").toBe(3);
+  expect(text("line")).toBe("Must be at most 3");
 
   await run(() => setMax(10));
-  eq(text("line"), "ok");
+  expect(text("line")).toBe("ok");
   await unmount();
 });
 
-testAsync("useSync warns for meta keys without keepOnReset; resetOnUnmount", async () => {
+it("useSync warns for meta keys without keepOnReset; resetOnUnmount", async () => {
   const { warnings, restore } = captureWarnings();
   let f!: RootStore<typeof shape>;
   let show!: (b: boolean) => void;
@@ -190,14 +190,14 @@ testAsync("useSync warns for meta keys without keepOnReset; resetOnUnmount", asy
   }
   await mount(h(App, {}));
   restore();
-  eq(f.get(shape.note.hint), "from component");
-  eq(warnings.some((w) => /keepOnReset/.test(w)), true);
+  expect(f.get(shape.note.hint)).toBe("from component");
+  expect(warnings.some((w) => /keepOnReset/.test(w))).toBe(true);
   await run(() => show(false));
-  eq(f.get(shape.note.hint), "", "reset on unmount");
+  expect(f.get(shape.note.hint), "reset on unmount").toBe("");
   await unmount();
 });
 
-testAsync("useSync under StrictMode ends with the synced value", async () => {
+it("useSync under StrictMode ends with the synced value", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty());
@@ -210,7 +210,7 @@ testAsync("useSync under StrictMode ends with the synced value", async () => {
   const { restore } = captureWarnings();
   await mount(h(StrictMode, {}, h(App, {})));
   restore();
-  eq(f.get(shape.name), "synced");
+  expect(f.get(shape.name)).toBe("synced");
   await unmount();
 });
 
@@ -221,7 +221,7 @@ function Field(props: { node: typeof shape.name | typeof shape.code; id: string 
   return h("input", { id: props.id, ref: c.focusRef, value: c.value, onChange: fromInput(c.onChange) });
 }
 
-testAsync("submit focuses the first error in DOM order, not shape order", async () => {
+it("submit focuses the first error in DOM order, not shape order", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty(), { behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")] });
@@ -230,11 +230,11 @@ testAsync("submit focuses the first error in DOM order, not shape order", async 
   }
   await mount(h(App, {}));
   await run(() => f.submit());
-  eq(document.activeElement?.id, "code");
+  expect(document.activeElement?.id).toBe("code");
   await unmount();
 });
 
-testAsync("an explicit focusOrder overrides DOM order", async () => {
+it("an explicit focusOrder overrides DOM order", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty(), {
@@ -245,11 +245,11 @@ testAsync("an explicit focusOrder overrides DOM order", async () => {
   }
   await mount(h(App, {}));
   await run(() => f.submit());
-  eq(document.activeElement?.id, "name");
+  expect(document.activeElement?.id).toBe("name");
   await unmount();
 });
 
-testAsync("handleSubmit on a real <form>: default prevented, onValid gets values", async () => {
+it("handleSubmit on a real <form>: default prevented, onValid gets values", async () => {
   let f!: RootStore<typeof shape>;
   const saved: string[] = [];
   function App() {
@@ -267,21 +267,19 @@ testAsync("handleSubmit on a real <form>: default prevented, onValid gets values
     (document.getElementById("go") as HTMLButtonElement).click();
     await new Promise((r) => setTimeout(r, 0));
   });
-  deepEq(saved, ["Ann"]);
-  eq(defaultPrevented, true);
-  eq(f.get(shape.submitCount), 1);
+  expect(saved).toEqual(["Ann"]);
+  expect(defaultPrevented).toBe(true);
+  expect(f.get(shape.submitCount)).toBe(1);
   await unmount();
 });
 
-testAsync("domOrder: nodes by document position, other targets equal", async () => {
+it("domOrder: nodes by document position, other targets equal", async () => {
   const a = document.createElement("i");
   const b = document.createElement("b");
   document.body.append(a, b);
-  eq(domOrder(a, b), -1);
-  eq(domOrder(b, a), 1);
-  eq(domOrder(a, { focus() {} }), 0);
+  expect(domOrder(a, b)).toBe(-1);
+  expect(domOrder(b, a)).toBe(1);
+  expect(domOrder(a, { focus() {} })).toBe(0);
   a.remove();
   b.remove();
 });
-
-runAsyncAndSignal("form.test.ts");
