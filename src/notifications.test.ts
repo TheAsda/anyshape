@@ -1,6 +1,5 @@
-// Run: npx tsx src/notifications.test.ts
 import { form, object, array, field, meta, createStore, type InferValue } from "./index";
-import { test, eq, deepEq, throws, report } from "./test/harness";
+import { it, expect } from "vitest";
 
 const address = object({
   street: field<string>(),
@@ -45,7 +44,7 @@ function recorder() {
 
 // ---------------------------------------------------------------------------
 // Rule 1 – value subscriptions
-test("rule 1: only changed values fire (incl. ancestors via store-wide)", () => {
+it("rule 1: only changed values fire (incl. ancestors via store-wide)", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribeValue(shape.shipping.city, r.on("city"));
@@ -56,40 +55,40 @@ test("rule 1: only changed values fire (incl. ancestors via store-wide)", () => 
   s.substore(shape.billing).subscribe(r.on("billingStore"));
 
   s.setValue(shape.shipping.city, "Vilnius");
-  deepEq(r.take(), ["city", "root", "shipping"]);
+  expect(r.take()).toEqual(["city", "root", "shipping"]);
 });
 
-test("rule 1: replacing a parent fires only children that differ", () => {
+it("rule 1: replacing a parent fires only children that differ", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribeValue(shape.shipping.city, r.on("city"));
   s.subscribeValue(shape.shipping.street, r.on("street"));
   s.setValue(shape.shipping, { street: "New", city: "Riga" });
-  deepEq(r.take(), ["street"]);
+  expect(r.take()).toEqual(["street"]);
 });
 
-test("rule 1: no-op write notifies nobody", () => {
+it("rule 1: no-op write notifies nobody", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribe(r.on("root"));
   s.setValue(shape.name, "Ann");
-  deepEq(r.take(), []);
+  expect(r.take()).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------
 // Rule 2 – separate channels, no meta bubbling
-test("rule 2: meta and value channels are separate", () => {
+it("rule 2: meta and value channels are separate", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribeValue(shape.name, r.on("value"));
   s.subscribeMeta(shape.name, r.on("meta"));
   s.setMeta(shape.name, { touched: true });
-  deepEq(r.take(), ["meta"]);
+  expect(r.take()).toEqual(["meta"]);
   s.setValue(shape.name, "Bob");
-  deepEq(r.take(), ["value"]);
+  expect(r.take()).toEqual(["value"]);
 });
 
-test("rule 2: meta does not bubble to parent meta, but store-wide sees it", () => {
+it("rule 2: meta does not bubble to parent meta, but store-wide sees it", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribeMeta(shape.shipping, r.on("shippingMeta"));
@@ -97,10 +96,10 @@ test("rule 2: meta does not bubble to parent meta, but store-wide sees it", () =
   s.substore(shape.billing).subscribe(r.on("billingStore"));
   s.subscribe(r.on("root"));
   s.setMeta(shape.shipping.city, { error: "Bad" });
-  deepEq(r.take(), ["root", "shippingStore"]);
+  expect(r.take()).toEqual(["root", "shippingStore"]);
 });
 
-test("rule 2: meta changed and changed back in one batch does not fire", () => {
+it("rule 2: meta changed and changed back in one batch does not fire", () => {
   const s = createStore(shape, initial());
   s.setMeta(shape.name, { touched: false });
   const r = recorder();
@@ -109,12 +108,12 @@ test("rule 2: meta changed and changed back in one batch does not fire", () => {
     s.setMeta(shape.name, { touched: true });
     s.setMeta(shape.name, { touched: false });
   });
-  deepEq(r.take(), []);
+  expect(r.take()).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------
 // Rule 3 – array structure channel
-test("rule 3: editing a row does not fire subscribeItems; items() is stable", () => {
+it("rule 3: editing a row does not fire subscribeItems; items() is stable", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const r = recorder();
@@ -123,11 +122,11 @@ test("rule 3: editing a row does not fire subscribeItems; items() is stable", ()
   const before = lines.items();
 
   lines.itemAt(0).setValue(L.qty, 5);
-  deepEq(r.take(), ["arrayValue"]);
-  eq(lines.items(), before);
+  expect(r.take()).toEqual(["arrayValue"]);
+  expect(lines.items()).toBe(before);
 });
 
-test("rule 3: add / remove / reorder fire subscribeItems", () => {
+it("rule 3: add / remove / reorder fire subscribeItems", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const r = recorder();
@@ -135,16 +134,16 @@ test("rule 3: add / remove / reorder fire subscribeItems", () => {
   const [a, b] = s.getValues().lines;
 
   s.setValue(shape.lines, [b, a]);
-  deepEq(r.take(), ["items"]);
+  expect(r.take()).toEqual(["items"]);
   s.setValue(shape.lines, [b, a, { sku: "C", price: 1, qty: 1, notes: [] }]);
-  deepEq(r.take(), ["items"]);
+  expect(r.take()).toEqual(["items"]);
   s.setValue(shape.lines, [b]);
-  deepEq(r.take(), ["items"]);
+  expect(r.take()).toEqual(["items"]);
 });
 
 // ---------------------------------------------------------------------------
 // Rule 4 – attachment changes
-test("rule 4: removal fires all subscribers of the detached store once", () => {
+it("rule 4: removal fires all subscribers of the detached store once", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(1);
@@ -154,25 +153,25 @@ test("rule 4: removal fires all subscribers of the detached store once", () => {
   row.subscribe(r.on("rowStore"));
 
   s.setValue(shape.lines, [s.getValues().lines[0]]);
-  deepEq(r.take(), ["rowStore", "sku", "skuMeta"]);
-  eq(row.getValue(L.sku), undefined);
+  expect(r.take()).toEqual(["rowStore", "sku", "skuMeta"]);
+  expect(row.getValue(L.sku)).toBe(undefined);
 
   s.setValue(shape.name, "Other");
-  deepEq(r.take(), [], "no further notifications");
+  expect(r.take(), "no further notifications").toEqual([]);
 });
 
-test("rule 4: nested stores inside a removed row fire too", () => {
+it("rule 4: nested stores inside a removed row fire too", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(0);
   const note = row.substore(L.notes).itemAt(0);
   const r = recorder();
   note.subscribeValue(L.notes.item.text, r.on("noteText"));
   s.setValue(shape.lines, [s.getValues().lines[1]]);
-  deepEq(r.take(), ["noteText"]);
-  eq(note.isAttached(), false);
+  expect(r.take()).toEqual(["noteText"]);
+  expect(note.isAttached()).toBe(false);
 });
 
-test("rule 4: restoring an old snapshot re-attaches the same store (undo)", () => {
+it("rule 4: restoring an old snapshot re-attaches the same store (undo)", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
@@ -182,31 +181,31 @@ test("rule 4: restoring an old snapshot re-attaches the same store (undo)", () =
   const undo = s.getValues().lines.slice();
 
   s.setValue(shape.lines, [undo[1]]);     // remove row 0
-  eq(row.isAttached(), false);
+  expect(row.isAttached()).toBe(false);
 
   const r = recorder();
   row.subscribeValue(L.qty, r.on("qty"));
   s.setValue(shape.lines, undo);          // put it back
-  deepEq(r.take(), ["qty"]);
-  eq(row.isAttached(), true);
-  eq(lines.itemAt(0), row);
-  eq(row.getMeta(L.sku).touched, true, "meta survived");
-  eq(snapshot.length, 2);
+  expect(r.take()).toEqual(["qty"]);
+  expect(row.isAttached()).toBe(true);
+  expect(lines.itemAt(0)).toBe(row);
+  expect(row.getMeta(L.sku).touched, "meta survived").toBe(true);
+  expect(snapshot.length).toBe(2);
 });
 
-test("bug fix: an older version of a row re-attaches to its store", () => {
+it("bug fix: an older version of a row re-attaches to its store", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
   const older = s.getValues().lines;      // row at version 1
   row.setValue(L.qty, 9);                 // version 2
   s.setValue(shape.lines, older);         // restore version 1
-  eq(lines.itemAt(0), row);
-  eq(row.isAttached(), true);
-  eq(row.getValue(L.qty), 1);
+  expect(lines.itemAt(0)).toBe(row);
+  expect(row.isAttached()).toBe(true);
+  expect(row.getValue(L.qty)).toBe(1);
 });
 
-test("both versions of a row present → the older one is a new item", () => {
+it("both versions of a row present → the older one is a new item", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
@@ -214,13 +213,13 @@ test("both versions of a row present → the older one is a new item", () => {
   row.setValue(L.qty, 9);
   const v2 = s.getValues().lines[0];
   s.setValue(shape.lines, [v2, v1]);
-  eq(lines.itemAt(0), row);
-  eq(lines.itemAt(1) === row, false);
+  expect(lines.itemAt(0)).toBe(row);
+  expect(lines.itemAt(1) === row).toBe(false);
 });
 
 // ---------------------------------------------------------------------------
 // Rule 5 – store-wide
-test("rule 5: store-wide on an item fires for its values and meta only", () => {
+it("rule 5: store-wide on an item fires for its values and meta only", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const [a, b] = lines.items();
@@ -230,38 +229,38 @@ test("rule 5: store-wide on an item fires for its values and meta only", () => {
   lines.subscribe(r.on("lines"));
 
   a.setValue(L.qty, 3);
-  deepEq(r.take(), ["a", "lines"]);
+  expect(r.take()).toEqual(["a", "lines"]);
   b.setMeta(L.sku, { error: "x" });
-  deepEq(r.take(), ["b", "lines"]);
+  expect(r.take()).toEqual(["b", "lines"]);
 });
 
 // ---------------------------------------------------------------------------
 // Rule 6 – batching
-test("rule 6: batch notifies once; reads see new values inside", () => {
+it("rule 6: batch notifies once; reads see new values inside", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribe(r.on("root"));
   s.batch(() => {
     s.setValue(shape.name, "B");
-    eq(s.getValue(shape.name), "B");
+    expect(s.getValue(shape.name)).toBe("B");
     s.setValue(shape.shipping.city, "X");
-    deepEq(r.log, [], "nothing fired inside the batch");
+    expect(r.log, "nothing fired inside the batch").toEqual([]);
   });
-  deepEq(r.take(), ["root"]);
+  expect(r.take()).toEqual(["root"]);
 });
 
-test("rule 6: nested batches flush at the outermost end", () => {
+it("rule 6: nested batches flush at the outermost end", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribe(r.on("root"));
   s.batch(() => {
     s.batch(() => s.setValue(shape.name, "B"));
-    deepEq(r.log, []);
+    expect(r.log).toEqual([]);
   });
-  deepEq(r.take(), ["root"]);
+  expect(r.take()).toEqual(["root"]);
 });
 
-test("rule 6: A → B → A in one batch notifies nobody", () => {
+it("rule 6: A → B → A in one batch notifies nobody", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribeValue(shape.name, r.on("name"));
@@ -269,7 +268,7 @@ test("rule 6: A → B → A in one batch notifies nobody", () => {
     s.setValue(shape.name, "B");
     s.setValue(shape.name, "Ann");
   });
-  deepEq(r.take(), []);
+  expect(r.take()).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------
@@ -285,92 +284,90 @@ function withTotal() {
   return { s, lines };
 }
 
-test("rule 8: reactions settle before UI; UI sees the final state once", () => {
+it("rule 8: reactions settle before UI; UI sees the final state once", () => {
   const { s, lines } = withTotal();
   const seen: number[] = [];
   s.subscribeValue(shape.total, () => seen.push(s.getValue(shape.total)));
   lines.itemAt(0).setValue(L.qty, 3);     // 30 + 40
-  deepEq(seen, [70]);
+  expect(seen).toEqual([70]);
 });
 
-test("rule 8: chained reactions settle", () => {
+it("rule 8: chained reactions settle", () => {
   const s = createStore(shape, initial());
   s.react(shape.name, (name) => s.setValue(shape.shipping.street, `${name} St`));
   s.react(shape.shipping.street, (street) => s.setValue(shape.billing.street, street));
   const r = recorder();
   s.subscribe(r.on("root"));
   s.setValue(shape.name, "Kate");
-  eq(s.getValue(shape.billing.street), "Kate St");
-  deepEq(r.take(), ["root"]);
+  expect(s.getValue(shape.billing.street)).toBe("Kate St");
+  expect(r.take()).toEqual(["root"]);
 });
 
-test("rule 8: reactions receive next and prev", () => {
+it("rule 8: reactions receive next and prev", () => {
   const s = createStore(shape, initial());
   const calls: [string, string][] = [];
   s.react(shape.name, (next, prev) => calls.push([next, prev]));
   s.setValue(shape.name, "B");
   s.setValue(shape.name, "C");
-  deepEq(calls, [["B", "Ann"], ["C", "B"]]);
+  expect(calls).toEqual([["B", "Ann"], ["C", "B"]]);
 });
 
-test("rule 8: meta reactions", () => {
+it("rule 8: meta reactions", () => {
   const s = createStore(shape, initial());
   s.reactMeta(shape.name, (next) => {
     if (next.touched) s.setMeta(shape.name, { error: s.getValue(shape.name) ? undefined : "Required" });
   });
   s.setValue(shape.name, "");
   s.setMeta(shape.name, { touched: true });
-  eq(s.getMeta(shape.name).error, "Required");
+  expect(s.getMeta(shape.name).error).toBe("Required");
 });
 
-test("rule 8: cycles are detected", () => {
+it("rule 8: cycles are detected", () => {
   const s = createStore(shape, initial());
   s.react(shape.total, (t) => s.setValue(shape.total, t + 1));
-  throws(() => s.setValue(shape.total, 1), /did not settle/);
+  expect(() => s.setValue(shape.total, 1)).toThrow(/did not settle/);
   // store is still usable afterwards
   s.batch(() => {});
 });
 
-test("rule 8: UI listeners cannot write", () => {
+it("rule 8: UI listeners cannot write", () => {
   const s = createStore(shape, initial());
   s.subscribeValue(shape.name, () => s.setValue(shape.total, 1));
-  throws(() => s.setValue(shape.name, "B"), /Cannot write while UI listeners/);
+  expect(() => s.setValue(shape.name, "B")).toThrow(/Cannot write while UI listeners/);
 });
 
-test("reactions do not run on registration", () => {
+it("reactions do not run on registration", () => {
   const s = createStore(shape, initial());
   let calls = 0;
   s.react(shape.name, () => calls++);
-  eq(calls, 0);
+  expect(calls).toBe(0);
 });
 
 // ---------------------------------------------------------------------------
 // Subscription housekeeping
-test("unsubscribe stops notifications", () => {
+it("unsubscribe stops notifications", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   const off = s.subscribeValue(shape.name, r.on("name"));
   off();
   s.setValue(shape.name, "B");
-  deepEq(r.take(), []);
+  expect(r.take()).toEqual([]);
 });
 
-test("a listener unsubscribed by an earlier listener in the same flush is not called", () => {
+it("a listener unsubscribed by an earlier listener in the same flush is not called", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   let offSecond = () => {};
   s.subscribeValue(shape.name, () => offSecond());
   offSecond = s.subscribeValue(shape.name, r.on("second"));
   s.setValue(shape.name, "B");
-  deepEq(r.take(), []);
+  expect(r.take()).toEqual([]);
 });
 
-test("subscribing through any store in scope reaches the same owner", () => {
+it("subscribing through any store in scope reaches the same owner", () => {
   const s = createStore(shape, initial());
   const r = recorder();
   s.subscribeMeta(shape.shipping.city, r.on("viaRoot"));
   s.substore(shape.shipping).setMeta(shape.shipping.city, { error: "x" });
-  deepEq(r.take(), ["viaRoot"]);
+  expect(r.take()).toEqual(["viaRoot"]);
 });
-
-report("notifications.test.ts");
