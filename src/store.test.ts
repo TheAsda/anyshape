@@ -1,18 +1,5 @@
-// Run: npx tsx src/store.test.ts   (type checks: npx tsc)
 import { form, object, array, field, meta, createStore, type InferValue } from "./index";
-
-let passed = 0;
-function test(name: string, fn: () => void) {
-  try { fn(); passed++; } catch (e) { console.error(`FAIL ${name}\n  ${(e as Error).message}`); process.exitCode = 1; }
-}
-function eq(a: unknown, b: unknown, msg = "") {
-  if (!Object.is(a, b)) throw new Error(`${msg} expected ${String(b)}, got ${String(a)}`);
-}
-function throws(fn: () => unknown, re: RegExp) {
-  try { fn(); } catch (e) { if (re.test((e as Error).message)) return; throw new Error(`wrong error: ${(e as Error).message}`); }
-  throw new Error(`expected throw matching ${re}`);
-}
-declare const process: { exitCode?: number };
+import { it, expect } from "vitest";
 
 // ---------------------------------------------------------------------------
 const address = object({
@@ -51,121 +38,121 @@ function initial(): User {
 
 // ---------------------------------------------------------------------------
 // Nodes
-test("parent links", () => {
-  eq(userShape.parent, undefined);
-  eq(userShape.shipping.parent, userShape);
-  eq(userShape.shipping.city.parent, userShape.shipping);
-  eq(userShape.items.item.parent, userShape.items);
-  eq(userShape.items.item.notes.item.text.parent, userShape.items.item.notes.item);
+it("parent links", () => {
+  expect(userShape.parent).toBe(undefined);
+  expect(userShape.shipping.parent).toBe(userShape);
+  expect(userShape.shipping.city.parent).toBe(userShape.shipping);
+  expect(userShape.items.item.parent).toBe(userShape.items);
+  expect(userShape.items.item.notes.item.text.parent).toBe(userShape.items.item.notes.item);
 });
 
-test("reused shapes get distinct nodes", () => {
-  eq(userShape.shipping.city === userShape.billing.city, false);
-  eq(userShape.shipping.city.id === userShape.billing.city.id, false);
+it("reused shapes get distinct nodes", () => {
+  expect(userShape.shipping.city === userShape.billing.city).toBe(false);
+  expect(userShape.shipping.city.id === userShape.billing.city.id).toBe(false);
 });
 
-test("item template lenses are item-relative", () => {
-  eq(userShape.items.item.sku.lens.get({ sku: "X" }), "X");
-  eq(userShape.items.item.sku.path, "items[].sku");
+it("item template lenses are item-relative", () => {
+  expect(userShape.items.item.sku.lens.get({ sku: "X" })).toBe("X");
+  expect(userShape.items.item.sku.path).toBe("items[].sku");
 });
 
-test("static meta incl. root meta", () => {
-  eq(userShape._meta.title, "User");
-  eq(userShape.name._meta.label, "Full name");
-  eq(userShape.items._meta.maxItems, 10);
+it("static meta incl. root meta", () => {
+  expect(userShape._meta.title).toBe("User");
+  expect(userShape.name._meta.label).toBe("Full name");
+  expect(userShape.items._meta.maxItems).toBe(10);
 });
 
-test("reserved field names rejected", () => {
-  throws(() => object({ parent: field<string>() }), /reserved/);
+it("reserved field names rejected", () => {
+  expect(() => object({ parent: field<string>() })).toThrow(/reserved/);
 });
 
-test("arrays of primitives rejected", () => {
+it("arrays of primitives rejected", () => {
   // @ts-expect-error – items must be object shapes
-  throws(() => array(field<string>()), /object shapes/);
+  expect(() => array(field<string>())).toThrow(/object shapes/);
 });
 
-test(".meta() after form() rejected", () => {
-  throws(() => userShape.name.meta({ x: 1 }), /before form/);
+it(".meta() after form() rejected", () => {
+  expect(() => userShape.name.meta({ x: 1 })).toThrow(/before form/);
 });
 
 // ---------------------------------------------------------------------------
 // Root + object substores
-test("get/set through root", () => {
+it("get/set through root", () => {
   const s = createStore(userShape, initial());
   s.setValue(userShape.shipping.city, "Vilnius");
-  eq(s.getValue(userShape.shipping.city), "Vilnius");
-  eq(s.getValues().billing.city, "Tallinn");
+  expect(s.getValue(userShape.shipping.city)).toBe("Vilnius");
+  expect(s.getValues().billing.city).toBe("Tallinn");
 });
 
-test("structural sharing: unchanged branches keep references", () => {
+it("structural sharing: unchanged branches keep references", () => {
   const s = createStore(userShape, initial());
   const billing = s.getValues().billing;
   const items = s.getValues().items;
   s.setValue(userShape.shipping.city, "Vilnius");
-  eq(s.getValues().billing, billing);
-  eq(s.getValues().items, items);
+  expect(s.getValues().billing).toBe(billing);
+  expect(s.getValues().items).toBe(items);
 });
 
-test("same-value write is a no-op", () => {
+it("same-value write is a no-op", () => {
   const s = createStore(userShape, initial());
   const before = s.getValues();
   s.setValue(userShape.name, "Ann");
-  eq(s.getValues(), before);
+  expect(s.getValues()).toBe(before);
 });
 
-test("substores are cached", () => {
+it("substores are cached", () => {
   const s = createStore(userShape, initial());
-  eq(s.substore(userShape.shipping), s.substore(userShape.shipping));
-  eq(s.substore(userShape.items), s.substore(userShape.items));
+  expect(s.substore(userShape.shipping)).toBe(s.substore(userShape.shipping));
+  expect(s.substore(userShape.items)).toBe(s.substore(userShape.items));
 });
 
-test("substore rejects nodes outside its focus", () => {
+it("substore rejects nodes outside its focus", () => {
   const s = createStore(userShape, initial());
   const shipping = s.substore(userShape.shipping);
-  throws(() => shipping.getValue(userShape.name), /not part of/);
-  throws(() => shipping.getValue(userShape.billing.city), /not part of/);
+  expect(() => shipping.getValue(userShape.name)).toThrow(/not part of/);
+  expect(() => shipping.getValue(userShape.billing.city)).toThrow(/not part of/);
   // @ts-expect-error – fields are not substores
-  throws(() => s.substore(userShape.name), /object or array/);
+  expect(() => s.substore(userShape.name)).toThrow(/object or array/);
 });
 
-test("root cannot reach into array items", () => {
+it("root cannot reach into array items", () => {
   const s = createStore(userShape, initial());
-  throws(() => s.getValue(userShape.items.item.sku), /array item/);
+  expect(() => s.getValue(userShape.items.item.sku)).toThrow(/array item/);
 });
 
-test("meta: one owner per node, seeded from static meta", () => {
+it("meta: one owner per node, seeded from static meta", () => {
   const s = createStore(userShape, initial());
   const shipping = s.substore(userShape.shipping);
-  eq(s.getMeta(userShape.shipping.city).label, "City");
+  expect(s.getMeta(userShape.shipping.city).label).toBe("City");
   shipping.setMeta(userShape.shipping.city, { error: "Bad city" });
-  eq(s.getMeta(userShape.shipping.city).error, "Bad city");          // delegated to owner
-  eq(s.getMeta(userShape.billing.city).error, undefined);            // reused shape, separate meta
+  expect(s.getMeta(userShape.shipping.city).error).toBe("Bad city");          // delegated to owner
+  expect(s.getMeta(userShape.billing.city).error).toBe(undefined);            // reused shape, separate meta
   s.setMeta(userShape.shipping, { collapsed: true });                  // section meta owned by root
-  eq(shipping.getMeta(userShape.shipping).collapsed, true);
+  expect(shipping.getMeta(userShape.shipping).collapsed).toBe(true);
 });
 
-test("meta keeps static types", () => {
+it("meta keeps static types", () => {
   const s = createStore(userShape, initial());
   const m = s.getMeta(userShape.name);
   const label: string = m.label;
   const required: boolean = m.required;
-  eq(label, "Full name");
-  eq(required, true);
+  expect(label).toBe("Full name");
+  expect(required).toBe(true);
 });
 
 // ---------------------------------------------------------------------------
 // Arrays
-test("items() returns stores in order with stable ids", () => {
+it("items() returns stores in order with stable ids", () => {
   const s = createStore(userShape, initial());
   const items = s.substore(userShape.items);
   const [a, b] = items.items();
-  eq(a.getValue(userShape.items.item.sku), "A");
-  eq(b.getValue(userShape.items.item.sku), "B");
-  eq(items.items()[0], a);
-  eq(a.stableId === b.stableId, false);
+  expect(a.getValue(userShape.items.item.sku)).toBe("A");
+  expect(b.getValue(userShape.items.item.sku)).toBe("B");
+  expect(items.items()[0]).toBe(a);
+  expect(a.stableId === b.stableId).toBe(false);
 });
 
-test("writes through an item store preserve identity and meta", () => {
+it("writes through an item store preserve identity and meta", () => {
   const s = createStore(userShape, initial());
   const items = s.substore(userShape.items);
   const a = items.itemAt(0);
@@ -175,82 +162,80 @@ test("writes through an item store preserve identity and meta", () => {
   a.setValue(userShape.items.item.qty, 5);
 
   const newRef = s.getValues().items[0];
-  eq(newRef === oldRef, false, "item reference changed");
-  eq(newRef.qty, 5);
-  eq(items.item(newRef), a, "same store for the new reference");
-  eq(items.itemAt(0).stableId, a.stableId);
-  eq(a.getMeta(userShape.items.item.sku).touched, true);
-  throws(() => items.item(oldRef), /not currently in/);
+  expect(newRef === oldRef, "item reference changed").toBe(false);
+  expect(newRef.qty).toBe(5);
+  expect(items.item(newRef), "same store for the new reference").toBe(a);
+  expect(items.itemAt(0).stableId).toBe(a.stableId);
+  expect(a.getMeta(userShape.items.item.sku).touched).toBe(true);
+  expect(() => items.item(oldRef)).toThrow(/not currently in/);
 });
 
-test("per-item meta is isolated", () => {
+it("per-item meta is isolated", () => {
   const s = createStore(userShape, initial());
   const [a, b] = s.substore(userShape.items).items();
   a.setMeta(userShape.items.item.sku, { error: "Required" });
-  eq(b.getMeta(userShape.items.item.sku).error, undefined);
-  eq(b.getMeta(userShape.items.item.sku).required, true);   // static meta seeded per item
+  expect(b.getMeta(userShape.items.item.sku).error).toBe(undefined);
+  expect(b.getMeta(userShape.items.item.sku).required).toBe(true);   // static meta seeded per item
   a.setMeta(userShape.items.item, { rowError: "Bad row" });   // whole-row meta on the item store
-  eq(b.getMeta(userShape.items.item).rowError, undefined);
+  expect(b.getMeta(userShape.items.item).rowError).toBe(undefined);
 });
 
-test("reordering keeps stores", () => {
+it("reordering keeps stores", () => {
   const s = createStore(userShape, initial());
   const items = s.substore(userShape.items);
   const [a, b] = items.items();
   const [ra, rb] = s.getValues().items;
   s.setValue(userShape.items, [rb, ra]);
-  eq(items.itemAt(0), b);
-  eq(items.itemAt(1), a);
+  expect(items.itemAt(0)).toBe(b);
+  expect(items.itemAt(1)).toBe(a);
 });
 
-test("new object from outside = new store", () => {
+it("new object from outside = new store", () => {
   const s = createStore(userShape, initial());
   const items = s.substore(userShape.items);
   const a = items.itemAt(0);
   const [ra, rb] = s.getValues().items;
   s.setValue(userShape.items, [{ ...ra }, rb]);
-  eq(items.itemAt(0) === a, false);
-  eq(a.isAttached(), false);
+  expect(items.itemAt(0) === a).toBe(false);
+  expect(a.isAttached()).toBe(false);
 });
 
-test("detached store: reads undefined, writes throw", () => {
+it("detached store: reads undefined, writes throw", () => {
   const s = createStore(userShape, initial());
   const items = s.substore(userShape.items);
   const b = items.itemAt(1);
   s.setValue(userShape.items, [s.getValues().items[0]]);
-  eq(b.isAttached(), false);
-  eq(b.getValue(userShape.items.item.sku), undefined);
-  throws(() => b.setValue(userShape.items.item.sku, "Z"), /detached/);
-  throws(() => b.setMeta(userShape.items.item.sku, { error: "x" }), /detached/);
+  expect(b.isAttached()).toBe(false);
+  expect(b.getValue(userShape.items.item.sku)).toBe(undefined);
+  expect(() => b.setValue(userShape.items.item.sku, "Z")).toThrow(/detached/);
+  expect(() => b.setMeta(userShape.items.item.sku, { error: "x" })).toThrow(/detached/);
 });
 
-test("nested arrays: identity preserved at both levels", () => {
+it("nested arrays: identity preserved at both levels", () => {
   const s = createStore(userShape, initial());
   const line = s.substore(userShape.items).itemAt(0);
   const notes = line.substore(userShape.items.item.notes);
   const note = notes.itemAt(0);
   note.setValue(userShape.items.item.notes.item.text, "edited");
-  eq(s.getValues().items[0].notes[0].text, "edited");
-  eq(s.substore(userShape.items).itemAt(0), line);
-  eq(notes.itemAt(0), note);
-  eq(line.isAttached() && note.isAttached(), true);
+  expect(s.getValues().items[0].notes[0].text).toBe("edited");
+  expect(s.substore(userShape.items).itemAt(0)).toBe(line);
+  expect(notes.itemAt(0)).toBe(note);
+  expect(line.isAttached() && note.isAttached()).toBe(true);
 });
 
-test("object substore inside an item reads through the item scope", () => {
+it("object substore inside an item reads through the item scope", () => {
   const s = createStore(userShape, initial());
   const line = s.substore(userShape.items).itemAt(1);
   const notes = line.substore(userShape.items.item.notes);
   notes.setValue(userShape.items.item.notes, [{ text: "b1" }]);
-  eq(s.getValues().items[1].notes[0].text, "b1");
-  eq(s.substore(userShape.items).itemAt(1), line);
+  expect(s.getValues().items[1].notes[0].text).toBe("b1");
+  expect(s.substore(userShape.items).itemAt(1)).toBe(line);
 });
 
-test("structural validation", () => {
+it("structural validation", () => {
   const s = createStore(userShape, initial());
   const r = s.getValues().items[0];
-  throws(() => s.setValue(userShape.items, [r, r]), /same object twice/);
-  throws(() => s.setValue(userShape.items, [1 as any]), /must be an object/);
-  throws(() => createStore(userShape, { ...initial(), items: "x" as any }), /must be an array/);
+  expect(() => s.setValue(userShape.items, [r, r])).toThrow(/same object twice/);
+  expect(() => s.setValue(userShape.items, [1 as any])).toThrow(/must be an object/);
+  expect(() => createStore(userShape, { ...initial(), items: "x" as any })).toThrow(/must be an array/);
 });
-
-console.log(`${passed} tests passed`);
