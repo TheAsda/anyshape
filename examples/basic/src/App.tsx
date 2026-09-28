@@ -56,9 +56,6 @@ function RegistrationForm() {
   const validatingCount = useValue(countIn(shape, "validating"));
   const companyVisible = useValue(shape.company.visible);
 
-  // After the first submit attempt, errors show on untouched fields too.
-  const showErrors = submitCount > 0;
-
   return (
     <div className="page">
       <header className="page__header">
@@ -85,31 +82,31 @@ function RegistrationForm() {
             </button>
           </div>
 
-          <TextField node={shape.name} label="Full name" showErrors={showErrors} autoComplete="name" placeholder="Ada Lovelace" />
+          <TextField node={shape.name} label="Full name" autoComplete="name" placeholder="Ada Lovelace" />
           <TextField
             node={shape.email}
             label="Email"
             type="email"
-            showErrors={showErrors}
+           
             autoComplete="email"
             placeholder="ada@example.com"
           />
           <SelectField
             node={shape.accountType}
             label="Account type"
-            showErrors={showErrors}
+           
             options={[
               { value: "personal", label: "Personal" },
               { value: "company", label: "Company" },
             ]}
           />
           {companyVisible && (
-            <TextField node={shape.company} label="Company" showErrors={showErrors} autoComplete="organization" />
+            <TextField node={shape.company} label="Company" autoComplete="organization" />
           )}
-          <NumberField node={shape.age} label="Age" showErrors={showErrors} min={13} max={120} placeholder="36" />
-          <CheckboxField node={shape.newsletter} label="Send me product updates" showErrors={showErrors} />
+          <NumberField node={shape.age} label="Age" min={13} max={120} placeholder="36" />
+          <CheckboxField node={shape.newsletter} label="Send me product updates" />
 
-          <SkillsSection showErrors={showErrors} />
+          <SkillsSection />
 
           <div className="form-actions">
             <button type="submit" className="btn btn--primary" disabled={submitting}>

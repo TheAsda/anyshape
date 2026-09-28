@@ -54,7 +54,7 @@ export function typeOnlyChecks() {
 // Declarations
 it("defaults from plain values and key definitions", () => {
   expect(shape.name._meta).toEqual({
-    error: undefined, validating: false, touched: false, dirty: false, focusTarget: undefined, label: "Name",
+    error: undefined, validating: false, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
   });
   expect(shape._meta).toEqual({ submitCount: 0, submitting: false });
 });

@@ -251,6 +251,41 @@ it("useControl: state, user writes set touched/dirty, errors", async () => {
   await unmount();
 });
 
+it("useControl: onBlur reveals, showError follows the default policy", async () => {
+  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  function C() {
+    c = useControl(shape.name);
+    return h("span", { id: "c" }, `${c.error ?? "-"}|${c.revealed}|${c.showError}`);
+  }
+  await mount(h(StoreProvider, { store: s }, h(C, {})));
+  const onBlur = c.onBlur;
+  await run(() => c.onChange("Al"));
+  expect(text("c"), "error hidden while typing").toBe("Too short|false|false");
+  expect(c.onBlur, "stable").toBe(onBlur);
+  await run(() => c.onBlur());
+  expect(text("c")).toBe("Too short|true|true");
+  await run(() => c.onChange("Alice"));
+  expect(text("c"), "live once revealed").toBe("-|true|false");
+  await run(() => s.reset());
+  expect(text("c")).toBe("-|false|false");
+  await unmount();
+});
+
+it("StoreProvider showError: a custom policy, inherited by nested row providers", async () => {
+  const s = createStore(shape, initial(), { behaviors: rule(L.sku, () => "bad") });
+  const row = s.substore(shape.lines).items()[0];
+  function Sku() {
+    const c = useControl(L.sku);
+    return h("span", { id: "sku" }, String(c.showError));
+  }
+  await mount(
+    h(StoreProvider, { store: s, showError: (st) => st.error !== undefined }, h(StoreProvider, { store: row }, h(Sku, {})))
+  );
+  expect(text("sku")).toBe("true");
+  await unmount();
+});
+
 it("focusRef registers the element, focus() and submit use it, unmount clears it", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
   function Input() {
