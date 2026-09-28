@@ -8,9 +8,7 @@
     "typecheck": "tsc --noEmit",
     "dev": "vite"
   },
-  "dependencies": {
-    "devtools-protocol": "link:../devtools-protocol"
-  },
+  "dependencies": {},
   "peerDependencies": {
     "zod": "^4.0.0",
     "react": "^19.0.0",
