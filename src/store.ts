@@ -45,7 +45,7 @@
 // ============================================================
 
 import type { Meta } from "./meta";
-import type { AnyBehavior } from "./behaviors";
+import type { AnyBehavior, BehaviorHandle } from "./behaviors";
 import type { ValidationHooks, ValidationResult } from "./validation";
 import type { FocusTarget } from "./features";
 import {
@@ -92,8 +92,25 @@ export class CountRef {
   }
 }
 
+const countRefs = new WeakMap<AnyNode, Map<string, CountRef>>();
+
+/** Count reference; the same instance for the same (node, key), so it can be used as a hook dependency. */
 export function countIn(node: AnyNode, key: string): CountRef {
-  return new CountRef(node, key);
+  let byKey = countRefs.get(node);
+  if (!byKey) countRefs.set(node, (byKey = new Map()));
+  let ref = byKey.get(key);
+  if (!ref) byKey.set(key, (ref = new CountRef(node, key)));
+  return ref;
+}
+
+export interface FocusOptions {
+  /** Order entries by their focus targets, e.g. by position on the page. */
+  compare?: (a: FocusTarget, b: FocusTarget) => number;
+}
+
+export interface SubmitOptions {
+  /** Focus the first error when invalid. Default true; FocusOptions to order the errors. */
+  focus?: boolean | FocusOptions;
 }
 
 /** The initial (baseline) value of a node. Changes with { as: "initial" } writes. */
@@ -108,8 +125,13 @@ export class InitialRef<V = unknown> {
   }
 }
 
+const initialRefs = new WeakMap<AnyNode, InitialRef<any>>();
+
+/** Initial-value reference; the same instance for the same node. */
 export function initialOf<N extends AnyNode>(node: N): InitialRef<InferValue<N>> {
-  return new InitialRef(node);
+  let ref = initialRefs.get(node);
+  if (!ref) initialRefs.set(node, (ref = new InitialRef(node)));
+  return ref;
 }
 
 export type AnyRef = AnyNode | MetaRef<any> | CountRef | InitialRef<any>;
@@ -130,7 +152,10 @@ export const MAX_REACTION_ROUNDS = 100;
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;
-  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[]): Unsubscribe;
+  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle;
+  replace(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle;
+  /** After reset(node) on `store`: re-run (as init) every instance that writes inside the reset part. */
+  reinit(store: BaseStore<any>, node: AnyNode): void;
 }
 
 // ============================================================
@@ -388,6 +413,9 @@ export abstract class BaseStore<N extends ContainerNode> {
       this.root._log({ loc: locOf(this._host, node), origin: "initial" });
       this._write(node, initial);
       this._resetMeta(node);
+      // Behavior-written meta (errors, disabled flags, ...) was reset to its
+      // defaults: recompute it as if the form were created with these values.
+      this.root._runtime?.reinit(this, node);
     });
   }
 
@@ -544,7 +572,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     if (!current) return;
     const next: Meta = { ...node._meta };
     for (const [key, def] of Object.entries(node._metaDefs)) {
-      if (def.options.reactive === false) next[key] = current[key];
+      if (def.options.reactive === false || def.options.keepOnReset) next[key] = current[key];
     }
     if (shallowEqual(current, next)) return;
     this._commitMeta(node, current, next, "initial");
@@ -598,10 +626,23 @@ export abstract class BaseStore<N extends ContainerNode> {
    * nodes apply to every row; on a row's store, only to that row (and rows
    * nested in it). Returns a function that removes them again.
    */
-  addBehavior(behaviors: AnyBehavior | readonly AnyBehavior[]): Unsubscribe {
+  addBehavior(behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+    return this._runtimeOrThrow().add(this._host, behaviors);
+  }
+
+  /**
+   * Swap the behaviors registered by `previous` for `behaviors` in one
+   * transaction, on the store `previous` was registered on. If a check fails,
+   * `previous` stays registered. Returns the new handle.
+   */
+  replaceBehavior(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+    return this._runtimeOrThrow().replace(previous, behaviors);
+  }
+
+  private _runtimeOrThrow(): RuntimeHooks {
     const runtime = this.root._runtime;
     if (!runtime) throw new Error("This store has no behavior runtime – create it with createStore()");
-    return runtime.add(this._host, behaviors);
+    return runtime;
   }
 
   // ==========================================================
@@ -620,34 +661,79 @@ export abstract class BaseStore<N extends ContainerNode> {
     return hooks.validate(this, target) as Promise<ValidationResult<X>>;
   }
 
+  /** The node's registered focus target, if any. */
+  focusTargetOf(node: AnyNode): FocusTarget | undefined {
+    this.assertInScope(node);
+    if (!("focusTarget" in node._metaDefs)) return undefined;
+    return this._ownerOf(node)._metaOf(node).focusTarget as FocusTarget | undefined;
+  }
+
   /** Focus the node's registered focus target. Returns false when there is none. */
   focus(node: AnyNode): boolean {
-    this.assertInScope(node);
-    if (!("focusTarget" in node._metaDefs)) return false;
-    const target = this._ownerOf(node)._metaOf(node).focusTarget as FocusTarget | undefined;
+    const target = this.focusTargetOf(node);
     if (!target) return false;
     target.focus();
     target.scrollIntoView?.();
     return true;
   }
 
-  /** Focus the first entry (e.g. result.errors) that has a focus target. */
-  focusFirst<E extends CollectEntry>(entries: readonly E[]): E | undefined {
-    for (const entry of entries) {
-      if (entry.store.isAttached() && entry.store.focus(entry.ref)) return entry;
-    }
-    return undefined;
+  /**
+   * Focus the first entry (e.g. result.errors) that has a focus target. By
+   * default entries keep their order (shape order); `compare` orders them by
+   * their targets instead, e.g. by position on the page. Falls back to the
+   * store's `focusOrder` (createStore option).
+   */
+  focusFirst<E extends CollectEntry>(entries: readonly E[], options: FocusOptions = {}): E | undefined {
+    const compare = options.compare ?? this.root._focusOrder;
+    const candidates = entries
+      .map((entry, index) => ({ entry, index, target: entry.store.isAttached() ? entry.store.focusTargetOf(entry.ref) : undefined }))
+      .filter((c): c is { entry: E; index: number; target: FocusTarget } => c.target !== undefined);
+    if (compare) candidates.sort((a, b) => compare(a.target, b.target) || a.index - b.index);
+    const first = candidates[0];
+    if (!first) return undefined;
+    first.target.focus();
+    first.target.scrollIntoView?.();
+    return first.entry;
   }
 
   /**
    * Submit flow: increments `submitCount` and sets `submitting` (when the root
-   * declares submission()), validates this store's subtree, calls `onValid`
-   * with the submit values when valid, otherwise focuses the first error.
+   * declares submission()), validates this store's subtree, then calls
+   * `onValid(values)`, or focuses the first error and calls `onInvalid(result)`.
+   * While a submit of this store is running, further calls return it.
    */
-  async submit(
-    onValid?: (values: ValidationResult<N>["values"]) => unknown | Promise<unknown>,
-    options: { focus?: boolean } = {}
-  ): Promise<ValidationResult<N>> {
+  submit(
+    onValid?: (values: ValidationResult<N & AnyNode>["values"]) => unknown | Promise<unknown>,
+    onInvalid?: (result: ValidationResult<N & AnyNode>) => unknown | Promise<unknown>,
+    options: SubmitOptions = {}
+  ): Promise<ValidationResult<N & AnyNode>> {
+    if (this._submitRun) return this._submitRun;
+    const run = this._submit(onValid, onInvalid, options).finally(() => {
+      this._submitRun = undefined;
+    });
+    this._submitRun = run;
+    return run;
+  }
+
+  /** submit() as an event handler: calls event.preventDefault() first. */
+  handleSubmit(
+    onValid?: (values: ValidationResult<N & AnyNode>["values"]) => unknown | Promise<unknown>,
+    onInvalid?: (result: ValidationResult<N & AnyNode>) => unknown | Promise<unknown>,
+    options: SubmitOptions = {}
+  ): (event?: { preventDefault?(): void }) => Promise<ValidationResult<N & AnyNode>> {
+    return (event) => {
+      event?.preventDefault?.();
+      return this.submit(onValid, onInvalid, options);
+    };
+  }
+
+  private _submitRun: Promise<ValidationResult<N & AnyNode>> | undefined;
+
+  private async _submit(
+    onValid: ((values: any) => unknown) | undefined,
+    onInvalid: ((result: any) => unknown) | undefined,
+    options: SubmitOptions
+  ): Promise<ValidationResult<N & AnyNode>> {
     const root = this.root;
     const rootNode = root.node as AnyNode;
     const has = (key: string) => key in rootNode._metaDefs;
@@ -658,12 +744,52 @@ export abstract class BaseStore<N extends ContainerNode> {
     });
     try {
       const result = await this.validate();
-      if (result.valid) await onValid?.(result.values);
-      else if (options.focus !== false) this.focusFirst(result.errors);
+      if (result.valid) {
+        await onValid?.(result.values);
+      } else {
+        if (options.focus !== false) this.focusFirst(result.errors, options.focus === true || options.focus === undefined ? {} : options.focus);
+        await onInvalid?.(result);
+      }
       return result;
     } finally {
       if (has("submitting")) patch({ submitting: false });
     }
+  }
+
+  // ==========================================================
+  // Paths
+  // ==========================================================
+  /**
+   * Resolve a concrete path from the form root – "lines[1].qty", or with a
+   * meta key "lines[1].qty#error" – to a store that can address it and its
+   * reference. undefined when the path does not exist (unknown field, row
+   * index out of range).
+   */
+  resolvePath(path: string): { store: BaseStore<any>; ref: AnyNode | MetaRef<any> } | undefined {
+    const hash = path.indexOf("#");
+    const valuePath = hash === -1 ? path : path.slice(0, hash);
+    const key = hash === -1 ? undefined : path.slice(hash + 1);
+    if (valuePath !== "" && !/^[^.[\]]+(?:\[\d+\])*(?:\.[^.[\]]+(?:\[\d+\])*)*$/.test(valuePath)) return undefined;
+    const tokens = valuePath.match(/[^.[\]]+|\[\d+\]/g) ?? [];
+
+    let store: BaseStore<any> = this.root;
+    let node: AnyNode = this.root.node;
+    for (const token of tokens) {
+      if (token.startsWith("[")) {
+        if (!(node instanceof ArrayNode)) return undefined;
+        const index = Number(token.slice(1, -1));
+        const rows = (store.substore(node as any) as ArrayStore<any>).items();
+        if (index >= rows.length) return undefined;
+        store = rows[index];
+        node = node.item;
+      } else {
+        if (!(node instanceof ObjectNode) || !Object.prototype.hasOwnProperty.call(node._fields, token)) return undefined;
+        node = (node._fields as Record<string, AnyNode>)[token];
+      }
+    }
+    if (key === undefined) return { store, ref: node };
+    if (!(key in node._metaDefs)) return undefined;
+    return { store, ref: new MetaRef(node, key) };
   }
 
   // ==========================================================
@@ -936,6 +1062,8 @@ export class RootStore<N extends ObjectNode<any, any>> extends BaseStore<N> impl
   private writeLog: WriteEntry[] = [];
   /** @internal */ _runtime: RuntimeHooks | undefined;
   /** @internal */ _validation: ValidationHooks | undefined;
+  /** @internal default order for focusFirst (createStore option `focusOrder`) */
+  _focusOrder: ((a: FocusTarget, b: FocusTarget) => number) | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { reaction: new Set(), ui: new Set() };
   private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { reaction: new Map(), ui: new Map() };
   private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<string>>>> = { reaction: new Map(), ui: new Map() };

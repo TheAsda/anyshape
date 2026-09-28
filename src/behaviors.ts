@@ -32,6 +32,7 @@
 // ============================================================
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
+import type { FocusTarget } from "./features";
 import {
   refNode, refKey, refLabel, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
 } from "./internal";
@@ -144,7 +145,7 @@ export interface QueueChange {
 
 /** @internal Installed by the validation layer. */
 export interface RuleHooks {
-  change(host: BaseStore<any>, rules: readonly RuleLike[], mode: "add" | "remove"): QueueChange;
+  change(host: BaseStore<any>, added: readonly RuleLike[], removed: readonly RuleLike[]): QueueChange;
 }
 
 export function defineBehavior(config: BehaviorConfig): Behavior {
@@ -160,6 +161,8 @@ export interface BehaviorErrorInfo {
 
 export interface StoreOptions {
   behaviors?: AnyBehavior | readonly AnyBehavior[];
+  /** Default order for focusFirst / submit (e.g. document position). Default: shape order. */
+  focusOrder?: (a: FocusTarget, b: FocusTarget) => number;
   /** Called when a behavior throws. Default: console.error. */
   onError?: (error: unknown, info: BehaviorErrorInfo) => void;
 }
@@ -257,6 +260,22 @@ class Binding {
 }
 
 // ============================================================
+// Handles
+// ============================================================
+/** Returned by addBehavior: call it to remove the behaviors; pass it to replaceBehavior to swap them. */
+export type BehaviorHandle = (() => void) & { readonly __behaviorHandle?: never };
+
+interface HandleEntry {
+  runtime: BehaviorRuntime;
+  host: BaseStore<any>;
+  regs: Registration[];
+  rules: RuleLike[];
+  disposed: boolean;
+}
+
+const handles = new WeakMap<BehaviorHandle, HandleEntry>();
+
+// ============================================================
 // Runtime
 // ============================================================
 export class BehaviorRuntime implements RuntimeHooks {
@@ -285,42 +304,71 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const [binding, p] of batch) this.run(binding, p);
   }
 
-  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[], feature = false): Unsubscribe {
+  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[], feature = false): BehaviorHandle {
+    return this.swap(host, undefined, behaviors, feature);
+  }
+
+  /**
+   * Replace what `previous` registered with `behaviors`, as one transaction:
+   * if any check fails, `previous` stays registered. The UI sees only the
+   * final state (no flicker of errors or meta in between).
+   */
+  replace(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+    const entry = handles.get(previous);
+    if (!entry || entry.runtime !== this) throw new Error("replace(): not a handle of this store");
+    if (entry.disposed) throw new Error("replace(): the handle was already disposed or replaced");
+    return this.swap(entry.host, entry, behaviors, false);
+  }
+
+  private swap(host: BaseStore<any>, previous: HandleEntry | undefined, behaviors: AnyBehavior | readonly AnyBehavior[], feature: boolean): BehaviorHandle {
     const list = (Array.isArray(behaviors) ? behaviors : [behaviors]) as readonly AnyBehavior[];
     if (!host.isAttached()) throw new Error("Cannot add behaviors to a detached row");
     const rules = list.filter(isRule);
     const plain = list.filter((b): b is Behavior => !isRule(b));
-    if (rules.length && !this.rules) throw new Error("Validation rules need a store created with createStore()");
+    const oldRules = previous?.rules ?? [];
+    if ((rules.length || oldRules.length) && !this.rules) throw new Error("Validation rules need a store created with createStore()");
 
-    const change = rules.length ? this.rules!.change(host, rules, "add") : undefined;
-    const regs = this.apply(host, plain.map((b) => ({ behavior: b, feature: feature || b._self !== undefined })), change);
+    const change = rules.length || oldRules.length ? this.rules!.change(host, rules, oldRules) : undefined;
+    const regs = this.apply(
+      host,
+      plain.map((b) => ({ behavior: b, feature: feature || b._self !== undefined })),
+      change,
+      previous?.regs ?? []
+    );
+    if (previous) previous.disposed = true;
 
-    let disposed = false;
-    return () => {
-      if (disposed) return;
-      disposed = true;
-      this.dispose(regs);
-      if (rules.length) this.apply(host, [], this.rules!.change(host, rules, "remove"));
-    };
+    const entry: HandleEntry = { runtime: this, host, regs, rules, disposed: false };
+    const handle = (() => {
+      if (entry.disposed) return;
+      entry.disposed = true;
+      this.store._batch(() => {
+        this.dispose(regs);
+        if (rules.length) this.apply(host, [], this.rules!.change(host, [], rules), []);
+      });
+    }) as BehaviorHandle;
+    handles.set(handle, entry);
+    return handle;
   }
 
   /**
-   * Registers behaviors and applies a queue change as one transaction: every
-   * check (scope, writers, cycles) runs before anything changes.
+   * Registers behaviors, removes `removing` and applies a queue change as one
+   * transaction: every check (scope, writers, cycles) runs before anything changes.
    */
   private apply(
     host: BaseStore<any>,
     items: { behavior: Behavior; feature: boolean }[],
-    change: QueueChange | undefined
+    change: QueueChange | undefined,
+    removing: readonly Registration[]
   ): Registration[] {
     const regs = items.map((i) => this.prepare(host, i.behavior, i.feature));
     const queueRegs = (change?.add ?? []).map((a) => this.prepare(this.store, a.behavior, true));
-    const removed = new Set((change?.remove ?? []).map((r) => r.reg));
+    const removed = new Set([...(change?.remove ?? []).map((r) => r.reg), ...removing]);
     const kept = this.regs.filter((r) => !removed.has(r));
     this.checkWriters([...regs, ...queueRegs], kept);
     this.rank([...kept, ...regs, ...queueRegs]); // throws on cycles, before any state change
 
     this.store._batch(() => {
+      for (const reg of removing) this.unregister(reg, true);
       for (const { reg, resetMeta } of change?.remove ?? []) this.unregister(reg, resetMeta);
       change?.commit();
       for (const reg of regs) this.register(reg, host);
@@ -335,6 +383,24 @@ export class BehaviorRuntime implements RuntimeHooks {
   private register(reg: Registration, host: BaseStore<any>): void {
     this.regs.push(reg);
     reg.root = this.bind(reg, host, reg.chain.indexOf(host.node), true);
+  }
+
+  // ---- reset ----
+  reinit(store: BaseStore<any>, node: AnyNode): void {
+    const resetHost = store._host;
+    const inside = (leafHost: BaseStore<any>): boolean => {
+      if (storeWithin(resetHost, leafHost)) return true; // the reset store's scope, or an enclosing one
+      // A row below the reset store: its array must be inside `node`.
+      for (let h: BaseStore<any> = leafHost; h instanceof ItemStore; h = h.arrayStore._host) {
+        if (h.arrayStore._host === resetHost) return isAncestorOrSelf(node, h.arrayStore.node);
+      }
+      return false;
+    };
+    for (const reg of this.regs) {
+      if (reg.disposed || !reg.runInit || !reg.root) continue;
+      if (!reg.writes.some((w) => isAncestorOrSelf(node, refNode(w)))) continue;
+      for (const leaf of this.leaves(reg.root)) if (inside(leaf.host)) this.mark(leaf, { init: true });
+    }
   }
 
   // ---- registration ----

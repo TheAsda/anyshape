@@ -1,9 +1,10 @@
+// Run: npx tsx src/behaviors.test.ts   (type assertions: npx tsc)
 import {
   form, object, array, field, createStore, defineBehavior, when, initialOf, countIn,
   control, visibility, disableable, touched, dirty,
   type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
-import { it, expect } from "vitest";
+import { test, eq, deepEq, throws, report } from "./test/harness";
 
 const shape = form({
   country: field<string>(),
@@ -79,60 +80,60 @@ function pricing(runs: Record<string, number>) {
 
 // ---------------------------------------------------------------------------
 // Ordering and init
-it("init: every instance runs once on creation, in dependency order", () => {
+test("init: every instance runs once on creation, in dependency order", () => {
   const runs: Record<string, number> = {};
   const s = createStore(shape, initial(), { behaviors: pricing(runs) });
-  expect(runs).toEqual({ lineTotal: 2, subtotal: 1, tax: 1, total: 1 });
-  expect(s.get(shape.subtotal)).toBe(50);
-  expect(s.get(shape.total)).toBe(60);
+  deepEq(runs, { lineTotal: 2, subtotal: 1, tax: 1, total: 1 });
+  eq(s.get(shape.subtotal), 50);
+  eq(s.get(shape.total), 60);
 });
 
-it("a change runs each affected behavior once, upstream first", () => {
+test("a change runs each affected behavior once, upstream first", () => {
   const runs: Record<string, number> = {};
   const s = createStore(shape, initial(), { behaviors: pricing(runs) });
   for (const k in runs) delete runs[k];
   s.substore(shape.lines).itemAt(0).set(L.qty, 3, { origin: "user" });
-  expect(runs).toEqual({ lineTotal: 1, subtotal: 1, tax: 1, total: 1 });
-  expect(s.get(shape.total)).toBe(84);
+  deepEq(runs, { lineTotal: 1, subtotal: 1, tax: 1, total: 1 });
+  eq(s.get(shape.total), 84);
 });
 
-it("an enclosing-scope trigger re-runs every row", () => {
+test("an enclosing-scope trigger re-runs every row", () => {
   const runs: Record<string, number> = {};
   const s = createStore(shape, initial(), { behaviors: pricing(runs) });
   for (const k in runs) delete runs[k];
   s.set(shape.discount, 0.5);
-  expect(runs).toEqual({ lineTotal: 2, subtotal: 1, tax: 1, total: 1 });
-  expect(s.get(shape.subtotal)).toBe(25);
+  deepEq(runs, { lineTotal: 2, subtotal: 1, tax: 1, total: 1 });
+  eq(s.get(shape.subtotal), 25);
 });
 
-it("UI listeners fire once, on the settled state", () => {
+test("UI listeners fire once, on the settled state", () => {
   const s = createStore(shape, initial(), { behaviors: pricing({}) });
   const seen: number[] = [];
   s.subscribe(shape.total, () => seen.push(s.get(shape.total)));
   s.substore(shape.lines).itemAt(1).set(L.price, 30);
-  expect(seen).toEqual([84]);
+  deepEq(seen, [84]);
 });
 
-it("new rows get an instance and an init run before the UI sees them", () => {
+test("new rows get an instance and an init run before the UI sees them", () => {
   const s = createStore(shape, initial(), { behaviors: pricing({}) });
   let seenTotal = -1;
   s.substore(shape.lines).subscribeItems(() => (seenTotal = s.get(shape.total)));
   const row = s.substore(shape.lines).append({ price: 5, qty: 2 });
-  expect(row.get(L.lineTotal)).toBe(10);
-  expect(seenTotal).toBe(72);
+  eq(row.get(L.lineTotal), 10);
+  eq(seenTotal, 72);
 });
 
-it("runOn: { init: false } skips the creation run", () => {
+test("runOn: { init: false } skips the creation run", () => {
   let runs = 0;
   createStore(shape, initial(), {
     behaviors: defineBehavior({ triggers: [shape.title], runOn: { init: false }, run: () => void runs++ }),
   });
-  expect(runs).toBe(0);
+  eq(runs, 0);
 });
 
 // ---------------------------------------------------------------------------
 // Own writes, two-way links, state
-it("a two-way link: own writes do not re-trigger it", () => {
+test("a two-way link: own writes do not re-trigger it", () => {
   let runs = 0;
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
@@ -150,19 +151,19 @@ it("a two-way link: own writes do not re-trigger it", () => {
     }),
   });
   s.set(shape.start, 10, { origin: "user" });
-  expect(s.get(shape.end)).toBe(12);
+  eq(s.get(shape.end), 12);
   s.set(shape.end, 20, { origin: "user" });
-  expect(s.get(shape.start)).toBe(18);
-  expect(runs).toBe(2);
+  eq(s.get(shape.start), 18);
+  eq(runs, 2);
   s.batch(() => {
     s.set(shape.start, 1);
     s.set(shape.end, 7);
   });
-  expect(s.get(shape.start)).toBe(1);
-  expect(s.get(shape.end)).toBe(7);
+  eq(s.get(shape.start), 1);
+  eq(s.get(shape.end), 7);
 });
 
-it("ctx.state: derived until the user edits it", () => {
+test("ctx.state: derived until the user edits it", () => {
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
       name: "slug",
@@ -176,15 +177,15 @@ it("ctx.state: derived until the user edits it", () => {
     }),
   });
   s.set(shape.title, "Big News", { origin: "user" });
-  expect(s.get(shape.slug)).toBe("big-news");
+  eq(s.get(shape.slug), "big-news");
   s.set(shape.slug, "custom", { origin: "user" });
   s.set(shape.title, "Other", { origin: "user" });
-  expect(s.get(shape.slug)).toBe("custom");
+  eq(s.get(shape.slug), "custom");
 });
 
 // ---------------------------------------------------------------------------
 // Origins and guards
-it("origins: reset the city only when the user changes the country", () => {
+test("origins: reset the city only when the user changes the country", () => {
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
       triggers: [shape.country], writes: [shape.city], origins: ["user"], runOn: { init: false },
@@ -192,23 +193,23 @@ it("origins: reset the city only when the user changes the country", () => {
     }),
   });
   s.set(shape.country, "EE");
-  expect(s.get(shape.city), "program write ignored").toBe("Riga");
+  eq(s.get(shape.city), "Riga", "program write ignored");
   s.set(shape.country, "LT", { as: "initial" });
-  expect(s.get(shape.city), "initial write ignored").toBe("Riga");
+  eq(s.get(shape.city), "Riga", "initial write ignored");
   s.set(shape.country, "FI", { origin: "user" });
-  expect(s.get(shape.city)).toBe("");
+  eq(s.get(shape.city), "");
 });
 
-it("ctx.origins lists what caused the run", () => {
+test("ctx.origins lists what caused the run", () => {
   const seen: Origin[][] = [];
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({ triggers: [shape.title], runOn: { init: false }, run: (ctx) => void seen.push([...ctx.origins]) }),
   });
   s.set(shape.title, "x", { origin: "user" });
-  expect(seen).toEqual([["user"]]);
+  deepEq(seen, [["user"]]);
 });
 
-it("when: skipped while false, guard references trigger", () => {
+test("when: skipped while false, guard references trigger", () => {
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
       name: "vatNote",
@@ -218,18 +219,18 @@ it("when: skipped while false, guard references trigger", () => {
       run: (ctx) => ctx.set(shape.vat.note, `VAT: ${ctx.get(shape.vat)}`),
     }),
   });
-  expect(s.get(shape.vat.note), "person: init skipped").toBe("");
+  eq(s.get(shape.vat.note), "", "person: init skipped");
   s.set(shape.vat, "LV1");
-  expect(s.get(shape.vat.note)).toBe("");
+  eq(s.get(shape.vat.note), "");
   s.set(shape.type, "company");          // guard ref is a trigger
-  expect(s.get(shape.vat.note)).toBe("VAT: LV1");
+  eq(s.get(shape.vat.note), "VAT: LV1");
   s.set(shape.type, "person");
-  expect(s.get(shape.vat.note), "writes stay when the guard turns false").toBe("VAT: LV1");
+  eq(s.get(shape.vat.note), "VAT: LV1", "writes stay when the guard turns false");
 });
 
 // ---------------------------------------------------------------------------
 // Errors and access
-it("a throwing behavior: writes dropped, error reported, form keeps running", () => {
+test("a throwing behavior: writes dropped, error reported, form keeps running", () => {
   const { list, onError } = errors();
   const s = createStore(shape, initial(), {
     onError,
@@ -248,14 +249,14 @@ it("a throwing behavior: writes dropped, error reported, form keeps running", ()
     ],
   });
   s.set(shape.title, "abc");
-  expect(s.get(shape.slug), "no partial writes").toBe("hello");
-  expect(s.get(shape.subtotal), "other behaviors still ran").toBe(3);
-  expect(list.length).toBe(1);
-  expect((list[0].error as Error).message).toBe("nope");
-  expect(list[0].info).toEqual({ behavior: "boom", scope: "" });
+  eq(s.get(shape.slug), "hello", "no partial writes");
+  eq(s.get(shape.subtotal), 3, "other behaviors still ran");
+  eq(list.length, 1);
+  eq((list[0].error as Error).message, "nope");
+  deepEq(list[0].info, { behavior: "boom", scope: "" });
 });
 
-it("errors in rows report the concrete scope", () => {
+test("errors in rows report the concrete scope", () => {
   const { list, onError } = errors();
   const s = createStore(shape, initial(), {
     onError,
@@ -265,10 +266,10 @@ it("errors in rows report the concrete scope", () => {
     }),
   });
   s.substore(shape.lines).itemAt(1).set(L.qty, 9);
-  expect(list[0].info).toEqual({ behavior: "rowBoom", scope: "lines[1]" });
+  deepEq(list[0].info, { behavior: "rowBoom", scope: "lines[1]" });
 });
 
-it("undeclared reads and writes are errors", () => {
+test("undeclared reads and writes are errors", () => {
   const { list, onError } = errors();
   createStore(shape, initial(), {
     onError,
@@ -277,67 +278,71 @@ it("undeclared reads and writes are errors", () => {
       defineBehavior({ name: "w", triggers: [shape.title], run: (ctx) => ctx.set(shape.city, "x") }),
     ],
   });
-  expect(list.map((e) => (e.error as Error).message.replace(/ in .*/, ""))).toEqual([
+  deepEq(list.map((e) => (e.error as Error).message.replace(/ in .*/, "")), [
     'Behavior "r": "city" is not declared',
     'Behavior "w": "city" is not declared',
   ]);
 });
 
-it("async behaviors are reported (stage 4)", () => {
+test("async behaviors are reported (stage 4)", () => {
   const { list, onError } = errors();
   createStore(shape, initial(), {
     onError,
     behaviors: defineBehavior({ name: "a", triggers: [shape.title], run: (async () => {}) as any }),
   });
-  expect(/not supported yet/.test((list[0].error as Error).message)).toBe(true);
+  eq(/not supported yet/.test((list[0].error as Error).message), true);
 });
 
 // ---------------------------------------------------------------------------
 // Registration checks
-it("one writer per target", () => {
+test("one writer per target", () => {
   const w = (name: string, target: any) => defineBehavior({ name, triggers: [shape.title], writes: [target], run: () => {} });
-  expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.city), w("b", shape.city)] })).toThrow(/already written by "a"/);
-  expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.lines), w("b", L.qty)] })).toThrow(/already written by "a"/);
-  expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.note)] })).toThrow(/already written/);
+  throws(() => createStore(shape, initial(), { behaviors: [w("a", shape.city), w("b", shape.city)] }), /already written by "a"/);
+  throws(() => createStore(shape, initial(), { behaviors: [w("a", shape.lines), w("b", L.qty)] }), /already written by "a"/);
+  throws(() => createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.note)] }), /already written/);
   createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.disabled)] });
 });
 
-it("feature-owned keys cannot be written by behaviors", () => {
-  expect(
+test("feature-owned keys cannot be written by behaviors", () => {
+  throws(
     () => createStore(shape, initial(), {
       behaviors: defineBehavior({ triggers: [shape.title], writes: [shape.name.touched], run: () => {} }),
-    })
-  ).toThrow(/owned by its feature/);
+    }),
+    /owned by its feature/
+  );
 });
 
-it("cycles are rejected at registration, nothing is registered", () => {
+test("cycles are rejected at registration, nothing is registered", () => {
   const s = createStore(shape, initial());
   const a = defineBehavior({ name: "a", triggers: [shape.city], writes: [shape.slug], run: (c) => c.set(shape.slug, c.get(shape.city)) });
   const b = defineBehavior({ name: "b", triggers: [shape.slug], writes: [shape.city], run: (c) => c.set(shape.city, c.get(shape.slug)) });
-  expect(() => s.addBehavior([a, b])).toThrow(/cycle: "a", "b"/);
+  throws(() => s.addBehavior([a, b]), /cycle: "a", "b"/);
   s.set(shape.city, "X");
-  expect(s.get(shape.slug), "neither was registered").toBe("hello");
+  eq(s.get(shape.slug), "hello", "neither was registered");
 });
 
-it("scope rules", () => {
+test("scope rules", () => {
   const s = createStore(shape, initial());
-  expect(
+  throws(
     () => s.addBehavior(defineBehavior({ triggers: [L.qty], writes: [shape.total], run: () => {} })),
-  ).toThrow(/behaviors write only their own scope/);
-  expect(
+    /behaviors write only their own scope/
+  );
+  throws(
     () => s.addBehavior(defineBehavior({ triggers: [L.qty, shape.other.item.x], run: () => {} })),
-  ).toThrow(/unrelated row scope/);
+    /unrelated row scope/
+  );
   const row = s.substore(shape.lines).itemAt(0);
-  expect(
+  throws(
     () => row.addBehavior(defineBehavior({ triggers: [shape.title], writes: [shape.city], run: () => {} })),
-  ).toThrow(/add it to an outer store/);
+    /add it to an outer store/
+  );
   const address = object({ city: field<string>() });
-  expect(() => s.addBehavior(defineBehavior({ triggers: [address.city], run: () => {} }))).toThrow(/not part of this form/);
+  throws(() => s.addBehavior(defineBehavior({ triggers: [address.city], run: () => {} })), /not part of this form/);
 });
 
 // ---------------------------------------------------------------------------
 // Rows
-it("row instances are independent and pause while the row is removed", () => {
+test("row instances are independent and pause while the row is removed", () => {
   let runs = 0;
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
@@ -348,20 +353,20 @@ it("row instances are independent and pause while the row is removed", () => {
   const lines = s.substore(shape.lines);
   const [a, b] = lines.items();
   a.set(L.qty, 5);
-  expect(a.get(L.sku)).toBe("Q5");
-  expect(b.get(L.sku)).toBe("B");
-  expect(runs).toBe(1);
+  eq(a.get(L.sku), "Q5");
+  eq(b.get(L.sku), "B");
+  eq(runs, 1);
 
   const snapshot = lines.current().slice();
   lines.remove(a);
-  expect(runs, "removal does not run it").toBe(1);
+  eq(runs, 1, "removal does not run it");
   s.set(shape.lines, snapshot);                        // undo
-  expect(lines.itemAt(0)).toBe(a);
+  eq(lines.itemAt(0), a);
   a.set(L.qty, 6);
-  expect(a.get(L.sku), "resumed after restore").toBe("Q6");
+  eq(a.get(L.sku), "Q6", "resumed after restore");
 });
 
-it("nested rows", () => {
+test("nested rows", () => {
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
       triggers: [N.text], writes: [N.len], run: (ctx) => ctx.set(N.len, ctx.get(N.text).length),
@@ -369,14 +374,14 @@ it("nested rows", () => {
   });
   const row = s.substore(shape.lines).itemAt(0);
   const note = row.substore(L.notes).itemAt(0);
-  expect(note.get(N.len), "init run in an existing nested row").toBe(2);
+  eq(note.get(N.len), 2, "init run in an existing nested row");
   const added = s.substore(shape.lines).itemAt(1).substore(L.notes).append({ text: "hello", len: 0 });
-  expect(added.get(N.len), "init run in a new nested row").toBe(5);
+  eq(added.get(N.len), 5, "init run in a new nested row");
 });
 
 // ---------------------------------------------------------------------------
 // Runtime registration
-it("addBehavior on a row applies to that row only; dispose cleans up", () => {
+test("addBehavior on a row applies to that row only; dispose cleans up", () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   const off = a.addBehavior(
@@ -386,93 +391,95 @@ it("addBehavior on a row applies to that row only; dispose cleans up", () => {
     })
   );
   a.set(L.qty, 2);
-  expect(a.get(L.sku.disabled)).toBe(true);
+  eq(a.get(L.sku.disabled), true);
   b.set(L.qty, 5);
-  expect(b.get(L.sku.disabled)).toBe(false);
+  eq(b.get(L.sku.disabled), false);
 
   off();
-  expect(a.get(L.sku.disabled), "meta reset to default on dispose").toBe(false);
+  eq(a.get(L.sku.disabled), false, "meta reset to default on dispose");
   a.set(L.qty, 3);
-  expect(a.get(L.sku.disabled), "no longer runs").toBe(false);
+  eq(a.get(L.sku.disabled), false, "no longer runs");
 });
 
-it("row-level writers: separate rows are fine, a template writer conflicts", () => {
+test("row-level writers: separate rows are fine, a template writer conflicts", () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   const hint = (name: string) => defineBehavior({ name, triggers: [L.qty], writes: [L.sku.hint], run: () => {} });
   a.addBehavior(hint("rowA"));
   b.addBehavior(hint("rowB"));
-  expect(() => s.addBehavior(hint("all"))).toThrow(/already written by "rowA"/);
-  expect(() => a.addBehavior(hint("rowA2"))).toThrow(/already written by "rowA"/);
+  throws(() => s.addBehavior(hint("all")), /already written by "rowA"/);
+  throws(() => a.addBehavior(hint("rowA2")), /already written by "rowA"/);
 });
 
-it("root registration later: rows present and future", () => {
+test("root registration later: rows present and future", () => {
   const s = createStore(shape, initial());
   const off = s.addBehavior(defineBehavior({ triggers: [L.qty], writes: [L.sku.hint], run: (c) => c.set(L.sku.hint, `x${c.get(L.qty)}`) }));
   const lines = s.substore(shape.lines);
-  expect(lines.itemAt(1).get(L.sku.hint)).toBe("x2");
-  expect(lines.append({ qty: 7 }).get(L.sku.hint)).toBe("x7");
+  eq(lines.itemAt(1).get(L.sku.hint), "x2");
+  eq(lines.append({ qty: 7 }).get(L.sku.hint), "x7");
   off();
-  expect(lines.itemAt(2).get(L.sku.hint), "reset in every row").toBe("");
+  eq(lines.itemAt(2).get(L.sku.hint), "", "reset in every row");
 });
 
 // ---------------------------------------------------------------------------
 // Default behaviors: touched, dirty
-it("touched: only user changes", () => {
+test("touched: only user changes", () => {
   const s = createStore(shape, initial(), { behaviors: pricing({}) });
   s.set(shape.name, "Bob");
-  expect(s.get(shape.name.touched), "program").toBe(false);
+  eq(s.get(shape.name.touched), false, "program");
   s.set(shape.name, "Cid", { as: "initial" });
-  expect(s.get(shape.name.touched), "initial").toBe(false);
+  eq(s.get(shape.name.touched), false, "initial");
   s.set(shape.name, "Ann", { origin: "user" });
-  expect(s.get(shape.name.touched)).toBe(true);
+  eq(s.get(shape.name.touched), true);
   s.set(shape.name, "Cid", { origin: "user" });
-  expect(s.get(shape.name.touched), "stays true when changed back").toBe(true);
+  eq(s.get(shape.name.touched), true, "stays true when changed back");
   const row = s.substore(shape.lines).itemAt(0);
   row.set(L.qty, 4, { origin: "user" });
-  expect(row.get(L.qty.touched)).toBe(true);
-  expect(row.get(L.lineTotal.touched), "calculated by a behavior").toBe(false);
+  eq(row.get(L.qty.touched), true);
+  eq(row.get(L.lineTotal.touched), false, "calculated by a behavior");
   s.reset();
-  expect(s.get(shape.name.touched), "reset clears it").toBe(false);
+  eq(s.get(shape.name.touched), false, "reset clears it");
 });
 
-it("dirty: follows the baseline", () => {
+test("dirty: follows the baseline", () => {
   const s = createStore(shape, initial());
-  expect(s.get(shape.name.dirty)).toBe(false);
+  eq(s.get(shape.name.dirty), false);
   s.set(shape.name, "Bob", { origin: "user" });
-  expect(s.get(shape.name.dirty)).toBe(true);
+  eq(s.get(shape.name.dirty), true);
   s.set(shape.name, "Ann", { origin: "user" });
-  expect(s.get(shape.name.dirty), "changed back").toBe(false);
+  eq(s.get(shape.name.dirty), false, "changed back");
   s.set(shape.name, "Bob");
   s.set(shape.name, "Bob", { as: "initial" });           // saved: baseline catches up, value unchanged
-  expect(s.get(shape.name.dirty)).toBe(false);
+  eq(s.get(shape.name.dirty), false);
 });
 
-it("dirty: new rows are dirty, counts aggregate", () => {
+test("dirty: new rows are dirty, counts aggregate", () => {
   const s = createStore(shape, initial());
-  expect(s.get(countIn(shape, "dirty"))).toBe(0);
+  eq(s.get(countIn(shape, "dirty")), 0);
   const row = s.substore(shape.lines).append();
-  expect(row.get(L.qty.dirty)).toBe(true);
-  expect(s.get(countIn(shape, "dirty")), "qty and lineTotal of the new row").toBe(2);
+  eq(row.get(L.qty.dirty), true);
+  eq(s.get(countIn(shape, "dirty")), 2, "qty and lineTotal of the new row");
   s.substore(shape.lines).remove(row);
-  expect(s.get(countIn(shape, "dirty"))).toBe(0);
+  eq(s.get(countIn(shape, "dirty")), 0);
 });
 
-it("dirty and touched after reset", () => {
+test("dirty and touched after reset", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(0);
   row.set(L.qty, 9, { origin: "user" });
-  expect(row.get(L.qty.dirty)).toBe(true);
+  eq(row.get(L.qty.dirty), true);
   s.reset();
-  expect(row.get(L.qty.dirty)).toBe(false);
-  expect(row.get(L.qty.touched)).toBe(false);
+  eq(row.get(L.qty.dirty), false);
+  eq(row.get(L.qty.touched), false);
 });
 
-it("touched and dirty work on their own, without control()", () => {
+test("touched and dirty work on their own, without control()", () => {
   const f = form({ a: field<string>().meta(touched(), dirty()) });
   const s = createStore(f, { a: "" });
   s.set(f.a, "x", { origin: "user" });
-  expect(s.get(f.a.touched)).toBe(true);
-  expect(s.get(f.a.dirty)).toBe(true);
-  expect(s.get(initialOf(f.a))).toBe("");
+  eq(s.get(f.a.touched), true);
+  eq(s.get(f.a.dirty), true);
+  eq(s.get(initialOf(f.a)), "");
 });
+
+report("behaviors.test.ts");

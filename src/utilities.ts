@@ -14,10 +14,10 @@
 //            exclusive.
 // ============================================================
 
-import { MetaRef, type AnyNode, type InferValue } from "./shape";
+import { MetaRef, type AnyNode, type InferValue, type Ref } from "./shape";
 import { defineBehavior, when, type AnyBehavior, type Behavior, type Guard } from "./behaviors";
 import { rule, type Rule, type Validatable } from "./validation";
-import { initialOf, type AnyRef, type RefValue } from "./store";
+import { initialOf, type AnyRef, type RefValue, type CountRef } from "./store";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
 type WithKey<K extends string, V> = AnyNode & { readonly _meta: { [P in K]: V } };
@@ -69,38 +69,51 @@ export function required<N extends Validatable>(node: N, options: RuleUtilOption
   });
 }
 
-type Lengthy = Validatable & { readonly _type: string | readonly unknown[] | null | undefined };
+/** A limit: a number, or a reference whose value is the limit (undefined = no limit, the rule passes). */
+export type Limit = number | Ref<number | undefined> | CountRef;
 
-export function minLength<N extends Lengthy>(node: N, length: number, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
+function limitRule<N extends Validatable>(
+  node: N,
+  limit: Limit,
+  fails: (value: any, limit: number) => boolean,
+  fallback: (limit: number) => string,
+  label: string,
+  options: RuleUtilOptions<InferValue<N>>
+): Rule<N> {
+  const ref = typeof limit === "number" ? undefined : limit;
   return rule(
     node,
-    (v) => (isEmpty(v) || (v as { length: number }).length >= length ? undefined : message(options.message, `At least ${length} characters`, v)),
-    { name: options.name ?? `minLength(${node.path}, ${length})`, when: options.when }
+    (v, ctx) => {
+      const resolved = ref === undefined ? (limit as number) : (ctx.get(ref) as number | undefined);
+      if (resolved === undefined || !fails(v, resolved)) return undefined;
+      return message(options.message, fallback(resolved), v);
+    },
+    {
+      name: options.name ?? `${label}(${node.path}, ${ref === undefined ? limit : ref.path})`,
+      when: options.when,
+      triggers: ref === undefined ? [] : [ref],
+    }
   );
 }
 
-export function maxLength<N extends Lengthy>(node: N, length: number, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
-  return rule(
-    node,
-    (v) => (isEmpty(v) || (v as { length: number }).length <= length ? undefined : message(options.message, `At most ${length} characters`, v)),
-    { name: options.name ?? `maxLength(${node.path}, ${length})`, when: options.when }
-  );
+type Lengthy = Validatable & { readonly _type: string | readonly unknown[] | null | undefined };
+
+export function minLength<N extends Lengthy>(node: N, length: Limit, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
+  return limitRule(node, length, (v, l) => !isEmpty(v) && v.length < l, (l) => `At least ${l} characters`, "minLength", options);
+}
+
+export function maxLength<N extends Lengthy>(node: N, length: Limit, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
+  return limitRule(node, length, (v, l) => !isEmpty(v) && v.length > l, (l) => `At most ${l} characters`, "maxLength", options);
 }
 
 type Numeric = Validatable & { readonly _type: number | null | undefined };
 
-export function min<N extends Numeric>(node: N, limit: number, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
-  return rule(node, (v) => (v == null || (v as number) >= limit ? undefined : message(options.message, `Must be at least ${limit}`, v)), {
-    name: options.name ?? `min(${node.path}, ${limit})`,
-    when: options.when,
-  });
+export function min<N extends Numeric>(node: N, limit: Limit, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
+  return limitRule(node, limit, (v, l) => v != null && v < l, (l) => `Must be at least ${l}`, "min", options);
 }
 
-export function max<N extends Numeric>(node: N, limit: number, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
-  return rule(node, (v) => (v == null || (v as number) <= limit ? undefined : message(options.message, `Must be at most ${limit}`, v)), {
-    name: options.name ?? `max(${node.path}, ${limit})`,
-    when: options.when,
-  });
+export function max<N extends Numeric>(node: N, limit: Limit, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
+  return limitRule(node, limit, (v, l) => v != null && v > l, (l) => `Must be at most ${l}`, "max", options);
 }
 
 type Textual = Validatable & { readonly _type: string | null | undefined };

@@ -86,7 +86,13 @@ export const submission = () => ({
   submitting: metaKey(false, { owner: "feature" }),
 });
 
-/** The usual set for an input: validation, touched, dirty and a focus target. */
+/**
+ * The usual set for an input: validation, touched, dirty and a focus target,
+ * with their default behaviors.
+ * Deliberately not configurable: control() exists to provide this default
+ * functionality. For different logic, compose the features you need and
+ * declare your own key, e.g. field().meta(validation(), touched(), { dirty: false }).
+ */
 export const control = (options?: ValidationOptions) => ({
   ...validation(options),
   ...touched(),

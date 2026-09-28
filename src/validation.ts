@@ -227,30 +227,29 @@ export class ValidationLayer implements RuleHooks, ValidationHooks {
   // ==========================================================
   // Rule registration (RuleHooks)
   // ==========================================================
-  change(host: BaseStore<any>, rules: readonly RuleLike[], mode: "add" | "remove"): QueueChange {
-    const byNode = new Map<AnyNode, Rule[]>();
-    for (const r of rules) {
+  /** Removes `removed` and adds `added` (both registered on `host`) as one queue change per node. */
+  change(host: BaseStore<any>, added: readonly RuleLike[], removed: readonly RuleLike[]): QueueChange {
+    const byNode = new Map<AnyNode, { add: Rule[]; remove: Rule[] }>();
+    const group = (r: RuleLike, kind: "add" | "remove") => {
       if (!(r instanceof Rule)) throw new Error("Expected a rule created with rule() or asyncRule()");
-      if (mode === "add") this.check(host, r);
-      const list = byNode.get(r.target) ?? [];
-      list.push(r);
-      byNode.set(r.target, list);
-    }
+      if (kind === "add") this.check(host, r);
+      let g = byNode.get(r.target);
+      if (!g) byNode.set(r.target, (g = { add: [], remove: [] }));
+      g[kind].push(r);
+    };
+    for (const r of removed) group(r, "remove");
+    for (const r of added) group(r, "add");
 
     const change: QueueChange = { remove: [], add: [], commit: () => {} };
     const commits: (() => void)[] = [];
-    for (const [node, list] of byNode) {
+    for (const [node, g] of byNode) {
       const current = this.queues.get(node);
-      let entries = current?.entries ?? [];
-      if (mode === "add") {
-        entries = [...entries, ...list.map((rule) => ({ rule, host }))];
-      } else {
-        entries = [...entries];
-        for (const rule of list) {
-          const i = entries.findIndex((e) => e.rule === rule && e.host === host);
-          if (i !== -1) entries.splice(i, 1);
-        }
+      const entries = [...(current?.entries ?? [])];
+      for (const rule of g.remove) {
+        const i = entries.findIndex((e) => e.rule === rule && e.host === host);
+        if (i !== -1) entries.splice(i, 1);
       }
+      for (const rule of g.add) entries.push({ rule, host });
       const queue: Queue = current ?? this.newQueue(node);
       if (queue.reg) change.remove.push({ reg: queue.reg, resetMeta: entries.length === 0 });
       if (entries.length) {
