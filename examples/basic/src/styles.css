@@ -1,0 +1,283 @@
+/* Minimal styling for the example – no frameworks, no dependencies. */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --border: #d8dce3;
+  --text: #1c2430;
+  --muted: #5b6675;
+  --accent: #2f5cf6;
+  --accent-strong: #1f45c2;
+  --error: #c62f2f;
+  --ok: #1d7a4c;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+.page__header {
+  margin-bottom: 24px;
+}
+
+.page__header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.page__header p {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+/* ---- fields ---- */
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field__input {
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.field__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.field--error .field__input {
+  border-color: var(--error);
+}
+
+.field__error {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--error);
+}
+
+.field__status {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.field__hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.field--checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field--checkbox .field__label {
+  margin: 0;
+  font-weight: 500;
+}
+
+.field--checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* ---- skills ---- */
+
+.skills {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 0 20px;
+}
+
+.skills legend {
+  padding: 0 6px;
+}
+
+.skills__empty {
+  margin: 4px 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 120px auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.skill-row__index {
+  padding-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.skill-row .field {
+  margin: 0;
+}
+
+/* ---- buttons ---- */
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn--primary:not(:disabled):hover {
+  background: var(--accent-strong);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn--ghost:not(:disabled):hover {
+  background: #f0f2f5;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* ---- sidebar ---- */
+
+.side h2 {
+  font-size: 15px;
+  margin: 4px 0 12px;
+}
+
+.side h2 + .stats {
+  margin-top: 0;
+}
+
+.stats {
+  margin: 0 0 20px;
+  font-size: 14px;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.stat dt {
+  color: var(--muted);
+}
+
+.stat dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__value--bad {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.side__hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.result {
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #f7f8fa;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
