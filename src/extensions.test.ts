@@ -299,6 +299,30 @@ it("collect lists matching nodes with row indexes", () => {
   expect(entry.ref).toBe(L.sku);
 });
 
+it("countIn warns when nothing in the subtree can aggregate the key", () => {
+  const local = form(
+    object({
+      a: field<string>().meta(control()),
+      b: field<boolean>().meta({ flag: false }),
+    })
+  );
+  const original = console.warn;
+  const seen: string[] = [];
+  console.warn = (...args: unknown[]) => void seen.push(args.join(" "));
+  try {
+    expect(countIn(local, "error")).toBeDefined(); // aggregable: silent
+    countIn(local, "flag"); // declared, but a plain value: always 0
+    countIn(local, "flag"); // cached ref: still one warning
+    countIn(local, "nope"); // not declared at all (e.g. a typo)
+    expect(countIn(local, "error")).toBe(countIn(local, "error"));
+  } finally {
+    console.warn = original;
+  }
+  expect(seen.length).toBe(2);
+  expect(seen[0]).toMatch(/"flag"/);
+  expect(seen[1]).toMatch(/"nope"/);
+});
+
 it("aggregate must be false for the default", async () => {
   const { metaKey } = await import("./meta");
   expect(() => metaKey(true, { aggregate: (v) => v })).toThrow(/default value/);
