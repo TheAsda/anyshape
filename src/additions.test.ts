@@ -1,10 +1,10 @@
-// Run: npx tsx src/additions.test.ts   (type assertions: npx tsc)
 import {
   form, object, array, field, metaKey, createStore, countIn, initialOf, defineBehavior, rule,
   control, submission, disableable, max, minLength,
   type InferValue, type FocusTarget, MetaRef,
 } from "./index";
-import { test, testAsync, runAsync, eq, deepEq, throws, deferred, sleep } from "./test/harness";
+import { it, expect } from "vitest";
+import { sleep, deferred } from "./test/harness";
 
 const shape = form(
   object({
@@ -37,121 +37,121 @@ function initial(): Values {
 
 // ---------------------------------------------------------------------------
 // Stable references
-test("countIn and initialOf return the same instance per (node, key)", () => {
-  eq(countIn(shape, "error"), countIn(shape, "error"));
-  eq(countIn(shape, "error") === countIn(shape, "dirty"), false);
-  eq(countIn(shape.lines, "error") === countIn(shape, "error"), false);
-  eq(initialOf(shape.name), initialOf(shape.name));
-  eq(initialOf(shape.name) === initialOf(shape.code), false);
+it("countIn and initialOf return the same instance per (node, key)", () => {
+  expect(countIn(shape, "error")).toBe(countIn(shape, "error"));
+  expect(countIn(shape, "error") === countIn(shape, "dirty")).toBe(false);
+  expect(countIn(shape.lines, "error") === countIn(shape, "error")).toBe(false);
+  expect(initialOf(shape.name)).toBe(initialOf(shape.name));
+  expect(initialOf(shape.name) === initialOf(shape.code)).toBe(false);
 });
 
 // ---------------------------------------------------------------------------
 // keepOnReset
-test("keepOnReset keys survive reset(); other meta does not", () => {
+it("keepOnReset keys survive reset(); other meta does not", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(1);
   row.set(L.qty.maxQty, 3);
   row.set(L.qty.hint, "tip");
   s.set(shape.name.note, "n");
   s.reset();
-  eq(row.get(L.qty.maxQty), 3);
-  eq(row.get(L.qty.hint), "");
-  eq(s.get(shape.name.note), "");
+  expect(row.get(L.qty.maxQty)).toBe(3);
+  expect(row.get(L.qty.hint)).toBe("");
+  expect(s.get(shape.name.note)).toBe("");
 });
 
 // ---------------------------------------------------------------------------
 // Reference limits
-test("max with a reference limit: follows the reference, undefined passes", () => {
+it("max with a reference limit: follows the reference, undefined passes", () => {
   const s = createStore(shape, initial(), { behaviors: max(L.qty, L.qty.maxQty) });
   const row = s.substore(shape.lines).itemAt(1);
-  eq(row.get(L.qty.error), undefined, "no limit yet");
+  expect(row.get(L.qty.error), "no limit yet").toBe(undefined);
   row.set(L.qty.maxQty, 3);
-  eq(row.get(L.qty.error), "Must be at most 3", "re-validated when the limit arrives");
+  expect(row.get(L.qty.error), "re-validated when the limit arrives").toBe("Must be at most 3");
   row.set(L.qty.maxQty, 10);
-  eq(row.get(L.qty.error), undefined);
+  expect(row.get(L.qty.error)).toBe(undefined);
   s.reset();
-  eq(row.get(L.qty.maxQty), 10, "kept by reset");
+  expect(row.get(L.qty.maxQty), "kept by reset").toBe(10);
   row.set(L.qty, 11, { origin: "user" });
-  eq(row.get(L.qty.error), "Must be at most 10");
+  expect(row.get(L.qty.error)).toBe("Must be at most 10");
 });
 
-test("minLength with a reference from an enclosing scope-less key", () => {
+it("minLength with a reference from an enclosing scope-less key", () => {
   const s = createStore(shape, initial(), { behaviors: minLength(shape.code, shape.code.minCode, { message: "Too short" }) });
-  eq(s.get(shape.code.error), undefined);
+  expect(s.get(shape.code.error)).toBe(undefined);
   s.set(shape.code.minCode, 3);
-  eq(s.get(shape.code.error), "Too short");
+  expect(s.get(shape.code.error)).toBe("Too short");
 });
 
-test("number limits keep working", () => {
+it("number limits keep working", () => {
   const s = createStore(shape, initial(), { behaviors: max(L.qty, 4) });
-  eq(s.substore(shape.lines).itemAt(1).get(L.qty.error), "Must be at most 4");
+  expect(s.substore(shape.lines).itemAt(1).get(L.qty.error)).toBe("Must be at most 4");
 });
 
 // ---------------------------------------------------------------------------
 // Atomic replacement
-test("replacing a rule: one notification, straight to the new error", () => {
+it("replacing a rule: one notification, straight to the new error", () => {
   const s = createStore(shape, initial());
   const h = s.addBehavior(rule(shape.name, () => "A"));
   const seen: (string | undefined)[] = [];
   s.subscribe(shape.name.error, () => seen.push(s.get(shape.name.error)));
   s.replaceBehavior(h, rule(shape.name, () => "B"));
-  deepEq(seen, ["B"]);
+  expect(seen).toEqual(["B"]);
 });
 
-test("replacing a behavior that writes the same meta: no notification", () => {
+it("replacing a behavior that writes the same meta: no notification", () => {
   const s = createStore(shape, initial());
   const lock = (name: string) =>
     defineBehavior({ name, triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, true) });
   const h = s.addBehavior(lock("a"));
-  eq(s.get(shape.flag.disabled), true);
+  expect(s.get(shape.flag.disabled)).toBe(true);
   let calls = 0;
   s.subscribe(shape.flag.disabled, () => calls++);
   const h2 = s.replaceBehavior(h, lock("b"));
-  eq(calls, 0, "reset to default and set again inside one batch");
-  eq(s.get(shape.flag.disabled), true);
+  expect(calls, "reset to default and set again inside one batch").toBe(0);
+  expect(s.get(shape.flag.disabled)).toBe(true);
   h2();
-  eq(s.get(shape.flag.disabled), false);
-  eq(calls, 1);
+  expect(s.get(shape.flag.disabled)).toBe(false);
+  expect(calls).toBe(1);
 });
 
-test("a failing replacement keeps the previous registration", () => {
+it("a failing replacement keeps the previous registration", () => {
   const s = createStore(shape, initial());
   s.addBehavior(defineBehavior({ name: "other", triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, true) }));
   const h = s.addBehavior(
     defineBehavior({ name: "mine", triggers: [shape.name], writes: [shape.name.note], run: (c) => c.set(shape.name.note, c.get(shape.name)) })
   );
   const clash = defineBehavior({ name: "next", triggers: [shape.name], writes: [shape.flag.disabled], run: () => {} });
-  throws(() => s.replaceBehavior(h, clash), /already written by "other"/);
+  expect(() => s.replaceBehavior(h, clash)).toThrow(/already written by "other"/);
   s.set(shape.name, "Kim");
-  eq(s.get(shape.name.note), "Kim", "previous behavior still runs");
+  expect(s.get(shape.name.note), "previous behavior still runs").toBe("Kim");
   const h2 = s.replaceBehavior(h, []);
   s.set(shape.name, "Lee");
-  eq(s.get(shape.name.note), "", "replaced by nothing: removed, meta reset");
+  expect(s.get(shape.name.note), "replaced by nothing: removed, meta reset").toBe("");
   h2();
 });
 
-test("handles: old handle is inert after replace; replacing twice throws", () => {
+it("handles: old handle is inert after replace; replacing twice throws", () => {
   const s = createStore(shape, initial());
   const h = s.addBehavior(rule(shape.name, () => "A"));
   const h2 = s.replaceBehavior(h, rule(shape.name, () => "B"));
   h();
-  eq(s.get(shape.name.error), "B", "disposing the old handle does nothing");
-  throws(() => s.replaceBehavior(h, []), /already disposed or replaced/);
+  expect(s.get(shape.name.error), "disposing the old handle does nothing").toBe("B");
+  expect(() => s.replaceBehavior(h, [])).toThrow(/already disposed or replaced/);
   h2();
-  eq(s.get(shape.name.error), undefined);
-  throws(() => s.replaceBehavior(h2, []), /already disposed or replaced/);
+  expect(s.get(shape.name.error)).toBe(undefined);
+  expect(() => s.replaceBehavior(h2, [])).toThrow(/already disposed or replaced/);
 });
 
-test("replacement on a row store stays on that row", () => {
+it("replacement on a row store stays on that row", () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   const h = a.addBehavior(max(L.qty, 0));
-  eq(a.get(L.qty.error), "Must be at most 0");
+  expect(a.get(L.qty.error)).toBe("Must be at most 0");
   a.replaceBehavior(h, max(L.qty, 2));
-  eq(a.get(L.qty.error), undefined);
-  eq(b.get(L.qty.error), undefined);
+  expect(a.get(L.qty.error)).toBe(undefined);
+  expect(b.get(L.qty.error)).toBe(undefined);
   b.set(L.qty, 50);
-  eq(b.get(L.qty.error), undefined, "row b never had the rule");
+  expect(b.get(L.qty.error), "row b never had the rule").toBe(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ function targets(s: ReturnType<typeof createStore<typeof shape>>, order: Record<
   return (a: FocusTarget, b: FocusTarget) => order[(a as any).id] - order[(b as any).id];
 }
 
-test("focusFirst: shape order by default, compare to reorder", () => {
+it("focusFirst: shape order by default, compare to reorder", () => {
   const s = createStore(shape, initial());
   const focused: string[] = [];
   const compare = targets(s, { name: 2, code: 1 }, focused);
@@ -171,12 +171,12 @@ test("focusFirst: shape order by default, compare to reorder", () => {
     { path: "name", ref: shape.name, store: s },
     { path: "code", ref: shape.code, store: s },
   ];
-  eq(s.focusFirst(entries)?.path, "name");
-  eq(s.focusFirst(entries, { compare })?.path, "code");
-  deepEq(focused, ["name", "code"]);
+  expect(s.focusFirst(entries)?.path).toBe("name");
+  expect(s.focusFirst(entries, { compare })?.path).toBe("code");
+  expect(focused).toEqual(["name", "code"]);
 });
 
-testAsync("focusOrder store option is used by submit", async () => {
+it("focusOrder store option is used by submit", async () => {
   const focused: string[] = [];
   const order = { name: 2, code: 1 };
   const s = createStore(shape, initial(), {
@@ -185,27 +185,27 @@ testAsync("focusOrder store option is used by submit", async () => {
   });
   targets(s, order, focused);
   await s.submit();
-  deepEq(focused, ["code"]);
+  expect(focused).toEqual(["code"]);
   await s.submit(undefined, undefined, { focus: false });
-  deepEq(focused, ["code"], "focus: false");
+  expect(focused, "focus: false").toEqual(["code"]);
 });
 
 // ---------------------------------------------------------------------------
 // submit / handleSubmit
-testAsync("handleSubmit: preventDefault, onValid with values", async () => {
+it("handleSubmit: preventDefault, onValid with values", async () => {
   const s = createStore(shape, initial());
   let prevented = 0;
   const got: string[] = [];
   const handler = s.handleSubmit((values) => void got.push(values.name));
   const r = await handler({ preventDefault: () => prevented++ });
-  eq(r.valid, true);
-  eq(prevented, 1);
-  deepEq(got, ["Ann"]);
+  expect(r.valid).toBe(true);
+  expect(prevented).toBe(1);
+  expect(got).toEqual(["Ann"]);
   await handler(); // no event
-  eq(got.length, 2);
+  expect(got.length).toBe(2);
 });
 
-testAsync("onInvalid receives the result after focusing", async () => {
+it("onInvalid receives the result after focusing", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
   const seen: string[] = [];
   s.set(shape.name.focusTarget, { focus: () => seen.push("focus") });
@@ -213,10 +213,10 @@ testAsync("onInvalid receives the result after focusing", async () => {
     () => seen.push("valid"),
     (result) => void seen.push(`invalid:${result.errors.length}`)
   )();
-  deepEq(seen, ["focus", "invalid:1"]);
+  expect(seen).toEqual(["focus", "invalid:1"]);
 });
 
-testAsync("a second submit while one is running returns the same promise", async () => {
+it("a second submit while one is running returns the same promise", async () => {
   const s = createStore(shape, initial());
   const gate = deferred<void>();
   let calls = 0;
@@ -226,18 +226,18 @@ testAsync("a second submit while one is running returns the same promise", async
   };
   const p1 = s.submit(onValid);
   const p2 = s.handleSubmit(onValid)();
-  eq(p1, p2);
+  expect(p1).toBe(p2);
   await sleep(0);
-  eq(s.get(shape.submitting), true);
+  expect(s.get(shape.submitting)).toBe(true);
   gate.resolve();
   await p1;
-  eq(calls, 1);
-  eq(s.get(shape.submitCount), 1);
+  expect(calls).toBe(1);
+  expect(s.get(shape.submitCount)).toBe(1);
   await s.submit(onValid);
-  eq(calls, 2, "a new submit after completion");
+  expect(calls, "a new submit after completion").toBe(2);
 });
 
-testAsync("an error in onValid rejects and resets submitting", async () => {
+it("an error in onValid rejects and resets submitting", async () => {
   const s = createStore(shape, initial());
   let caught: unknown;
   try {
@@ -247,93 +247,93 @@ testAsync("an error in onValid rejects and resets submitting", async () => {
   } catch (e) {
     caught = e;
   }
-  eq((caught as Error).message, "save failed");
-  eq(s.get(shape.submitting), false);
+  expect((caught as Error).message).toBe("save failed");
+  expect(s.get(shape.submitting)).toBe(false);
   const r = await s.submit();
-  eq(r.valid, true, "not stuck");
+  expect(r.valid, "not stuck").toBe(true);
 });
 
 // ---------------------------------------------------------------------------
 // resolvePath
-test("resolvePath: fields, rows, nested rows, meta keys", () => {
+it("resolvePath: fields, rows, nested rows, meta keys", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const a = s.resolvePath("name")!;
-  eq(a.store, s);
-  eq(a.ref, shape.name);
+  expect(a.store).toBe(s);
+  expect(a.ref).toBe(shape.name);
   const b = s.resolvePath("lines[1].qty")!;
-  eq(b.store, lines.itemAt(1));
-  eq(b.ref, L.qty);
+  expect(b.store).toBe(lines.itemAt(1));
+  expect(b.ref).toBe(L.qty);
   const c = s.resolvePath("lines[1].notes[0].text#error")!;
-  eq(c.store, lines.itemAt(1).substore(L.notes).itemAt(0));
-  eq(c.ref instanceof MetaRef, true);
-  eq((c.ref as MetaRef<any>).key, "error");
+  expect(c.store).toBe(lines.itemAt(1).substore(L.notes).itemAt(0));
+  expect(c.ref instanceof MetaRef).toBe(true);
+  expect((c.ref as MetaRef<any>).key).toBe("error");
   const root = s.resolvePath("")!;
-  eq(root.ref, shape);
-  eq(s.resolvePath("#submitCount")!.ref instanceof MetaRef, true);
+  expect(root.ref).toBe(shape);
+  expect(s.resolvePath("#submitCount")!.ref instanceof MetaRef).toBe(true);
 });
 
-test("resolvePath: unknown paths are undefined", () => {
+it("resolvePath: unknown paths are undefined", () => {
   const s = createStore(shape, initial());
   for (const p of ["nope", "lines[9].qty", "lines[1].nope", "lines..qty", "lines[x].qty", "name[0]", "lines[1].qty#nokey", ".name", "name."]) {
-    eq(s.resolvePath(p), undefined, p);
+    expect(s.resolvePath(p), p).toBe(undefined);
   }
 });
 
-test("resolvePath works from a row store (paths are from the form root)", () => {
+it("resolvePath works from a row store (paths are from the form root)", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(0);
-  eq(row.resolvePath("name")!.store, s);
+  expect(row.resolvePath("name")!.store).toBe(s);
 });
 
-test("server errors: resolve and set", () => {
+it("server errors: resolve and set", () => {
   const s = createStore(shape, initial());
   const server = { "lines[1].qty": "Out of stock", name: "Taken" };
   for (const [path, message] of Object.entries(server)) {
     const target = s.resolvePath(`${path}#error`);
     if (target) target.store.set(target.ref as MetaRef<string | undefined>, message);
   }
-  eq(s.substore(shape.lines).itemAt(1).get(L.qty.error), "Out of stock");
-  eq(s.get(countIn(shape, "error")), 2);
+  expect(s.substore(shape.lines).itemAt(1).get(L.qty.error)).toBe("Out of stock");
+  expect(s.get(countIn(shape, "error"))).toBe(2);
 });
 
 // ---------------------------------------------------------------------------
 // reset() re-runs behaviors (found by the React tests)
-test("reset re-validates: a kept limit still applies to the reset value", () => {
+it("reset re-validates: a kept limit still applies to the reset value", () => {
   const s = createStore(shape, { ...initial(), lines: [{ qty: 5, notes: [] }] }, { behaviors: max(L.qty, L.qty.maxQty) });
   const row = s.substore(shape.lines).itemAt(0);
   row.set(L.qty.maxQty, 3);
-  eq(row.get(L.qty.error), "Must be at most 3");
+  expect(row.get(L.qty.error)).toBe("Must be at most 3");
   s.reset();
-  eq(row.get(L.qty.error), "Must be at most 3", "not cleared by reset");
+  expect(row.get(L.qty.error), "not cleared by reset").toBe("Must be at most 3");
 });
 
-test("reset: rule errors match the initial values again", () => {
+it("reset: rule errors match the initial values again", () => {
   const s = createStore(shape, { ...initial(), name: "" }, { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
-  eq(s.get(shape.name.error), "Required");
+  expect(s.get(shape.name.error)).toBe("Required");
   s.set(shape.name, "Bob", { origin: "user" });
-  eq(s.get(shape.name.error), undefined);
+  expect(s.get(shape.name.error)).toBe(undefined);
   let notified = 0;
   s.subscribe(shape.name.error, () => notified++);
   s.reset();
-  eq(s.get(shape.name.error), "Required");
-  eq(s.get(shape.name.touched), false, "touched stays cleared (it does not run on init)");
-  eq(notified, 1);
+  expect(s.get(shape.name.error)).toBe("Required");
+  expect(s.get(shape.name.touched), "touched stays cleared (it does not run on init)").toBe(false);
+  expect(notified).toBe(1);
 });
 
-test("reset: behavior-written meta is recomputed, without flicker", () => {
+it("reset: behavior-written meta is recomputed, without flicker", () => {
   const s = createStore(shape, { ...initial(), name: "" }, {
     behaviors: defineBehavior({ triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, c.get(shape.name) === "") }),
   });
-  eq(s.get(shape.flag.disabled), true);
+  expect(s.get(shape.flag.disabled)).toBe(true);
   let notified = 0;
   s.subscribe(shape.flag.disabled, () => notified++);
   s.reset();
-  eq(s.get(shape.flag.disabled), true, "the condition still holds");
-  eq(notified, 0, "reset to default and recomputed in one batch");
+  expect(s.get(shape.flag.disabled), "the condition still holds").toBe(true);
+  expect(notified, "reset to default and recomputed in one batch").toBe(0);
 });
 
-test("resetting one row re-runs only that row's instances", () => {
+it("resetting one row re-runs only that row's instances", () => {
   let runs: string[] = [];
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
@@ -349,9 +349,8 @@ test("resetting one row re-runs only that row's instances", () => {
   const [a, b] = s.substore(shape.lines).items();
   runs = [];
   b.reset();
-  deepEq(runs, ["5"]);
-  eq(a.get(L.qty.hint), "q1");
-  eq(b.get(L.qty.hint), "q5");
+  expect(runs).toEqual(["5"]);
+  expect(a.get(L.qty.hint)).toBe("q1");
+  expect(b.get(L.qty.hint)).toBe("q5");
 });
 
-runAsync("additions.test.ts");

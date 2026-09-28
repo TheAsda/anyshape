@@ -1,10 +1,10 @@
-// Run: npx tsx src/validation.test.ts   (type assertions: npx tsc)
 import {
   form, object, array, field, createStore, defineBehavior, when, countIn, rule, asyncRule,
   control, validation, visibility, disableable, submission,
   type InferValue, type BehaviorErrorInfo, type FocusTarget, type SubmitValue,
 } from "./index";
-import { test, testAsync, runAsync, eq, deepEq, throws, sleep, deferred } from "./test/harness";
+import { it, expect } from "vitest";
+import { sleep, deferred } from "./test/harness";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
@@ -74,65 +74,65 @@ export function typeOnlyChecks() {
 
 // ---------------------------------------------------------------------------
 // Sync queue
-test("queue: rules in order, first error wins, runs on creation", () => {
+it("queue: rules in order, first error wins, runs on creation", () => {
   const s = createStore(shape, { ...initial(), name: "" }, { behaviors: [required(shape.name), minLength(shape.name, 3)] });
-  eq(s.get(shape.name.error), "Required", "loaded data is validated on creation");
+  expect(s.get(shape.name.error), "loaded data is validated on creation").toBe("Required");
   s.set(shape.name, "Jo", { origin: "user" });
-  eq(s.get(shape.name.error), "At least 3");
+  expect(s.get(shape.name.error)).toBe("At least 3");
   s.set(shape.name, "Joe");                                // program writes validate too
-  eq(s.get(shape.name.error), undefined);
+  expect(s.get(shape.name.error)).toBe(undefined);
 });
 
-test("rules need the validation() feature", () => {
+it("rules need the validation() feature", () => {
   const s = createStore(shape, initial());
-  throws(() => s.addBehavior(rule(shape.note as any, () => undefined)), /no validation\(\) feature/);
+  expect(() => s.addBehavior(rule(shape.note as any, () => undefined))).toThrow(/no validation\(\) feature/);
 });
 
-test("guards: conditional rules, guard refs trigger", () => {
+it("guards: conditional rules, guard refs trigger", () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(shape.taxId, (v) => (v ? undefined : "Required"), { when: when([shape.type], (t) => t === "company") }),
   });
-  eq(s.get(shape.taxId.error), undefined);
+  expect(s.get(shape.taxId.error)).toBe(undefined);
   s.set(shape.type, "company");
-  eq(s.get(shape.taxId.error), "Required", "revalidated when the guard turns true");
+  expect(s.get(shape.taxId.error), "revalidated when the guard turns true").toBe("Required");
   s.set(shape.type, "person");
-  eq(s.get(shape.taxId.error), undefined, "cleared when no rule is active");
+  expect(s.get(shape.taxId.error), "cleared when no rule is active").toBe(undefined);
 });
 
-test("cross-field: confirm re-validates when password changes", () => {
+it("cross-field: confirm re-validates when password changes", () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(shape.confirm, (v, ctx) => (v === ctx.get(shape.password) ? undefined : "Does not match"), {
       triggers: [shape.password],
     }),
   });
   s.set(shape.password, "other", { origin: "user" });
-  eq(s.get(shape.confirm.error), "Does not match");
+  expect(s.get(shape.confirm.error)).toBe("Does not match");
   s.set(shape.confirm, "other", { origin: "user" });
-  eq(s.get(shape.confirm.error), undefined);
+  expect(s.get(shape.confirm.error)).toBe(undefined);
 });
 
-test("undeclared reads in a rule are reported", () => {
+it("undeclared reads in a rule are reported", () => {
   const { list, onError } = errors();
   createStore(shape, initial(), { onError, behaviors: rule(shape.confirm, (_v, ctx) => (ctx.get(shape.password), undefined)) });
-  eq(/not declared/.test((list[0].error as Error).message), true);
+  expect(/not declared/.test((list[0].error as Error).message)).toBe(true);
 });
 
-test("rows: one queue per row, counted, removed rows leave the count", () => {
+it("rows: one queue per row, counted, removed rows leave the count", () => {
   const s = createStore(shape, initial(), { behaviors: rule(L.qty, (q) => (q >= 1 ? undefined : "Min 1")) });
   const lines = s.substore(shape.lines);
   lines.itemAt(1).set(L.qty, 0, { origin: "user" });
-  eq(lines.itemAt(1).get(L.qty.error), "Min 1");
-  eq(lines.itemAt(0).get(L.qty.error), undefined);
-  eq(s.get(countIn(shape, "error")), 1);
+  expect(lines.itemAt(1).get(L.qty.error)).toBe("Min 1");
+  expect(lines.itemAt(0).get(L.qty.error)).toBe(undefined);
+  expect(s.get(countIn(shape, "error"))).toBe(1);
   const bad = lines.append({ qty: 0 });
-  eq(bad.get(L.qty.error), "Min 1", "new rows are validated on creation");
-  eq(s.get(countIn(shape.lines, "error")), 2);
+  expect(bad.get(L.qty.error), "new rows are validated on creation").toBe("Min 1");
+  expect(s.get(countIn(shape.lines, "error"))).toBe(2);
   lines.remove(bad);
   lines.remove(lines.itemAt(1));
-  eq(s.get(countIn(shape, "error")), 0);
+  expect(s.get(countIn(shape, "error"))).toBe(0);
 });
 
-test("rows: a rule can read the whole array (unique SKU)", () => {
+it("rows: a rule can read the whole array (unique SKU)", () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(L.sku, (sku, ctx) => (ctx.get(shape.lines).filter((l) => l.sku === sku).length > 1 ? "Duplicate" : undefined), {
       triggers: [shape.lines],
@@ -140,14 +140,14 @@ test("rows: a rule can read the whole array (unique SKU)", () => {
   });
   const [a, b] = s.substore(shape.lines).items();
   b.set(L.sku, "A", { origin: "user" });
-  eq(a.get(L.sku.error), "Duplicate");
-  eq(b.get(L.sku.error), "Duplicate");
+  expect(a.get(L.sku.error)).toBe("Duplicate");
+  expect(b.get(L.sku.error)).toBe("Duplicate");
   a.set(L.sku, "Z", { origin: "user" });
-  eq(a.get(L.sku.error), undefined);
-  eq(b.get(L.sku.error), undefined);
+  expect(a.get(L.sku.error)).toBe(undefined);
+  expect(b.get(L.sku.error)).toBe(undefined);
 });
 
-test("validation runs after the behavior that computes the value", () => {
+it("validation runs after the behavior that computes the value", () => {
   let checks = 0;
   const s = createStore(shape, initial(), {
     behaviors: [
@@ -158,57 +158,57 @@ test("validation runs after the behavior that computes the value", () => {
   const row = s.substore(shape.lines).itemAt(0);
   checks = 0;
   row.set(L.qty, 3, { origin: "user" });
-  eq(row.get(L.total.error), "Too much");
-  eq(checks, 1, "validated once, on the final value");
+  expect(row.get(L.total.error)).toBe("Too much");
+  expect(checks, "validated once, on the final value").toBe(1);
 });
 
 // ---------------------------------------------------------------------------
 // Hidden / disabled
-test("hidden fields are skipped and re-validated when shown", () => {
+it("hidden fields are skipped and re-validated when shown", () => {
   const s = createStore(shape, initial(), { behaviors: [rule(shape.company.vat, (v) => (v ? undefined : "Required"))] });
-  eq(s.get(shape.company.vat.error), "Required");
+  expect(s.get(shape.company.vat.error)).toBe("Required");
   s.set(shape.company.visible, false);
-  eq(s.get(shape.company.vat.error), undefined);
-  eq(s.get(countIn(shape, "error")), 0);
+  expect(s.get(shape.company.vat.error)).toBe(undefined);
+  expect(s.get(countIn(shape, "error"))).toBe(0);
   s.set(shape.company.visible, true);
-  eq(s.get(shape.company.vat.error), "Required");
+  expect(s.get(shape.company.vat.error)).toBe("Required");
 });
 
-test("validateHidden keeps validating", () => {
+it("validateHidden keeps validating", () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.company.secret, (v) => (v ? undefined : "Required")) });
   s.set(shape.company.visible, false);
-  eq(s.get(shape.company.secret.error), "Required");
+  expect(s.get(shape.company.secret.error)).toBe("Required");
 });
 
-test("disabled (inherited into rows) is skipped", () => {
+it("disabled (inherited into rows) is skipped", () => {
   const s = createStore(shape, initial(), { behaviors: rule(L.sku, () => "Always") });
   const row = s.substore(shape.lines).itemAt(0);
-  eq(row.get(L.sku.error), "Always");
+  expect(row.get(L.sku.error)).toBe("Always");
   s.set(shape.lines.disabled, true);
-  eq(row.get(L.sku.error), undefined);
+  expect(row.get(L.sku.error)).toBe(undefined);
 });
 
 // ---------------------------------------------------------------------------
 // Component rules
-test("a rule added on a row applies to that row, after the form's rules", () => {
+it("a rule added on a row applies to that row, after the form's rules", () => {
   const s = createStore(shape, { ...initial() }, { behaviors: rule(L.sku, (v) => (v ? undefined : "Required")) });
   const [a, b] = s.substore(shape.lines).items();
   const off = a.addBehavior(rule(L.sku, (v) => (v.length > 1 ? undefined : "Too short")));
-  eq(a.get(L.sku.error), "Too short");
-  eq(b.get(L.sku.error), undefined);
+  expect(a.get(L.sku.error)).toBe("Too short");
+  expect(b.get(L.sku.error)).toBe(undefined);
   a.set(L.sku, "", { origin: "user" });
-  eq(a.get(L.sku.error), "Required", "form rules first");
+  expect(a.get(L.sku.error), "form rules first").toBe("Required");
   a.set(L.sku, "Q", { origin: "user" });
   off();
-  eq(a.get(L.sku.error), undefined, "re-validated without it");
+  expect(a.get(L.sku.error), "re-validated without it").toBe(undefined);
 });
 
-test("removing the last rule clears the error", () => {
+it("removing the last rule clears the error", () => {
   const s = createStore(shape, initial());
   const off = s.addBehavior(rule(shape.name, () => "Bad"));
-  eq(s.get(shape.name.error), "Bad");
+  expect(s.get(shape.name.error)).toBe("Bad");
   off();
-  eq(s.get(shape.name.error), undefined);
+  expect(s.get(shape.name.error)).toBe(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -223,87 +223,87 @@ function lookup() {
   return { calls, check };
 }
 
-testAsync("async: starts on user changes, result arrives as a new batch", async () => {
+it("async: starts on user changes, result arrives as a new batch", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check) });
-  eq(calls.length, 0, "never on creation");
+  expect(calls.length, "never on creation").toBe(0);
   s.set(shape.email, "taken@x.io", { origin: "user" });
-  eq(calls.length, 1);
-  eq(s.get(shape.email.validating), true);
-  eq(s.get(countIn(shape, "validating")), 1);
+  expect(calls.length).toBe(1);
+  expect(s.get(shape.email.validating)).toBe(true);
+  expect(s.get(countIn(shape, "validating"))).toBe(1);
   let notified = 0;
   s.subscribe(shape.email.error, () => notified++);
   calls[0].d.resolve("Already taken");
   await sleep(0);
-  eq(s.get(shape.email.error), "Already taken");
-  eq(s.get(shape.email.validating), false);
-  eq(notified, 1);
+  expect(s.get(shape.email.error)).toBe("Already taken");
+  expect(s.get(shape.email.validating)).toBe(false);
+  expect(notified).toBe(1);
 });
 
-testAsync("async: program writes mark unchecked; validate() checks them", async () => {
+it("async: program writes mark unchecked; validate() checks them", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check) });
   s.set(shape.email, "loaded@x.io");
-  eq(calls.length, 0);
-  eq(s.get(shape.email.validating), false);
+  expect(calls.length).toBe(0);
+  expect(s.get(shape.email.validating)).toBe(false);
   const pending = s.validate();
-  eq(calls.length, 1);
-  eq(calls[0].value, "loaded@x.io");
+  expect(calls.length).toBe(1);
+  expect(calls[0].value).toBe("loaded@x.io");
   calls[0].d.resolve("Already taken");
   const result = await pending;
-  eq(result.valid, false);
-  deepEq(result.errors.map((e) => [e.path, e.error]), [["email", "Already taken"]]);
+  expect(result.valid).toBe(false);
+  expect(result.errors.map((e) => [e.path, e.error])).toEqual([["email", "Already taken"]]);
   await s.validate();
-  eq(calls.length, 1, "unchanged value is not checked again");
+  expect(calls.length, "unchanged value is not checked again").toBe(1);
 });
 
-testAsync("async: not started while sync rules fail", async () => {
+it("async: not started while sync rules fail", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), {
     behaviors: [asyncRule(shape.email, check), rule(shape.email, (v) => (v.includes("@") ? undefined : "Invalid"))],
   });
   s.set(shape.email, "nope", { origin: "user" });
-  eq(calls.length, 0);
-  eq(s.get(shape.email.error), "Invalid");
+  expect(calls.length).toBe(0);
+  expect(s.get(shape.email.error)).toBe("Invalid");
   const r = await s.validate();
-  eq(calls.length, 0);
-  eq(r.valid, false);
+  expect(calls.length).toBe(0);
+  expect(r.valid).toBe(false);
 });
 
-testAsync("async: debounce, and validate() skips the wait", async () => {
+it("async: debounce, and validate() skips the wait", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { debounce: 30 }) });
   s.set(shape.email, "a@x.io", { origin: "user" });
   s.set(shape.email, "ab@x.io", { origin: "user" });
   s.set(shape.email, "abc@x.io", { origin: "user" });
-  eq(s.get(shape.email.validating), true, "pending during the debounce");
+  expect(s.get(shape.email.validating), "pending during the debounce").toBe(true);
   await sleep(50);
-  deepEq(calls.map((c) => c.value), ["abc@x.io"]);
+  expect(calls.map((c) => c.value)).toEqual(["abc@x.io"]);
   calls[0].d.resolve(undefined);
   await sleep(0);
 
   s.set(shape.email, "zzz@x.io", { origin: "user" });
   const pending = s.validate();
-  eq(calls.length, 2, "started immediately");
+  expect(calls.length, "started immediately").toBe(2);
   calls[1].d.resolve(undefined);
-  eq((await pending).valid, true);
+  expect((await pending).valid).toBe(true);
   await sleep(50);
-  eq(calls.length, 2, "the debounced timer did not start a second run");
+  expect(calls.length, "the debounced timer did not start a second run").toBe(2);
 });
 
-testAsync("async: a newer change aborts the running check; late results are dropped", async () => {
+it("async: a newer change aborts the running check; late results are dropped", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check) });
   s.set(shape.email, "one@x.io", { origin: "user" });
   s.set(shape.email, "two@x.io", { origin: "user" });
-  eq(calls[0].signal.aborted, true);
+  expect(calls[0].signal.aborted).toBe(true);
   calls[0].d.resolve("Stale");
   calls[1].d.resolve(undefined);
   await sleep(0);
-  eq(s.get(shape.email.error), undefined);
+  expect(s.get(shape.email.error)).toBe(undefined);
 });
 
-testAsync("async: a removed row drops its result", async () => {
+it("async: a removed row drops its result", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(L.sku, check) });
   const lines = s.substore(shape.lines);
@@ -312,28 +312,28 @@ testAsync("async: a removed row drops its result", async () => {
   lines.remove(row);
   calls[0].d.resolve("Taken");
   await sleep(0);
-  eq(s.get(countIn(shape, "error")), 0);
-  eq(s.get(countIn(shape, "validating")), 0, "the removed row no longer counts");
+  expect(s.get(countIn(shape, "error"))).toBe(0);
+  expect(s.get(countIn(shape, "validating")), "the removed row no longer counts").toBe(0);
 });
 
-testAsync("async: hiding the field aborts the check", async () => {
+it("async: hiding the field aborts the check", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.company.vat, check) });
   s.set(shape.company.vat, "LV1", { origin: "user" });
   s.set(shape.company.visible, false);
-  eq(calls[0].signal.aborted, true);
-  eq(s.get(shape.company.vat.validating), false);
+  expect(calls[0].signal.aborted).toBe(true);
+  expect(s.get(shape.company.vat.validating)).toBe(false);
 });
 
-testAsync("async: origins 'any' starts on program writes", async () => {
+it("async: origins 'any' starts on program writes", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { origins: "any" }) });
-  eq(calls.length, 0, "still not on creation");
+  expect(calls.length, "still not on creation").toBe(0);
   s.set(shape.email, "p@x.io");
-  eq(calls.length, 1);
+  expect(calls.length).toBe(1);
 });
 
-testAsync("async: a throwing check is reported and fails validate()", async () => {
+it("async: a throwing check is reported and fails validate()", async () => {
   const { list, onError } = errors();
   const s = createStore(shape, initial(), {
     onError,
@@ -342,52 +342,52 @@ testAsync("async: a throwing check is reported and fails validate()", async () =
     }),
   });
   const r = await s.validate();
-  eq(r.valid, false);
-  eq(r.errors.length, 0);
-  deepEq(r.failures.map((f) => [f.path, (f.error as Error).message]), [["email", "network"]]);
-  eq(list.length, 1);
-  eq(s.get(shape.email.validating), false);
+  expect(r.valid).toBe(false);
+  expect(r.errors.length).toBe(0);
+  expect(r.failures.map((f) => [f.path, (f.error as Error).message])).toEqual([["email", "network"]]);
+  expect(list.length).toBe(1);
+  expect(s.get(shape.email.validating)).toBe(false);
 });
 
-testAsync("async: adding another rule keeps a checked result", async () => {
+it("async: adding another rule keeps a checked result", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check) });
   s.set(shape.email, "t@x.io", { origin: "user" });
   calls[0].d.resolve("Taken");
   await sleep(0);
   s.addBehavior(rule(shape.email, () => undefined));
-  eq(s.get(shape.email.error), "Taken");
-  eq(calls.length, 1);
+  expect(s.get(shape.email.error)).toBe("Taken");
+  expect(calls.length).toBe(1);
 });
 
 // ---------------------------------------------------------------------------
 // validate(), values, focus, submit
-testAsync("validate: errors in shape order with concrete paths; subtrees", async () => {
+it("validate: errors in shape order with concrete paths; subtrees", async () => {
   const s = createStore(shape, initial(), {
     behaviors: [rule(shape.name, () => "N"), rule(L.qty, (q) => (q > 1 ? "Q" : undefined)), rule(shape.company.vat, () => "V")],
   });
   const r = await s.validate();
-  deepEq(r.errors.map((e) => e.path), ["name", "company.vat", "lines[1].qty"]);
-  eq(r.errors[2].store, s.substore(shape.lines).itemAt(1));
+  expect(r.errors.map((e) => e.path)).toEqual(["name", "company.vat", "lines[1].qty"]);
+  expect(r.errors[2].store).toBe(s.substore(shape.lines).itemAt(1));
   const lines = await s.validate(shape.lines);
-  deepEq(lines.errors.map((e) => e.path), ["lines[1].qty"]);
-  deepEq(lines.values, initial().lines);
+  expect(lines.errors.map((e) => e.path)).toEqual(["lines[1].qty"]);
+  expect(lines.values).toEqual(initial().lines);
   const row = await s.substore(shape.lines).itemAt(0).validate();
-  eq(row.valid, true);
+  expect(row.valid).toBe(true);
 });
 
-testAsync("validate: values leave out hidden and disabled nodes", async () => {
+it("validate: values leave out hidden and disabled nodes", async () => {
   const s = createStore(shape, initial());
   s.set(shape.company.visible, false);
   s.set(shape.promo.disabled, true);
   const r = await s.validate();
-  eq("company" in r.values, false);
-  eq("promo" in r.values, false);
-  eq(r.values.name, "Ann");
-  eq(r.values.lines?.length, 2);
+  expect("company" in r.values).toBe(false);
+  expect("promo" in r.values).toBe(false);
+  expect(r.values.name).toBe("Ann");
+  expect(r.values.lines?.length).toBe(2);
 });
 
-test("focusFirst skips errors without a focus target", () => {
+it("focusFirst skips errors without a focus target", () => {
   const s = createStore(shape, initial());
   const focused: string[] = [];
   const target = (id: string): FocusTarget => ({ focus: () => focused.push(id) });
@@ -396,12 +396,12 @@ test("focusFirst skips errors without a focus target", () => {
     { path: "name", ref: shape.name, store: s },
     { path: "email", ref: shape.email, store: s },
   ];
-  eq(s.focusFirst(entries)?.path, "email");
-  deepEq(focused, ["email"]);
-  eq(s.focus(shape.name), false);
+  expect(s.focusFirst(entries)?.path).toBe("email");
+  expect(focused).toEqual(["email"]);
+  expect(s.focus(shape.name)).toBe(false);
 });
 
-testAsync("submit: counts, submitting, onValid with values, focus on errors", async () => {
+it("submit: counts, submitting, onValid with values, focus on errors", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
   const submitted: unknown[] = [];
   let submittingSeen = false;
@@ -409,33 +409,32 @@ testAsync("submit: counts, submitting, onValid with values, focus on errors", as
     submittingSeen = s.get(shape.submitting);
     submitted.push(values.name);
   });
-  eq(ok.valid, true);
-  deepEq(submitted, ["Ann"]);
-  eq(submittingSeen, true);
-  eq(s.get(shape.submitting), false);
-  eq(s.get(shape.submitCount), 1);
+  expect(ok.valid).toBe(true);
+  expect(submitted).toEqual(["Ann"]);
+  expect(submittingSeen).toBe(true);
+  expect(s.get(shape.submitting)).toBe(false);
+  expect(s.get(shape.submitCount)).toBe(1);
 
   const focused: string[] = [];
   s.set(shape.name.focusTarget, { focus: () => focused.push("name") });
   s.set(shape.name, "", { origin: "user" });
   const bad = await s.submit(() => submitted.push("never"));
-  eq(bad.valid, false);
-  deepEq(focused, ["name"]);
-  eq(s.get(shape.submitCount), 2);
-  eq(submitted.length, 1);
+  expect(bad.valid).toBe(false);
+  expect(focused).toEqual(["name"]);
+  expect(s.get(shape.submitCount)).toBe(2);
+  expect(submitted.length).toBe(1);
 });
 
-testAsync("submit waits for a running async check", async () => {
+it("submit waits for a running async check", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { debounce: 1000 }) });
   s.set(shape.email, "late@x.io", { origin: "user" });
   const pending = s.submit();
   await sleep(0);
-  eq(calls.length, 1, "debounce skipped on submit");
+  expect(calls.length, "debounce skipped on submit").toBe(1);
   calls[0].d.resolve("Taken");
   const r = await pending;
-  eq(r.valid, false);
-  eq(r.errors[0].error, "Taken");
+  expect(r.valid).toBe(false);
+  expect(r.errors[0].error).toBe("Taken");
 });
 
-runAsync("validation.test.ts");
