@@ -94,12 +94,34 @@ export class CountRef {
 
 const countRefs = new WeakMap<AnyNode, Map<string, CountRef>>();
 
+/**
+ * Whether any node in the subtree declares `key` with an `aggregate`. Rows share
+ * the array item template's declarations, so walking the template covers them.
+ */
+function isCountable(node: AnyNode, key: string): boolean {
+  if (node._metaDefs[key]?.options.aggregate) return true;
+  if (node instanceof ObjectNode) {
+    for (const child of Object.values(node._fields as Record<string, AnyNode>)) if (isCountable(child, key)) return true;
+  } else if (node instanceof ArrayNode) {
+    return isCountable(node.item, key);
+  }
+  return false;
+}
+
 /** Count reference; the same instance for the same (node, key), so it can be used as a hook dependency. */
 export function countIn(node: AnyNode, key: string): CountRef {
   let byKey = countRefs.get(node);
   if (!byKey) countRefs.set(node, (byKey = new Map()));
   let ref = byKey.get(key);
-  if (!ref) byKey.set(key, (ref = new CountRef(node, key)));
+  if (!ref) {
+    byKey.set(key, (ref = new CountRef(node, key)));
+    if (!isCountable(node, key)) {
+      console.warn(
+        `countIn: no node under "${node.path || "<root>"}" declares "${key}" with an aggregate – ` +
+          `the count is always 0. Counted keys are declared with metaKey(value, { aggregate }).`
+      );
+    }
+  }
   return ref;
 }
 
