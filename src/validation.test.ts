@@ -425,6 +425,33 @@ it("submit: counts, submitting, onValid with values, focus on errors", async () 
   expect(submitted.length).toBe(1);
 });
 
+it("submit reveals its subtree: existing rows yes, later rows no; reset clears", async () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  expect(s.get(shape.name.revealed)).toBe(false);
+  await s.submit();
+  expect(s.get(shape.name.revealed)).toBe(true);
+  expect(lines.items().map((row) => row.get(L.sku.revealed))).toEqual([true, true]);
+
+  const added = lines.append();
+  expect(added.get(L.sku.revealed), "a row added after submit starts hidden").toBe(false);
+  await added.submit();
+  expect(added.get(L.sku.revealed), "a row's submit reveals the row").toBe(true);
+
+  s.reset();
+  expect(s.get(shape.name.revealed)).toBe(false);
+  expect(lines.items().map((row) => row.get(L.sku.revealed))).toEqual([false, false]);
+});
+
+it("a row's submit reveals only that row", async () => {
+  const s = createStore(shape, initial());
+  const [first, second] = s.substore(shape.lines).items();
+  await second.submit();
+  expect(first.get(L.sku.revealed)).toBe(false);
+  expect(second.get(L.sku.revealed)).toBe(true);
+  expect(s.get(shape.name.revealed)).toBe(false);
+});
+
 it("submit waits for a running async check", async () => {
   const { calls, check } = lookup();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { debounce: 1000 }) });

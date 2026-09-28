@@ -8,6 +8,10 @@
 //     the provided row, references of enclosing scopes to their own store.
 //   • Returns are generic – no native input bindings. fromInput / fromCheckbox
 //     adapt an onChange to native events.
+//   • When a control's error is shown is a display policy (useControl's
+//     showError), set once with <StoreProvider showError={...}> and inherited
+//     by nested providers. The default shows an error once the field is
+//     revealed: on blur (useControl's onBlur) or by a submit.
 // ============================================================
 
 import {
@@ -25,14 +29,36 @@ import { refNode, refLabel, rootOf, scopeOf } from "../internal";
 // ============================================================
 const StoreContext = createContext<BaseStore<any> | undefined>(undefined);
 
+/** What an error display policy decides on: a control's current state. */
+export interface ErrorDisplayState {
+  error: string | undefined;
+  touched: boolean;
+  dirty: boolean;
+  revealed: boolean;
+  validating: boolean;
+}
+
+/** Decides whether a control shows its error (useControl's showError). */
+export type ErrorDisplayPolicy = (state: ErrorDisplayState) => boolean;
+
+/** Show an error once the field is revealed (blurred, or covered by a submit); then it stays live. */
+export const defaultErrorDisplay: ErrorDisplayPolicy = (s) => s.error !== undefined && s.revealed;
+
+const ErrorDisplayContext = createContext<ErrorDisplayPolicy>(defaultErrorDisplay);
+
 export interface StoreProviderProps {
   store: BaseStore<any>;
+  /** Error display policy for the controls below; inherited when omitted. */
+  showError?: ErrorDisplayPolicy;
   children?: ReactNode;
 }
 
 /** Provide any store (root, object substore, row store) to the hooks below it. */
 export function StoreProvider(props: StoreProviderProps): ReactNode {
-  return createElement(StoreContext.Provider, { value: props.store }, props.children);
+  const children = props.showError
+    ? createElement(ErrorDisplayContext.Provider, { value: props.showError }, props.children)
+    : props.children;
+  return createElement(StoreContext.Provider, { value: props.store }, children);
 }
 
 export interface HookOptions {
@@ -165,6 +191,7 @@ export type ControlNode = AnyNode & {
     validating: boolean;
     touched: boolean;
     dirty: boolean;
+    revealed: boolean;
     focusTarget: FocusTarget | undefined;
   };
 };
@@ -177,6 +204,12 @@ export interface ControlBinding<N extends ControlNode> {
   touched: boolean;
   dirty: boolean;
   validating: boolean;
+  /** Set on blur (onBlur) and by submit; cleared by reset. */
+  revealed: boolean;
+  /** Whether to show the error now, per the provided display policy. */
+  showError: boolean;
+  /** Stable; marks the field revealed. Pass it to the input's onBlur. */
+  onBlur: () => void;
   /** Stable callback ref: registers the element (or any FocusTarget) for focusing errors. */
   focusRef: (target: FocusTarget | null) => void;
   store: BaseStore<any>;
@@ -206,6 +239,14 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
     [store, node]
   );
 
+  const onBlur = useCallback(() => {
+    // A row being removed may blur its focused input after detaching.
+    if (store.isAttached()) store.setMeta(node, { revealed: true } as never, { origin: "user" });
+  }, [store, node]);
+
+  const policy = useContext(ErrorDisplayContext);
+  const showError = policy(meta);
+
   return {
     value,
     onChange,
@@ -213,6 +254,9 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
     touched: meta.touched,
     dirty: meta.dirty,
     validating: meta.validating,
+    revealed: meta.revealed,
+    showError,
+    onBlur,
     focusRef,
     store,
   };

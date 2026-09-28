@@ -618,6 +618,16 @@ export abstract class BaseStore<N extends ContainerNode> {
     }
   }
 
+  /** @internal this = scope host: every node in the subtree that declares `key`, rows included */
+  _eachWithKey(node: AnyNode, key: string, fn: (store: BaseStore<any>, node: AnyNode) => void): void {
+    if (key in node._metaDefs) fn(this, node);
+    if (node instanceof ObjectNode) {
+      for (const child of Object.values(node._fields as Record<string, AnyNode>)) this._eachWithKey(child, key, fn);
+    } else if (node instanceof ArrayNode && node !== this.node) {
+      for (const row of (this.substore(node as any) as ArrayStore<any>).items()) row._eachWithKey(row.node, key, fn);
+    }
+  }
+
   // ==========================================================
   // Behaviors
   // ==========================================================
@@ -698,7 +708,8 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /**
    * Submit flow: increments `submitCount` and sets `submitting` (when the root
-   * declares submission()), validates this store's subtree, then calls
+   * declares submission()), sets `revealed` on every node in this store's
+   * subtree that declares it (reveal()), validates the subtree, then calls
    * `onValid(values)`, or focuses the first error and calls `onInvalid(result)`.
    * While a submit of this store is running, further calls return it.
    */
@@ -741,6 +752,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     root.batch(() => {
       if (has("submitCount")) patch({ submitCount: ((root.getMeta(rootNode) as Meta).submitCount as number) + 1 });
       if (has("submitting")) patch({ submitting: true });
+      this._host._eachWithKey(this.node, "revealed", (store, node) => store.setMeta(node, { revealed: true } as never));
     });
     try {
       const result = await this.validate();

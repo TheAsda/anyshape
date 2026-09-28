@@ -1,11 +1,12 @@
 // ============================================================
 // Generic input components over useControl. `useControl` returns
 // value / onChange plus the control() state (error, touched,
-// dirty, validating) and a focusRef that registers the element
-// for submit-time error focusing.
+// dirty, validating), a focusRef that registers the element
+// for submit-time error focusing, and onBlur / showError.
 //
-// Errors are shown once a field is touched, or on every field
-// after the first submit attempt (the `showErrors` prop).
+// showError follows the display policy of the StoreProvider: by
+// default an error shows once the field was left (onBlur) or
+// covered by a submit, and then stays live while it's fixed.
 // ============================================================
 
 import { useId } from "react";
@@ -20,8 +21,6 @@ type BooleanNode = ControlNode & { readonly _type: boolean };
 
 interface CommonProps {
   label: string;
-  /** Show errors on untouched fields (set after the first submit attempt). */
-  showErrors: boolean;
 }
 
 // ------------------------------------------------------------
@@ -34,11 +33,11 @@ interface TextFieldProps extends CommonProps {
   autoComplete?: string;
 }
 
-export function TextField({ node, label, showErrors, type = "text", placeholder, autoComplete }: TextFieldProps) {
+export function TextField({ node, label, type = "text", placeholder, autoComplete }: TextFieldProps) {
   const c = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
-  const show = c.error !== undefined && (c.touched || showErrors);
+  const show = c.showError;
 
   return (
     <div className={show ? "field field--error" : "field"}>
@@ -53,6 +52,7 @@ export function TextField({ node, label, showErrors, type = "text", placeholder,
         value={c.value}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        onBlur={c.onBlur}
         aria-invalid={show || undefined}
         aria-describedby={show ? errorId : undefined}
         onChange={fromInput(c.onChange)}
@@ -77,11 +77,11 @@ interface NumberFieldProps extends CommonProps {
   placeholder?: string;
 }
 
-export function NumberField({ node, label, showErrors, min, max, placeholder }: NumberFieldProps) {
+export function NumberField({ node, label, min, max, placeholder }: NumberFieldProps) {
   const c = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
-  const show = c.error !== undefined && (c.touched || showErrors);
+  const show = c.showError;
 
   return (
     <div className={show ? "field field--error" : "field"}>
@@ -98,6 +98,7 @@ export function NumberField({ node, label, showErrors, min, max, placeholder }: 
         max={max}
         placeholder={placeholder}
         value={c.value ?? ""}
+        onBlur={c.onBlur}
         aria-invalid={show || undefined}
         aria-describedby={show ? errorId : undefined}
         onChange={(e) => c.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
@@ -119,11 +120,11 @@ interface SelectFieldProps extends CommonProps {
   options: readonly { value: string; label: string }[];
 }
 
-export function SelectField({ node, label, showErrors, options }: SelectFieldProps) {
+export function SelectField({ node, label, options }: SelectFieldProps) {
   const c = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
-  const show = c.error !== undefined && (c.touched || showErrors);
+  const show = c.showError;
 
   return (
     <div className={show ? "field field--error" : "field"}>
@@ -135,6 +136,7 @@ export function SelectField({ node, label, showErrors, options }: SelectFieldPro
         ref={c.focusRef}
         className="field__input"
         value={c.value}
+        onBlur={c.onBlur}
         aria-invalid={show || undefined}
         aria-describedby={show ? errorId : undefined}
         // A select always returns one of the listed option values.
@@ -162,11 +164,11 @@ interface CheckboxFieldProps extends CommonProps {
   node: BooleanNode;
 }
 
-export function CheckboxField({ node, label, showErrors }: CheckboxFieldProps) {
+export function CheckboxField({ node, label }: CheckboxFieldProps) {
   const c = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
-  const show = c.error !== undefined && (c.touched || showErrors);
+  const show = c.showError;
 
   return (
     <div className={show ? "field field--checkbox field--error" : "field field--checkbox"}>
@@ -175,6 +177,7 @@ export function CheckboxField({ node, label, showErrors }: CheckboxFieldProps) {
         ref={c.focusRef}
         type="checkbox"
         checked={c.value}
+        onBlur={c.onBlur}
         aria-invalid={show || undefined}
         aria-describedby={show ? errorId : undefined}
         onChange={fromCheckbox(c.onChange)}
