@@ -1,9 +1,10 @@
+// Run: npx tsx src/extensions.test.ts   (type assertions: npx tsc)
 import {
   form, object, array, field, createStore, countIn,
   control, validation, touched, visibility, disableable,
   type InferValue, type Origin, type FocusTarget,
 } from "./index";
-import { it, expect } from "vitest";
+import { test, eq, deepEq, throws, report } from "./test/harness";
 
 const shape = form(
   object({
@@ -42,29 +43,29 @@ function initial(): Values {
 
 // ---------------------------------------------------------------------------
 // Reference API
-it("get / set with value and meta refs", () => {
+test("get / set with value and meta refs", () => {
   const s = createStore(shape, initial());
-  expect(s.get(shape.name)).toBe("Ann");
+  eq(s.get(shape.name), "Ann");
   s.set(shape.name, "Bob");
-  expect(s.getValue(shape.name)).toBe("Bob");
+  eq(s.getValue(shape.name), "Bob");
   s.set(shape.name.error, "Bad");
-  expect(s.get(shape.name.error)).toBe("Bad");
-  expect(s.getMeta(shape.name).error).toBe("Bad");
+  eq(s.get(shape.name.error), "Bad");
+  eq(s.getMeta(shape.name).error, "Bad");
 });
 
-it("subscribe to a single meta key ignores other keys", () => {
+test("subscribe to a single meta key ignores other keys", () => {
   const s = createStore(shape, initial());
   let calls = 0;
   s.subscribe(shape.name.error, () => calls++);
   s.set(shape.name.touched, true);
-  expect(calls).toBe(0);
+  eq(calls, 0);
   s.set(shape.name.error, "x");
-  expect(calls).toBe(1);
+  eq(calls, 1);
 });
 
-it("counts are read-only", () => {
+test("counts are read-only", () => {
   const s = createStore(shape, initial());
-  expect(() => s.set(countIn(shape, "error") as any, 1 as never)).toThrow(/read-only/);
+  throws(() => s.set(countIn(shape, "error") as any, 1 as never), /read-only/);
 });
 
 // ---------------------------------------------------------------------------
@@ -75,16 +76,16 @@ function originsOf(fn: (record: (o: ReadonlySet<Origin>) => void) => void): Orig
   return seen;
 }
 
-it("reactions receive the origin of the write", () => {
+test("reactions receive the origin of the write", () => {
   const s = createStore(shape, initial());
   const seen = originsOf((rec) => s.react(shape.name, (_n, _p, info) => rec(info.origins)));
   s.set(shape.name, "U", { origin: "user" });
   s.set(shape.name, "P");
   s.set(shape.name, "I", { as: "initial" });
-  expect(seen).toEqual([["user"], ["program"], ["initial"]]);
+  deepEq(seen, [["user"], ["program"], ["initial"]]);
 });
 
-it("origins are tracked per target within one batch", () => {
+test("origins are tracked per target within one batch", () => {
   const s = createStore(shape, initial());
   const name: Origin[][] = [];
   const email: Origin[][] = [];
@@ -94,11 +95,11 @@ it("origins are tracked per target within one batch", () => {
     s.set(shape.name, "U", { origin: "user" });
     s.set(shape.email, "p@x.io");
   });
-  expect(name).toEqual([["user"]]);
-  expect(email).toEqual([["program"]]);
+  deepEq(name, [["user"]]);
+  deepEq(email, [["program"]]);
 });
 
-it("origins cross scopes in both directions", () => {
+test("origins cross scopes in both directions", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
@@ -108,71 +109,71 @@ it("origins cross scopes in both directions", () => {
   row.react(L.sku, (_n, _p, i) => toRow.push([...i.origins]));
 
   row.set(L.sku, "Z", { origin: "user" });              // row → enclosing array
-  expect(toRoot).toEqual([["user"]]);
-  expect(toRow).toEqual([["user"]]);
+  deepEq(toRoot, [["user"]]);
+  deepEq(toRow, [["user"]]);
 
   const current = s.getValues().lines;
   s.set(shape.lines, [current[1]]);                      // array write detaches the row
-  expect(toRow.at(-1)).toEqual(["program"]);
+  deepEq(toRow.at(-1), ["program"]);
 });
 
-it("a write in one row is not an origin for another row", () => {
+test("a write in one row is not an origin for another row", () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   let bCalls = 0;
   b.react(L.sku, () => bCalls++);
   a.set(L.sku, "Z", { origin: "user" });
-  expect(bCalls).toBe(0);
+  eq(bCalls, 0);
 });
 
-it("meta reactions receive origins", () => {
+test("meta reactions receive origins", () => {
   const s = createStore(shape, initial());
   const seen: Origin[][] = [];
   s.react(shape.name.error, (_n, _p, i) => seen.push([...i.origins]));
   s.set(shape.name.error, "x", { origin: "behavior:required" });
-  expect(seen).toEqual([["behavior:required"]]);
+  deepEq(seen, [["behavior:required"]]);
 });
 
 // ---------------------------------------------------------------------------
 // Initial values
-it("getInitial and { as: 'initial' }", () => {
+test("getInitial and { as: 'initial' }", () => {
   const s = createStore(shape, initial());
   s.set(shape.name, "Bob");
-  expect(s.getInitial(shape.name)).toBe("Ann");
+  eq(s.getInitial(shape.name), "Ann");
   s.set(shape.name, "Cid", { as: "initial" });
-  expect(s.getInitial(shape.name)).toBe("Cid");
-  expect(s.get(shape.name)).toBe("Cid");
+  eq(s.getInitial(shape.name), "Cid");
+  eq(s.get(shape.name), "Cid");
 });
 
-it("rows keep their own initial value through edits and reordering", () => {
+test("rows keep their own initial value through edits and reordering", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const [a, b] = lines.items();
   a.set(L.qty, 9);
-  expect(a.getInitial(L.qty)).toBe(1);
+  eq(a.getInitial(L.qty), 1);
   lines.move(a, 1);
-  expect(lines.itemAt(1)).toBe(a);
-  expect(a.getInitial(L.qty)).toBe(1);
-  expect(b.getInitial(L.sku)).toBe("B");
+  eq(lines.itemAt(1), a);
+  eq(a.getInitial(L.qty), 1);
+  eq(b.getInitial(L.sku), "B");
 });
 
-it("new rows start from {}", () => {
+test("new rows start from {}", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).append();
-  expect(row.getInitial(L.sku)).toBe(undefined);
-  expect(row.get(L.qty)).toBe(1);
+  eq(row.getInitial(L.sku), undefined);
+  eq(row.get(L.qty), 1);
 });
 
-it("a baseline write on the array makes current rows initial", () => {
+test("a baseline write on the array makes current rows initial", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.append({ sku: "N" });
-  expect(row.getInitial(L.sku)).toBe(undefined);
+  eq(row.getInitial(L.sku), undefined);
   s.set(shape.lines, lines.current().slice(), { as: "initial" });
-  expect(row.getInitial(L.sku)).toBe("N");
+  eq(row.getInitial(L.sku), "N");
 });
 
-it("reset restores values and meta, keeps rows and focus targets", () => {
+test("reset restores values and meta, keeps rows and focus targets", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
@@ -186,64 +187,64 @@ it("reset restores values and meta, keeps rows and focus targets", () => {
 
   s.reset();
 
-  expect(s.get(shape.name)).toBe("Ann");
-  expect(s.get(shape.name.error)).toBe(undefined);
-  expect(s.get(shape.name.focusTarget), "focus target kept").toBe(target);
-  expect(lines.items().length).toBe(2);
-  expect(lines.itemAt(0), "same row store after reset").toBe(row);
-  expect(row.get(L.qty)).toBe(1);
-  expect(row.get(L.sku.error)).toBe(undefined);
-  expect(s.get(countIn(shape, "error"))).toBe(0);
+  eq(s.get(shape.name), "Ann");
+  eq(s.get(shape.name.error), undefined);
+  eq(s.get(shape.name.focusTarget), target, "focus target kept");
+  eq(lines.items().length, 2);
+  eq(lines.itemAt(0), row, "same row store after reset");
+  eq(row.get(L.qty), 1);
+  eq(row.get(L.sku.error), undefined);
+  eq(s.get(countIn(shape, "error")), 0);
 });
 
-it("reset of one row", () => {
+test("reset of one row", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(1);
   row.set(L.sku, "Z");
   row.set(L.sku.touched, true);
   row.reset();
-  expect(row.get(L.sku)).toBe("B");
-  expect(row.get(L.sku.touched)).toBe(false);
+  eq(row.get(L.sku), "B");
+  eq(row.get(L.sku.touched), false);
 });
 
 // ---------------------------------------------------------------------------
 // Array helpers
-it("append / insert / remove / move", () => {
+test("append / insert / remove / move", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const c = lines.append({ sku: "C" });
-  expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "C"]);
-  expect(c.get(L.qty), "factory default kept").toBe(1);
+  deepEq(lines.items().map((r) => r.get(L.sku)), ["A", "B", "C"]);
+  eq(c.get(L.qty), 1, "factory default kept");
   const z = lines.insert(0, { sku: "Z", qty: 3 });
-  expect(lines.items().map((r) => r.get(L.sku))).toEqual(["Z", "A", "B", "C"]);
+  deepEq(lines.items().map((r) => r.get(L.sku)), ["Z", "A", "B", "C"]);
   lines.move(z, 3);
-  expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "C", "Z"]);
+  deepEq(lines.items().map((r) => r.get(L.sku)), ["A", "B", "C", "Z"]);
   lines.remove(c);
-  expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "Z"]);
-  expect(c.isAttached()).toBe(false);
-  expect(() => lines.remove(c)).toThrow(/detached/);
+  deepEq(lines.items().map((r) => r.get(L.sku)), ["A", "B", "Z"]);
+  eq(c.isAttached(), false);
+  throws(() => lines.remove(c), /detached/);
 });
 
-it("arrays without create need complete items", () => {
+test("arrays without create need complete items", () => {
   const s = createStore(shape, initial());
   const tags = s.substore(shape.tags);
   tags.append({ text: "t" });
-  expect(tags.items().length).toBe(1);
+  eq(tags.items().length, 1);
   // @ts-expect-error – no create factory: an item is required
-  expect(() => tags.append()).toThrow(/no `create` factory/);
+  throws(() => tags.append(), /no `create` factory/);
 });
 
-it("helpers pass the origin through", () => {
+test("helpers pass the origin through", () => {
   const s = createStore(shape, initial());
   const seen: Origin[][] = [];
   s.react(shape.lines, (_n, _p, i) => seen.push([...i.origins]));
   s.substore(shape.lines).append(undefined, { origin: "user" });
-  expect(seen).toEqual([["user"]]);
+  deepEq(seen, [["user"]]);
 });
 
 // ---------------------------------------------------------------------------
 // Counts and collect
-it("counts across fields, objects and rows", () => {
+test("counts across fields, objects and rows", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const [a, b] = lines.items();
@@ -251,31 +252,31 @@ it("counts across fields, objects and rows", () => {
   s.set(shape.company.vat.error, "y");
   a.set(L.sku.error, "z");
   b.set(L.sku.error, "w");
-  expect(s.get(countIn(shape, "error"))).toBe(4);
-  expect(s.get(countIn(shape.company, "error"))).toBe(1);
-  expect(s.get(countIn(shape.lines, "error"))).toBe(2);
-  expect(a.get(countIn(L, "error"))).toBe(1);
+  eq(s.get(countIn(shape, "error")), 4);
+  eq(s.get(countIn(shape.company, "error")), 1);
+  eq(s.get(countIn(shape.lines, "error")), 2);
+  eq(a.get(countIn(L, "error")), 1);
   a.set(L.sku.error, undefined);
-  expect(s.get(countIn(shape, "error"))).toBe(3);
+  eq(s.get(countIn(shape, "error")), 3);
 });
 
-it("removing and restoring rows moves their counts", () => {
+test("removing and restoring rows moves their counts", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
   row.set(L.sku.error, "z");
   const note = row.substore(L.notes).itemAt(0);
   note.set(L.notes.item.text.error, "n");
-  expect(s.get(countIn(shape, "error"))).toBe(2);
+  eq(s.get(countIn(shape, "error")), 2);
 
   const before = lines.current().slice();
   s.set(shape.lines, [before[1]]);
-  expect(s.get(countIn(shape, "error")), "detached row no longer counts").toBe(0);
+  eq(s.get(countIn(shape, "error")), 0, "detached row no longer counts");
   s.set(shape.lines, before);
-  expect(s.get(countIn(shape, "error")), "restored row counts again").toBe(2);
+  eq(s.get(countIn(shape, "error")), 2, "restored row counts again");
 });
 
-it("count subscriptions fire on changes and row removal", () => {
+test("count subscriptions fire on changes and row removal", () => {
   const s = createStore(shape, initial());
   const seen: number[] = [];
   s.subscribe(countIn(shape, "error"), () => seen.push(s.get(countIn(shape, "error"))));
@@ -283,54 +284,54 @@ it("count subscriptions fire on changes and row removal", () => {
   row.set(L.sku.error, "z");
   s.set(shape.name.error, "x");
   s.substore(shape.lines).remove(row);
-  expect(seen).toEqual([1, 2, 1]);
+  deepEq(seen, [1, 2, 1]);
 });
 
-it("collect lists matching nodes with row indexes", () => {
+test("collect lists matching nodes with row indexes", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   s.set(shape.email.error, "e");
   lines.itemAt(1).set(L.sku.error, "s");
   lines.itemAt(0).substore(L.notes).itemAt(0).set(L.notes.item.text.error, "n");
   const found = s.collect(shape, "error").map((e) => e.path);
-  expect(found).toEqual(["email", "lines[0].notes[0].text", "lines[1].sku"]);
+  deepEq(found, ["email", "lines[0].notes[0].text", "lines[1].sku"]);
   const entry = s.collect(shape.lines, "error").find((e) => e.path === "lines[1].sku")!;
-  expect(entry.store).toBe(lines.itemAt(1));
-  expect(entry.ref).toBe(L.sku);
+  eq(entry.store, lines.itemAt(1));
+  eq(entry.ref, L.sku);
 });
 
-it("aggregate must be false for the default", async () => {
+test("aggregate must be false for the default", async () => {
   const { metaKey } = await import("./meta");
-  expect(() => metaKey(true, { aggregate: (v) => v })).toThrow(/default value/);
+  throws(() => metaKey(true, { aggregate: (v) => v }), /default value/);
 });
 
 // ---------------------------------------------------------------------------
 // Inheritance
-it("visible: hidden if any ancestor is hidden", () => {
+test("visible: hidden if any ancestor is hidden", () => {
   const s = createStore(shape, initial());
-  expect(s.get(shape.company.address.city.visible)).toBe(true);
+  eq(s.get(shape.company.address.city.visible), true);
   s.set(shape.company.visible, false);
-  expect(s.get(shape.company.address.city.visible)).toBe(false);
-  expect(s.getOwn(shape.company.address.city.visible)).toBe(true);
+  eq(s.get(shape.company.address.city.visible), false);
+  eq(s.getOwn(shape.company.address.city.visible), true);
   s.set(shape.company.visible, true);
   s.set(shape.company.address.visible, false);
-  expect(s.get(shape.company.address.city.visible)).toBe(false);
-  expect(s.get(shape.company.vat.visible)).toBe(true);
+  eq(s.get(shape.company.address.city.visible), false);
+  eq(s.get(shape.company.vat.visible), true);
 });
 
-it("disabled: inherited from the root and through arrays into rows", () => {
+test("disabled: inherited from the root and through arrays into rows", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(0);
-  expect(row.get(L.sku.disabled)).toBe(false);
+  eq(row.get(L.sku.disabled), false);
   s.set(shape.lines.disabled, true);
-  expect(row.get(L.sku.disabled)).toBe(true);
+  eq(row.get(L.sku.disabled), true);
   s.set(shape.lines.disabled, false);
   s.set(shape.disabled, true);                  // form-wide read-only
-  expect(row.get(L.sku.disabled)).toBe(true);
-  expect(s.get(shape.company.vat.disabled)).toBe(true);
+  eq(row.get(L.sku.disabled), true);
+  eq(s.get(shape.company.vat.disabled), true);
 });
 
-it("subscriptions to inherited values fire when an ancestor changes", () => {
+test("subscriptions to inherited values fire when an ancestor changes", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(0);
   const seen: boolean[] = [];
@@ -339,12 +340,12 @@ it("subscriptions to inherited values fire when an ancestor changes", () => {
   s.set(shape.lines.disabled, true);           // already effectively disabled: no change
   s.set(shape.disabled, false);                // still disabled via lines
   s.set(shape.lines.disabled, false);
-  expect(seen).toEqual([true, false]);
+  deepEq(seen, [true, false]);
 });
 
 // ---------------------------------------------------------------------------
 // Non-reactive keys
-it("focus targets never notify and work on detached rows", () => {
+test("focus targets never notify and work on detached rows", () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.itemAt(0);
@@ -353,13 +354,15 @@ it("focus targets never notify and work on detached rows", () => {
   row.subscribeMeta(L.sku, () => calls++);
   const target: FocusTarget = { focus() {} };
   row.set(L.sku.focusTarget, target);
-  expect(calls).toBe(0);
-  expect(row.get(L.sku.focusTarget)).toBe(target);
+  eq(calls, 0);
+  eq(row.get(L.sku.focusTarget), target);
   lines.remove(row);
   calls = 0;
   row.set(L.sku.focusTarget, undefined);        // unmount after removal must not throw
-  expect(calls).toBe(0);
+  eq(calls, 0);
 });
+
+report("extensions.test.ts");
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {

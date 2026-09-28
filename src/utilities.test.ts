@@ -1,3 +1,4 @@
+// Run: npx tsx src/utilities.test.ts   (type assertions: npx tsc)
 import {
   form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
   control, visibility, disableable,
@@ -5,7 +6,7 @@ import {
   calculate, link, visibleWhen, disableWhen, clearWhenHidden, exclusive,
   type InferValue, type BehaviorBuilder,
 } from "./index";
-import { it, expect } from "vitest";
+import { test, testAsync, runAsync, eq, deepEq, throws } from "./test/harness";
 
 const shape = form({
   type: field<"person" | "company">(),
@@ -61,43 +62,43 @@ export function typeOnlyChecks() {
 
 // ---------------------------------------------------------------------------
 // Rules
-it("isEmpty and labelOf", () => {
-  expect([undefined, null, "", "  ", [], 0, "x", [1], false].map(isEmpty)).toEqual([true, true, true, true, true, false, false, false, false]);
-  expect(labelOf(shape.name)).toBe("Full name");
-  expect(labelOf(shape.company.vat)).toBe("vat");
-  expect(labelOf(L.qty)).toBe("qty");
+test("isEmpty and labelOf", () => {
+  deepEq([undefined, null, "", "  ", [], 0, "x", [1], false].map(isEmpty), [true, true, true, true, true, false, false, false, false]);
+  eq(labelOf(shape.name), "Full name");
+  eq(labelOf(shape.company.vat), "vat");
+  eq(labelOf(L.qty), "qty");
 });
 
-it("required: strings, arrays, numbers; custom message", () => {
+test("required: strings, arrays, numbers; custom message", () => {
   const s = createStore(shape, initial(), {
     behaviors: [required(shape.name), required(shape.tags, { message: "Pick one" }), required(shape.age)],
   });
   s.set(shape.name, "  ");
-  expect(s.get(shape.name.error)).toBe("Required");
+  eq(s.get(shape.name.error), "Required");
   s.set(shape.tags, []);
-  expect(s.get(shape.tags.error)).toBe("Pick one");
+  eq(s.get(shape.tags.error), "Pick one");
   s.set(shape.age, 0);
-  expect(s.get(shape.age.error), "0 is a value").toBe(undefined);
+  eq(s.get(shape.age.error), undefined, "0 is a value");
   s.set(shape.age, undefined);
-  expect(s.get(shape.age.error)).toBe("Required");
+  eq(s.get(shape.age.error), "Required");
 });
 
-it("required follows the `required` meta key (switched by a behavior)", () => {
+test("required follows the `required` meta key (switched by a behavior)", () => {
   const s = createStore(shape, initial(), {
     behaviors: [
       required(shape.taxId),
       defineBehavior({ triggers: [shape.type], writes: [shape.taxId.required], run: (c) => c.set(shape.taxId.required, c.get(shape.type) === "company") }),
     ],
   });
-  expect(s.get(shape.taxId.error)).toBe(undefined);
+  eq(s.get(shape.taxId.error), undefined);
   s.set(shape.type, "company");
-  expect(s.get(shape.taxId.required)).toBe(true);
-  expect(s.get(shape.taxId.error)).toBe("Required");
+  eq(s.get(shape.taxId.required), true);
+  eq(s.get(shape.taxId.error), "Required");
   s.set(shape.taxId, "LV123");
-  expect(s.get(shape.taxId.error)).toBe(undefined);
+  eq(s.get(shape.taxId.error), undefined);
 });
 
-it("format rules pass on empty values and combine with required", () => {
+test("format rules pass on empty values and combine with required", () => {
   const s = createStore(shape, initial(), {
     behaviors: [
       minLength(shape.name, 3), maxLength(shape.name, 5),
@@ -108,43 +109,43 @@ it("format rules pass on empty values and combine with required", () => {
   });
   const err = (r: { error: any }) => s.get(r.error);
   s.set(shape.name, "");
-  expect(err(shape.name), "empty passes minLength").toBe(undefined);
+  eq(err(shape.name), undefined, "empty passes minLength");
   s.set(shape.name, "Jo");
-  expect(err(shape.name)).toBe("At least 3 characters");
+  eq(err(shape.name), "At least 3 characters");
   s.set(shape.name, "Johnny");
-  expect(err(shape.name)).toBe("At most 5 characters");
+  eq(err(shape.name), "At most 5 characters");
   s.set(shape.age, 12);
-  expect(err(shape.age)).toBe("Must be at least 18");
+  eq(err(shape.age), "Must be at least 18");
   s.set(shape.age, 120);
-  expect(err(shape.age)).toBe("120 is too old");
+  eq(err(shape.age), "120 is too old");
   s.set(shape.age, undefined);
-  expect(err(shape.age)).toBe(undefined);
+  eq(err(shape.age), undefined);
   s.set(shape.zip, "1010");
-  expect(err(shape.zip)).toBe("Invalid format");
+  eq(err(shape.zip), "Invalid format");
   s.set(shape.email, "nope");
-  expect(err(shape.email)).toBe("Invalid email address");
+  eq(err(shape.email), "Invalid email address");
   s.set(shape.email, "");
-  expect(err(shape.email), "required comes after email but email passes on empty").toBe("Required");
-  expect(err(shape.tags)).toBe("Two tags");
+  eq(err(shape.email), "Required", "required comes after email but email passes on empty");
+  eq(err(shape.tags), "Two tags");
 });
 
 // ---------------------------------------------------------------------------
 // Behaviors
-it("calculate, including stopOnUserEdit and reset", () => {
+test("calculate, including stopOnUserEdit and reset", () => {
   const s = createStore(shape, initial(), {
     behaviors: calculate(shape.slug, [shape.title], (t) => t.toLowerCase().replace(/\s+/g, "-"), { stopOnUserEdit: true }),
   });
   s.set(shape.title, "Big News", { origin: "user" });
-  expect(s.get(shape.slug)).toBe("big-news");
+  eq(s.get(shape.slug), "big-news");
   s.set(shape.slug, "mine", { origin: "user" });
   s.set(shape.title, "Other", { origin: "user" });
-  expect(s.get(shape.slug), "stopped after the user edit").toBe("mine");
+  eq(s.get(shape.slug), "mine", "stopped after the user edit");
   s.reset();
   s.set(shape.title, "Again", { origin: "user" });
-  expect(s.get(shape.slug), "reset resumes it").toBe("again");
+  eq(s.get(shape.slug), "again", "reset resumes it");
 });
 
-it("calculate in rows with an enclosing source", () => {
+test("calculate in rows with an enclosing source", () => {
   const f = form({
     rate: field<number>(),
     rows: array(object({ net: field<number>(), gross: field<number>() })),
@@ -153,27 +154,27 @@ it("calculate in rows with an enclosing source", () => {
     behaviors: calculate(f.rows.item.gross, [f.rows.item.net, f.rate], (net, rate) => net * (1 + rate)),
   });
   const row = s.substore(f.rows).itemAt(0);
-  expect(row.get(f.rows.item.gross)).toBe(12);
+  eq(row.get(f.rows.item.gross), 12);
   s.set(f.rate, 0.5);
-  expect(row.get(f.rows.item.gross)).toBe(15);
+  eq(row.get(f.rows.item.gross), 15);
 });
 
-it("link: two dates two apart", () => {
+test("link: two dates two apart", () => {
   const s = createStore(shape, initial(), {
     behaviors: link(shape.start, shape.end, { forward: (s) => s + 2, backward: (e) => e - 2 }),
   });
   s.set(shape.start, 10, { origin: "user" });
-  expect(s.get(shape.end)).toBe(12);
+  eq(s.get(shape.end), 12);
   s.set(shape.end, 30, { origin: "user" });
-  expect(s.get(shape.start)).toBe(28);
+  eq(s.get(shape.start), 28);
   s.batch(() => {
     s.set(shape.start, 1);
     s.set(shape.end, 9);
   });
-  expect([s.get(shape.start), s.get(shape.end)], "both changed together: left alone").toEqual([1, 9]);
+  deepEq([s.get(shape.start), s.get(shape.end)], [1, 9], "both changed together: left alone");
 });
 
-it("visibleWhen and disableWhen; hidden fields skip validation", () => {
+test("visibleWhen and disableWhen; hidden fields skip validation", () => {
   const s = createStore(shape, initial(), {
     behaviors: [
       visibleWhen(shape.company, [shape.type], (t) => t === "company"),
@@ -181,15 +182,15 @@ it("visibleWhen and disableWhen; hidden fields skip validation", () => {
       required(shape.company.vat),
     ],
   });
-  expect(s.get(shape.company.visible)).toBe(false);
-  expect(s.get(shape.company.vat.error), "hidden: skipped").toBe(undefined);
+  eq(s.get(shape.company.visible), false);
+  eq(s.get(shape.company.vat.error), undefined, "hidden: skipped");
   s.set(shape.type, "company");
-  expect(s.get(shape.company.vat.error)).toBe("Required");
+  eq(s.get(shape.company.vat.error), "Required");
   s.set(shape.name, "");
-  expect(s.get(shape.note.disabled)).toBe(true);
+  eq(s.get(shape.note.disabled), true);
 });
 
-it("clearWhenHidden: back to the initial value, or to a given value", () => {
+test("clearWhenHidden: back to the initial value, or to a given value", () => {
   const start = { ...initial(), type: "company" as const, company: { vat: "LV1", phone: "123" } };
   const s = createStore(shape, start, {
     behaviors: [
@@ -201,11 +202,11 @@ it("clearWhenHidden: back to the initial value, or to a given value", () => {
   s.set(shape.company.vat, "LV2");
   s.set(shape.company.phone, "999");
   s.set(shape.type, "person");
-  expect(s.get(shape.company.vat)).toBe("");
-  expect(s.get(shape.company.phone)).toBe("123");
+  eq(s.get(shape.company.vat), "");
+  eq(s.get(shape.company.phone), "123");
   s.set(shape.type, "company");
-  expect(s.get(shape.company.vat), "not restored when shown again").toBe("");
-  expect(() => clearWhenHidden(shape.name)).toThrow(/declares visibility/);
+  eq(s.get(shape.company.vat), "", "not restored when shown again");
+  throws(() => clearWhenHidden(shape.name), /declares visibility/);
 });
 
 // ---------------------------------------------------------------------------
@@ -221,44 +222,44 @@ function exclusiveStore(values: Partial<Values> = {}, required = false) {
 const disabledOf = (s: ReturnType<typeof exclusiveStore>) => [shape.price, shape.discount, shape.promo].map((f) => s.get(f.disabled));
 const errorsOf = (s: ReturnType<typeof exclusiveStore>) => [shape.price, shape.discount, shape.promo].map((f) => s.get(f.error));
 
-it("exclusive: filling one disables the others", () => {
+test("exclusive: filling one disables the others", () => {
   const s = exclusiveStore();
-  expect(disabledOf(s)).toEqual([false, false, false]);
+  deepEq(disabledOf(s), [false, false, false]);
   s.set(shape.promo, "SAVE", { origin: "user" });
-  expect(disabledOf(s)).toEqual([true, true, false]);
+  deepEq(disabledOf(s), [true, true, false]);
   s.set(shape.promo, "", { origin: "user" });
-  expect(disabledOf(s)).toEqual([false, false, false]);
+  deepEq(disabledOf(s), [false, false, false]);
   s.set(shape.discount, 0);
-  expect(disabledOf(s), "custom isFilled: discount 0 is empty").toEqual([false, false, false]);
+  deepEq(disabledOf(s), [false, false, false], "custom isFilled: discount 0 is empty");
 });
 
-it("exclusive: several filled (loaded data) → all enabled, errors on the filled ones", () => {
+test("exclusive: several filled (loaded data) → all enabled, errors on the filled ones", () => {
   const s = exclusiveStore({ price: 10, promo: "SAVE" });
-  expect(disabledOf(s)).toEqual([false, false, false]);
-  expect(errorsOf(s)).toEqual(["Only one of Price, Discount, Promo code can be set", undefined, "Only one of Price, Discount, Promo code can be set"]);
+  deepEq(disabledOf(s), [false, false, false]);
+  deepEq(errorsOf(s), ["Only one of Price, Discount, Promo code can be set", undefined, "Only one of Price, Discount, Promo code can be set"]);
   s.set(shape.promo, "", { origin: "user" });
-  expect(errorsOf(s)).toEqual([undefined, undefined, undefined]);
-  expect(disabledOf(s)).toEqual([false, true, true]);
+  deepEq(errorsOf(s), [undefined, undefined, undefined]);
+  deepEq(disabledOf(s), [false, true, true]);
 });
 
-it("exclusive: required", () => {
+test("exclusive: required", () => {
   const s = exclusiveStore({}, true);
-  expect(errorsOf(s)).toEqual(Array(3).fill("One of Price, Discount, Promo code is required"));
+  deepEq(errorsOf(s), Array(3).fill("One of Price, Discount, Promo code is required"));
   s.set(shape.price, 5);
-  expect(errorsOf(s), "the others are disabled and skipped").toEqual([undefined, undefined, undefined]);
+  deepEq(errorsOf(s), [undefined, undefined, undefined], "the others are disabled and skipped");
 });
 
-it("exclusive: disabled fields are left out of the submit values", async () => {
+testAsync("exclusive: disabled fields are left out of the submit values", async () => {
   const s = exclusiveStore();
   s.set(shape.promo, "SAVE", { origin: "user" });
   const r = await s.validate();
-  expect("price" in r.values).toBe(false);
-  expect(r.values.promo).toBe("SAVE");
+  eq("price" in r.values, false);
+  eq(r.values.promo, "SAVE");
 });
 
 // ---------------------------------------------------------------------------
 // Builder
-it("builder: when / otherwise with rules", () => {
+test("builder: when / otherwise with rules", () => {
   const behaviors = defineBehaviors(shape, (b) => {
     b.add(required(shape.name));
     b.when([shape.type], (t) => t === "company", (b) => {
@@ -267,66 +268,67 @@ it("builder: when / otherwise with rules", () => {
       b.add(required(shape.personalId));
     });
   });
-  expect(behaviors.length).toBe(3);
+  eq(behaviors.length, 3);
   const s = createStore(shape, initial(), { behaviors });
-  expect(s.get(shape.personalId.error)).toBe("Required");
-  expect(s.get(shape.taxId.error)).toBe(undefined);
+  eq(s.get(shape.personalId.error), "Required");
+  eq(s.get(shape.taxId.error), undefined);
   s.set(shape.type, "company");
-  expect(s.get(shape.personalId.error)).toBe(undefined);
-  expect(s.get(shape.taxId.error), "taxId: required meta is false").toBe(undefined);
+  eq(s.get(shape.personalId.error), undefined);
+  eq(s.get(shape.taxId.error), undefined, "taxId: required meta is false");
   s.set(shape.taxId.required, true);
-  expect(s.get(shape.taxId.error)).toBe("Required");
+  eq(s.get(shape.taxId.error), "Required");
 });
 
-it("builder: opposite branches may write the same target", () => {
+test("builder: opposite branches may write the same target", () => {
   const hint = (text: string) => defineBehavior({ triggers: [shape.name], writes: [shape.note.hint], run: (c) => c.set(shape.note.hint, text) });
   const behaviors = defineBehaviors(shape, (b) => {
     b.when([shape.type], (t) => t === "company", (b) => b.add(hint("company"))).otherwise((b) => b.add(hint("person")));
   });
   const s = createStore(shape, initial(), { behaviors });
-  expect(s.get(shape.note.hint)).toBe("person");
+  eq(s.get(shape.note.hint), "person");
   s.set(shape.type, "company");
-  expect(s.get(shape.note.hint)).toBe("company");
-  expect(() => createStore(shape, initial(), { behaviors: [hint("a"), hint("b")] })).toThrow(/already written/);
+  eq(s.get(shape.note.hint), "company");
+  throws(() => createStore(shape, initial(), { behaviors: [hint("a"), hint("b")] }), /already written/);
   const sameSide = defineBehaviors(shape, (b) => b.when([shape.type], () => true, (b) => b.add(hint("a"), hint("b"))));
-  expect(() => createStore(shape, initial(), { behaviors: sameSide })).toThrow(/already written/);
+  throws(() => createStore(shape, initial(), { behaviors: sameSide }), /already written/);
 });
 
-it("builder: nested blocks accumulate guards", () => {
+test("builder: nested blocks accumulate guards", () => {
   const behaviors = defineBehaviors(shape, (b) => {
     b.when([shape.type], (t) => t === "company", (b) => {
       b.when([shape.name], (n) => n.startsWith("A"), (b) => b.add(required(shape.personalId)));
     });
   });
   const s = createStore(shape, initial(), { behaviors });
-  expect(s.get(shape.personalId.error)).toBe(undefined);
+  eq(s.get(shape.personalId.error), undefined);
   s.set(shape.type, "company");
-  expect(s.get(shape.personalId.error)).toBe("Required");
+  eq(s.get(shape.personalId.error), "Required");
   s.set(shape.name, "Bob");
-  expect(s.get(shape.personalId.error)).toBe(undefined);
+  eq(s.get(shape.personalId.error), undefined);
 });
 
-it("builder: each, reusable fragments, flattened arrays", () => {
+test("builder: each, reusable fragments, flattened arrays", () => {
   const lineRules = (b: BehaviorBuilder, line: typeof L) => b.add(min(line.qty, 1), required(line.sku));
   const behaviors = defineBehaviors(shape, (b) => {
     b.each(shape.lines, lineRules);
     b.add(exclusive([shape.price, shape.promo]));
   });
-  expect(behaviors.length).toBe(5);
+  eq(behaviors.length, 5);
   const s = createStore(shape, initial(), { behaviors });
   const row = s.substore(shape.lines).itemAt(1);
   row.set(L.qty, 0);
   row.set(L.sku, "");
-  expect(row.get(L.qty.error)).toBe("Must be at least 1");
-  expect(s.get(countIn(shape.lines, "error"))).toBe(2);
+  eq(row.get(L.qty.error), "Must be at least 1");
+  eq(s.get(countIn(shape.lines, "error")), 2);
 });
 
-it("builder output works with addBehavior (component rules)", () => {
+test("builder output works with addBehavior (component rules)", () => {
   const s = createStore(shape, initial());
   const row = s.substore(shape.lines).itemAt(0);
   const off = row.addBehavior(defineBehaviors(shape, (b) => b.add(maxLength(L.sku, 0, { message: "No SKU here" }))));
-  expect(row.get(L.sku.error)).toBe("No SKU here");
+  eq(row.get(L.sku.error), "No SKU here");
   off();
-  expect(row.get(L.sku.error)).toBe(undefined);
+  eq(row.get(L.sku.error), undefined);
 });
 
+runAsync("utilities.test.ts");
