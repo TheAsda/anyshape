@@ -166,10 +166,10 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### N. Utilities & builder
 **Covered:** `isEmpty`, `labelOf`, `required` (incl. `required` meta), format rules on empty values, `calculate` (+`stopOnUserEdit`, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhenHidden`, `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
 
-- [ ] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `labelOf` uses a `label` meta key in `exclusive`'s default text. → `utilities.test.ts`
-- [ ] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhenHidden` on a node with no `visibility()` on it or any ancestor throws; with visibility declared on an ancestor it works. → `utilities.test.ts`
-- [ ] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `utilities.test.ts`
-- [ ] **N4 · P2** The `when` option on utilities (`calculate(…, { when })`, `required(…, { when })`) behaves like a builder block. → `utilities.test.ts`
+- [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `labelOf` uses a `label` meta key in `exclusive`'s default text. → `utilities.test.ts`
+- [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhenHidden` on a node with no `visibility()` on it or any ancestor throws; with visibility declared on an ancestor it works. → `utilities.test.ts`
+- [x] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `utilities.test.ts`
+- [x] **N4 · P2** The `when` option on utilities (`calculate(…, { when })`, `required(…, { when })`) behaves like a builder block. → `utilities.test.ts`
 - [ ] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
 
 ### O. Submit, focus, paths

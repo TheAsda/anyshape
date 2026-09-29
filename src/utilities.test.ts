@@ -3,6 +3,7 @@ import {
   control, visibility, disableable,
   required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf,
   calculate, link, visibleWhen, disableWhen, clearWhenHidden, exclusive,
+  when, type AnyBehavior,
   type InferValue, type BehaviorBuilder,
 } from "./index";
 import { it, expect } from "vitest";
@@ -330,3 +331,91 @@ it("builder output works with addBehavior (component rules)", () => {
   expect(row.get(L.sku.error)).toBe(undefined);
 });
 
+
+// ---------------------------------------------------------------------------
+// Messages
+it("messages as functions; exclusive's custom messages; labels in exclusive's default text", () => {
+  const s = createStore(shape, initial(), {
+    behaviors: [
+      min(shape.age, 18, { message: (v) => `${v} is too young` }),
+      pattern(shape.zip, /^LV-\d{4}$/, { message: (v) => `"${v}" is not a zip` }),
+      ...exclusive([shape.price, shape.discount], { required: true, message: { tooMany: "Pick one", missing: "Need one" } }),
+    ],
+  });
+  s.set(shape.age, 12);
+  expect(s.get(shape.age.error)).toBe("12 is too young");
+  s.set(shape.zip, "nope");
+  expect(s.get(shape.zip.error)).toBe('"nope" is not a zip');
+  expect(s.get(shape.price.error)).toBe("Need one");
+  s.batch(() => {
+    s.set(shape.price, 1);
+    s.set(shape.discount, 2);
+  });
+  expect(s.get(shape.discount.error)).toBe("Pick one");
+
+  const d = createStore(shape, initial(), { behaviors: exclusive([shape.price, shape.promo], { required: true }) });
+  expect(d.get(shape.price.error), "labels, not paths").toBe("One of Price, Promo code is required");
+});
+
+// ---------------------------------------------------------------------------
+// Misuse
+it("exclusive needs two fields; clearWhenHidden needs visibility() on the node or an ancestor", () => {
+  expect(() => exclusive([shape.price])).toThrow("exclusive() needs at least two fields");
+  expect(() => clearWhenHidden(shape.name)).toThrow(/neither the node nor an ancestor declares visibility/);
+
+  const s = createStore(shape, initial(), { behaviors: clearWhenHidden(shape.company.vat) });
+  s.set(shape.company.vat, "LV1", { origin: "user" });
+  s.set(shape.company.visible, false);
+  expect(s.get(shape.company.vat), "visibility declared on the ancestor").toBe("");
+});
+
+// ---------------------------------------------------------------------------
+// link on load
+it("link: loading a whole new value changes both sides, nothing is written", () => {
+  let writes = 0;
+  const s = createStore(shape, initial(), {
+    behaviors: link(shape.start, shape.end, { forward: (v) => (writes++, v + 2), backward: (v) => (writes++, v - 2) }),
+  });
+  s.set(shape, { ...initial(), start: 5, end: 100 });
+  expect([s.get(shape.start), s.get(shape.end)]).toEqual([5, 100]);
+  expect(writes).toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// The `when` option
+it("the `when` option on utilities behaves like a builder block", () => {
+  const isCompany = when([shape.type], (t) => t === "company");
+  const viaOption: AnyBehavior[] = [
+    required(shape.personalId, { when: isCompany }),
+    calculate(shape.slug, [shape.title], (t) => t.toLowerCase(), { when: isCompany }),
+  ];
+  const viaBlock = defineBehaviors(shape, (b) =>
+    b.when([shape.type], (t) => t === "company", (b) =>
+      b.add(required(shape.personalId), calculate(shape.slug, [shape.title], (t) => t.toLowerCase()))
+    )
+  );
+  const trace = (behaviors: readonly AnyBehavior[]) => {
+    const s = createStore(shape, initial(), { behaviors });
+    const seen: unknown[] = [];
+    const snap = () => seen.push([s.get(shape.personalId.error), s.get(shape.slug)]);
+    snap();
+    s.set(shape.title, "ONE");
+    snap();
+    s.set(shape.type, "company");
+    snap();
+    s.set(shape.title, "TWO");
+    snap();
+    s.set(shape.type, "person");
+    snap();
+    return seen;
+  };
+  const expected = [
+    [undefined, "hello"],
+    [undefined, "hello"],
+    ["Required", "one"],
+    ["Required", "two"],
+    [undefined, "two"],
+  ];
+  expect(trace(viaOption)).toEqual(expected);
+  expect(trace(viaBlock)).toEqual(expected);
+});
