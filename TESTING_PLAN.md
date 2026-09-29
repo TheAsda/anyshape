@@ -52,7 +52,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `store.test.ts`
 - [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `_fields`, …). Same for meta keys, plus `item`. → `meta.test.ts`
 - [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `extensions.test.ts`
-- [ ] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
+- [x] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
 
 ### B. Lenses (`lens.ts`)
 **Covered:** only indirectly, through stores (structural sharing, no-op writes).
@@ -76,7 +76,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **D1 · P2** Meta delegation: `root.getMeta(deep)` and `root.substore(section).getMeta(deep)` return the *same object*; a write through one is visible through the other. → `store.test.ts`
 - [x] **D2 · P2** `substore(fieldNode)` throws "needs an object or array node". → `store.test.ts`
-- [ ] **D3 · P3** A node from another form, or an uninstantiated description, is rejected by `get`/`set`/`substore` with "is not part of the store". → `store.test.ts`
+- [x] **D3 · P3** A node from another form, or an uninstantiated description, is rejected by `get`/`set`/`substore` with "is not part of the store". → `store.test.ts`
 
 ### E. Row identity & array helpers (`ArrayStore`, `ItemStore`)
 **Covered:** stable ids, identity preserved through row writes, isolated per-row meta, reorder, outside replace = new store, detached reads/writes, nested arrays, `append`/`insert`/`remove`/`move`, complete items without `create`, origins passed through, undo re-attach, both versions present.
@@ -91,7 +91,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
   → `extensions.test.ts`
 - [x] **E2 · P1** Regression: `append()`/`insert()` return the right row store **when a behavior edits the new row in the same flush** (e.g. a row-scoped `calculate` with `runOn.init`). → `behaviors.test.ts`
-- [ ] **E3 · P3** A write through a row store that would make the array contain the same object twice is rejected by `_replaceItem`. → `store.test.ts`
+- [x] **E3 · P3** A write through a row store that would make the array contain the same object twice is rejected by `_replaceItem`. → `store.test.ts`
 
 ### F. Notifications & flush (the 9 rules)
 **Covered:** every rule has at least one test; cycles hit the 100-round limit; UI can't write; unsubscribe mid-flush.
@@ -99,8 +99,8 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **F1 · P1** A **UI listener that throws**: the other listeners of the same flush are still called, the first error is rethrown from the write, and the next flush is consistent. → `notifications.test.ts`
 - [x] **F2 · P1** A **reaction that throws**: the error propagates out of `set()`, UI listeners are not called for that flush, and the next write delivers the UI notification with the settled state (subscriptions caught up). → `notifications.test.ts`
 - [x] **F3 · P2** Rule 5 on views: `substore(section).subscribe(l)` fires for a nested row's meta change inside the section, and not for changes outside it. → `notifications.test.ts`
-- [ ] **F4 · P3** `subscribeItems` fires when the array is replaced from outside with the *same length but new objects*. → `notifications.test.ts`
-- [ ] **F5 · P3** Flat-form constraint: with 300 fields on the root, one write calls only the changed field's listener (pin the "no extra listener calls" guarantee; cost is covered in §4). → `notifications.test.ts`
+- [x] **F4 · P3** `subscribeItems` fires when the array is replaced from outside with the *same length but new objects*. → `notifications.test.ts`
+- [x] **F5 · P3** Flat-form constraint: with 300 fields on the root, one write calls only the changed field's listener (pin the "no extra listener calls" guarantee; cost is covered in §4). → `notifications.test.ts`
 
 ### G. Origins, baselines & reset
 **Covered:** origins in reactions, per target, across scopes, per row; `getInitial` and `{ as: "initial" }`; per-row baselines, new rows `{}`, a baseline write on the array; reset of root and of one row; `keepOnReset`; reset re-validation and recompute.

@@ -433,3 +433,27 @@ it("rule 5 on views: an array or object substore's listener sees changes inside 
   s.set(shape.name, "Bob");
   expect(r.take()).toEqual([]);
 });
+
+// ---------------------------------------------------------------------------
+it("rule 3: replacing the array with new objects of the same length fires subscribeItems", () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  const before = lines.items();
+  let fired = 0;
+  lines.subscribeItems(() => fired++);
+  s.set(shape.lines, s.get(shape.lines).map((l) => ({ ...l })));
+  expect(fired).toBe(1);
+  expect(lines.items().length).toBe(2);
+  expect(lines.items()[0], "new objects, new row stores").not.toBe(before[0]);
+});
+
+it("a flat form with 300 fields: one write calls only that field's listener", () => {
+  const fields = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`f${i}`, field<number>()]));
+  const flat = form(object(fields));
+  const s = createStore(flat, Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`f${i}`, 0])) as never);
+  const calls: string[] = [];
+  const nodes = flat as unknown as Record<string, Parameters<typeof s.subscribeValue>[0]>;
+  for (let i = 0; i < 300; i++) s.subscribeValue(nodes[`f${i}`], () => calls.push(`f${i}`));
+  s.set(nodes.f150 as never, 1 as never);
+  expect(calls).toEqual(["f150"]);
+});

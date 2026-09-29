@@ -208,3 +208,12 @@ it("MetaBuilder: chained helpers and custom keys build a typed plain object", ()
   expect(f.name.hint instanceof MetaRef).toBe(true);
   expect(meta().disabled(false).visible().placeholder("x").build()).toEqual({ disabled: false, visible: true, placeholder: "x" });
 });
+
+it("paths through nested arrays, for nodes and meta refs", () => {
+  const f = form({
+    outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
+  });
+  expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
+  expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
+  expect(f.outer.item.inner.path).toBe("outer[].inner");
+});
