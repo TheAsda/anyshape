@@ -470,3 +470,21 @@ it("useArray: insert and move through the hook; an explicit origin replaces the 
   expect(origins).toEqual([["user"], ["program"], ["program"], ["user"]]);
   await unmount();
 });
+
+// ---------------------------------------------------------------------------
+it("useField on a node without meta: meta is {}, onChange writes as the user", async () => {
+  const s = createStore(shape, initial());
+  let field!: ReturnType<typeof useField<typeof shape.note>>;
+  function Note() {
+    field = useField(shape.note);
+    return h("span", { id: "note" }, field.value);
+  }
+  const origins: Origin[][] = [];
+  s.react(shape.note, (_n, _p, info) => origins.push([...info.origins]));
+  await mount(h(StoreProvider, { store: s }, h(Note, {})));
+  expect(field.meta).toEqual({});
+  await run(() => field.onChange("hello"));
+  expect(text("note")).toBe("hello");
+  expect(origins).toEqual([["user"]]);
+  await unmount();
+});

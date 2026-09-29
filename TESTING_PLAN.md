@@ -187,14 +187,14 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `react/react.test.ts`
 - [x] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.ts`
 - [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.ts`
-- [ ] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.ts`
+- [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.ts`
 
 ### Q. Lifetime & outside data (`react/form.ts`)
 **Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, `resetOnUnmount`, StrictMode), DOM focus order, explicit `focusOrder`, `handleSubmit` on a real form, `domOrder`.
 
 - [x] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.ts`
 - [x] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.ts`
-- [ ] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.ts`
+- [x] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.ts`
 
 ### R. Behaviors in components (`react/behaviors.ts`)
 **Covered:** mount/unmount timing, row scoping, deps-driven atomic swap, latest props in `run`/checks/guards, declarations changing without deps (warning), builder features, StrictMode, duplicates with the `{ key }` hint and sharing, store change moves the registration, explicit `{ store }`.

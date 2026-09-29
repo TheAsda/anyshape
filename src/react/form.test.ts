@@ -317,3 +317,22 @@ it("useSync under a row provider writes that row; after the row is removed it ne
   expect(second.get(L.qty.maxQty), "the detached row was not written").toBe(5);
   await unmount();
 });
+
+// Documented caveat: `values` is compared by reference. A refetch that returns
+// an equal-but-new object reloads the form and discards the user's edits.
+it("caveat: a new values object with identical data replaces the user's edits", async () => {
+  let setData!: (v: Values) => void;
+  let f!: RootStore<typeof shape>;
+  function App() {
+    const [data, set] = useState<Values>({ ...empty(), name: "Loaded" });
+    setData = set;
+    f = useForm(shape, empty(), { values: data });
+    return null;
+  }
+  await mount(h(App, {}));
+  await run(() => f.set(shape.name, "Edited", { origin: "user" }));
+  await run(() => setData({ ...empty(), name: "Loaded" }));
+  expect(f.get(shape.name)).toBe("Loaded");
+  expect(f.get(shape.name.dirty)).toBe(false);
+  await unmount();
+});
