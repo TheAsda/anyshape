@@ -161,7 +161,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **M2 · P2** An async rule with `triggers`/`reads`: a change of a read value makes `validate()` re-check (no stale reuse); identical inputs reuse the result. Guards on async rules: a false guard clears the error and aborts. → `validation.test.ts`
 - [x] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `additions.test.ts`
 - [x] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues, errors and values. → `validation.test.ts`
-- [ ] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
+- [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Utilities & builder
 **Covered:** `isEmpty`, `labelOf`, `required` (incl. `required` meta), format rules on empty values, `calculate` (+`stopOnUserEdit`, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhenHidden`, `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
@@ -170,7 +170,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhenHidden` on a node with no `visibility()` on it or any ancestor throws; with visibility declared on an ancestor it works. → `utilities.test.ts`
 - [x] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `utilities.test.ts`
 - [x] **N4 · P2** The `when` option on utilities (`calculate(…, { when })`, `required(…, { when })`) behaves like a builder block. → `utilities.test.ts`
-- [ ] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
+- [x] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
 
 ### O. Submit, focus, paths
 **Covered:** `focusFirst` order and `compare`, `focusOrder` option, `handleSubmit`, `onInvalid`, the double-submit guard, errors in `onValid`, `focus: false`, `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors.
@@ -178,7 +178,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **O1 · P2** `store.focus(node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `additions.test.ts`
 - [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `additions.test.ts`
 - [x] **O3 · P2** `submit()` on a form whose root has **no** `submission()` works (no counters, no throw). → `validation.test.ts`
-- [ ] **O4 · P3** `handleSubmit(...)()` called without an event. → `additions.test.ts`
+- [x] **O4 · P3** `handleSubmit(...)()` called without an event. → `additions.test.ts`
 
 ### P. React bindings (`react/hooks.ts`)
 **Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useControl` (state, user writes, `onBlur` reveal, default and custom policies), `focusRef`, adapters (real events, caching), `useArray` (re-render on structure only, nested arrays).

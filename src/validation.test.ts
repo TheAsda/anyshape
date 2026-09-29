@@ -627,3 +627,40 @@ it("submit works on a form whose root has no submission()", async () => {
   expect(got).toEqual([{ name: "x" }]);
   expect(s.get(f.name.revealed)).toBe(true);
 });
+
+// ---------------------------------------------------------------------------
+it("validate() with a check pending on a row that is then removed: the row is not listed", async () => {
+  const { calls, check } = lookup();
+  const s = createStore(shape, initial(), { behaviors: asyncRule(L.sku, check, { debounce: 1000 }) });
+  const lines = s.substore(shape.lines);
+  const doomed = lines.itemAt(1);
+  doomed.set(L.sku, "ZZ", { origin: "user" });
+  const pending = s.validate();
+  await sleep(0);
+  expect(calls.map((c) => c.value), "validate() skipped the debounce").toEqual(["A", "ZZ"]);
+  lines.remove(doomed);
+  calls[0].d.resolve(undefined);
+  calls[1].d.resolve("Taken");
+  const r = await pending;
+  expect(r.valid).toBe(true);
+  expect(r.errors).toEqual([]);
+  expect(r.values.lines).toEqual([{ sku: "A", qty: 1, total: 0 }]);
+});
+
+// BUG: the header of validation.ts says removing a row aborts its check, but
+// nothing does – the signal never fires and validate() keeps waiting for the
+// removed row's promise, so a check that never settles hangs validate()/submit().
+it.fails("validate(): removing a row aborts its pending check and validate() does not wait for it", async () => {
+  const { calls, check } = lookup();
+  const s = createStore(shape, initial(), { behaviors: asyncRule(L.sku, check, { debounce: 1000 }) });
+  const lines = s.substore(shape.lines);
+  const doomed = lines.itemAt(1);
+  doomed.set(L.sku, "ZZ", { origin: "user" });
+  const pending = s.validate();
+  await sleep(0);
+  lines.remove(doomed);
+  calls[0].d.resolve(undefined); // row 0
+  expect(calls[1].signal.aborted).toBe(true);
+  const r = await Promise.race([pending, sleep(50).then(() => "hung" as const)]);
+  expect(r).not.toBe("hung");
+});
