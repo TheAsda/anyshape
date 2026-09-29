@@ -105,14 +105,14 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### G. Origins, baselines & reset
 **Covered:** origins in reactions, per target, across scopes, per row; `getInitial` and `{ as: "initial" }`; per-row baselines, new rows `{}`, a baseline write on the array; reset of root and of one row; `keepOnReset`; reset re-validation and recompute.
 
-- [ ] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `additions.test.ts`
+- [x] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `additions.test.ts`
 - [x] **G2 · P2** `setValues(values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `extensions.test.ts`
 - [ ] **G3 · P3** Reset uses origin `"initial"`: a reaction receives `{"initial"}`, and `touched` does not flip. → `extensions.test.ts`
 
 ### H. Counts & collect
 **Covered:** counts across fields/objects/rows, rows removed and restored, count subscriptions, `collect` with row indexes, warning for non-countable keys, `aggregate(default)` must be false, stable `countIn` refs.
 
-- [ ] **H1 · P2** A `CountRef` as a **behavior trigger** (re-runs when the count changes, including on row removal) and as a **rule limit** (`max(node, countIn(…))`). → `behaviors.test.ts`, `additions.test.ts`
+- [x] **H1 · P2** A `CountRef` as a **behavior trigger** (re-runs when the count changes, including on row removal) and as a **rule limit** (`max(node, countIn(…))`). → `behaviors.test.ts`, `additions.test.ts`
 - [ ] **H2 · P3** `collect` called on a row store (paths still from the root, only that row's entries); nested rows `a[1].b[0].c`. → `extensions.test.ts`
 - [ ] **H3 · P3** A custom counted key (`metaKey(…, { aggregate })`) written by application code updates counts like built-in keys. → `extensions.test.ts`
 
@@ -120,7 +120,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** `visible` via ancestors, `disabled` from the root into rows, subscriptions fire on ancestor changes, hidden/disabled skipped by validation, `validateHidden`, values omit hidden and disabled.
 
 - [x] **I1 · P1** Submitted values, the documented rule: a node that **declares** `visible`/`disabled` and is hidden/disabled is omitted; **descendants of a disabled ancestor that don't declare the key stay in `values`** (but are still skipped by validation). Add a matching `SubmitValue` type assertion. → `validation.test.ts`
-- [ ] **I2 · P2** `validation({ validateDisabled: true })` keeps validating a disabled field. → `validation.test.ts`
+- [x] **I2 · P2** `validation({ validateDisabled: true })` keeps validating a disabled field. → `validation.test.ts`
 - [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `extensions.test.ts`
 
 ### J. Behavior registration checks
@@ -158,9 +158,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - it's skipped when the array is hidden.
 
   If `minItems`/`maxItems` utilities are added, test them here. → `validation.test.ts`
-- [ ] **M2 · P2** An async rule with `triggers`/`reads`: a change of a read value makes `validate()` re-check (no stale reuse); identical inputs reuse the result. Guards on async rules: a false guard clears the error and aborts. → `validation.test.ts`
-- [ ] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `additions.test.ts`
-- [ ] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues, errors and values. → `validation.test.ts`
+- [x] **M2 · P2** An async rule with `triggers`/`reads`: a change of a read value makes `validate()` re-check (no stale reuse); identical inputs reuse the result. Guards on async rules: a false guard clears the error and aborts. → `validation.test.ts`
+- [x] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `additions.test.ts`
+- [x] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues, errors and values. → `validation.test.ts`
 - [ ] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Utilities & builder
@@ -175,9 +175,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### O. Submit, focus, paths
 **Covered:** `focusFirst` order and `compare`, `focusOrder` option, `handleSubmit`, `onInvalid`, the double-submit guard, errors in `onValid`, `focus: false`, `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors.
 
-- [ ] **O1 · P2** `store.focus(node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `additions.test.ts`
-- [ ] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `additions.test.ts`
-- [ ] **O3 · P2** `submit()` on a form whose root has **no** `submission()` works (no counters, no throw). → `validation.test.ts`
+- [x] **O1 · P2** `store.focus(node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `additions.test.ts`
+- [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `additions.test.ts`
+- [x] **O3 · P2** `submit()` on a form whose root has **no** `submission()` works (no counters, no throw). → `validation.test.ts`
 - [ ] **O4 · P3** `handleSubmit(...)()` called without an event. → `additions.test.ts`
 
 ### P. React bindings (`react/hooks.ts`)

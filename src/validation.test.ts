@@ -541,3 +541,89 @@ it("array-level rules: skipped while the array is hidden", async () => {
   s.set(party.travelers.visible, true);
   expect(s.get(party.travelers.error), "re-validated when shown").toBe("Add at least one traveler");
 });
+
+// ---------------------------------------------------------------------------
+// validateDisabled
+it("validation({ validateDisabled: true }) keeps validating a disabled field", () => {
+  const f = form({
+    keep: field<string>().meta(control({ validateDisabled: true }), disableable()),
+    skip: field<string>().meta(control(), disableable()),
+  });
+  const s = createStore(f, { keep: "", skip: "" }, {
+    behaviors: [rule(f.keep, (v) => (v ? undefined : "Required")), rule(f.skip, (v) => (v ? undefined : "Required"))],
+  });
+  s.set(f.keep.disabled, true);
+  s.set(f.skip.disabled, true);
+  expect(s.get(f.keep.error)).toBe("Required");
+  expect(s.get(f.skip.error)).toBe(undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Async: inputs and guards
+it("async: a changed read value makes validate() re-check; identical inputs reuse the result", async () => {
+  const { calls, check } = lookup();
+  const s = createStore(shape, initial(), {
+    behaviors: asyncRule(shape.email, (v, ctx) => check(`${v}|${ctx.get(shape.type)}`, ctx), { reads: [shape.type] }),
+  });
+  s.set(shape.email, "a@x.io", { origin: "user" });
+  expect(calls.length).toBe(1);
+  calls[0].d.resolve(undefined);
+  await sleep(0);
+  await s.validate();
+  expect(calls.length, "same inputs: reused").toBe(1);
+
+  s.set(shape.type, "company"); // a read, not a trigger
+  expect(calls.length, "reads don't start a check").toBe(1);
+  const pending = s.validate();
+  expect(calls.length, "inputs changed: checked again").toBe(2);
+  expect(calls[1].value).toBe("a@x.io|company");
+  calls[1].d.resolve("Taken");
+  expect((await pending).valid).toBe(false);
+});
+
+it("async: a guard turning false clears the state and aborts the running check", async () => {
+  const { calls, check } = lookup();
+  const s = createStore(shape, initial(), {
+    behaviors: asyncRule(shape.email, check, { when: when([shape.type], (t) => t === "person") }),
+  });
+  s.set(shape.email, "b@x.io", { origin: "user" });
+  expect(calls.length).toBe(1);
+  expect(s.get(shape.email.validating)).toBe(true);
+  s.set(shape.type, "company");
+  expect(calls[0].signal.aborted).toBe(true);
+  expect(s.get(shape.email.validating)).toBe(false);
+  calls[0].d.resolve("Taken");
+  await sleep(0);
+  expect(s.get(shape.email.error), "the late result is dropped").toBe(undefined);
+});
+
+// ---------------------------------------------------------------------------
+// validate() on a part
+it("validate() on a row or a section: only that part's errors and values", async () => {
+  const s = createStore(shape, initial(), {
+    behaviors: [
+      rule(shape.name, () => "name bad"),
+      rule(L.sku, (v) => (v === "B" ? "sku bad" : undefined)),
+      rule(shape.company.vat, () => "vat bad"),
+    ],
+  });
+  const row = await s.substore(shape.lines).itemAt(1).validate();
+  expect(row.errors.map((e) => [e.path, e.error])).toEqual([["lines[1].sku", "sku bad"]]);
+  expect(row.values).toEqual({ sku: "B", qty: 2, total: 0 });
+
+  const section = await s.substore(shape.company).validate();
+  expect(section.errors.map((e) => [e.path, e.error])).toEqual([["company.vat", "vat bad"]]);
+  expect(section.values).toEqual({ vat: "", secret: "" });
+});
+
+// ---------------------------------------------------------------------------
+// submit without submission()
+it("submit works on a form whose root has no submission()", async () => {
+  const f = form({ name: field<string>().meta(control()) });
+  const s = createStore(f, { name: "x" });
+  const got: unknown[] = [];
+  const r = await s.submit((values) => void got.push(values));
+  expect(r.valid).toBe(true);
+  expect(got).toEqual([{ name: "x" }]);
+  expect(s.get(f.name.revealed)).toBe(true);
+});
