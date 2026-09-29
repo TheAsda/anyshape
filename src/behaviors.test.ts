@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule,
   control, visibility, disableable, touched, dirty,
   type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
@@ -508,4 +508,144 @@ it("a feature's default behavior may only use its own node", () => {
   const f = form({ a: field<string>(), b: field<string>().meta(mirror()) });
   other = f.a;
   expect(() => createStore(f, { a: "", b: "" })).toThrow(/default behaviors may only use their own node \("b"\), got "a"/);
+});
+
+// ---------------------------------------------------------------------------
+// Counts as triggers
+it("a count as a trigger re-runs when the count changes, including on row removal", () => {
+  const dirtyCount = countIn(shape, "dirty");
+  const mirror = defineBehavior({
+    name: "dirtyCount", triggers: [dirtyCount], writes: [shape.subtotal],
+    run: (ctx) => ctx.set(shape.subtotal, ctx.get(dirtyCount)),
+  });
+  const s = createStore(shape, initial(), { behaviors: mirror });
+  expect(s.get(shape.subtotal)).toBe(0);
+  const row = s.substore(shape.lines).itemAt(0);
+  row.set(L.qty, 9);
+  expect(s.get(shape.subtotal), "the row's qty is dirty").toBe(1);
+  s.substore(shape.lines).remove(row);
+  expect(s.get(shape.subtotal), "the removed row left the count").toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// More registration checks
+it("only values and meta keys can be written", () => {
+  const writeCount = defineBehavior({ name: "c", writes: [countIn(shape, "dirty") as never], run: () => {} });
+  const writeInitial = defineBehavior({ name: "i", writes: [initialOf(shape.total) as never], run: () => {} });
+  expect(() => createStore(shape, initial(), { behaviors: writeCount })).toThrow(/only values and meta keys are writable/);
+  expect(() => createStore(shape, initial(), { behaviors: writeInitial })).toThrow(/only values and meta keys are writable/);
+});
+
+it("behaviors can't be added to a detached row", () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  const row = lines.itemAt(0);
+  lines.remove(row);
+  expect(() => row.addBehavior(defineBehavior({ triggers: [L.qty], run: () => {} }))).toThrow(/detached row/);
+});
+
+// ---------------------------------------------------------------------------
+// Ordering edges
+it("container edge: a row writer runs before a root behavior reading the whole array", () => {
+  const log: string[] = [];
+  const perRow = defineBehavior({
+    name: "row", triggers: [L.qty], writes: [L.lineTotal],
+    run: (c) => (log.push("row"), c.set(L.lineTotal, c.get(L.qty) * 10)),
+  });
+  const sum = defineBehavior({
+    name: "sum", triggers: [shape.lines], writes: [shape.subtotal],
+    run: (c) => (log.push("sum"), c.set(shape.subtotal, c.get(shape.lines).reduce((t, l) => t + l.lineTotal, 0))),
+  });
+  const s = createStore(shape, initial(), { behaviors: [sum, perRow] }); // registered downstream-first
+  expect(s.get(shape.subtotal)).toBe(10 + 20);
+  log.length = 0;
+  s.substore(shape.lines).itemAt(0).set(L.qty, 3);
+  expect(log).toEqual(["row", "sum"]);
+  expect(s.get(shape.subtotal)).toBe(30 + 20);
+});
+
+it("inherited-meta edge: writing an ancestor's `visible` is ranked before the field's queue", () => {
+  const f = form({
+    kind: field<string>(),
+    section: object({ code: field<string>().meta(control()) }).meta(visibility()),
+  });
+  const show = defineBehavior({
+    name: "show", triggers: [f.kind], writes: [f.section.visible],
+    run: (c) => c.set(f.section.visible, c.get(f.kind) === "x"),
+  });
+  const req = rule(f.section.code, (v) => (v ? undefined : "Required"));
+  const s = createStore(f, { kind: "y", section: { code: "" } }, { behaviors: [req, show] });
+  // Internal check: the queue is registered by the validation layer, so compare ranks.
+  const regs = (s as any)._runtime.regs as { name: string; rank: number }[];
+  const rank = (name: string) => regs.find((r) => r.name === name)!.rank;
+  expect(rank("section.code#validation")).toBeGreaterThan(rank("show"));
+
+  expect(s.get(f.section.code.error), "hidden: skipped").toBe(undefined);
+  s.set(f.kind, "x");
+  expect(s.get(f.section.code.error), "shown: validated in the same flush").toBe("Required");
+});
+
+it("disposing a middle behavior keeps the remaining chain in order", () => {
+  const runs: Record<string, number> = {};
+  const [total, tax, subtotal, lineTotal] = pricing(runs);
+  const s = createStore(shape, initial(), { behaviors: [total, subtotal, lineTotal] });
+  const dispose = s.addBehavior(tax);
+  dispose();
+  for (const k of Object.keys(runs)) delete runs[k];
+  s.set(shape.discount, 0.5);
+  expect(runs, "each ran once: ranks were recomputed without tax").toEqual({ lineTotal: 2, subtotal: 1, total: 1 });
+  expect(s.get(shape.subtotal)).toBe(5 + 20);
+  expect(s.get(shape.total), "subtotal + the tax value left behind").toBe(25 + s.get(shape.tax));
+});
+
+// ---------------------------------------------------------------------------
+// The run context
+it("ctx.changed is false on the init run and true only for triggers that changed", () => {
+  const seen: string[] = [];
+  const b = defineBehavior({
+    name: "c", triggers: [shape.start, shape.end], writes: [shape.total],
+    run: (ctx) => {
+      seen.push(`${ctx.isInit}:${ctx.changed(shape.start)}:${ctx.changed(shape.end)}`);
+      ctx.set(shape.total, 0);
+    },
+  });
+  const s = createStore(shape, initial(), { behaviors: b });
+  s.set(shape.end, 5);
+  s.batch(() => {
+    s.set(shape.start, 2);
+    s.set(shape.end, 6);
+  });
+  expect(seen).toEqual(["true:false:false", "false:false:true", "false:true:true"]);
+});
+
+it("within one run the last ctx.set wins, and ctx.get sees the pending write", () => {
+  let readBack: number | undefined;
+  const b = defineBehavior({
+    name: "w", triggers: [shape.start], writes: [shape.total],
+    run: (ctx) => {
+      ctx.set(shape.total, 1);
+      readBack = ctx.get(shape.total);
+      ctx.set(shape.total, 2);
+    },
+  });
+  const s = createStore(shape, initial(), { behaviors: b });
+  expect(readBack).toBe(1);
+  expect(s.get(shape.total)).toBe(2);
+});
+
+it("ctx.initial needs initialOf(node) to be declared", () => {
+  const e = errors();
+  const undeclared = defineBehavior({
+    name: "undeclared", triggers: [shape.title], writes: [shape.slug],
+    run: (ctx) => ctx.set(shape.slug, ctx.initial(shape.title)),
+  });
+  createStore(shape, initial(), { behaviors: undeclared, onError: e.onError });
+  expect(String(e.list[0]?.error)).toMatch(/"title#initial" is not declared in triggers, reads, writes or when/);
+
+  const declared = defineBehavior({
+    name: "declared", triggers: [shape.start], reads: [initialOf(shape.title)], writes: [shape.slug],
+    run: (ctx) => ctx.set(shape.slug, ctx.initial(shape.title) + "!"),
+  });
+  const s = createStore(shape, initial(), { behaviors: declared });
+  expect(s.get(shape.slug)).toBe("Hello!");
 });
