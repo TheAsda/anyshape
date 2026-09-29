@@ -1,4 +1,4 @@
-import { createElement as h, act, useState, StrictMode, type ReactNode } from "react";
+import { createElement as h, act, useState, StrictMode, Component, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
   form, object, array, field, rule, defineBehavior, required, pattern, max, control, disableable, countIn,
@@ -291,5 +291,66 @@ it("explicit { store } option", async () => {
   }
   await mount(h(Rules, {}));
   expect(s.get(shape.name.error)).toBe("Required");
+  await unmount();
+});
+
+// ---------------------------------------------------------------------------
+it("{ key } is shared per store: the same key on different stores registers twice", async () => {
+  const s1 = createStore(shape, initial());
+  const s2 = createStore(shape, initial());
+  const calls = [spyRegistrations(s1), spyRegistrations(s2)];
+  function Keyed() {
+    useBehaviors((b) => b.add(required(shape.name)), [], { key: "name-required" });
+    return null;
+  }
+  let show!: (n: number) => void;
+  function App() {
+    const [n, set] = useState(2);
+    show = set;
+    return h("div", {}, h(StoreProvider, { store: s1 }, h(Keyed, {})), n >= 2 ? h(StoreProvider, { store: s2 }, h(Keyed, {})) : null);
+  }
+  await mount(h(App, {}));
+  expect(calls.map((c) => c.add)).toEqual([1, 1]);
+  expect([s1.get(shape.name.error), s2.get(shape.name.error)]).toEqual(["Required", "Required"]);
+  await run(() => show(1));
+  expect(s1.get(shape.name.error), "s2's holder leaving does not release s1's").toBe("Required");
+  expect(s2.get(shape.name.error)).toBe(undefined);
+  await unmount();
+});
+
+it("a deps change whose new registration fails keeps the old one and surfaces the error with the hint", async () => {
+  const s = createStore(shape, initial());
+  const lock = () =>
+    defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) });
+  function Static() {
+    useBehaviors((b) => b.add(lock()), []);
+    return null;
+  }
+  function Switching({ mode }: { mode: "rule" | "lock" }) {
+    useBehaviors((b) => (mode === "rule" ? b.add(required(shape.vat)) : b.add(lock())), [mode]);
+    return null;
+  }
+  const atError: { message?: string; vatError?: string } = {};
+  class Boundary extends Component<{ children?: ReactNode }, { failed: boolean }> {
+    state = { failed: false };
+    static getDerivedStateFromError(error: Error) {
+      atError.message = error.message;
+      atError.vatError = s.get(shape.vat.error); // read before the failed subtree is removed
+      return { failed: true };
+    }
+    render() {
+      return this.state.failed ? null : this.props.children;
+    }
+  }
+  const app = (mode: "rule" | "lock") =>
+    h(StoreProvider, { store: s }, h(Static, {}), h(Boundary, {}, h(Switching, { mode })));
+  await mount(app("rule"));
+  expect(s.get(shape.vat.error)).toBe("Required");
+  await rerender(app("lock"));
+  expect(atError.message).toMatch(/already written by/);
+  expect(atError.message).toMatch(/pass \{ key \}/);
+  expect(atError.vatError, "the old registration was still active").toBe("Required");
+  expect(s.get(shape.vat.error), "removed once its component left").toBe(undefined);
+  expect(s.get(shape.note.disabled), "the other component's registration is untouched").toBe(true);
   await unmount();
 });

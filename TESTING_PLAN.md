@@ -199,8 +199,8 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### R. Behaviors in components (`react/behaviors.ts`)
 **Covered:** mount/unmount timing, row scoping, deps-driven atomic swap, latest props in `run`/checks/guards, declarations changing without deps (warning), builder features, StrictMode, duplicates with the `{ key }` hint and sharing, store change moves the registration, explicit `{ store }`.
 
-- [ ] **R1 · P2** A `{ key }`-shared registration is removed only when the **last** holder unmounts; holders on *different* stores with the same key don't share. → `react/behaviors.test.ts`
-- [ ] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.ts`
+- [x] **R1 · P2** A `{ key }`-shared registration is removed only when the **last** holder unmounts; holders on *different* stores with the same key don't share. → `react/behaviors.test.ts`
+- [x] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.ts`
 
 ### S. Type-level tests
 Type assertions are spread across the files today. Collect the public-API type contract in one place: **new `src/types.test.ts`** (checked by `npm run typecheck`).
