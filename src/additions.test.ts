@@ -354,3 +354,92 @@ it("resetting one row re-runs only that row's instances", () => {
   expect(b.get(L.qty.hint)).toBe("q5");
 });
 
+
+// ---------------------------------------------------------------------------
+// Reset of an object section
+it("reset of a section: only its values and meta, and only behaviors writing inside it re-run", () => {
+  const f = form(
+    object({
+      a: object({ x: field<string>().meta(control()), locked: field<boolean>().meta(disableable()) }),
+      b: field<string>().meta(control()),
+      flag: field<boolean>(),
+    })
+  );
+  const lockA = defineBehavior({
+    name: "lockA", triggers: [f.flag], writes: [f.a.locked.disabled],
+    run: (c) => c.set(f.a.locked.disabled, c.get(f.flag)),
+  });
+  let outsideRuns = 0;
+  const outside = defineBehavior({
+    name: "outside", triggers: [f.flag], writes: [f.b],
+    run: (c) => (outsideRuns++, c.set(f.b, c.get(f.flag) ? "on" : "off")),
+  });
+  const s = createStore(f, { a: { x: "", locked: false }, b: "", flag: true }, { behaviors: [lockA, outside] });
+  s.set(f.a.x, "typed", { origin: "user" });
+  s.set(f.b, "typed b", { origin: "user" });
+  expect(s.get(f.a.locked.disabled)).toBe(true);
+  outsideRuns = 0;
+
+  s.reset(f.a);
+  expect(s.get(f.a.x)).toBe("");
+  expect(s.get(f.a.x.touched)).toBe(false);
+  expect(s.get(f.a.locked.disabled), "recomputed, not left at its default: flag is still true").toBe(true);
+  expect(s.get(f.b), "outside the section: kept").toBe("typed b");
+  expect(s.get(f.b.touched)).toBe(true);
+  expect(outsideRuns, "a behavior writing outside the section is not re-run").toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// A count as a rule limit
+it("a count as a rule limit: re-checked whenever the count changes", () => {
+  const f = form({
+    wanted: field<number>().meta(control()),
+    rows: array(object({ v: field<string>().meta(control()) }), { create: () => ({ v: "" }) }),
+  });
+  const s = createStore(f, { wanted: 2, rows: [] }, { behaviors: max(f.wanted, countIn(f.rows, "dirty")) });
+  const rows = s.substore(f.rows);
+  expect(s.get(f.wanted.error)).toBe("Must be at most 0");
+  rows.append(); // a new row's field starts dirty
+  const second = rows.append();
+  expect(s.get(f.wanted.error)).toBe(undefined);
+  rows.remove(second);
+  expect(s.get(f.wanted.error), "the message uses the current limit").toBe("Must be at most 1");
+});
+
+// ---------------------------------------------------------------------------
+// Server errors vs validation
+it("a server error stays until the field's next validation run", () => {
+  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
+  const target = s.resolvePath("name#error")!;
+  target.store.set(target.ref as never, "Taken on the server" as never);
+  expect(s.get(shape.name.error)).toBe("Taken on the server");
+  s.set(shape.code, "XY");
+  expect(s.get(shape.name.error), "unrelated changes don't clear it").toBe("Taken on the server");
+  s.set(shape.name, "Bob", { origin: "user" });
+  expect(s.get(shape.name.error), "the field's next validation replaces it").toBe(undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Focus
+it("focus(node): false without a target; focus() then scrollIntoView() with one", () => {
+  const s = createStore(shape, initial());
+  expect(s.focus(shape.name)).toBe(false);
+  expect(s.focus(shape.flag), "a node without focusable()").toBe(false);
+  const calls: string[] = [];
+  s.set(shape.name.focusTarget, { focus: () => calls.push("focus"), scrollIntoView: () => calls.push("scroll") });
+  expect(s.focus(shape.name)).toBe(true);
+  expect(calls).toEqual(["focus", "scroll"]);
+});
+
+it("focusFirst skips entries whose row was removed", () => {
+  const s = createStore(shape, initial(), { behaviors: rule(L.qty, () => "bad") });
+  const lines = s.substore(shape.lines);
+  const [a, b] = lines.items();
+  const focused: string[] = [];
+  a.set(L.qty.focusTarget, { focus: () => focused.push("a") });
+  b.set(L.qty.focusTarget, { focus: () => focused.push("b") });
+  const entries = s.collect(shape, "error");
+  lines.remove(a);
+  expect(s.focusFirst(entries)?.store).toBe(b);
+  expect(focused).toEqual(["b"]);
+});
