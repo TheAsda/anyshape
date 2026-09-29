@@ -232,10 +232,10 @@ The unit suites test each mechanism in isolation. Add **`src/integration.test.ts
 - [x] **INT3 · P1** Switching the destination shows the visa section (required errors appear); switching back hides it, clears its values and errors, and `validate().values` omits `visa` (type and runtime).
 - [x] **INT4 · P1** Travelers: append (new row dirty, `isAdult` computed before any UI notification), edit a middle row, remove the first, undo. Assert row identity, per-row meta, counts and `stableId`s throughout.
 - [x] **INT5 · P1** `seatsLeft` below the number of travelers: an error appears; `reset()` keeps `seatsLeft` (`keepOnReset`) and recomputes the error.
-- [ ] **INT6 · P2** Loaded data with both promo and voucher: both enabled, both in error; clearing one disables the other and clears both errors.
-- [ ] **INT7 · P2** `handleSubmit` on the whole form: waits for pending passport checks, focuses the first error, and on a server rejection maps `travelers[1].passport` via `resolvePath` onto the right row.
-- [ ] **INT8 · P2** A step submit (`substore(section).submit`) reveals and validates only that section; root `submitCount` still increments.
-- [ ] **INT9 · P2** React: render the whole booking (provider, traveler rows, a field with `useBehaviors` under a row provider); a keystroke in one traveler re-renders only that traveler's field and any counter whose value changed.
+- [x] **INT6 · P2** Loaded data with both promo and voucher: both enabled, both in error; clearing one disables the other and clears both errors.
+- [x] **INT7 · P2** `handleSubmit` on the whole form: waits for pending passport checks, focuses the first error, and on a server rejection maps `travelers[1].passport` via `resolvePath` onto the right row.
+- [x] **INT8 · P2** A step submit (`substore(section).submit`) reveals and validates only that section; root `submitCount` still increments.
+- [x] **INT9 · P2** React: render the whole booking (provider, traveler rows, a field with `useBehaviors` under a row provider); a keystroke in one traveler re-renders only that traveler's field and any counter whose value changed.
 
 ---
 
