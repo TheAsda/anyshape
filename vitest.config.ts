@@ -16,17 +16,13 @@ export default defineConfig({
         },
       },
       {
-        // React suites not yet moved to browser mode (removed once all are .tsx).
-        extends: true,
-        test: {
-          name: 'react-dom',
-          environment: 'happy-dom',
-          include: ['src/react/**/*.test.ts'],
-        },
-      },
-      {
         // React bindings in a real browser (vitest-browser-react).
         extends: true,
+        // Pre-bundled up front: discovering them mid-run makes Vite reload the
+        // page and fail the files that were loading (always on a cold cache).
+        optimizeDeps: {
+          include: ['react', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client', 'vitest-browser-react'],
+        },
         test: {
           name: 'react',
           include: ['src/react/**/*.test.tsx'],
