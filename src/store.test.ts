@@ -272,3 +272,21 @@ it("substore() needs an object or array node", () => {
   const s = createStore(userShape, initial());
   expect(() => s.substore(userShape.name as never)).toThrow(/needs an object or array node, got field "name"/);
 });
+
+// ---------------------------------------------------------------------------
+it("nodes of another form, or uninstantiated descriptions, are rejected", () => {
+  const s = createStore(userShape, initial());
+  const other = form(object({ name: field<string>(), shipping: address }));
+  expect(() => s.get(other.name)).toThrow(/is not part of the store/);
+  expect(() => s.set(other.name, "x")).toThrow(/is not part of the store/);
+  expect(() => s.substore(other.shipping)).toThrow(/is not part of the store/);
+  expect(() => s.get(address.city)).toThrow(/is not part of the store/);
+});
+
+it("a row write that would put the same object in the array twice is rejected", () => {
+  const s = createStore(userShape, initial());
+  const [a, b] = s.substore(userShape.items).items();
+  const aValue = a.get(userShape.items.item);
+  expect(() => b.set(userShape.items.item, aValue)).toThrow(/would contain the same object twice/);
+  expect(s.get(userShape.items).map((i) => i.sku), "unchanged").toEqual(["A", "B"]);
+});
