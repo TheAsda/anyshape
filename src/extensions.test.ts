@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, countIn, initialOf,
+  form, object, array, field, metaKey, createStore, countIn, initialOf,
   control, validation, touched, visibility, disableable,
   type InferValue, type Origin, type FocusTarget,
 } from "./index";
@@ -487,4 +487,45 @@ it("get vs getOwn for an inherited `any` key across a row boundary", () => {
   expect(first.get(L.sku.disabled)).toBe(true);
   expect(first.getOwn(L.sku.disabled)).toBe(true);
   expect(second.get(L.sku.disabled), "other rows unaffected").toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+it("reset writes with origin \"initial\": reactions see it, touched does not flip", () => {
+  const s = createStore(shape, initial());
+  s.set(shape.name, "Bob");
+  const origins: Origin[][] = [];
+  s.react(shape.name, (_n, _p, info) => origins.push([...info.origins]));
+  s.reset();
+  expect(s.get(shape.name)).toBe("Ann");
+  expect(origins).toEqual([["initial"]]);
+  expect(s.get(shape.name.touched)).toBe(false);
+});
+
+it("collect on a row store: paths from the root, only that row; nested rows", () => {
+  const s = createStore(shape, initial());
+  const [a, b] = s.substore(shape.lines).items();
+  a.set(L.sku.error, "bad a");
+  b.set(L.sku.error, "bad b");
+  a.substore(L.notes).itemAt(0).set(L.notes.item.text.error, "bad note");
+  expect(b.collect(L, "error").map((e) => e.path)).toEqual(["lines[1].sku"]);
+  const inA = a.collect(L, "error");
+  expect(inA.map((e) => e.path)).toEqual(["lines[0].sku", "lines[0].notes[0].text"]);
+  expect(inA[1].store.get(L.notes.item.text.error)).toBe("bad note");
+});
+
+it("a custom counted key written by application code counts like the built-in ones", () => {
+  const f = form({
+    a: field<string>().meta({ flagged: metaKey<boolean>(false, { aggregate: (v) => v }) }),
+    rows: array(object({ b: field<string>().meta({ flagged: metaKey<boolean>(false, { aggregate: (v) => v }) }) })),
+  });
+  const s = createStore(f, { a: "", rows: [{ b: "" }, { b: "" }] });
+  const flagged = countIn(f, "flagged");
+  s.set(f.a.flagged, true);
+  const rows = s.substore(f.rows);
+  rows.itemAt(1).set(f.rows.item.b.flagged, true);
+  expect(s.get(flagged)).toBe(2);
+  expect(s.get(countIn(f.rows, "flagged"))).toBe(1);
+  rows.remove(rows.itemAt(1));
+  expect(s.get(flagged)).toBe(1);
+  expect(s.collect(f, "flagged").map((e) => e.path)).toEqual(["a"]);
 });
