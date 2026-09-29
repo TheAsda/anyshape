@@ -184,9 +184,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useControl` (state, user writes, `onBlur` reveal, default and custom policies), `focusRef`, adapters (real events, caching), `useArray` (re-render on structure only, nested arrays).
 
 - [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `react/react.test.ts`
-- [ ] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `react/react.test.ts`
-- [ ] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.ts`
-- [ ] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.ts`
+- [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `react/react.test.ts`
+- [x] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.ts`
+- [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.ts`
 - [ ] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.ts`
 
 ### Q. Lifetime & outside data (`react/form.ts`)

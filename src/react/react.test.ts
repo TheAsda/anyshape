@@ -405,3 +405,68 @@ it("useArray inside a row provider resolves nested arrays", async () => {
   expect(text("n")).toBe("2");
   await unmount();
 });
+
+// ---------------------------------------------------------------------------
+// focusRef: two inputs for one field
+it("focusRef: unmounting one of two inputs keeps the other's registration", async () => {
+  const s = createStore(shape, initial());
+  function Input({ id }: { id: string }) {
+    const c = useControl(shape.name);
+    return h("input", { id, ref: c.focusRef, value: c.value, onChange: fromInput(c.onChange) });
+  }
+  function Both({ showFirst }: { showFirst: boolean }) {
+    return h("div", {}, showFirst ? h(Input, { key: "a", id: "a" }) : null, h(Input, { key: "b", id: "b" }));
+  }
+  await mount(h(StoreProvider, { store: s }, h(Both, { showFirst: true })));
+  const b = document.getElementById("b");
+  expect(s.get(shape.name.focusTarget), "the last one mounted wins").toBe(b);
+  await act(async () => root!.render(h(StoreProvider, { store: s }, h(Both, { showFirst: false }))));
+  expect(s.get(shape.name.focusTarget)).toBe(b);
+  await unmount();
+  expect(s.get(shape.name.focusTarget)).toBe(undefined);
+});
+
+// ---------------------------------------------------------------------------
+// useValue with an explicit store and a selector
+it("useValue with { store } and a selector reads that store, not the provider's", async () => {
+  const provided = createStore(shape, initial());
+  const other = createStore(shape, { ...initial(), lines: [] });
+  const c = counter();
+  function Count() {
+    c.hit("count");
+    return h("span", { id: "count" }, String(useValue(shape.lines, (lines) => lines.length, { store: other })));
+  }
+  await mount(h(StoreProvider, { store: provided }, h(Count, {})));
+  expect(text("count")).toBe("0");
+  c.reset();
+  await run(() => void provided.substore(shape.lines).append());
+  expect(c.counts, "the provider's store is not subscribed").toEqual({});
+  await run(() => void other.substore(shape.lines).append());
+  expect(text("count")).toBe("1");
+  await unmount();
+});
+
+// ---------------------------------------------------------------------------
+// useArray helpers and origins
+it("useArray: insert and move through the hook; an explicit origin replaces the user default", async () => {
+  const s = createStore(shape, initial());
+  let lines!: ReturnType<typeof useArray<typeof shape.lines>>;
+  function List() {
+    lines = useArray(shape.lines);
+    return h("ul", { id: "list" }, lines.items.map((row) => h("li", { key: row.stableId }, row.get(L.sku) || "-")));
+  }
+  const origins: Origin[][] = [];
+  s.react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
+  await mount(h(StoreProvider, { store: s }, h(List, {})));
+
+  await run(() => void lines.insert(1));
+  expect(text("list")).toBe("A-B");
+  await run(() => void lines.insert(0, { sku: "Z" }, { origin: "program" }));
+  expect(text("list")).toBe("ZA-B");
+  await run(() => lines.move(lines.items[0], 3, { origin: "program" }));
+  expect(text("list")).toBe("A-BZ");
+  await run(() => lines.remove(lines.items[1]));
+  expect(text("list")).toBe("ABZ");
+  expect(origins).toEqual([["user"], ["program"], ["program"], ["user"]]);
+  await unmount();
+});
