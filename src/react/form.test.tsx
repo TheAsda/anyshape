@@ -1,12 +1,11 @@
-import { createElement as h, act, useState, StrictMode, type ReactNode } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { useState, StrictMode } from "react";
+import { test, expect } from "vitest";
 import {
   form, object, array, field, metaKey, rule, max, control, submission, countIn, createStore,
   type InferValue, type RootStore,
 } from "../index";
 import { StoreProvider, useForm, useSync, useControl, useValue, fromInput, domOrder } from "./index";
-import "./test-setup";
-import { it, expect } from "vitest";
+import { render, settle, captureWarnings } from "./test-utils";
 
 const shape = form(
   object({
@@ -25,30 +24,8 @@ const L = shape.lines.item;
 const empty = (): Values => ({ name: "", code: "", note: "", lines: [{ qty: 1 }] });
 
 // ---------------------------------------------------------------------------
-let root: Root | undefined;
-async function mount(node: ReactNode) {
-  if (root) await unmount();
-  root = createRoot(document.getElementById("root")!);
-  await act(async () => root!.render(node));
-}
-async function unmount() {
-  await act(async () => root?.unmount());
-  root = undefined;
-}
-async function run(fn: () => unknown) {
-  await act(async () => void (await fn()));
-}
-const text = (id: string) => document.getElementById(id)?.textContent;
-function captureWarnings() {
-  const warnings: string[] = [];
-  const original = console.warn;
-  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
-  return { warnings, restore: () => (console.warn = original) };
-}
-
-// ---------------------------------------------------------------------------
 // useForm
-it("useForm creates the store once; later initialValues are ignored", async () => {
+test("useForm creates the store once; later initialValues are ignored", async () => {
   const stores = new Set<RootStore<typeof shape>>();
   let setTick!: (n: number) => void;
   function App() {
@@ -56,20 +33,23 @@ it("useForm creates the store once; later initialValues are ignored", async () =
     setTick = set;
     const f = useForm(shape, { ...empty(), name: `n${tick}` });
     stores.add(f);
-    return h(StoreProvider, { store: f }, h(Name, {}));
+    return (
+      <StoreProvider store={f}>
+        <Name />
+      </StoreProvider>
+    );
   }
   function Name() {
-    return h("span", { id: "name" }, useValue(shape.name));
+    return <span data-testid="name">{useValue(shape.name)}</span>;
   }
-  await mount(h(App, {}));
-  await run(() => setTick(1));
-  await run(() => setTick(2));
+  const screen = await render(<App />);
+  await settle(() => setTick(1));
+  await settle(() => setTick(2));
   expect(stores.size).toBe(1);
-  expect(text("name")).toBe("n0");
-  await unmount();
+  await expect.element(screen.getByTestId("name")).toHaveTextContent("n0");
 });
 
-it("useForm passes behaviors and warns when the shape changes", async () => {
+test("useForm passes behaviors and warns when the shape changes", async () => {
   const other = form(object({ name: field<string>().meta(control()) }).meta(submission()));
   const { warnings, restore } = captureWarnings();
   let useOther!: (b: boolean) => void;
@@ -79,102 +59,114 @@ it("useForm passes behaviors and warns when the shape changes", async () => {
     const f = useForm((flip ? other : shape) as typeof shape, empty(), {
       behaviors: rule(shape.name, (v) => (v ? undefined : "Required")),
     });
-    return h(StoreProvider, { store: f }, h(Err, {}));
+    return (
+      <StoreProvider store={f}>
+        <Err />
+      </StoreProvider>
+    );
   }
   function Err() {
-    return h("span", { id: "err" }, useValue(shape.name.error) ?? "-");
+    return <span data-testid="err">{useValue(shape.name.error) ?? "-"}</span>;
   }
-  await mount(h(App, {}));
-  expect(text("err")).toBe("Required");
-  await run(() => useOther(true));
+  const screen = await render(<App />);
+  await expect.element(screen.getByTestId("err")).toHaveTextContent("Required");
+  await settle(() => useOther(true));
   restore();
   expect(warnings.some((w) => /shape` changed/.test(w))).toBe(true);
-  await unmount();
 });
 
-it("values: loading data becomes the baseline; same object keeps edits; a new object reloads", async () => {
+test("values: loading data becomes the baseline; same object keeps edits; a new object reloads", async () => {
   let setData!: (v: Values | undefined) => void;
   let f!: RootStore<typeof shape>;
   function App() {
     const [data, set] = useState<Values | undefined>(undefined);
     setData = set;
     f = useForm(shape, empty(), { values: data });
-    return h(StoreProvider, { store: f }, h(Name, {}));
+    return (
+      <StoreProvider store={f}>
+        <Name />
+      </StoreProvider>
+    );
   }
   function Name() {
     const c = useControl(shape.name);
-    return h("span", { id: "name" }, `${c.value}|${c.dirty}`);
+    return <span data-testid="name">{`${c.value}|${c.dirty}`}</span>;
   }
-  await mount(h(App, {}));
-  expect(text("name"), "loading: initialValues").toBe("|false");
+  const screen = await render(<App />);
+  const name = screen.getByTestId("name");
+  await expect.element(name, { message: "loading: initialValues" }).toHaveTextContent("|false");
 
   const loaded = { ...empty(), name: "Loaded" };
-  await run(() => setData(loaded));
-  expect(text("name"), "loaded as the baseline: not dirty").toBe("Loaded|false");
+  await settle(() => setData(loaded));
+  await expect.element(name, { message: "loaded as the baseline: not dirty" }).toHaveTextContent("Loaded|false");
 
-  await run(() => f.set(shape.name, "Edited", { origin: "user" }));
-  await run(() => setData(loaded)); // same object: nothing happens
-  expect(text("name")).toBe("Edited|true");
+  await settle(() => f.set(shape.name, "Edited", { origin: "user" }));
+  await settle(() => setData(loaded)); // same object: nothing happens
+  await expect.element(name).toHaveTextContent("Edited|true");
 
-  await run(() => f.reset());
-  expect(text("name"), "reset returns to the loaded data").toBe("Loaded|false");
+  await settle(() => f.reset());
+  await expect.element(name, { message: "reset returns to the loaded data" }).toHaveTextContent("Loaded|false");
 
-  await run(() => setData({ ...loaded, name: "Refetched" }));
-  expect(text("name")).toBe("Refetched|false");
-  await unmount();
+  await settle(() => setData({ ...loaded, name: "Refetched" }));
+  await expect.element(name).toHaveTextContent("Refetched|false");
 });
 
-it("values given on the first render are used at creation", async () => {
+test("values given on the first render are used at creation", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty(), { values: { ...empty(), name: "Ready" } });
     return null;
   }
-  await mount(h(App, {}));
+  await render(<App />);
   expect(f.get(shape.name)).toBe("Ready");
   expect(f.getInitial(shape.name)).toBe("Ready");
-  await unmount();
 });
 
 // ---------------------------------------------------------------------------
 // useSync
-it("useSync feeds a limit from React; survives reset; writes only on change", async () => {
+test("useSync feeds a limit from React; survives reset; writes only on change", async () => {
   let f!: RootStore<typeof shape>;
   let setMax!: (n: number | undefined) => void;
   function App() {
     f = useForm(shape, { ...empty(), lines: [{ qty: 5 }] }, { behaviors: max(L.qty, L.qty.maxQty) });
     const row = f.substore(shape.lines).itemAt(0);
-    return h(StoreProvider, { store: f }, h(StoreProvider, { store: row }, h(Line, {})));
+    return (
+      <StoreProvider store={f}>
+        <StoreProvider store={row}>
+          <Line />
+        </StoreProvider>
+      </StoreProvider>
+    );
   }
   function Line() {
     const [available, set] = useState<number | undefined>(undefined); // e.g. from a query
     setMax = set;
     useSync(L.qty.maxQty, available);
     const qty = useControl(L.qty);
-    return h("span", { id: "line" }, qty.error ?? "ok");
+    return <span data-testid="line">{qty.error ?? "ok"}</span>;
   }
-  await mount(h(App, {}));
-  expect(text("line"), "no limit while loading").toBe("ok");
+  const screen = await render(<App />);
+  const line = screen.getByTestId("line");
+  await expect.element(line, { message: "no limit while loading" }).toHaveTextContent("ok");
 
   const row = () => f.substore(shape.lines).itemAt(0);
   let writes = 0;
   f.subscribe(countIn(shape, "error"), () => writes++);
   row().subscribe(L.qty.maxQty, () => writes++);
 
-  await run(() => setMax(3));
-  expect(text("line")).toBe("Must be at most 3");
+  await settle(() => setMax(3));
+  await expect.element(line).toHaveTextContent("Must be at most 3");
   expect(writes, "the key changed once and the error count once").toBe(2);
 
-  await run(() => f.reset());
+  await settle(() => f.reset());
   expect(row().get(L.qty.maxQty), "kept by reset").toBe(3);
-  expect(text("line")).toBe("Must be at most 3");
+  await expect.element(line).toHaveTextContent("Must be at most 3");
 
-  await run(() => setMax(10));
-  expect(text("line")).toBe("ok");
-  await unmount();
+  await settle(() => setMax(10));
+  await expect.element(line).toHaveTextContent("ok");
 });
 
-it("useSync warns for meta keys without keepOnReset; resetOnUnmount", async () => {
+test("useSync warns for meta keys without keepOnReset; resetOnUnmount", async () => {
   const { warnings, restore } = captureWarnings();
   let f!: RootStore<typeof shape>;
   let show!: (b: boolean) => void;
@@ -182,98 +174,115 @@ it("useSync warns for meta keys without keepOnReset; resetOnUnmount", async () =
     const [visible, set] = useState(true);
     show = set;
     f = useForm(shape, empty());
-    return h(StoreProvider, { store: f }, visible ? h(Hint, {}) : null);
+    return <StoreProvider store={f}>{visible ? <Hint /> : null}</StoreProvider>;
   }
   function Hint() {
     useSync(shape.note.hint, "from component", { resetOnUnmount: true });
     return null;
   }
-  await mount(h(App, {}));
+  await render(<App />);
   restore();
   expect(f.get(shape.note.hint)).toBe("from component");
   expect(warnings.some((w) => /keepOnReset/.test(w))).toBe(true);
-  await run(() => show(false));
+  await settle(() => show(false));
   expect(f.get(shape.note.hint), "reset on unmount").toBe("");
-  await unmount();
 });
 
-it("useSync under StrictMode ends with the synced value", async () => {
+test("useSync under StrictMode ends with the synced value", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty());
-    return h(StoreProvider, { store: f }, h(Hint, {}));
+    return (
+      <StoreProvider store={f}>
+        <Hint />
+      </StoreProvider>
+    );
   }
   function Hint() {
     useSync(shape.name, "synced", { resetOnUnmount: true });
     return null;
   }
   const { restore } = captureWarnings();
-  await mount(h(StrictMode, {}, h(App, {})));
+  await render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
   restore();
   expect(f.get(shape.name)).toBe("synced");
-  await unmount();
 });
 
 // ---------------------------------------------------------------------------
 // DOM order and handleSubmit
 function Field(props: { node: typeof shape.name | typeof shape.code; id: string }) {
   const c = useControl(props.node);
-  return h("input", { id: props.id, ref: c.focusRef, value: c.value, onChange: fromInput(c.onChange) });
+  return <input data-testid={props.id} ref={c.focusRef} value={c.value} onChange={fromInput(c.onChange)} />;
 }
 
-it("submit focuses the first error in DOM order, not shape order", async () => {
+test("submit focuses the first error in DOM order, not shape order", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty(), { behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")] });
     // code is rendered before name, but name comes first in the shape
-    return h(StoreProvider, { store: f }, h(Field, { node: shape.code, id: "code" }), h(Field, { node: shape.name, id: "name" }));
+    return (
+      <StoreProvider store={f}>
+        <Field node={shape.code} id="code" />
+        <Field node={shape.name} id="name" />
+      </StoreProvider>
+    );
   }
-  await mount(h(App, {}));
-  await run(() => f.submit());
-  expect(document.activeElement?.id).toBe("code");
-  await unmount();
+  const screen = await render(<App />);
+  await settle(() => f.submit());
+  await expect.element(screen.getByTestId("code")).toHaveFocus();
 });
 
-it("an explicit focusOrder overrides DOM order", async () => {
+test("an explicit focusOrder overrides DOM order", async () => {
   let f!: RootStore<typeof shape>;
   function App() {
     f = useForm(shape, empty(), {
       behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")],
       focusOrder: () => 0, // keep shape order
     });
-    return h(StoreProvider, { store: f }, h(Field, { node: shape.code, id: "code" }), h(Field, { node: shape.name, id: "name" }));
+    return (
+      <StoreProvider store={f}>
+        <Field node={shape.code} id="code" />
+        <Field node={shape.name} id="name" />
+      </StoreProvider>
+    );
   }
-  await mount(h(App, {}));
-  await run(() => f.submit());
-  expect(document.activeElement?.id).toBe("name");
-  await unmount();
+  const screen = await render(<App />);
+  await settle(() => f.submit());
+  await expect.element(screen.getByTestId("name")).toHaveFocus();
 });
 
-it("handleSubmit on a real <form>: default prevented, onValid gets values", async () => {
+test("handleSubmit on a real <form>: default prevented, onValid gets values", async () => {
   let f!: RootStore<typeof shape>;
   const saved: string[] = [];
   function App() {
     f = useForm(shape, { ...empty(), name: "Ann" });
-    return h(
-      StoreProvider,
-      { store: f },
-      h("form", { id: "form", onSubmit: f.handleSubmit((values) => void saved.push(values.name)) }, h("button", { id: "go", type: "submit" }, "Save"))
+    return (
+      <StoreProvider store={f}>
+        <form data-testid="form" onSubmit={f.handleSubmit((values) => void saved.push(values.name))}>
+          <button data-testid="go" type="submit">
+            Save
+          </button>
+        </form>
+      </StoreProvider>
     );
   }
-  await mount(h(App, {}));
+  const screen = await render(<App />);
+  // React handles the event at its root container; a document listener runs after it.
   let defaultPrevented: boolean | undefined;
-  document.getElementById("form")!.addEventListener("submit", (e) => queueMicrotask(() => (defaultPrevented = e.defaultPrevented)));
-  await run(async () => {
-    (document.getElementById("go") as HTMLButtonElement).click();
-    await new Promise((r) => setTimeout(r, 0));
-  });
-  expect(saved).toEqual(["Ann"]);
+  const onSubmit = (e: Event) => (defaultPrevented = e.defaultPrevented);
+  document.addEventListener("submit", onSubmit);
+  await screen.getByTestId("go").click();
+  document.removeEventListener("submit", onSubmit);
+  await expect.poll(() => saved).toEqual(["Ann"]);
   expect(defaultPrevented).toBe(true);
   expect(f.get(shape.submitCount)).toBe(1);
-  await unmount();
 });
 
-it("domOrder: nodes by document position, other targets equal", async () => {
+test("domOrder: nodes by document position, other targets equal", async () => {
   const a = document.createElement("i");
   const b = document.createElement("b");
   document.body.append(a, b);
@@ -286,19 +295,23 @@ it("domOrder: nodes by document position, other targets equal", async () => {
 
 // ---------------------------------------------------------------------------
 // useSync on a value node, and under a row provider
-it("useSync on a value node with resetOnUnmount restores the node's initial value", async () => {
+test("useSync on a value node with resetOnUnmount restores the node's initial value", async () => {
   const s = createStore(shape, { ...empty(), note: "from the server" });
   function Sync({ value }: { value: string }) {
     useSync(shape.note, value, { resetOnUnmount: true });
     return null;
   }
-  await mount(h(StoreProvider, { store: s }, h(Sync, { value: "synced" })));
+  const screen = await render(
+    <StoreProvider store={s}>
+      <Sync value="synced" />
+    </StoreProvider>
+  );
   expect(s.get(shape.note)).toBe("synced");
-  await unmount();
+  await screen.unmount();
   expect(s.get(shape.note), "the initial value, not a meta default").toBe("from the server");
 });
 
-it("useSync under a row provider writes that row; after the row is removed it neither writes nor throws", async () => {
+test("useSync under a row provider writes that row; after the row is removed it neither writes nor throws", async () => {
   const s = createStore(shape, { ...empty(), lines: [{ qty: 1 }, { qty: 2 }] });
   const lines = s.substore(shape.lines);
   const [first, second] = lines.items();
@@ -306,21 +319,26 @@ it("useSync under a row provider writes that row; after the row is removed it ne
     useSync(L.qty.maxQty, limit);
     return null;
   }
-  const tree = (limit: number) => h(StoreProvider, { store: s }, h(StoreProvider, { store: second }, h(Sync, { limit })));
-  await mount(tree(5));
+  const tree = (limit: number) => (
+    <StoreProvider store={s}>
+      <StoreProvider store={second}>
+        <Sync limit={limit} />
+      </StoreProvider>
+    </StoreProvider>
+  );
+  const screen = await render(tree(5));
   expect(second.get(L.qty.maxQty)).toBe(5);
   expect(first.get(L.qty.maxQty)).toBe(undefined);
 
-  await run(() => lines.remove(second));
-  await act(async () => root!.render(tree(9)));
+  await settle(() => lines.remove(second));
+  await screen.rerender(tree(9));
   expect(lines.items().map((r) => r.get(L.qty.maxQty))).toEqual([undefined]);
   expect(second.get(L.qty.maxQty), "the detached row was not written").toBe(5);
-  await unmount();
 });
 
 // Documented caveat: `values` is compared by reference. A refetch that returns
 // an equal-but-new object reloads the form and discards the user's edits.
-it("caveat: a new values object with identical data replaces the user's edits", async () => {
+test("caveat: a new values object with identical data replaces the user's edits", async () => {
   let setData!: (v: Values) => void;
   let f!: RootStore<typeof shape>;
   function App() {
@@ -329,10 +347,9 @@ it("caveat: a new values object with identical data replaces the user's edits", 
     f = useForm(shape, empty(), { values: data });
     return null;
   }
-  await mount(h(App, {}));
-  await run(() => f.set(shape.name, "Edited", { origin: "user" }));
-  await run(() => setData({ ...empty(), name: "Loaded" }));
+  await render(<App />);
+  await settle(() => f.set(shape.name, "Edited", { origin: "user" }));
+  await settle(() => setData({ ...empty(), name: "Loaded" }));
   expect(f.get(shape.name)).toBe("Loaded");
   expect(f.get(shape.name.dirty)).toBe(false);
-  await unmount();
 });
