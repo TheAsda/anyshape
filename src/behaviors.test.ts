@@ -649,3 +649,68 @@ it("ctx.initial needs initialOf(node) to be declared", () => {
   const s = createStore(shape, initial(), { behaviors: declared });
   expect(s.get(shape.slug)).toBe("Hello!");
 });
+
+// ---------------------------------------------------------------------------
+// Pinned constraints
+it("constraint: a row behavior reading the whole array runs twice per flush when siblings write", () => {
+  const f = form({ lines: array(object({ price: field<number>(), share: field<number>() })) });
+  const R = f.lines.item;
+  let runs = 0;
+  const share = defineBehavior({
+    name: "share", triggers: [f.lines], reads: [R.price], writes: [R.share],
+    run: (ctx) => {
+      runs++;
+      const sum = ctx.get(f.lines).reduce((s, l) => s + l.price, 0);
+      ctx.set(R.share, sum ? Math.round((ctx.get(R.price) / sum) * 100) : 0);
+    },
+  });
+  const s = createStore(f, { lines: [{ price: 10, share: 0 }, { price: 30, share: 0 }, { price: 60, share: 0 }] }, { behaviors: share });
+  expect(runs, "init: 3 rows × 2").toBe(6);
+  runs = 0;
+  s.substore(f.lines).itemAt(0).set(R.price, 40, { origin: "user" });
+  // Each instance runs, its write re-triggers the siblings (origins are per
+  // instance), and the second pass writes equal values, so the flush settles.
+  expect(runs, "3 rows × 2, not once per instance").toBe(6);
+  expect(s.get(f.lines).map((l) => l.share)).toEqual([31, 23, 46]);
+});
+
+it("constraint: behaviors on different rows that form a cycle only across rows are rejected", () => {
+  const s = createStore(shape, initial());
+  const [a, b] = s.substore(shape.lines).items();
+  a.addBehavior(defineBehavior({ name: "qtyFromPrice", triggers: [L.price], writes: [L.qty], run: (c) => c.set(L.qty, c.get(L.price)) }));
+  const priceFromQty = defineBehavior({ name: "priceFromQty", triggers: [L.qty], writes: [L.price], run: (c) => c.set(L.price, c.get(L.qty)) });
+  expect(() => b.addBehavior(priceFromQty)).toThrow(/form a cycle: .*qtyFromPrice.*priceFromQty|form a cycle: .*priceFromQty.*qtyFromPrice/);
+  expect(b.get(L.price), "nothing registered").toBe(20);
+});
+
+// ---------------------------------------------------------------------------
+it("replaceBehavior rejects a handle of another store and a disposed handle", () => {
+  const s1 = createStore(shape, initial());
+  const s2 = createStore(shape, initial());
+  const make = () => defineBehavior({ triggers: [shape.title], writes: [shape.slug], run: (c) => c.set(shape.slug, c.get(shape.title)) });
+  const h1 = s1.addBehavior(make());
+  expect(() => s2.replaceBehavior(h1, make())).toThrow("replace(): not a handle of this store");
+  const h2 = s1.replaceBehavior(h1, make());
+  expect(() => s1.replaceBehavior(h1, make()), "replaced").toThrow("replace(): the handle was already disposed or replaced");
+  h2();
+  expect(() => s1.replaceBehavior(h2, make()), "disposed").toThrow("replace(): the handle was already disposed or replaced");
+});
+
+it("the default onError logs the behavior name and scope via console.error", () => {
+  const logged: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void logged.push(args);
+  try {
+    const boom = new Error("boom");
+    createStore(shape, initial(), {
+      behaviors: defineBehavior({ name: "exploding", triggers: [L.qty], writes: [L.lineTotal], run: () => { throw boom; } }),
+    });
+    expect(logged.map((a) => a[0])).toEqual([
+      '[form] "exploding" failed at "lines[0]"',
+      '[form] "exploding" failed at "lines[1]"',
+    ]);
+    expect(logged[0][1]).toBe(boom);
+  } finally {
+    console.error = original;
+  }
+});
