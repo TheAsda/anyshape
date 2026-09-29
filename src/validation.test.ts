@@ -465,3 +465,79 @@ it("submit waits for a running async check", async () => {
   expect(r.errors[0].error).toBe("Taken");
 });
 
+
+// ---------------------------------------------------------------------------
+// Submitted values under a disabled ancestor
+const readOnly = form(
+  object({
+    name: field<string>().meta(control()),
+    promo: field<string>().meta(control(), disableable()),
+    section: object({ note: field<string>().meta(control()) }),
+  }).meta(disableable())
+);
+type ReadOnlySubmit = SubmitValue<typeof readOnly>;
+type _ro1 = Expect<Equal<ReadOnlySubmit["name"], string>>;
+type _ro2 = Expect<Equal<ReadOnlySubmit["promo"], string | undefined>>;
+type _ro3 = Expect<Equal<ReadOnlySubmit["section"], { note: string }>>;
+
+it("values: a disabled ancestor keeps descendants that don't declare `disabled`, omits those that do", async () => {
+  const s = createStore(readOnly, { name: "", promo: "P", section: { note: "" } }, {
+    behaviors: [
+      rule(readOnly.name, (v) => (v ? undefined : "Required")),
+      rule(readOnly.section.note, (v) => (v ? undefined : "Required")),
+    ],
+  });
+  expect(s.get(countIn(readOnly, "error"))).toBe(2);
+
+  s.set(readOnly.disabled, true);
+  expect(s.get(readOnly.promo.disabled), "effective value, inherited from the root").toBe(true);
+  expect(s.get(countIn(readOnly, "error")), "effectively disabled fields are not validated").toBe(0);
+
+  const r = await s.validate();
+  expect(r.valid).toBe(true);
+  expect(r.values, "promo declares `disabled` and is omitted; the others stay").toEqual({
+    name: "",
+    section: { note: "" },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rules on a whole array
+const party = form(
+  object({
+    travelers: array(object({ name: field<string>().meta(control()) }), { create: () => ({ name: "" }) }).meta(
+      validation(),
+      visibility()
+    ),
+  })
+);
+const atLeastOne = rule(party.travelers, (rows) => (rows.length === 0 ? "Add at least one traveler" : undefined));
+
+it("array-level rules: an error on the array itself, counted and validated", async () => {
+  const s = createStore(party, { travelers: [] }, { behaviors: atLeastOne });
+  const travelers = s.substore(party.travelers);
+  expect(s.get(party.travelers.error)).toBe("Add at least one traveler");
+  expect(s.get(countIn(party, "error"))).toBe(1);
+
+  const r = await s.validate();
+  expect(r.valid).toBe(false);
+  expect(r.errors.map((e) => [e.path, e.error])).toEqual([["travelers", "Add at least one traveler"]]);
+
+  const row = travelers.append();
+  expect(s.get(party.travelers.error)).toBe(undefined);
+  expect(s.get(countIn(party, "error"))).toBe(0);
+
+  travelers.remove(row);
+  expect(s.get(party.travelers.error), "back when the last row goes").toBe("Add at least one traveler");
+});
+
+it("array-level rules: skipped while the array is hidden", async () => {
+  const s = createStore(party, { travelers: [] }, { behaviors: atLeastOne });
+  s.set(party.travelers.visible, false);
+  expect(s.get(party.travelers.error)).toBe(undefined);
+  const r = await s.validate();
+  expect(r.valid).toBe(true);
+  expect("travelers" in r.values).toBe(false);
+  s.set(party.travelers.visible, true);
+  expect(s.get(party.travelers.error), "re-validated when shown").toBe("Add at least one traveler");
+});

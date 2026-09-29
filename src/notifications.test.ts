@@ -371,3 +371,44 @@ it("subscribing through any store in scope reaches the same owner", () => {
   s.substore(shape.shipping).setMeta(shape.shipping.city, { error: "x" });
   expect(r.take()).toEqual(["viaRoot"]);
 });
+
+// ---------------------------------------------------------------------------
+// Errors during the flush
+it("a throwing UI listener: the others still run, the first error is rethrown", () => {
+  const s = createStore(shape, initial());
+  const r = recorder();
+  s.subscribe(shape.name, () => {
+    r.log.push("a");
+    throw new Error("first");
+  });
+  s.subscribe(shape.name, () => {
+    r.log.push("b");
+    throw new Error("second");
+  });
+  s.subscribe(shape.name, r.on("c"));
+  expect(() => s.set(shape.name, "Bob")).toThrow("first");
+  expect(r.take(), "every listener was called").toEqual(["a", "b", "c"]);
+  expect(s.get(shape.name), "the write itself happened").toBe("Bob");
+
+  // The store is not stuck in the UI phase: the next write flushes normally.
+  s.subscribe(shape.total, r.on("total"));
+  s.set(shape.total, 5);
+  expect(r.take()).toEqual(["total"]);
+});
+
+it("a throwing reaction: the write throws, UI is skipped, the next flush catches up", () => {
+  const s = createStore(shape, initial());
+  const r = recorder();
+  let fail = true;
+  s.react(shape.name, () => {
+    if (fail) throw new Error("reaction");
+  });
+  s.subscribe(shape.name, r.on("name"));
+  expect(() => s.set(shape.name, "Bob")).toThrow("reaction");
+  expect(r.take(), "UI listeners are not called for the failed flush").toEqual([]);
+  expect(s.get(shape.name)).toBe("Bob");
+
+  fail = false;
+  s.set(shape.total, 1); // any later write flushes
+  expect(r.take(), "the name listener catches up: its value changed since it was last told").toEqual(["name"]);
+});

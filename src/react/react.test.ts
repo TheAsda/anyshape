@@ -272,6 +272,24 @@ it("useControl: onBlur reveals, showError follows the default policy", async () 
   await unmount();
 });
 
+it("useControl: onBlur after its row was removed does nothing", async () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  const row = lines.items()[1];
+  let c!: ReturnType<typeof useControl<typeof L.sku>>;
+  function Sku() {
+    c = useControl(L.sku);
+    return h("span", { id: "sku" }, c.value ?? "-");
+  }
+  await mount(h(StoreProvider, { store: row }, h(Sku, {})));
+  const onBlur = c.onBlur;
+  await run(() => lines.remove(row)); // e.g. a blur fired while the removed row unmounts
+  expect(row.isAttached()).toBe(false);
+  expect(() => onBlur()).not.toThrow();
+  expect(row.getMeta(L.sku).revealed, "nothing was written").toBe(false);
+  await unmount();
+});
+
 it("StoreProvider showError: a custom policy, inherited by nested row providers", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(L.sku, () => "bad") });
   const row = s.substore(shape.lines).items()[0];
