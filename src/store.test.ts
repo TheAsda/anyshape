@@ -1,60 +1,11 @@
-import { it, expect } from "vitest";
-import { form, object, array, field, meta, createStore, type InferValue } from "./index";
+import { describe, it, expect } from "vitest";
+import * as company from "./test/fixtures/company";
+import { form, object, array, field, meta, createStore, countIn, type InferValue, type Origin } from "./index";
 
-// ---------------------------------------------------------------------------
-const address = object({
-  street: field<string>(),
-  city: field<string>().meta(meta().required().label("City"), { error: undefined as string | undefined }),
-});
+import { address, userShape, initial, type User } from "./test/fixtures/user";
 
-const lineShape = object({
-  sku: field<string>().meta(meta().required(), { touched: false, error: undefined as string | undefined }),
-  qty: field<number>(),
-  notes: array(object({ text: field<string>() })),
-}).meta({ rowError: undefined as string | undefined });
 
-const userShape = form(
-  object({
-    name: field<string>().meta(meta().required().label("Full name")),
-    shipping: address.meta({ collapsed: false }),
-    billing: address,
-    items: array(lineShape).meta(meta().custom("maxItems", 10)),
-  }).meta({ title: "User" })
-);
 
-type User = InferValue<typeof userShape>;
-
-function initial(): User {
-  return {
-    name: "Ann",
-    shipping: { street: "Main", city: "Riga" },
-    billing: { street: "Side", city: "Tallinn" },
-    items: [
-      { sku: "A", qty: 1, notes: [{ text: "a1" }] },
-      { sku: "B", qty: 2, notes: [] },
-    ],
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Nodes
-it("parent links", () => {
-  expect(userShape.parent).toBe(undefined);
-  expect(userShape.shipping.parent).toBe(userShape);
-  expect(userShape.shipping.city.parent).toBe(userShape.shipping);
-  expect(userShape.items.item.parent).toBe(userShape.items);
-  expect(userShape.items.item.notes.item.text.parent).toBe(userShape.items.item.notes.item);
-});
-
-it("reused shapes get distinct nodes", () => {
-  expect(userShape.shipping.city === userShape.billing.city).toBe(false);
-  expect(userShape.shipping.city.id === userShape.billing.city.id).toBe(false);
-});
-
-it("item template lenses are item-relative", () => {
-  expect(userShape.items.item.sku.lens.get({ sku: "X" })).toBe("X");
-  expect(userShape.items.item.sku.path).toBe("items[].sku");
-});
 
 it("static meta incl. root meta", () => {
   expect(userShape._meta.title).toBe("User");
@@ -62,18 +13,8 @@ it("static meta incl. root meta", () => {
   expect(userShape.items._meta.maxItems).toBe(10);
 });
 
-it("reserved field names rejected", () => {
-  expect(() => object({ parent: field<string>() })).toThrow(/reserved/);
-});
 
-it("arrays of primitives rejected", () => {
-  // @ts-expect-error – items must be object shapes
-  expect(() => array(field<string>())).toThrow(/object shapes/);
-});
 
-it(".meta() after form() rejected", () => {
-  expect(() => userShape.name.meta({ x: 1 })).toThrow(/before form/);
-});
 
 // ---------------------------------------------------------------------------
 // Root + object substores
@@ -240,23 +181,6 @@ it("structural validation", () => {
   expect(() => createStore(userShape, { ...initial(), items: "x" as any })).toThrow(/must be an array/);
 });
 
-// ---------------------------------------------------------------------------
-// Reused shapes containing arrays; meta delegation; substore arguments
-it("a reused shape containing an array: separate templates, ids and paths per use", () => {
-  const block = object({ items: array(object({ x: field<string>() })) });
-  const f = form({ a: block, b: block });
-  expect(f.a.items.item).not.toBe(f.b.items.item);
-  expect(f.a.items.item.x.path).toBe("a.items[].x");
-  expect(f.b.items.item.x.path).toBe("b.items[].x");
-  const nodes = [f, f.a, f.a.items, f.a.items.item, f.a.items.item.x, f.b, f.b.items, f.b.items.item, f.b.items.item.x];
-  expect(new Set(nodes.map((n) => n.id)).size, "every id is unique").toBe(nodes.length);
-
-  const s = createStore(f, { a: { items: [{ x: "1" }] }, b: { items: [{ x: "2" }] } });
-  const rowA = s.substore(f.a.items).itemAt(0);
-  expect(rowA.get(f.a.items.item.x)).toBe("1");
-  expect(s.substore(f.b.items).itemAt(0).get(f.b.items.item.x)).toBe("2");
-  expect(() => rowA.get(f.b.items.item.x), "the other copy's template is not in this row").toThrow();
-});
 
 it("meta of a deep node is one object, whichever store is asked", () => {
   const s = createStore(userShape, initial());
@@ -289,4 +213,109 @@ it("a row write that would put the same object in the array twice is rejected", 
   const aValue = a.get(userShape.items.item);
   expect(() => b.set(userShape.items.item, aValue)).toThrow(/would contain the same object twice/);
   expect(s.get(userShape.items).map((i) => i.sku), "unchanged").toEqual(["A", "B"]);
+});
+
+describe('D, E · reference API and array helpers', () => {
+  const { shape, L, initial, originsOf } = company;
+  // Compile-time only – never called.
+  function typeOnlyChecks() {
+    const s = createStore(shape, initial());
+    const b: boolean = s.get(shape.name.touched);
+    const e: string | undefined = s.get(shape.name.error);
+    const n: number = s.get(countIn(shape, "error"));
+    const v: string = s.get(shape.name);
+    // @ts-expect-error – a meta ref is not a count
+    const wrong: number = s.get(shape.name.touched);
+    // @ts-expect-error – value type is checked
+    s.set(shape.name.touched, "yes");
+    return [b, e, n, v, wrong];
+  }
+  void typeOnlyChecks;
+
+  // ---------------------------------------------------------------------------
+  // Reference API
+  it("get / set with value and meta refs", () => {
+    const s = createStore(shape, initial());
+    expect(s.get(shape.name)).toBe("Ann");
+    s.set(shape.name, "Bob");
+    expect(s.getValue(shape.name)).toBe("Bob");
+    s.set(shape.name.error, "Bad");
+    expect(s.get(shape.name.error)).toBe("Bad");
+    expect(s.getMeta(shape.name).error).toBe("Bad");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Array helpers
+  it("append / insert / remove / move", () => {
+    const s = createStore(shape, initial());
+    const lines = s.substore(shape.lines);
+    const c = lines.append({ sku: "C" });
+    expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "C"]);
+    expect(c.get(L.qty), "factory default kept").toBe(1);
+    const z = lines.insert(0, { sku: "Z", qty: 3 });
+    expect(lines.items().map((r) => r.get(L.sku))).toEqual(["Z", "A", "B", "C"]);
+    lines.move(z, 3);
+    expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "C", "Z"]);
+    lines.remove(c);
+    expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "Z"]);
+    expect(c.isAttached()).toBe(false);
+    expect(() => lines.remove(c)).toThrow(/detached/);
+  });
+
+  it("arrays without create need complete items", () => {
+    const s = createStore(shape, initial());
+    const tags = s.substore(shape.tags);
+    tags.append({ text: "t" });
+    expect(tags.items().length).toBe(1);
+    // @ts-expect-error – no create factory: an item is required
+    expect(() => tags.append()).toThrow(/no `create` factory/);
+  });
+
+  it("helpers pass the origin through", () => {
+    const s = createStore(shape, initial());
+    const seen: Origin[][] = [];
+    s.react(shape.lines, (_n, _p, i) => seen.push([...i.origins]));
+    s.substore(shape.lines).append(undefined, { origin: "user" });
+    expect(seen).toEqual([["user"]]);
+  });
+
+  it("helpers reject out-of-range indexes", () => {
+    const s = createStore(shape, initial());
+    const lines = s.substore(shape.lines);
+    const [a] = lines.items();
+    expect(() => lines.itemAt(-1)).toThrow(RangeError);
+    expect(() => lines.itemAt(2)).toThrow(RangeError);
+    expect(() => lines.insert(-1, { sku: "X" })).toThrow(RangeError);
+    expect(() => lines.insert(3, { sku: "X" })).toThrow(RangeError);
+    expect(() => lines.move(a, -1)).toThrow(RangeError);
+    expect(() => lines.move(a, 2)).toThrow(RangeError);
+    expect(lines.items().map((r) => r.get(L.sku)), "nothing changed").toEqual(["A", "B"]);
+  });
+
+  it("helpers reject objects and rows that are not in this array", () => {
+    const s = createStore(shape, initial());
+    const lines = s.substore(shape.lines);
+    expect(() => lines.item({ sku: "A", qty: 1, notes: [] })).toThrow(/not currently in "lines"/);
+    const [note] = lines.itemAt(0).substore(L.notes).items();
+    expect(() => lines.remove(note as never)).toThrow(/does not belong to "lines"/);
+    expect(() => lines.move(note as never, 0)).toThrow(/does not belong to "lines"/);
+    const [a] = lines.items();
+    lines.remove(a);
+    expect(() => lines.move(a, 0)).toThrow(/detached/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Factories and baselines
+  it("the create factory's result is copied, so even a shared default gives distinct rows", () => {
+    const shared = { t: "" };
+    const f = form({ rows: array(object({ t: field<string>() }), { create: () => shared }) });
+    const s = createStore(f, { rows: [] });
+    const rows = s.substore(f.rows);
+    const a = rows.append();
+    const b = rows.append({ t: "x" });
+    expect(a).not.toBe(b);
+    expect(rows.items().length).toBe(2);
+    expect(s.get(f.rows)[0]).not.toBe(shared);
+    expect(shared, "the factory's object is never written").toEqual({ t: "" });
+  });
 });

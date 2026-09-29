@@ -1,9 +1,10 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule, max,
   control, visibility, disableable, touched, dirty,
   type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
-import { it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
+import * as limits from "./test/fixtures/limits";
 
 const shape = form({
   country: field<string>(),
@@ -713,4 +714,75 @@ it("the default onError logs the behavior name and scope via console.error", () 
   } finally {
     console.error = original;
   }
+});
+
+describe('J · atomic replacement', () => {
+  const { shape, L, initial, targets } = limits;
+
+  // ---------------------------------------------------------------------------
+  // Atomic replacement
+  it("replacing a rule: one notification, straight to the new error", () => {
+    const s = createStore(shape, initial());
+    const h = s.addBehavior(rule(shape.name, () => "A"));
+    const seen: (string | undefined)[] = [];
+    s.subscribe(shape.name.error, () => seen.push(s.get(shape.name.error)));
+    s.replaceBehavior(h, rule(shape.name, () => "B"));
+    expect(seen).toEqual(["B"]);
+  });
+
+  it("replacing a behavior that writes the same meta: no notification", () => {
+    const s = createStore(shape, initial());
+    const lock = (name: string) =>
+      defineBehavior({ name, triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, true) });
+    const h = s.addBehavior(lock("a"));
+    expect(s.get(shape.flag.disabled)).toBe(true);
+    let calls = 0;
+    s.subscribe(shape.flag.disabled, () => calls++);
+    const h2 = s.replaceBehavior(h, lock("b"));
+    expect(calls, "reset to default and set again inside one batch").toBe(0);
+    expect(s.get(shape.flag.disabled)).toBe(true);
+    h2();
+    expect(s.get(shape.flag.disabled)).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  it("a failing replacement keeps the previous registration", () => {
+    const s = createStore(shape, initial());
+    s.addBehavior(defineBehavior({ name: "other", triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, true) }));
+    const h = s.addBehavior(
+      defineBehavior({ name: "mine", triggers: [shape.name], writes: [shape.name.note], run: (c) => c.set(shape.name.note, c.get(shape.name)) })
+    );
+    const clash = defineBehavior({ name: "next", triggers: [shape.name], writes: [shape.flag.disabled], run: () => {} });
+    expect(() => s.replaceBehavior(h, clash)).toThrow(/already written by "other"/);
+    s.set(shape.name, "Kim");
+    expect(s.get(shape.name.note), "previous behavior still runs").toBe("Kim");
+    const h2 = s.replaceBehavior(h, []);
+    s.set(shape.name, "Lee");
+    expect(s.get(shape.name.note), "replaced by nothing: removed, meta reset").toBe("");
+    h2();
+  });
+
+  it("handles: old handle is inert after replace; replacing twice throws", () => {
+    const s = createStore(shape, initial());
+    const h = s.addBehavior(rule(shape.name, () => "A"));
+    const h2 = s.replaceBehavior(h, rule(shape.name, () => "B"));
+    h();
+    expect(s.get(shape.name.error), "disposing the old handle does nothing").toBe("B");
+    expect(() => s.replaceBehavior(h, [])).toThrow(/already disposed or replaced/);
+    h2();
+    expect(s.get(shape.name.error)).toBe(undefined);
+    expect(() => s.replaceBehavior(h2, [])).toThrow(/already disposed or replaced/);
+  });
+
+  it("replacement on a row store stays on that row", () => {
+    const s = createStore(shape, initial());
+    const [a, b] = s.substore(shape.lines).items();
+    const h = a.addBehavior(max(L.qty, 0));
+    expect(a.get(L.qty.error)).toBe("Must be at most 0");
+    a.replaceBehavior(h, max(L.qty, 2));
+    expect(a.get(L.qty.error)).toBe(undefined);
+    expect(b.get(L.qty.error)).toBe(undefined);
+    b.set(L.qty, 50);
+    expect(b.get(L.qty.error), "row b never had the rule").toBe(undefined);
+  });
 });
