@@ -10,7 +10,7 @@ import {
   required, min, pattern, visibleWhen, exclusive, rule,
   type InferValue, type InferMeta, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
 } from "./index";
-import { it, expect } from "vitest";
+import { test, expect } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
@@ -119,7 +119,7 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   return [n, e, c];
 }
 
-it("the type contract compiles (asserted by npm run typecheck)", () => {
+test("the type contract compiles (asserted by npm run typecheck)", () => {
   expect(t.a.name).not.toBe(t.b.name);
   const s = createStore(t, {
     a: { name: "", email: "" }, b: { name: "", email: "" }, grid: [], optional: undefined,

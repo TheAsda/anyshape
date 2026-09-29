@@ -3,7 +3,7 @@ import {
   control, validation, touched, visibility, disableable, submission,
   type InferValue, type InferMeta,
 } from "./index";
-import { it, expect } from "vitest";
+import { test, describe, expect } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
@@ -50,170 +50,170 @@ export function typeOnlyChecks() {
   array(object({ a: field<string>() }), { create: () => ({}) });
 }
 
-// ---------------------------------------------------------------------------
-// Declarations
-it("defaults from plain values and key definitions", () => {
-  expect(shape.name._meta).toEqual({
-    error: undefined, validating: false, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
+describe("C · Declarations", () => {
+  test("defaults from plain values and key definitions", () => {
+    expect(shape.name._meta).toEqual({
+      error: undefined, validating: false, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
+    });
+    expect(shape._meta).toEqual({ submitCount: 0, submitting: false });
   });
-  expect(shape._meta).toEqual({ submitCount: 0, submitting: false });
-});
 
-it("key definitions keep their capabilities", () => {
-  const defs = shape.name._metaDefs;
-  expect(defs.error.options.owner).toBe("feature");
-  expect(defs.error.options.aggregate!("x")).toBe(true);
-  expect(defs.error.options.aggregate!(undefined)).toBe(false);
-  expect(defs.focusTarget.options.reactive).toBe(false);
-  expect(defs.label.plain).toBe(true);
-  expect(shape.company._metaDefs.visible.options.inherit).toBe("all");
-  expect(shape.company._metaDefs.disabled.options.inherit).toBe("any");
-});
-
-it("variadic and chained .meta() merge", () => {
-  const a = field<string>().meta(validation(), { hint: "x" }).meta(touched());
-  expect(Object.keys(a._metaDefs).sort()).toEqual(["error", "hint", "touched", "validating"]);
-});
-
-it("MetaBuilder still works", () => {
-  const f = field<string>().meta(meta().required().label("A"));
-  expect(f._meta).toEqual({ required: true, label: "A" });
-});
-
-it("plain values can be overridden by plain values", () => {
-  const f = field<string>().meta({ hint: "a" }).meta({ hint: "b" });
-  expect(f._meta.hint).toBe("b");
-});
-
-it("key definitions cannot be declared twice", () => {
-  expect(() => field<string>().meta(validation()).meta(validation())).toThrow(/already declared/);
-  expect(() => field<string>().meta(control(), touched())).toThrow(/already declared/);
-  expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(/already declared/);
-  expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(/already declared/);
-});
-
-it("reserved meta keys are rejected", () => {
-  expect(() => field<string>().meta({ path: "" })).toThrow(/reserved/);
-  expect(() => field<string>().meta({ id: 1 })).toThrow(/reserved/);
-  expect(() => field<string>().meta({ item: 1 })).toThrow(/reserved/);
-  expect(() => field<string>().meta({ _meta: 1 })).toThrow(/reserved/);
-});
-
-it("inherit on a non-boolean key throws at runtime too", () => {
-  expect(() => metaKey(0, { inherit: "any" } as any)).toThrow(/boolean/);
-});
-
-// ---------------------------------------------------------------------------
-// Meta references
-it("meta refs point at the instantiated node", () => {
-  const ref = shape.name.error;
-  expect(ref instanceof MetaRef).toBe(true);
-  expect(ref.node).toBe(shape.name);
-  expect(ref.key).toBe("error");
-  expect(ref.path).toBe("name#error");
-  expect(ref.def).toBe(shape.name._metaDefs.error);
-});
-
-it("reused shapes get separate refs", () => {
-  expect(shape.shipping.city.error.node).toBe(shape.shipping.city);
-  expect(shape.billing.city.error.node).toBe(shape.billing.city);
-  expect(shape.shipping.city.error === shape.billing.city.error).toBe(false);
-  expect(address.city.error.node === shape.shipping.city, "reusable shape keeps its own refs").toBe(false);
-});
-
-it("row template refs", () => {
-  expect(shape.lines.item.sku.error.node).toBe(shape.lines.item.sku);
-  expect(shape.lines.item.sku.error.path).toBe("lines[].sku#error");
-});
-
-it("container and root refs", () => {
-  expect(shape.company.visible.node).toBe(shape.company);
-  expect(shape.submitCount.path).toBe("#submitCount");
-});
-
-it("a child field wins over a meta key with the same name", () => {
-  const f = form({
-    group: object({ label: field<string>() }).meta({ label: "Group" }),
+  test("key definitions keep their capabilities", () => {
+    const defs = shape.name._metaDefs;
+    expect(defs.error.options.owner).toBe("feature");
+    expect(defs.error.options.aggregate!("x")).toBe(true);
+    expect(defs.error.options.aggregate!(undefined)).toBe(false);
+    expect(defs.focusTarget.options.reactive).toBe(false);
+    expect(defs.label.plain).toBe(true);
+    expect(shape.company._metaDefs.visible.options.inherit).toBe("all");
+    expect(shape.company._metaDefs.disabled.options.inherit).toBe("any");
   });
-  expect(f.group.label instanceof MetaRef).toBe(false);
-  expect(f.group.label.path).toBe("group.label");
-  expect(f.group._meta.label).toBe("Group");
-});
 
-it(".meta() leaves the original node untouched", () => {
-  const base = field<string>();
-  const withMeta = base.meta(validation());
-  expect((base as any).error).toBe(undefined);
-  expect(withMeta.error instanceof MetaRef).toBe(true);
-});
-
-// ---------------------------------------------------------------------------
-// Closed meta in the store
-it("setMeta accepts only declared keys", () => {
-  const s = createStore(shape, {
-    note: "", name: "", company: { vat: "" },
-    shipping: { street: "", city: "" }, billing: { street: "", city: "" },
-    lines: [], tags: [],
+  test("variadic and chained .meta() merge", () => {
+    const a = field<string>().meta(validation(), { hint: "x" }).meta(touched());
+    expect(Object.keys(a._metaDefs).sort()).toEqual(["error", "hint", "touched", "validating"]);
   });
-  s.setMeta(shape.name, { label: "Full name" });
-  expect(s.getMeta(shape.name).label).toBe("Full name");
-  // @ts-expect-error – `hint` is not declared on `name`
-  expect(() => s.setMeta(shape.name, { hint: "x" })).toThrow(/no meta key "hint"/);
-  // @ts-expect-error – `note` declares no meta at all
-  expect(() => s.setMeta(shape.note, { error: "x" })).toThrow(/no meta key "error"/);
+
+  test("MetaBuilder still works", () => {
+    const f = field<string>().meta(meta().required().label("A"));
+    expect(f._meta).toEqual({ required: true, label: "A" });
+  });
+
+  test("plain values can be overridden by plain values", () => {
+    const f = field<string>().meta({ hint: "a" }).meta({ hint: "b" });
+    expect(f._meta.hint).toBe("b");
+  });
+
+  test("key definitions cannot be declared twice", () => {
+    expect(() => field<string>().meta(validation()).meta(validation())).toThrow(/already declared/);
+    expect(() => field<string>().meta(control(), touched())).toThrow(/already declared/);
+    expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(/already declared/);
+    expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(/already declared/);
+  });
+
+  test("reserved meta keys are rejected", () => {
+    expect(() => field<string>().meta({ path: "" })).toThrow(/reserved/);
+    expect(() => field<string>().meta({ id: 1 })).toThrow(/reserved/);
+    expect(() => field<string>().meta({ item: 1 })).toThrow(/reserved/);
+    expect(() => field<string>().meta({ _meta: 1 })).toThrow(/reserved/);
+  });
+
+  test("inherit on a non-boolean key throws at runtime too", () => {
+    expect(() => metaKey(0, { inherit: "any" } as any)).toThrow(/boolean/);
+  });
 });
 
-// ---------------------------------------------------------------------------
-// Arrays
-it("array create is kept on the instantiated node", () => {
-  const a = shape.lines._create!();
-  const b = shape.lines._create!();
-  expect(a).toEqual({ sku: "", qty: 1 });
-  expect(a === b, "a new object per call").toBe(false);
-  expect(shape.tags._create).toBe(undefined);
+describe("C · Meta references", () => {
+  test("meta refs point at the instantiated node", () => {
+    const ref = shape.name.error;
+    expect(ref instanceof MetaRef).toBe(true);
+    expect(ref.node).toBe(shape.name);
+    expect(ref.key).toBe("error");
+    expect(ref.path).toBe("name#error");
+    expect(ref.def).toBe(shape.name._metaDefs.error);
+  });
+
+  test("reused shapes get separate refs", () => {
+    expect(shape.shipping.city.error.node).toBe(shape.shipping.city);
+    expect(shape.billing.city.error.node).toBe(shape.billing.city);
+    expect(shape.shipping.city.error === shape.billing.city.error).toBe(false);
+    expect(address.city.error.node === shape.shipping.city, "reusable shape keeps its own refs").toBe(false);
+  });
+
+  test("row template refs", () => {
+    expect(shape.lines.item.sku.error.node).toBe(shape.lines.item.sku);
+    expect(shape.lines.item.sku.error.path).toBe("lines[].sku#error");
+  });
+
+  test("container and root refs", () => {
+    expect(shape.company.visible.node).toBe(shape.company);
+    expect(shape.submitCount.path).toBe("#submitCount");
+  });
+
+  test("a child field wins over a meta key with the same name", () => {
+    const f = form({
+      group: object({ label: field<string>() }).meta({ label: "Group" }),
+    });
+    expect(f.group.label instanceof MetaRef).toBe(false);
+    expect(f.group.label.path).toBe("group.label");
+    expect(f.group._meta.label).toBe("Group");
+  });
+
+  test(".meta() leaves the original node untouched", () => {
+    const base = field<string>();
+    const withMeta = base.meta(validation());
+    expect((base as any).error).toBe(undefined);
+    expect(withMeta.error instanceof MetaRef).toBe(true);
+  });
 });
 
-it("array create must be a function", () => {
-  expect(() => array(object({ a: field<string>() }), { create: {} as any })).toThrow(/must be a function/);
+describe("C · Closed meta in the store", () => {
+  test("setMeta accepts only declared keys", () => {
+    const s = createStore(shape, {
+      note: "", name: "", company: { vat: "" },
+      shipping: { street: "", city: "" }, billing: { street: "", city: "" },
+      lines: [], tags: [],
+    });
+    s.setMeta(shape.name, { label: "Full name" });
+    expect(s.getMeta(shape.name).label).toBe("Full name");
+    // @ts-expect-error – `hint` is not declared on `name`
+    expect(() => s.setMeta(shape.name, { hint: "x" })).toThrow(/no meta key "hint"/);
+    // @ts-expect-error – `note` declares no meta at all
+    expect(() => s.setMeta(shape.note, { error: "x" })).toThrow(/no meta key "error"/);
+  });
 });
 
-// ---------------------------------------------------------------------------
-// Reserved names, table-driven
+describe("C · Arrays", () => {
+  test("array create is kept on the instantiated node", () => {
+    const a = shape.lines._create!();
+    const b = shape.lines._create!();
+    expect(a).toEqual({ sku: "", qty: 1 });
+    expect(a === b, "a new object per call").toBe(false);
+    expect(shape.tags._create).toBe(undefined);
+  });
+
+  test("array create must be a function", () => {
+    expect(() => array(object({ a: field<string>() }), { create: {} as any })).toThrow(/must be a function/);
+  });
+});
+
 const NODE_INTERNALS = [
   "id", "lens", "path", "parent", "meta", "constructor",
   "_meta", "_metaDefs", "_type", "_fields", "_create", "_hasCreate",
   "_instantiate", "_createInstance", "_attachMetaRefs", "_hasChild",
 ];
 
-it("every node-internal name is rejected as a field name and as a meta key", () => {
-  for (const name of NODE_INTERNALS) {
-    expect(() => object({ [name]: field<string>() }), `field "${name}"`).toThrow(/reserved name/);
-    expect(() => field<string>().meta({ [name]: 1 }), `meta key "${name}"`).toThrow(/reserved name/);
-  }
-  expect(() => field<string>().meta({ item: 1 }), "`item` is reserved for meta keys").toThrow(/reserved name/);
-  expect(() => object({ item: field<string>() }), "…but allowed as a field name").not.toThrow();
-});
-
-// ---------------------------------------------------------------------------
-// MetaBuilder
-it("MetaBuilder: chained helpers and custom keys build a typed plain object", () => {
-  const built = meta().required().label("Name").custom("hint", "Use your legal name").custom("max", 3);
-  expect(built.build()).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
-  const f = form({ name: field<string>().meta(built) });
-  type M = InferMeta<typeof f.name>;
-  type _c1 = Expect<Equal<M["hint"], string>>;
-  type _c2 = Expect<Equal<M["max"], number>>;
-  type _c3 = Expect<Equal<M["required"], boolean>>;
-  expect(f.name._meta).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
-  expect(f.name.hint instanceof MetaRef).toBe(true);
-  expect(meta().disabled(false).visible().placeholder("x").build()).toEqual({ disabled: false, visible: true, placeholder: "x" });
-});
-
-it("paths through nested arrays, for nodes and meta refs", () => {
-  const f = form({
-    outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
+describe("C · Reserved names, table-driven", () => {
+  test("every node-internal name is rejected as a field name and as a meta key", () => {
+    for (const name of NODE_INTERNALS) {
+      expect(() => object({ [name]: field<string>() }), `field "${name}"`).toThrow(/reserved name/);
+      expect(() => field<string>().meta({ [name]: 1 }), `meta key "${name}"`).toThrow(/reserved name/);
+    }
+    expect(() => field<string>().meta({ item: 1 }), "`item` is reserved for meta keys").toThrow(/reserved name/);
+    expect(() => object({ item: field<string>() }), "…but allowed as a field name").not.toThrow();
   });
-  expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
-  expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
-  expect(f.outer.item.inner.path).toBe("outer[].inner");
+});
+
+describe("C · MetaBuilder", () => {
+  test("MetaBuilder: chained helpers and custom keys build a typed plain object", () => {
+    const built = meta().required().label("Name").custom("hint", "Use your legal name").custom("max", 3);
+    expect(built.build()).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
+    const f = form({ name: field<string>().meta(built) });
+    type M = InferMeta<typeof f.name>;
+    type _c1 = Expect<Equal<M["hint"], string>>;
+    type _c2 = Expect<Equal<M["max"], number>>;
+    type _c3 = Expect<Equal<M["required"], boolean>>;
+    expect(f.name._meta).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
+    expect(f.name.hint instanceof MetaRef).toBe(true);
+    expect(meta().disabled(false).visible().placeholder("x").build()).toEqual({ disabled: false, visible: true, placeholder: "x" });
+  });
+
+  test("paths through nested arrays, for nodes and meta refs", () => {
+    const f = form({
+      outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
+    });
+    expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
+    expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
+    expect(f.outer.item.inner.path).toBe("outer[].inner");
+  });
 });

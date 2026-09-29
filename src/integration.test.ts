@@ -5,11 +5,11 @@
 
 import { createStore, countIn } from "./index";
 import { trip, T, tripBehaviors, emptyTrip, savedBooking, quiet } from "./test/trip";
-import { it, expect } from "vitest";
+import { test, expect } from "vitest";
 
 // ---------------------------------------------------------------------------
 // INT1
-it("INT1 loading a saved booking: clean, sync errors present, async checks deferred to validate()", async () => {
+test("INT1 loading a saved booking: clean, sync errors present, async checks deferred to validate()", async () => {
   const s = createStore(trip, emptyTrip(), { behaviors: tripBehaviors(), ...quiet });
   s.setValues(savedBooking(), { as: "initial" });
   const [ada, tim] = s.substore(trip.travelers).items();
@@ -31,7 +31,7 @@ it("INT1 loading a saved booking: clean, sync errors present, async checks defer
 
 // ---------------------------------------------------------------------------
 // INT2
-it("INT2 one user edit runs the pricing chain once each, in order, and the budget rule sees the final total", () => {
+test("INT2 one user edit runs the pricing chain once each, in order, and the budget rule sees the final total", () => {
   const runs: Record<string, number> = {};
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(runs), ...quiet });
   s.set(trip.budget, 1500);
@@ -53,7 +53,7 @@ it("INT2 one user edit runs the pricing chain once each, in order, and the budge
 
 // ---------------------------------------------------------------------------
 // INT3
-it("INT3 the visa section: shown and required for some destinations, cleared and omitted when hidden", async () => {
+test("INT3 the visa section: shown and required for some destinations, cleared and omitted when hidden", async () => {
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
   expect(s.get(trip.visa.visible)).toBe(false);
   expect(s.get(trip.visa.number.error), "hidden: not validated").toBe(undefined);
@@ -78,7 +78,7 @@ it("INT3 the visa section: shown and required for some destinations, cleared and
 
 // ---------------------------------------------------------------------------
 // INT4
-it("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta and counts", () => {
+test("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta and counts", () => {
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
   const travelers = s.substore(trip.travelers);
   const [ada, tim] = travelers.items();
@@ -124,7 +124,7 @@ it("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta a
 
 // ---------------------------------------------------------------------------
 // INT5
-it("INT5 a limit synced from outside: error while exceeded; reset keeps the limit and recomputes", () => {
+test("INT5 a limit synced from outside: error while exceeded; reset keeps the limit and recomputes", () => {
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
   expect(s.get(trip.seats.error), "no limit yet").toBe(undefined);
 
@@ -151,7 +151,7 @@ it("INT5 a limit synced from outside: error while exceeded; reset keeps the limi
 
 // ---------------------------------------------------------------------------
 // INT6
-it("INT6 loaded data with both promo and voucher: both enabled and in error until one is cleared", () => {
+test("INT6 loaded data with both promo and voucher: both enabled and in error until one is cleared", () => {
   const s = createStore(trip, { ...savedBooking(), promo: "SUMMER", voucher: "V-100" }, { behaviors: tripBehaviors(), ...quiet });
   expect([s.get(trip.promo.disabled), s.get(trip.voucher.disabled)]).toEqual([false, false]);
   expect(s.get(trip.promo.error)).toBe("Only one of promo, voucher can be set");
@@ -164,7 +164,7 @@ it("INT6 loaded data with both promo and voucher: both enabled and in error unti
 
 // ---------------------------------------------------------------------------
 // INT7
-it("INT7 handleSubmit: waits for passport checks, focuses the first error, maps a server rejection onto its row", async () => {
+test("INT7 handleSubmit: waits for passport checks, focuses the first error, maps a server rejection onto its row", async () => {
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
   const [ada, tim] = s.substore(trip.travelers).items();
   const focused: string[] = [];
@@ -204,7 +204,7 @@ it("INT7 handleSubmit: waits for passport checks, focuses the first error, maps 
 
 // ---------------------------------------------------------------------------
 // INT8
-it("INT8 a step submit reveals and validates only its section; the root submitCount still counts", async () => {
+test("INT8 a step submit reveals and validates only its section; the root submitCount still counts", async () => {
   const s = createStore(trip, emptyTrip(), { behaviors: tripBehaviors(), ...quiet });
   const step = s.substore(trip.contact);
   const got: unknown[] = [];

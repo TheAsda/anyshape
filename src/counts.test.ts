@@ -3,23 +3,23 @@
 import {
   form, object, array, field, meta, metaKey, createStore, countIn, initialOf, when, control,
 } from "./index";
-import { describe, it, expect } from "vitest";
+import { test, test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";
 
-describe('H · counts and collect', () => {
+describe("H · Counts and collect", () => {
   const { shape, L, initial, originsOf } = company;
+  const test = base
+    .extend("store", () => createStore(shape, initial()))
+    .extend("lines", ({ store }) => store.substore(shape.lines));
 
-  it("counts are read-only", () => {
-    const s = createStore(shape, initial());
+  test("counts are read-only", ({ store: s }) => {
     expect(() => s.set(countIn(shape, "error") as any, 1 as never)).toThrow(/read-only/);
   });
 
   // ---------------------------------------------------------------------------
   // Counts and collect
-  it("counts across fields, objects and rows", () => {
-    const s = createStore(shape, initial());
-    const lines = s.substore(shape.lines);
+  test("counts across fields, objects and rows", ({ store: s, lines }) => {
     const [a, b] = lines.items();
     s.set(shape.name.error, "x");
     s.set(shape.company.vat.error, "y");
@@ -33,9 +33,7 @@ describe('H · counts and collect', () => {
     expect(s.get(countIn(shape, "error"))).toBe(3);
   });
 
-  it("removing and restoring rows moves their counts", () => {
-    const s = createStore(shape, initial());
-    const lines = s.substore(shape.lines);
+  test("removing and restoring rows moves their counts", ({ store: s, lines }) => {
     const row = lines.itemAt(0);
     row.set(L.sku.error, "z");
     const note = row.substore(L.notes).itemAt(0);
@@ -49,8 +47,7 @@ describe('H · counts and collect', () => {
     expect(s.get(countIn(shape, "error")), "restored row counts again").toBe(2);
   });
 
-  it("count subscriptions fire on changes and row removal", () => {
-    const s = createStore(shape, initial());
+  test("count subscriptions fire on changes and row removal", ({ store: s }) => {
     const seen: number[] = [];
     s.subscribe(countIn(shape, "error"), () => seen.push(s.get(countIn(shape, "error"))));
     const row = s.substore(shape.lines).itemAt(1);
@@ -60,9 +57,7 @@ describe('H · counts and collect', () => {
     expect(seen).toEqual([1, 2, 1]);
   });
 
-  it("collect lists matching nodes with row indexes", () => {
-    const s = createStore(shape, initial());
-    const lines = s.substore(shape.lines);
+  test("collect lists matching nodes with row indexes", ({ store: s, lines }) => {
     s.set(shape.email.error, "e");
     lines.itemAt(1).set(L.sku.error, "s");
     lines.itemAt(0).substore(L.notes).itemAt(0).set(L.notes.item.text.error, "n");
@@ -73,7 +68,7 @@ describe('H · counts and collect', () => {
     expect(entry.ref).toBe(L.sku);
   });
 
-  it("countIn warns when nothing in the subtree can aggregate the key", () => {
+  test("countIn warns when nothing in the subtree can aggregate the key", () => {
     const local = form(
       object({
         a: field<string>().meta(control()),
@@ -97,13 +92,12 @@ describe('H · counts and collect', () => {
     expect(seen[1]).toMatch(/"nope"/);
   });
 
-  it("aggregate must be false for the default", async () => {
+  test("aggregate must be false for the default", async () => {
     const { metaKey } = await import("./meta");
     expect(() => metaKey(true, { aggregate: (v) => v })).toThrow(/default value/);
   });
 
-  it("collect on a row store: paths from the root, only that row; nested rows", () => {
-    const s = createStore(shape, initial());
+  test("collect on a row store: paths from the root, only that row; nested rows", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
     a.set(L.sku.error, "bad a");
     b.set(L.sku.error, "bad b");
@@ -114,7 +108,7 @@ describe('H · counts and collect', () => {
     expect(inA[1].store.get(L.notes.item.text.error)).toBe("bad note");
   });
 
-  it("a custom counted key written by application code counts like the built-in ones", () => {
+  test("a custom counted key written by application code counts like the built-in ones", () => {
     const f = form({
       a: field<string>().meta({ flagged: metaKey<boolean>(false, { aggregate: (v) => v }) }),
       rows: array(object({ b: field<string>().meta({ flagged: metaKey<boolean>(false, { aggregate: (v) => v }) }) })),
@@ -132,12 +126,12 @@ describe('H · counts and collect', () => {
   });
 });
 
-describe('H · stable count references', () => {
+describe("H · Stable count references", () => {
   const { shape, L, initial, targets } = limits;
 
   // ---------------------------------------------------------------------------
   // Stable references
-  it("countIn and initialOf return the same instance per (node, key)", () => {
+  test("countIn and initialOf return the same instance per (node, key)", () => {
     expect(countIn(shape, "error")).toBe(countIn(shape, "error"));
     expect(countIn(shape, "error") === countIn(shape, "dirty")).toBe(false);
     expect(countIn(shape.lines, "error") === countIn(shape, "error")).toBe(false);
