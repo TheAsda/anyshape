@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "strict": true,
+    "jsx": "react-jsx",
     "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -9,7 +10,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node", "vitest-browser-react", "@vitest/browser-playwright"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
