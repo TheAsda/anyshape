@@ -176,3 +176,35 @@ it("array create is kept on the instantiated node", () => {
 it("array create must be a function", () => {
   expect(() => array(object({ a: field<string>() }), { create: {} as any })).toThrow(/must be a function/);
 });
+
+// ---------------------------------------------------------------------------
+// Reserved names, table-driven
+const NODE_INTERNALS = [
+  "id", "lens", "path", "parent", "meta", "constructor",
+  "_meta", "_metaDefs", "_type", "_fields", "_create", "_hasCreate",
+  "_instantiate", "_createInstance", "_attachMetaRefs", "_hasChild",
+];
+
+it("every node-internal name is rejected as a field name and as a meta key", () => {
+  for (const name of NODE_INTERNALS) {
+    expect(() => object({ [name]: field<string>() }), `field "${name}"`).toThrow(/reserved name/);
+    expect(() => field<string>().meta({ [name]: 1 }), `meta key "${name}"`).toThrow(/reserved name/);
+  }
+  expect(() => field<string>().meta({ item: 1 }), "`item` is reserved for meta keys").toThrow(/reserved name/);
+  expect(() => object({ item: field<string>() }), "…but allowed as a field name").not.toThrow();
+});
+
+// ---------------------------------------------------------------------------
+// MetaBuilder
+it("MetaBuilder: chained helpers and custom keys build a typed plain object", () => {
+  const built = meta().required().label("Name").custom("hint", "Use your legal name").custom("max", 3);
+  expect(built.build()).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
+  const f = form({ name: field<string>().meta(built) });
+  type M = InferMeta<typeof f.name>;
+  type _c1 = Expect<Equal<M["hint"], string>>;
+  type _c2 = Expect<Equal<M["max"], number>>;
+  type _c3 = Expect<Equal<M["required"], boolean>>;
+  expect(f.name._meta).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
+  expect(f.name.hint instanceof MetaRef).toBe(true);
+  expect(meta().disabled(false).visible().placeholder("x").build()).toEqual({ disabled: false, visible: true, placeholder: "x" });
+});

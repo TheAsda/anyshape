@@ -412,3 +412,24 @@ it("a throwing reaction: the write throws, UI is skipped, the next flush catches
   s.set(shape.total, 1); // any later write flushes
   expect(r.take(), "the name listener catches up: its value changed since it was last told").toEqual(["name"]);
 });
+
+// ---------------------------------------------------------------------------
+// Rule 5 on views
+it("rule 5 on views: an array or object substore's listener sees changes inside it only", () => {
+  const s = createStore(shape, initial());
+  const r = recorder();
+  s.substore(shape.lines).subscribe(r.on("lines"));
+  s.substore(shape.shipping).subscribe(r.on("shipping"));
+  const row = s.substore(shape.lines).itemAt(1);
+
+  row.setMeta(L.sku, { error: "Bad" });
+  expect(r.take(), "a row's meta").toEqual(["lines"]);
+  row.set(L.qty, 9);
+  expect(r.take(), "a row's value").toEqual(["lines"]);
+  s.setMeta(shape.shipping.city, { error: "x" });
+  expect(r.take()).toEqual(["shipping"]);
+  s.setMeta(shape.billing.city, { error: "y" });
+  expect(r.take(), "the other copy of the reused shape").toEqual([]);
+  s.set(shape.name, "Bob");
+  expect(r.take()).toEqual([]);
+});

@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, countIn,
+  form, object, array, field, createStore, countIn, initialOf,
   control, validation, touched, visibility, disableable,
   type InferValue, type Origin, type FocusTarget,
 } from "./index";
@@ -423,3 +423,68 @@ export function typeOnlyChecks() {
   s.set(shape.name.touched, "yes");
   return [b, e, n, v, wrong];
 }
+
+// ---------------------------------------------------------------------------
+// Write options and read-only references
+it("setMeta rejects { as: 'initial' }: baselines are for values", () => {
+  const s = createStore(shape, initial());
+  expect(() => s.setMeta(shape.name, { touched: true }, { as: "initial" })).toThrow(/applies to values only/);
+});
+
+it("initial values and counts can't be set directly", () => {
+  const s = createStore(shape, initial());
+  expect(() => s.set(initialOf(shape.name) as never, "x" as never)).toThrow(/Initial values are written with \{ as: "initial" \}/);
+  expect(() => s.set(countIn(shape, "error") as never, 1 as never)).toThrow(/Counts are read-only/);
+});
+
+// ---------------------------------------------------------------------------
+// Factories and baselines
+it("the create factory's result is copied, so even a shared default gives distinct rows", () => {
+  const shared = { t: "" };
+  const f = form({ rows: array(object({ t: field<string>() }), { create: () => shared }) });
+  const s = createStore(f, { rows: [] });
+  const rows = s.substore(f.rows);
+  const a = rows.append();
+  const b = rows.append({ t: "x" });
+  expect(a).not.toBe(b);
+  expect(rows.items().length).toBe(2);
+  expect(s.get(f.rows)[0]).not.toBe(shared);
+  expect(shared, "the factory's object is never written").toEqual({ t: "" });
+});
+
+it("saving (a root baseline write) makes every current row clean; rows added later start dirty", () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  const added = lines.append({ sku: "N" });
+  const [a] = lines.items();
+  a.set(L.sku, "A2");
+  expect(a.get(L.sku.dirty)).toBe(true);
+  expect(added.get(L.sku.dirty)).toBe(true);
+
+  s.setValues(s.getValues(), { as: "initial" });
+  expect(a.get(L.sku.dirty)).toBe(false);
+  expect(added.get(L.sku.dirty), "the added row is part of the new baseline").toBe(false);
+  expect(s.get(countIn(shape, "dirty"))).toBe(0);
+  expect(added.get(initialOf(L.sku))).toBe("N");
+
+  const later = lines.append({ sku: "L" });
+  expect(later.get(L.sku.dirty)).toBe(true);
+  s.reset();
+  expect(lines.items().map((r) => r.get(L.sku)), "reset goes back to the saved rows").toEqual(["A2", "B", "N"]);
+});
+
+// ---------------------------------------------------------------------------
+// Inherited keys: effective vs own, across a row boundary
+it("get vs getOwn for an inherited `any` key across a row boundary", () => {
+  const s = createStore(shape, initial());
+  const [first, second] = s.substore(shape.lines).items();
+  s.set(shape.lines.disabled, true);
+  expect(first.get(L.sku.disabled), "effective: from the array").toBe(true);
+  expect(first.getOwn(L.sku.disabled), "own: never written").toBe(false);
+
+  s.set(shape.lines.disabled, false);
+  first.set(L.sku.disabled, true);
+  expect(first.get(L.sku.disabled)).toBe(true);
+  expect(first.getOwn(L.sku.disabled)).toBe(true);
+  expect(second.get(L.sku.disabled), "other rows unaffected").toBe(false);
+});
