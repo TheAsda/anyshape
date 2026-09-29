@@ -192,8 +192,8 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### Q. Lifetime & outside data (`react/form.ts`)
 **Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, `resetOnUnmount`, StrictMode), DOM focus order, explicit `focusOrder`, `handleSubmit` on a real form, `domOrder`.
 
-- [ ] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.ts`
-- [ ] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.ts`
+- [x] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.ts`
+- [x] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.ts`
 - [ ] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.ts`
 
 ### R. Behaviors in components (`react/behaviors.ts`)
