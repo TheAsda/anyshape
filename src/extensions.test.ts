@@ -241,6 +241,31 @@ it("helpers pass the origin through", () => {
   expect(seen).toEqual([["user"]]);
 });
 
+it("helpers reject out-of-range indexes", () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  const [a] = lines.items();
+  expect(() => lines.itemAt(-1)).toThrow(RangeError);
+  expect(() => lines.itemAt(2)).toThrow(RangeError);
+  expect(() => lines.insert(-1, { sku: "X" })).toThrow(RangeError);
+  expect(() => lines.insert(3, { sku: "X" })).toThrow(RangeError);
+  expect(() => lines.move(a, -1)).toThrow(RangeError);
+  expect(() => lines.move(a, 2)).toThrow(RangeError);
+  expect(lines.items().map((r) => r.get(L.sku)), "nothing changed").toEqual(["A", "B"]);
+});
+
+it("helpers reject objects and rows that are not in this array", () => {
+  const s = createStore(shape, initial());
+  const lines = s.substore(shape.lines);
+  expect(() => lines.item({ sku: "A", qty: 1, notes: [] })).toThrow(/not currently in "lines"/);
+  const [note] = lines.itemAt(0).substore(L.notes).items();
+  expect(() => lines.remove(note as never)).toThrow(/does not belong to "lines"/);
+  expect(() => lines.move(note as never, 0)).toThrow(/does not belong to "lines"/);
+  const [a] = lines.items();
+  lines.remove(a);
+  expect(() => lines.move(a, 0)).toThrow(/detached/);
+});
+
 // ---------------------------------------------------------------------------
 // Counts and collect
 it("counts across fields, objects and rows", () => {

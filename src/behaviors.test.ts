@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey,
   control, visibility, disableable, touched, dirty,
   type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
@@ -469,4 +469,43 @@ it("touched and dirty work on their own, without control()", () => {
   expect(s.get(f.a.touched)).toBe(true);
   expect(s.get(f.a.dirty)).toBe(true);
   expect(s.get(initialOf(f.a))).toBe("");
+});
+
+// ---------------------------------------------------------------------------
+// Rows created by the helpers while behaviors edit them
+it("append / insert return the new row when a behavior edits it in the same flush", () => {
+  const lineTotal = pricing({})[3];
+  const s = createStore(shape, initial(), { behaviors: [lineTotal] });
+  const lines = s.substore(shape.lines);
+
+  const appended = lines.append({ price: 5, qty: 2 });
+  expect(appended.isAttached(), "the returned store is live").toBe(true);
+  expect(appended.get(L.lineTotal), "the init run edited the new row").toBe(10);
+  expect(lines.items()[2]).toBe(appended);
+
+  const inserted = lines.insert(0, { price: 3, qty: 3 });
+  expect(inserted.isAttached()).toBe(true);
+  expect(inserted.get(L.lineTotal)).toBe(9);
+  expect(lines.items()[0]).toBe(inserted);
+  inserted.set(L.qty, 4);
+  expect(inserted.get(L.lineTotal), "the returned store keeps working").toBe(12);
+});
+
+// ---------------------------------------------------------------------------
+// Feature default behaviors
+it("a feature's default behavior may only use its own node", () => {
+  let other: unknown;
+  const mirror = () => ({
+    mirror: metaKey("", {
+      behavior: (self) => ({
+        triggers: [self],
+        reads: [other as typeof self],
+        writes: [self.mirror],
+        run: () => {},
+      }),
+    }),
+  });
+  const f = form({ a: field<string>(), b: field<string>().meta(mirror()) });
+  other = f.a;
+  expect(() => createStore(f, { a: "", b: "" })).toThrow(/default behaviors may only use their own node \("b"\), got "a"/);
 });
