@@ -14,7 +14,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 
 ---
 
-## 1. How the tests are written today
+## 1. How the tests are organised
 
 | File | Layer | Area | Tests |
 |---|---|---|---|
@@ -40,10 +40,28 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`.
 
 **Conventions (keep them):**
-- **Runner:** vitest + happy-dom (`vitest.config.ts`). React tests render real React 19 with `act`.
-- **Async:** `src/test/harness.ts` has `sleep(ms)` and `deferred()` for controlling async rules. Prefer `deferred()` over timers where possible.
-- **Type-level assertions:** `Expect<Equal<A, B>>` and `// @ts-expect-error` inside the test files. They run under `npm run typecheck`, not under vitest, so **CI must run both**.
-- **One behavior per test,** named after the guarantee ("a removed row drops its async result"), not the function.
+- **Projects** (`vitest.config.ts`):
+  - `unit`: the core, in Node, with no DOM.
+  - `react`: the bindings in real Chromium, through Vitest browser mode (Playwright provider) and `vitest-browser-react`.
+  - Commands: `bun run test` runs both; also `test:unit`, `test:react`, `bench` (NF3), `test:memory` (NF4).
+  - First run on a machine: `bunx playwright install chromium`.
+- **Structure:** one file per layer (table above). Inside a file, a `describe` per section, named with the layer ID (`"F · Rule 3 – array structure channel"`). Test titles state the guarantee ("a removed row drops its async result"), not the function.
+- **Fixtures:**
+  - A file's form and `initial()` stay local unless several files need them; then they live in `src/test/fixtures/`.
+  - Repeated setup comes from `test.extend` builder fixtures: `store`, `lines`, `recorder`, `lookup`, e.g. `test("…", ({ store: s, lines }) => …)`.
+  - Use a fixture only where it removes repetition without hiding the setup the test is about. A test with its own store options creates its store explicitly.
+  - A `describe` that uses another file's fixture binds it at the top (`const { shape, L, initial } = company;`) and defines its own `test`.
+- **React tests** (`src/react/*.test.tsx`, helpers in `src/react/test-utils.tsx`):
+  - Render with `render()` from `vitest-browser-react`; it's async and cleaned up before each test.
+  - Drive inputs through locators and `userEvent` (`fill`, `click`, `keyboard`); these are real browser events, so focus moves and blur fires as with a user.
+  - Assert DOM with retrying `await expect.element(locator)`. `toHaveTextContent("…")` is an exact match in Vitest 5; `toMatchTextContent` is the substring/regex form.
+  - Wrap writes from outside React in `settle(fn)` (act) before render-count assertions, especially "nothing re-rendered", where there is no DOM change to wait for.
+- **Async and timers:**
+  - Control async rules with `deferred()` / the `lookup` fixture.
+  - Let results land with `flush()` (`src/test/harness.ts`).
+  - Test debounce and other delays with `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync`, restoring with `onTestFinished(() => vi.useRealTimers())`.
+- **Type-level assertions:** `Expect<Equal<A, B>>` and `// @ts-expect-error` inside the test files. They run under `bun run typecheck`, not under vitest, so **CI must run both**.
+- **Known bugs** are pinned with `test.fails` and a comment naming the ticket (`tickets/`). Switch the test to `test` when the fix lands.
 - **Mutation check.** After writing tests for a mechanism, break the mechanism on purpose and confirm that a test fails. The mechanisms to check this way are listed in §5.
 
 ---
@@ -55,7 +73,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### A. Shape & instantiation (`shape.ts`)
 **Covered:** parent links, reused shapes get distinct nodes, item template lenses, reserved field names, primitive arrays rejected, `.meta()` after `form()` rejected, `create` kept and must be a function.
 
-- [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `store.test.ts`
+- [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `shape.test.ts`
 - [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `_fields`, …). Same for meta keys, plus `item`. → `meta.test.ts`
 - [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `store.test.ts`
 - [x] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
