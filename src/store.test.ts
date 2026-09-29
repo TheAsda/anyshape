@@ -239,3 +239,36 @@ it("structural validation", () => {
   expect(() => s.setValue(userShape.items, [1 as any])).toThrow(/must be an object/);
   expect(() => createStore(userShape, { ...initial(), items: "x" as any })).toThrow(/must be an array/);
 });
+
+// ---------------------------------------------------------------------------
+// Reused shapes containing arrays; meta delegation; substore arguments
+it("a reused shape containing an array: separate templates, ids and paths per use", () => {
+  const block = object({ items: array(object({ x: field<string>() })) });
+  const f = form({ a: block, b: block });
+  expect(f.a.items.item).not.toBe(f.b.items.item);
+  expect(f.a.items.item.x.path).toBe("a.items[].x");
+  expect(f.b.items.item.x.path).toBe("b.items[].x");
+  const nodes = [f, f.a, f.a.items, f.a.items.item, f.a.items.item.x, f.b, f.b.items, f.b.items.item, f.b.items.item.x];
+  expect(new Set(nodes.map((n) => n.id)).size, "every id is unique").toBe(nodes.length);
+
+  const s = createStore(f, { a: { items: [{ x: "1" }] }, b: { items: [{ x: "2" }] } });
+  const rowA = s.substore(f.a.items).itemAt(0);
+  expect(rowA.get(f.a.items.item.x)).toBe("1");
+  expect(s.substore(f.b.items).itemAt(0).get(f.b.items.item.x)).toBe("2");
+  expect(() => rowA.get(f.b.items.item.x), "the other copy's template is not in this row").toThrow();
+});
+
+it("meta of a deep node is one object, whichever store is asked", () => {
+  const s = createStore(userShape, initial());
+  const section = s.substore(userShape.shipping);
+  expect(section.getMeta(userShape.shipping.city)).toBe(s.getMeta(userShape.shipping.city));
+  section.setMeta(userShape.shipping.city, { error: "Bad" });
+  expect(s.getMeta(userShape.shipping.city).error).toBe("Bad");
+  expect(s.get(userShape.shipping.city.error)).toBe("Bad");
+  expect(s.getMeta(userShape.billing.city).error, "the reused shape's other copy is separate").toBe(undefined);
+});
+
+it("substore() needs an object or array node", () => {
+  const s = createStore(userShape, initial());
+  expect(() => s.substore(userShape.name as never)).toThrow(/needs an object or array node, got field "name"/);
+});

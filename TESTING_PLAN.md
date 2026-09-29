@@ -49,9 +49,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### A. Shape & instantiation (`shape.ts`)
 **Covered:** parent links, reused shapes get distinct nodes, item template lenses, reserved field names, primitive arrays rejected, `.meta()` after `form()` rejected, `create` kept and must be a function.
 
-- [ ] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `store.test.ts`
-- [ ] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `_fields`, …). Same for meta keys, plus `item`. → `meta.test.ts`
-- [ ] **A3 · P2** A `create` factory that returns the same object every time → the second `append()` throws "same object twice". → `extensions.test.ts`
+- [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `store.test.ts`
+- [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `_fields`, …). Same for meta keys, plus `item`. → `meta.test.ts`
+- [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `extensions.test.ts`
 - [ ] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
 
 ### B. Lenses (`lens.ts`)
@@ -67,15 +67,15 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### C. Meta declarations & references (`meta.ts`, `shape.ts`)
 **Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, `inherit` on non-boolean throws, refs on instantiated / reused / row / container / root nodes, child field wins, closed `setMeta`.
 
-- [ ] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
-- [ ] **C2 · P2** `setMeta(node, …, { as: "initial" })` throws "applies to values only". → `extensions.test.ts`
-- [ ] **C3 · P2** `store.set(initialOf(node), v)` throws "Initial values are written with { as: \"initial\" }"; confirm that `set(countIn(…))` throws "Counts are read-only" (assert the message, not only that it throws). → `extensions.test.ts`
+- [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
+- [x] **C2 · P2** `setMeta(node, …, { as: "initial" })` throws "applies to values only". → `extensions.test.ts`
+- [x] **C3 · P2** `store.set(initialOf(node), v)` throws "Initial values are written with { as: \"initial\" }"; confirm that `set(countIn(…))` throws "Counts are read-only" (assert the message, not only that it throws). → `extensions.test.ts`
 
 ### D. Store structure & scopes (`store.ts`)
 **Covered:** get/set through root, structural sharing, same-value no-op, cached substores, focus checks, root can't reach rows, meta owner seeding, object substore inside an item.
 
-- [ ] **D1 · P2** Meta delegation: `root.getMeta(deep)` and `root.substore(section).getMeta(deep)` return the *same object*; a write through one is visible through the other. → `store.test.ts`
-- [ ] **D2 · P2** `substore(fieldNode)` throws "needs an object or array node". → `store.test.ts`
+- [x] **D1 · P2** Meta delegation: `root.getMeta(deep)` and `root.substore(section).getMeta(deep)` return the *same object*; a write through one is visible through the other. → `store.test.ts`
+- [x] **D2 · P2** `substore(fieldNode)` throws "needs an object or array node". → `store.test.ts`
 - [ ] **D3 · P3** A node from another form, or an uninstantiated description, is rejected by `get`/`set`/`substore` with "is not part of the store". → `store.test.ts`
 
 ### E. Row identity & array helpers (`ArrayStore`, `ItemStore`)
@@ -98,7 +98,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **F1 · P1** A **UI listener that throws**: the other listeners of the same flush are still called, the first error is rethrown from the write, and the next flush is consistent. → `notifications.test.ts`
 - [x] **F2 · P1** A **reaction that throws**: the error propagates out of `set()`, UI listeners are not called for that flush, and the next write delivers the UI notification with the settled state (subscriptions caught up). → `notifications.test.ts`
-- [ ] **F3 · P2** Rule 5 on views: `substore(section).subscribe(l)` fires for a nested row's meta change inside the section, and not for changes outside it. → `notifications.test.ts`
+- [x] **F3 · P2** Rule 5 on views: `substore(section).subscribe(l)` fires for a nested row's meta change inside the section, and not for changes outside it. → `notifications.test.ts`
 - [ ] **F4 · P3** `subscribeItems` fires when the array is replaced from outside with the *same length but new objects*. → `notifications.test.ts`
 - [ ] **F5 · P3** Flat-form constraint: with 300 fields on the root, one write calls only the changed field's listener (pin the "no extra listener calls" guarantee; cost is covered in §4). → `notifications.test.ts`
 
@@ -106,7 +106,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** origins in reactions, per target, across scopes, per row; `getInitial` and `{ as: "initial" }`; per-row baselines, new rows `{}`, a baseline write on the array; reset of root and of one row; `keepOnReset`; reset re-validation and recompute.
 
 - [ ] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `additions.test.ts`
-- [ ] **G2 · P2** `setValues(values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `extensions.test.ts`
+- [x] **G2 · P2** `setValues(values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `extensions.test.ts`
 - [ ] **G3 · P3** Reset uses origin `"initial"`: a reaction receives `{"initial"}`, and `touched` does not flip. → `extensions.test.ts`
 
 ### H. Counts & collect
@@ -121,7 +121,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **I1 · P1** Submitted values, the documented rule: a node that **declares** `visible`/`disabled` and is hidden/disabled is omitted; **descendants of a disabled ancestor that don't declare the key stay in `values`** (but are still skipped by validation). Add a matching `SubmitValue` type assertion. → `validation.test.ts`
 - [ ] **I2 · P2** `validation({ validateDisabled: true })` keeps validating a disabled field. → `validation.test.ts`
-- [ ] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `extensions.test.ts`
+- [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `extensions.test.ts`
 
 ### J. Behavior registration checks
 **Covered:** undeclared reads and writes, async reported, one writer, feature-owned keys, cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
