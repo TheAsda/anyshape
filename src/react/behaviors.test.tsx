@@ -1,12 +1,12 @@
-import { createElement as h, act, useState, StrictMode, Component, type ReactNode } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { useState, StrictMode, Component, type ReactNode } from "react";
+import { test, expect } from "vitest";
+import { cleanup } from "vitest-browser-react";
 import {
   form, object, array, field, rule, defineBehavior, required, pattern, max, control, disableable, countIn,
   createStore, type InferValue, type RootStore, type BaseStore,
 } from "../index";
 import { StoreProvider, useBehaviors, useValue } from "./index";
-import { it, expect } from "vitest";
-import "./test-setup";
+import { render, settle, captureWarnings } from "./test-utils";
 
 const shape = form({
   type: field<"person" | "company">(),
@@ -24,29 +24,11 @@ const initial = (): Values => ({
 });
 
 // ---------------------------------------------------------------------------
-let root: Root | undefined;
+/** Renders with React's uncaught errors collected into `uncaught`. */
 let uncaught: unknown[] = [];
-async function mount(node: ReactNode) {
-  if (root) await unmount();
+function mount(ui: ReactNode) {
   uncaught = [];
-  root = createRoot(document.getElementById("root")!, { onUncaughtError: (e) => void uncaught.push(e) });
-  await act(async () => root!.render(node));
-}
-async function rerender(node: ReactNode) {
-  await act(async () => root!.render(node));
-}
-async function unmount() {
-  await act(async () => root?.unmount());
-  root = undefined;
-}
-async function run(fn: () => unknown) {
-  await act(async () => void (await fn()));
-}
-function captureWarnings() {
-  const warnings: string[] = [];
-  const original = console.warn;
-  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
-  return { warnings, restore: () => (console.warn = original) };
+  return render(ui, { createRootOptions: { onUncaughtError: (e) => void uncaught.push(e) } });
 }
 /** Counts registrations made through the store API. */
 function spyRegistrations(store: BaseStore<any>) {
@@ -59,7 +41,7 @@ function spyRegistrations(store: BaseStore<any>) {
 }
 
 // ---------------------------------------------------------------------------
-it("registers on mount, before paint; removed on unmount", async () => {
+test("registers on mount, before paint; removed on unmount", async () => {
   const s = createStore(shape, initial());
   let paintedError: string | undefined = "not rendered";
   function Rules() {
@@ -70,28 +52,38 @@ it("registers on mount, before paint; removed on unmount", async () => {
     paintedError = useValue(shape.name.error);
     return null;
   }
-  await mount(h(StoreProvider, { store: s }, h(Rules, {}), h(Show, {})));
+  const screen = await mount(
+    <StoreProvider store={s}>
+      <Rules />
+      <Show />
+    </StoreProvider>
+  );
   expect(s.get(shape.name.error)).toBe("Required");
   expect(paintedError).toBe("Required");
-  await unmount();
+  await screen.unmount();
   expect(s.get(shape.name.error), "the rule left with the component").toBe(undefined);
 });
 
-it("under a row provider the behaviors apply to that row only", async () => {
+test("under a row provider the behaviors apply to that row only", async () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   function RowRules() {
     useBehaviors((b) => b.add(max(L.qty, 3)), []);
     return null;
   }
-  await mount(h(StoreProvider, { store: s }, h(StoreProvider, { store: a }, h(RowRules, {}))));
+  await mount(
+    <StoreProvider store={s}>
+      <StoreProvider store={a}>
+        <RowRules />
+      </StoreProvider>
+    </StoreProvider>
+  );
   expect(a.get(L.qty.error)).toBe("Must be at most 3");
-  await run(() => b.set(L.qty, 9));
+  await settle(() => b.set(L.qty, 9));
   expect(b.get(L.qty.error)).toBe(undefined);
-  await unmount();
 });
 
-it("deps: props choose the behaviors; the swap is atomic", async () => {
+test("deps: props choose the behaviors; the swap is atomic", async () => {
   const s = createStore(shape, initial());
   const calls = spyRegistrations(s);
   function Phone(props: { strict: boolean }) {
@@ -104,21 +96,24 @@ it("deps: props choose the behaviors; the swap is atomic", async () => {
     );
     return null;
   }
-  const app = (strict: boolean) => h(StoreProvider, { store: s }, h(Phone, { strict }));
-  await mount(app(false));
+  const app = (strict: boolean) => (
+    <StoreProvider store={s}>
+      <Phone strict={strict} />
+    </StoreProvider>
+  );
+  const screen = await mount(app(false));
   expect(s.get(shape.phone.error)).toBe(undefined);
   const seen: (string | undefined)[] = [];
   s.subscribe(shape.phone.error, () => seen.push(s.get(shape.phone.error)));
-  await rerender(app(true));
+  await screen.rerender(app(true));
   expect(seen, "straight to the new error").toEqual(["Use +digits"]);
-  await rerender(app(true));
+  await screen.rerender(app(true));
   expect(calls, "same deps: no re-registration").toEqual({ add: 1, replace: 1 });
-  await rerender(app(false));
+  await screen.rerender(app(false));
   expect(seen).toEqual(["Use +digits", undefined]);
-  await unmount();
 });
 
-it("latest props reach run without re-registering", async () => {
+test("latest props reach run without re-registering", async () => {
   const s = createStore(shape, initial());
   const calls = spyRegistrations(s);
   function Hint(props: { suffix: string }) {
@@ -135,18 +130,21 @@ it("latest props reach run without re-registering", async () => {
     );
     return null;
   }
-  const app = (suffix: string) => h(StoreProvider, { store: s }, h(Hint, { suffix }));
-  await mount(app("!"));
+  const app = (suffix: string) => (
+    <StoreProvider store={s}>
+      <Hint suffix={suffix} />
+    </StoreProvider>
+  );
+  const screen = await mount(app("!"));
   expect(s.get(shape.name.hint)).toBe("!");
-  await rerender(app("?"));
+  await screen.rerender(app("?"));
   expect(s.get(shape.name.hint), "not re-run by a prop change (not in deps)").toBe("!");
-  await run(() => s.set(shape.name, "Ann", { origin: "user" }));
+  await settle(() => s.set(shape.name, "Ann", { origin: "user" }));
   expect(s.get(shape.name.hint), "the next run uses the latest props").toBe("Ann?");
   expect(calls).toEqual({ add: 1, replace: 0 });
-  await unmount();
 });
 
-it("latest props reach rule checks and guards too", async () => {
+test("latest props reach rule checks and guards too", async () => {
   const s = createStore(shape, initial());
   function Limit(props: { limit: number; active: boolean }) {
     useBehaviors(
@@ -160,36 +158,42 @@ it("latest props reach rule checks and guards too", async () => {
     );
     return null;
   }
-  const app = (limit: number, active: boolean) => h(StoreProvider, { store: s }, h(Limit, { limit, active }));
-  await mount(app(10, true));
-  await rerender(app(2, true));
-  await run(() => s.set(shape.name, "Abc", { origin: "user" }));
+  const app = (limit: number, active: boolean) => (
+    <StoreProvider store={s}>
+      <Limit limit={limit} active={active} />
+    </StoreProvider>
+  );
+  const screen = await mount(app(10, true));
+  await screen.rerender(app(2, true));
+  await settle(() => s.set(shape.name, "Abc", { origin: "user" }));
   expect(s.get(shape.name.error)).toBe("Too long");
-  await rerender(app(2, false));
-  await run(() => s.set(shape.name, "Abcd", { origin: "user" }));
+  await screen.rerender(app(2, false));
+  await settle(() => s.set(shape.name, "Abcd", { origin: "user" }));
   expect(s.get(shape.name.error), "the latest guard says inactive").toBe(undefined);
-  await unmount();
 });
 
-it("declarations changing without deps: kept, with a warning", async () => {
+test("declarations changing without deps: kept, with a warning", async () => {
   const s = createStore(shape, initial());
   const { warnings, restore } = captureWarnings();
   function Bad(props: { strict: boolean }) {
     useBehaviors((b) => (props.strict ? b.add(required(shape.vat)) : b.add(required(shape.phone))), []);
     return null;
   }
-  const app = (strict: boolean) => h(StoreProvider, { store: s }, h(Bad, { strict }));
-  await mount(app(false));
-  await run(() => s.set(shape.phone, ""));
+  const app = (strict: boolean) => (
+    <StoreProvider store={s}>
+      <Bad strict={strict} />
+    </StoreProvider>
+  );
+  const screen = await mount(app(false));
+  await settle(() => s.set(shape.phone, ""));
   expect(s.get(shape.phone.error)).toBe("Required");
-  await rerender(app(true));
+  await screen.rerender(app(true));
   restore();
   expect(s.get(shape.vat.error), "not re-registered").toBe(undefined);
   expect(warnings.filter((w) => /without a deps change/.test(w)).length).toBe(1);
-  await unmount();
 });
 
-it("builder features: when / otherwise with a shared target", async () => {
+test("builder features: when / otherwise with a shared target", async () => {
   const s = createStore(shape, initial());
   const lock = (value: boolean) =>
     defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, value) });
@@ -199,16 +203,19 @@ it("builder features: when / otherwise with a shared target", async () => {
     }, []);
     return null;
   }
-  await mount(h(StoreProvider, { store: s }, h(Rules, {})));
+  await mount(
+    <StoreProvider store={s}>
+      <Rules />
+    </StoreProvider>
+  );
   expect(s.get(shape.note.disabled)).toBe(false);
   expect(s.get(shape.vat.error)).toBe(undefined);
-  await run(() => s.set(shape.type, "company"));
+  await settle(() => s.set(shape.type, "company"));
   expect(s.get(shape.note.disabled)).toBe(true);
   expect(s.get(shape.vat.error)).toBe("Required");
-  await unmount();
 });
 
-it("StrictMode: registered once, removed on unmount", async () => {
+test("StrictMode: registered once, removed on unmount", async () => {
   const s = createStore(shape, initial());
   function Lock() {
     // a plain behavior: registering it twice would violate one-writer-per-target
@@ -218,14 +225,20 @@ it("StrictMode: registered once, removed on unmount", async () => {
     );
     return null;
   }
-  await mount(h(StrictMode, {}, h(StoreProvider, { store: s }, h(Lock, {}))));
+  const screen = await mount(
+    <StrictMode>
+      <StoreProvider store={s}>
+        <Lock />
+      </StoreProvider>
+    </StrictMode>
+  );
   expect(uncaught).toEqual([]);
   expect(s.get(shape.note.disabled)).toBe(true);
-  await unmount();
+  await screen.unmount();
   expect(s.get(shape.note.disabled)).toBe(false);
 });
 
-it("the same component twice: conflict with a hint; { key } shares one registration", async () => {
+test("the same component twice: conflict with a hint; { key } shares one registration", async () => {
   const s = createStore(shape, initial());
   const lock = () =>
     defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) });
@@ -235,14 +248,19 @@ it("the same component twice: conflict with a hint; { key } shares one registrat
   }
   let thrown: unknown;
   try {
-    await mount(h(StoreProvider, { store: s }, h(Unkeyed, {}), h(Unkeyed, {})));
+    await mount(
+      <StoreProvider store={s}>
+        <Unkeyed />
+        <Unkeyed />
+      </StoreProvider>
+    );
   } catch (e) {
-    thrown = e; // act() rethrows errors from effects
+    thrown = e; // act() may rethrow errors from effects
   }
   const error = (thrown ?? uncaught[0]) as Error;
   expect(/already written by/.test(error.message)).toBe(true);
   expect(/pass \{ key \}/.test(error.message), "the message carries the hint").toBe(true);
-  await unmount();
+  await cleanup();
   expect(s.get(shape.note.disabled), "nothing left registered").toBe(false);
 
   let show!: (n: number) => void;
@@ -253,49 +271,57 @@ it("the same component twice: conflict with a hint; { key } shares one registrat
   function App() {
     const [n, set] = useState(2);
     show = set;
-    return h(StoreProvider, { store: s }, n >= 1 ? h(Keyed, {}) : null, n >= 2 ? h(Keyed, {}) : null);
+    return (
+      <StoreProvider store={s}>
+        {n >= 1 ? <Keyed /> : null}
+        {n >= 2 ? <Keyed /> : null}
+      </StoreProvider>
+    );
   }
-  await mount(h(App, {}));
+  await mount(<App />);
   expect(uncaught).toEqual([]);
   expect(s.get(shape.note.disabled)).toBe(true);
-  await run(() => show(1));
+  await settle(() => show(1));
   expect(s.get(shape.note.disabled), "still held by the other instance").toBe(true);
-  await run(() => show(0));
+  await settle(() => show(0));
   expect(s.get(shape.note.disabled), "removed with the last holder").toBe(false);
-  await unmount();
 });
 
-it("changing the provided store moves the registration", async () => {
+test("changing the provided store moves the registration", async () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();
   function RowRules() {
     useBehaviors((bb) => bb.add(max(L.qty, 0)), []);
     return null;
   }
-  const app = (row: BaseStore<any>) => h(StoreProvider, { store: s }, h(StoreProvider, { store: row }, h(RowRules, {})));
-  await mount(app(a));
+  const app = (row: BaseStore<any>) => (
+    <StoreProvider store={s}>
+      <StoreProvider store={row}>
+        <RowRules />
+      </StoreProvider>
+    </StoreProvider>
+  );
+  const screen = await mount(app(a));
   expect(a.get(L.qty.error)).toBe("Must be at most 0");
   expect(b.get(L.qty.error)).toBe(undefined);
-  await rerender(app(b));
+  await screen.rerender(app(b));
   expect(a.get(L.qty.error)).toBe(undefined);
   expect(b.get(L.qty.error)).toBe("Must be at most 0");
   expect(s.get(countIn(shape, "error"))).toBe(1);
-  await unmount();
 });
 
-it("explicit { store } option", async () => {
+test("explicit { store } option", async () => {
   const s: RootStore<typeof shape> = createStore(shape, initial());
   function Rules() {
     useBehaviors((b) => b.add(required(shape.name)), [], { store: s });
     return null;
   }
-  await mount(h(Rules, {}));
+  await mount(<Rules />);
   expect(s.get(shape.name.error)).toBe("Required");
-  await unmount();
 });
 
 // ---------------------------------------------------------------------------
-it("{ key } is shared per store: the same key on different stores registers twice", async () => {
+test("{ key } is shared per store: the same key on different stores registers twice", async () => {
   const s1 = createStore(shape, initial());
   const s2 = createStore(shape, initial());
   const calls = [spyRegistrations(s1), spyRegistrations(s2)];
@@ -307,18 +333,28 @@ it("{ key } is shared per store: the same key on different stores registers twic
   function App() {
     const [n, set] = useState(2);
     show = set;
-    return h("div", {}, h(StoreProvider, { store: s1 }, h(Keyed, {})), n >= 2 ? h(StoreProvider, { store: s2 }, h(Keyed, {})) : null);
+    return (
+      <div>
+        <StoreProvider store={s1}>
+          <Keyed />
+        </StoreProvider>
+        {n >= 2 ? (
+          <StoreProvider store={s2}>
+            <Keyed />
+          </StoreProvider>
+        ) : null}
+      </div>
+    );
   }
-  await mount(h(App, {}));
+  await mount(<App />);
   expect(calls.map((c) => c.add)).toEqual([1, 1]);
   expect([s1.get(shape.name.error), s2.get(shape.name.error)]).toEqual(["Required", "Required"]);
-  await run(() => show(1));
+  await settle(() => show(1));
   expect(s1.get(shape.name.error), "s2's holder leaving does not release s1's").toBe("Required");
   expect(s2.get(shape.name.error)).toBe(undefined);
-  await unmount();
 });
 
-it("a deps change whose new registration fails keeps the old one and surfaces the error with the hint", async () => {
+test("a deps change whose new registration fails keeps the old one and surfaces the error with the hint", async () => {
   const s = createStore(shape, initial());
   const lock = () =>
     defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) });
@@ -342,15 +378,20 @@ it("a deps change whose new registration fails keeps the old one and surfaces th
       return this.state.failed ? null : this.props.children;
     }
   }
-  const app = (mode: "rule" | "lock") =>
-    h(StoreProvider, { store: s }, h(Static, {}), h(Boundary, {}, h(Switching, { mode })));
-  await mount(app("rule"));
+  const app = (mode: "rule" | "lock") => (
+    <StoreProvider store={s}>
+      <Static />
+      <Boundary>
+        <Switching mode={mode} />
+      </Boundary>
+    </StoreProvider>
+  );
+  const screen = await mount(app("rule"));
   expect(s.get(shape.vat.error)).toBe("Required");
-  await rerender(app("lock"));
+  await screen.rerender(app("lock"));
   expect(atError.message).toMatch(/already written by/);
   expect(atError.message).toMatch(/pass \{ key \}/);
   expect(atError.vatError, "the old registration was still active").toBe("Required");
   expect(s.get(shape.vat.error), "removed once its component left").toBe(undefined);
   expect(s.get(shape.note.disabled), "the other component's registration is untouched").toBe(true);
-  await unmount();
 });
