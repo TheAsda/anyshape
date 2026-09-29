@@ -12,3 +12,5 @@ extension/dist/
 *.swo
 *~
 .omo/
+# Vitest browser mode (failure screenshots, traces)
+.vitest/
