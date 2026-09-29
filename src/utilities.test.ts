@@ -51,6 +51,17 @@ export function typeOnlyChecks() {
   minLength(shape.age, 1);
   // @ts-expect-error – email needs a string field
   email(shape.tags);
+  // @ts-expect-error – email needs a string field
+  email(shape.age);
+  // @ts-expect-error – pattern needs a string field
+  pattern(shape.tags, /x/);
+  // @ts-expect-error – max needs a number field
+  max(shape.name, 1);
+  // @ts-expect-error – maxLength needs a string or array field
+  maxLength(shape.age, 1);
+  minLength(shape.tags, 1); // arrays have a length
+  maxLength(shape.name, 5);
+  min(shape.age, 0); // number | undefined is numeric
   // @ts-expect-error – `name` has no visibility()
   visibleWhen(shape.name, [shape.type], () => true);
   // @ts-expect-error – exclusive fields need disableable()
