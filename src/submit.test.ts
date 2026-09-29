@@ -4,17 +4,19 @@ import {
   form, field, meta, MetaRef, createStore, countIn, rule, asyncRule, control, validation, submission,
   type FocusTarget,
 } from "./index";
-import { describe, it, expect } from "vitest";
-import { sleep, deferred } from "./test/harness";
+import { test as base, describe, expect } from "vitest";
+import { flush, deferred } from "./test/harness";
 import * as account from "./test/fixtures/account";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";
 
-describe('O · submit, focus and paths', () => {
+describe("O · Submit, focus and paths", () => {
   const { shape, L, initial, targets } = limits;
+  const test = base
+    .extend("store", () => createStore(shape, initial()))
+    .extend("lines", ({ store }) => store.substore(shape.lines));
 
-  it("focusFirst: shape order by default, compare to reorder", () => {
-    const s = createStore(shape, initial());
+  test("focusFirst: shape order by default, compare to reorder", ({ store: s }) => {
     const focused: string[] = [];
     const compare = targets(s, { name: 2, code: 1 }, focused);
     const entries = [
@@ -26,7 +28,7 @@ describe('O · submit, focus and paths', () => {
     expect(focused).toEqual(["name", "code"]);
   });
 
-  it("focusOrder store option is used by submit", async () => {
+  test("focusOrder store option is used by submit", async () => {
     const focused: string[] = [];
     const order = { name: 2, code: 1 };
     const s = createStore(shape, initial(), {
@@ -42,8 +44,7 @@ describe('O · submit, focus and paths', () => {
 
   // ---------------------------------------------------------------------------
   // submit / handleSubmit
-  it("handleSubmit: preventDefault, onValid with values", async () => {
-    const s = createStore(shape, initial());
+  test("handleSubmit: preventDefault, onValid with values", async ({ store: s }) => {
     let prevented = 0;
     const got: string[] = [];
     const handler = s.handleSubmit((values) => void got.push(values.name));
@@ -55,7 +56,7 @@ describe('O · submit, focus and paths', () => {
     expect(got.length).toBe(2);
   });
 
-  it("onInvalid receives the result after focusing", async () => {
+  test("onInvalid receives the result after focusing", async () => {
     const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
     const seen: string[] = [];
     s.set(shape.name.focusTarget, { focus: () => seen.push("focus") });
@@ -66,8 +67,7 @@ describe('O · submit, focus and paths', () => {
     expect(seen).toEqual(["focus", "invalid:1"]);
   });
 
-  it("a second submit while one is running returns the same promise", async () => {
-    const s = createStore(shape, initial());
+  test("a second submit while one is running returns the same promise", async ({ store: s }) => {
     const gate = deferred<void>();
     let calls = 0;
     const onValid = async () => {
@@ -77,7 +77,7 @@ describe('O · submit, focus and paths', () => {
     const p1 = s.submit(onValid);
     const p2 = s.handleSubmit(onValid)();
     expect(p1).toBe(p2);
-    await sleep(0);
+    await flush();
     expect(s.get(shape.submitting)).toBe(true);
     gate.resolve();
     await p1;
@@ -87,8 +87,7 @@ describe('O · submit, focus and paths', () => {
     expect(calls, "a new submit after completion").toBe(2);
   });
 
-  it("an error in onValid rejects and resets submitting", async () => {
-    const s = createStore(shape, initial());
+  test("an error in onValid rejects and resets submitting", async ({ store: s }) => {
     let caught: unknown;
     try {
       await s.submit(() => {
@@ -105,9 +104,7 @@ describe('O · submit, focus and paths', () => {
 
   // ---------------------------------------------------------------------------
   // resolvePath
-  it("resolvePath: fields, rows, nested rows, meta keys", () => {
-    const s = createStore(shape, initial());
-    const lines = s.substore(shape.lines);
+  test("resolvePath: fields, rows, nested rows, meta keys", ({ store: s, lines }) => {
     const a = s.resolvePath("name")!;
     expect(a.store).toBe(s);
     expect(a.ref).toBe(shape.name);
@@ -123,21 +120,18 @@ describe('O · submit, focus and paths', () => {
     expect(s.resolvePath("#submitCount")!.ref instanceof MetaRef).toBe(true);
   });
 
-  it("resolvePath: unknown paths are undefined", () => {
-    const s = createStore(shape, initial());
+  test("resolvePath: unknown paths are undefined", ({ store: s }) => {
     for (const p of ["nope", "lines[9].qty", "lines[1].nope", "lines..qty", "lines[x].qty", "name[0]", "lines[1].qty#nokey", ".name", "name."]) {
       expect(s.resolvePath(p), p).toBe(undefined);
     }
   });
 
-  it("resolvePath works from a row store (paths are from the form root)", () => {
-    const s = createStore(shape, initial());
+  test("resolvePath works from a row store (paths are from the form root)", ({ store: s }) => {
     const row = s.substore(shape.lines).itemAt(0);
     expect(row.resolvePath("name")!.store).toBe(s);
   });
 
-  it("server errors: resolve and set", () => {
-    const s = createStore(shape, initial());
+  test("server errors: resolve and set", ({ store: s }) => {
     const server = { "lines[1].qty": "Out of stock", name: "Taken" };
     for (const [path, message] of Object.entries(server)) {
       const target = s.resolvePath(`${path}#error`);
@@ -149,8 +143,7 @@ describe('O · submit, focus and paths', () => {
 
   // ---------------------------------------------------------------------------
   // Focus
-  it("focus(node): false without a target; focus() then scrollIntoView() with one", () => {
-    const s = createStore(shape, initial());
+  test("focus(node): false without a target; focus() then scrollIntoView() with one", ({ store: s }) => {
     expect(s.focus(shape.name)).toBe(false);
     expect(s.focus(shape.flag), "a node without focusable()").toBe(false);
     const calls: string[] = [];
@@ -159,7 +152,7 @@ describe('O · submit, focus and paths', () => {
     expect(calls).toEqual(["focus", "scroll"]);
   });
 
-  it("focusFirst skips entries whose row was removed", () => {
+  test("focusFirst skips entries whose row was removed", () => {
     const s = createStore(shape, initial(), { behaviors: rule(L.qty, () => "bad") });
     const lines = s.substore(shape.lines);
     const [a, b] = lines.items();
@@ -173,11 +166,13 @@ describe('O · submit, focus and paths', () => {
   });
 });
 
-describe('O · submit with validation', () => {
+describe("O · Submit with validation", () => {
   const { shape, L, initial, errors, lookup } = account;
+  const test = base
+    .extend("store", () => createStore(shape, initial()))
+    .extend("lines", ({ store }) => store.substore(shape.lines));
 
-  it("focusFirst skips errors without a focus target", () => {
-    const s = createStore(shape, initial());
+  test("focusFirst skips errors without a focus target", ({ store: s }) => {
     const focused: string[] = [];
     const target = (id: string): FocusTarget => ({ focus: () => focused.push(id) });
     s.set(shape.email.focusTarget, target("email"));
@@ -190,7 +185,7 @@ describe('O · submit with validation', () => {
     expect(s.focus(shape.name)).toBe(false);
   });
 
-  it("submit: counts, submitting, onValid with values, focus on errors", async () => {
+  test("submit: counts, submitting, onValid with values, focus on errors", async () => {
     const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
     const submitted: unknown[] = [];
     let submittingSeen = false;
@@ -214,9 +209,7 @@ describe('O · submit with validation', () => {
     expect(submitted.length).toBe(1);
   });
 
-  it("submit reveals its subtree: existing rows yes, later rows no; reset clears", async () => {
-    const s = createStore(shape, initial());
-    const lines = s.substore(shape.lines);
+  test("submit reveals its subtree: existing rows yes, later rows no; reset clears", async ({ store: s, lines }) => {
     expect(s.get(shape.name.revealed)).toBe(false);
     await s.submit();
     expect(s.get(shape.name.revealed)).toBe(true);
@@ -232,8 +225,7 @@ describe('O · submit with validation', () => {
     expect(lines.items().map((row) => row.get(L.sku.revealed))).toEqual([false, false]);
   });
 
-  it("a row's submit reveals only that row", async () => {
-    const s = createStore(shape, initial());
+  test("a row's submit reveals only that row", async ({ store: s }) => {
     const [first, second] = s.substore(shape.lines).items();
     await second.submit();
     expect(first.get(L.sku.revealed)).toBe(false);
@@ -241,12 +233,12 @@ describe('O · submit with validation', () => {
     expect(s.get(shape.name.revealed)).toBe(false);
   });
 
-  it("submit waits for a running async check", async () => {
+  test("submit waits for a running async check", async () => {
     const { calls, check } = lookup();
     const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { debounce: 1000 }) });
     s.set(shape.email, "late@x.io", { origin: "user" });
     const pending = s.submit();
-    await sleep(0);
+    await flush();
     expect(calls.length, "debounce skipped on submit").toBe(1);
     calls[0].d.resolve("Taken");
     const r = await pending;
@@ -256,7 +248,7 @@ describe('O · submit with validation', () => {
 
   // ---------------------------------------------------------------------------
   // submit without submission()
-  it("submit works on a form whose root has no submission()", async () => {
+  test("submit works on a form whose root has no submission()", async () => {
     const f = form({ name: field<string>().meta(control()) });
     const s = createStore(f, { name: "x" });
     const got: unknown[] = [];
@@ -267,14 +259,15 @@ describe('O · submit with validation', () => {
   });
 });
 
-describe('O · focus targets', () => {
+describe("O · Focus targets", () => {
   const { shape, L, initial, originsOf } = company;
+  const test = base
+    .extend("store", () => createStore(shape, initial()))
+    .extend("lines", ({ store }) => store.substore(shape.lines));
 
   // ---------------------------------------------------------------------------
   // Non-reactive keys
-  it("focus targets never notify and work on detached rows", () => {
-    const s = createStore(shape, initial());
-    const lines = s.substore(shape.lines);
+  test("focus targets never notify and work on detached rows", ({ store: s, lines }) => {
     const row = lines.itemAt(0);
     let calls = 0;
     s.subscribe(() => calls++);
