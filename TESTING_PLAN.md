@@ -127,25 +127,25 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** undeclared reads and writes, async reported, one writer, feature-owned keys, cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
 
 - [x] **J1 · P1** A custom feature whose default `behavior` references another node is rejected: "default behaviors may only use their own node". → `behaviors.test.ts`
-- [ ] **J2 · P2** Writing a `CountRef` or `InitialRef` is rejected: "only values and meta keys are writable". → `behaviors.test.ts`
-- [ ] **J3 · P2** `addBehavior` on a detached row throws "Cannot add behaviors to a detached row". → `behaviors.test.ts`
+- [x] **J2 · P2** Writing a `CountRef` or `InitialRef` is rejected: "only values and meta keys are writable". → `behaviors.test.ts`
+- [x] **J3 · P2** `addBehavior` on a detached row throws "Cannot add behaviors to a detached row". → `behaviors.test.ts`
 - [ ] **J4 · P3** `replaceBehavior` with a handle from another store / runtime throws; with an already-disposed handle throws. → `additions.test.ts`
 
 ### K. Ordering & ownership
 **Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), one writer, opposite `when/otherwise` branches may share a target.
 
-- [ ] **K1 · P2** **Container edge:** a row behavior writing a row field runs before a root behavior that triggers on the whole array (assert run order with a log, not only final values). → `behaviors.test.ts`
-- [ ] **K2 · P2** **Inherited-meta edge:** a behavior writing an ancestor's `visible` runs before a field's validation queue that triggers on its effective visibility. → `behaviors.test.ts`
-- [ ] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
+- [x] **K1 · P2** **Container edge:** a row behavior writing a row field runs before a root behavior that triggers on the whole array (assert run order with a log, not only final values). → `behaviors.test.ts`
+- [x] **K2 · P2** **Inherited-meta edge:** a behavior writing an ancestor's `visible` runs before a field's validation queue that triggers on its effective visibility. → `behaviors.test.ts`
+- [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
 - [ ] **K4 · P3** Pin the constraint: a row behavior that reads the whole array can run more than once per flush when a sibling row's instance writes (document the expected count). → `behaviors.test.ts`
 - [ ] **K5 · P3** Pin the constraint: two component behaviors on different rows that would only form a cycle across rows are rejected at registration. → `behaviors.test.ts`
 
 ### L. Runtime lifecycle
 **Covered:** init runs, `runOn.init`, `ctx.state`, `ctx.origins`, `when` skip, throwing behaviors isolated (writes dropped, concrete scope), row instances pause/resume, nested rows, row-level `addBehavior`/dispose.
 
-- [ ] **L1 · P2** `ctx.changed(ref)` is `false` on the init run and `true` only for triggers that changed since the last run. → `behaviors.test.ts`
-- [ ] **L2 · P2** Within one run: two `ctx.set` calls to the same target → the last one wins; `ctx.get` sees the pending write. → `behaviors.test.ts`
-- [ ] **L3 · P2** `ctx.initial(node)` without `initialOf(node)` declared throws the undeclared-read error. → `behaviors.test.ts`
+- [x] **L1 · P2** `ctx.changed(ref)` is `false` on the init run and `true` only for triggers that changed since the last run. → `behaviors.test.ts`
+- [x] **L2 · P2** Within one run: two `ctx.set` calls to the same target → the last one wins; `ctx.get` sees the pending write. → `behaviors.test.ts`
+- [x] **L3 · P2** `ctx.initial(node)` without `initialOf(node)` declared throws the undeclared-read error. → `behaviors.test.ts`
 - [ ] **L4 · P3** The default `onError` logs `[form] "<name>" failed at "<scope>"` via `console.error` (spy). → `behaviors.test.ts`
 
 ### M. Validation
