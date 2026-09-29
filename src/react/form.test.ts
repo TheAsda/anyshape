@@ -1,7 +1,7 @@
 import { createElement as h, act, useState, StrictMode, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
-  form, object, array, field, metaKey, rule, max, control, submission, countIn,
+  form, object, array, field, metaKey, rule, max, control, submission, countIn, createStore,
   type InferValue, type RootStore,
 } from "../index";
 import { StoreProvider, useForm, useSync, useControl, useValue, fromInput, domOrder } from "./index";
@@ -282,4 +282,38 @@ it("domOrder: nodes by document position, other targets equal", async () => {
   expect(domOrder(a, { focus() {} })).toBe(0);
   a.remove();
   b.remove();
+});
+
+// ---------------------------------------------------------------------------
+// useSync on a value node, and under a row provider
+it("useSync on a value node with resetOnUnmount restores the node's initial value", async () => {
+  const s = createStore(shape, { ...empty(), note: "from the server" });
+  function Sync({ value }: { value: string }) {
+    useSync(shape.note, value, { resetOnUnmount: true });
+    return null;
+  }
+  await mount(h(StoreProvider, { store: s }, h(Sync, { value: "synced" })));
+  expect(s.get(shape.note)).toBe("synced");
+  await unmount();
+  expect(s.get(shape.note), "the initial value, not a meta default").toBe("from the server");
+});
+
+it("useSync under a row provider writes that row; after the row is removed it neither writes nor throws", async () => {
+  const s = createStore(shape, { ...empty(), lines: [{ qty: 1 }, { qty: 2 }] });
+  const lines = s.substore(shape.lines);
+  const [first, second] = lines.items();
+  function Sync({ limit }: { limit: number }) {
+    useSync(L.qty.maxQty, limit);
+    return null;
+  }
+  const tree = (limit: number) => h(StoreProvider, { store: s }, h(StoreProvider, { store: second }, h(Sync, { limit })));
+  await mount(tree(5));
+  expect(second.get(L.qty.maxQty)).toBe(5);
+  expect(first.get(L.qty.maxQty)).toBe(undefined);
+
+  await run(() => lines.remove(second));
+  await act(async () => root!.render(tree(9)));
+  expect(lines.items().map((r) => r.get(L.qty.maxQty))).toEqual([undefined]);
+  expect(second.get(L.qty.maxQty), "the detached row was not written").toBe(5);
+  await unmount();
 });
