@@ -16,22 +16,28 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 
 ## 1. How the tests are written today
 
-| File | Area | Tests |
-|---|---|---|
-| `src/store.test.ts` | nodes, lenses, stores, row identity basics | 24 |
-| `src/meta.test.ts` | `.meta()`, key definitions, meta refs, closed meta | 17 |
-| `src/notifications.test.ts` | the 9 notification rules, flush | 27 |
-| `src/extensions.test.ts` | refs API, origins, baselines, reset, array helpers, counts, inheritance, focus targets | 26 |
-| `src/behaviors.test.ts` | behavior runtime, scopes, ordering, ownership, touched/dirty | 29 |
-| `src/validation.test.ts` | rules, queues, async, `validate()`, `submit()` | 30 |
-| `src/utilities.test.ts` | ready-made rules and behaviors, builder | 18 |
-| `src/additions.test.ts` | stable refs, `keepOnReset`, ref limits, atomic replace, submit/focus, `resolvePath`, reset recompute | 24 |
-| `src/react/react.test.ts` | provider, resolution, `useValue`, `useField`, `useControl`, adapters, `useArray` | 14 |
-| `src/react/form.test.ts` | `useForm`, `useSync`, DOM focus order, `handleSubmit` | 11 |
-| `src/react/behaviors.test.ts` | `useBehaviors` | 11 |
-| `src/lens.test.ts` | lens unit tests | 8 |
-| `src/types.test.ts` | the public type contract (asserted by `tsc`) | 1 |
-| `src/integration.test.ts` | trip-booking scenarios across all layers | 5 |
+| File | Layer | Area | Tests |
+|---|---|---|---|
+| `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
+| `src/lens.test.ts` | B | lens unit tests | 8 |
+| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 20 |
+| `src/store.test.ts` | D, E | stores, scopes, reference API, row identity, array helpers | 29 |
+| `src/notifications.test.ts` | F | the notification rules, flush | 33 |
+| `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
+| `src/counts.test.ts` | H | `countIn`, `collect`, aggregate keys | 10 |
+| `src/inheritance.test.ts` | I | inherited `visible` / `disabled`, `get` vs `getOwn` | 4 |
+| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 49 |
+| `src/validation.test.ts` | M | rules, queues, async, `validate()` | 35 |
+| `src/utilities.test.ts` | N | ready-made rules and behaviors, reference limits, builder | 26 |
+| `src/submit.test.ts` | O | `submit`, `handleSubmit`, focus order and targets, `resolvePath` | 19 |
+| `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
+| `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
+| `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useControl`, adapters, `useArray` | 19 |
+| `src/react/form.test.tsx` | Q | `useForm`, `useSync`, DOM focus order, `handleSubmit` | 14 |
+| `src/react/behaviors.test.tsx` | R | `useBehaviors` | 13 |
+| `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
+
+Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`.
 
 **Conventions (keep them):**
 - **Runner:** vitest + happy-dom (`vitest.config.ts`). React tests render real React 19 with `act`.
@@ -51,7 +57,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `store.test.ts`
 - [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `_fields`, …). Same for meta keys, plus `item`. → `meta.test.ts`
-- [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `extensions.test.ts`
+- [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `store.test.ts`
 - [x] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
 
 ### B. Lenses (`lens.ts`)
@@ -68,8 +74,8 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, `inherit` on non-boolean throws, refs on instantiated / reused / row / container / root nodes, child field wins, closed `setMeta`.
 
 - [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
-- [x] **C2 · P2** `setMeta(node, …, { as: "initial" })` throws "applies to values only". → `extensions.test.ts`
-- [x] **C3 · P2** `store.set(initialOf(node), v)` throws "Initial values are written with { as: \"initial\" }"; confirm that `set(countIn(…))` throws "Counts are read-only" (assert the message, not only that it throws). → `extensions.test.ts`
+- [x] **C2 · P2** `setMeta(node, …, { as: "initial" })` throws "applies to values only". → `origins.test.ts`
+- [x] **C3 · P2** `store.set(initialOf(node), v)` throws "Initial values are written with { as: \"initial\" }"; confirm that `set(countIn(…))` throws "Counts are read-only" (assert the message, not only that it throws). → `origins.test.ts`
 
 ### D. Store structure & scopes (`store.ts`)
 **Covered:** get/set through root, structural sharing, same-value no-op, cached substores, focus checks, root can't reach rows, meta owner seeding, object substore inside an item.
@@ -89,7 +95,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - `remove`/`move` with a row from *another* array throws "does not belong";
   - `remove` of a detached row throws "is detached".
 
-  → `extensions.test.ts`
+  → `store.test.ts`
 - [x] **E2 · P1** Regression: `append()`/`insert()` return the right row store **when a behavior edits the new row in the same flush** (e.g. a row-scoped `calculate` with `runOn.init`). → `behaviors.test.ts`
 - [x] **E3 · P3** A write through a row store that would make the array contain the same object twice is rejected by `_replaceItem`. → `store.test.ts`
 
@@ -105,23 +111,23 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### G. Origins, baselines & reset
 **Covered:** origins in reactions, per target, across scopes, per row; `getInitial` and `{ as: "initial" }`; per-row baselines, new rows `{}`, a baseline write on the array; reset of root and of one row; `keepOnReset`; reset re-validation and recompute.
 
-- [x] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `additions.test.ts`
-- [x] **G2 · P2** `setValues(values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `extensions.test.ts`
-- [x] **G3 · P3** Reset uses origin `"initial"`: a reaction receives `{"initial"}`, and `touched` does not flip. → `extensions.test.ts`
+- [x] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `origins.test.ts`
+- [x] **G2 · P2** `setValues(values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `origins.test.ts`
+- [x] **G3 · P3** Reset uses origin `"initial"`: a reaction receives `{"initial"}`, and `touched` does not flip. → `origins.test.ts`
 
 ### H. Counts & collect
 **Covered:** counts across fields/objects/rows, rows removed and restored, count subscriptions, `collect` with row indexes, warning for non-countable keys, `aggregate(default)` must be false, stable `countIn` refs.
 
-- [x] **H1 · P2** A `CountRef` as a **behavior trigger** (re-runs when the count changes, including on row removal) and as a **rule limit** (`max(node, countIn(…))`). → `behaviors.test.ts`, `additions.test.ts`
-- [x] **H2 · P3** `collect` called on a row store (paths still from the root, only that row's entries); nested rows `a[1].b[0].c`. → `extensions.test.ts`
-- [x] **H3 · P3** A custom counted key (`metaKey(…, { aggregate })`) written by application code updates counts like built-in keys. → `extensions.test.ts`
+- [x] **H1 · P2** A `CountRef` as a **behavior trigger** (re-runs when the count changes, including on row removal) and as a **rule limit** (`max(node, countIn(…))`). → `behaviors.test.ts`, `utilities.test.ts`
+- [x] **H2 · P3** `collect` called on a row store (paths still from the root, only that row's entries); nested rows `a[1].b[0].c`. → `counts.test.ts`
+- [x] **H3 · P3** A custom counted key (`metaKey(…, { aggregate })`) written by application code updates counts like built-in keys. → `counts.test.ts`
 
 ### I. Inheritance (hidden & disabled)
 **Covered:** `visible` via ancestors, `disabled` from the root into rows, subscriptions fire on ancestor changes, hidden/disabled skipped by validation, `validateHidden`, values omit hidden and disabled.
 
 - [x] **I1 · P1** Submitted values, the documented rule: a node that **declares** `visible`/`disabled` and is hidden/disabled is omitted; **descendants of a disabled ancestor that don't declare the key stay in `values`** (but are still skipped by validation). Add a matching `SubmitValue` type assertion. → `validation.test.ts`
 - [x] **I2 · P2** `validation({ validateDisabled: true })` keeps validating a disabled field. → `validation.test.ts`
-- [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `extensions.test.ts`
+- [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `inheritance.test.ts`
 
 ### J. Behavior registration checks
 **Covered:** undeclared reads and writes, async reported, one writer, feature-owned keys, cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
@@ -129,7 +135,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **J1 · P1** A custom feature whose default `behavior` references another node is rejected: "default behaviors may only use their own node". → `behaviors.test.ts`
 - [x] **J2 · P2** Writing a `CountRef` or `InitialRef` is rejected: "only values and meta keys are writable". → `behaviors.test.ts`
 - [x] **J3 · P2** `addBehavior` on a detached row throws "Cannot add behaviors to a detached row". → `behaviors.test.ts`
-- [x] **J4 · P3** `replaceBehavior` with a handle from another store / runtime throws; with an already-disposed handle throws. → `additions.test.ts`
+- [x] **J4 · P3** `replaceBehavior` with a handle from another store / runtime throws; with an already-disposed handle throws. → `behaviors.test.ts`
 
 ### K. Ordering & ownership
 **Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), one writer, opposite `when/otherwise` branches may share a target.
@@ -159,7 +165,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
   If `minItems`/`maxItems` utilities are added, test them here. → `validation.test.ts`
 - [x] **M2 · P2** An async rule with `triggers`/`reads`: a change of a read value makes `validate()` re-check (no stale reuse); identical inputs reuse the result. Guards on async rules: a false guard clears the error and aborts. → `validation.test.ts`
-- [x] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `additions.test.ts`
+- [x] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `validation.test.ts`
 - [x] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues, errors and values. → `validation.test.ts`
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
@@ -175,32 +181,32 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### O. Submit, focus, paths
 **Covered:** `focusFirst` order and `compare`, `focusOrder` option, `handleSubmit`, `onInvalid`, the double-submit guard, errors in `onValid`, `focus: false`, `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors.
 
-- [x] **O1 · P2** `store.focus(node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `additions.test.ts`
-- [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `additions.test.ts`
+- [x] **O1 · P2** `store.focus(node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `submit.test.ts`
+- [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `submit.test.ts`
 - [x] **O3 · P2** `submit()` on a form whose root has **no** `submission()` works (no counters, no throw). → `validation.test.ts`
-- [x] **O4 · P3** `handleSubmit(...)()` called without an event. → `additions.test.ts`
+- [x] **O4 · P3** `handleSubmit(...)()` called without an event. → `submit.test.ts`
 
 ### P. React bindings (`react/hooks.ts`)
 **Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useControl` (state, user writes, `onBlur` reveal, default and custom policies), `focusRef`, adapters (real events, caching), `useArray` (re-render on structure only, nested arrays).
 
-- [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `react/react.test.ts`
-- [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `react/react.test.ts`
-- [x] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.ts`
-- [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.ts`
-- [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.ts`
+- [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `react/react.test.tsx`
+- [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `react/react.test.tsx`
+- [x] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.tsx`
+- [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.tsx`
+- [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.tsx`
 
 ### Q. Lifetime & outside data (`react/form.ts`)
 **Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, `resetOnUnmount`, StrictMode), DOM focus order, explicit `focusOrder`, `handleSubmit` on a real form, `domOrder`.
 
-- [x] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.ts`
-- [x] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.ts`
-- [x] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.ts`
+- [x] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.tsx`
+- [x] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.tsx`
+- [x] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.tsx`
 
 ### R. Behaviors in components (`react/behaviors.ts`)
 **Covered:** mount/unmount timing, row scoping, deps-driven atomic swap, latest props in `run`/checks/guards, declarations changing without deps (warning), builder features, StrictMode, duplicates with the `{ key }` hint and sharing, store change moves the registration, explicit `{ store }`.
 
-- [x] **R1 · P2** A `{ key }`-shared registration is removed only when the **last** holder unmounts; holders on *different* stores with the same key don't share. → `react/behaviors.test.ts`
-- [x] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.ts`
+- [x] **R1 · P2** A `{ key }`-shared registration is removed only when the **last** holder unmounts; holders on *different* stores with the same key don't share. → `react/behaviors.test.tsx`
+- [x] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.tsx`
 
 ### S. Type-level tests
 Type assertions are spread across the files today. Collect the public-API type contract in one place: **new `src/types.test.ts`** (checked by `npm run typecheck`).

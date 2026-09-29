@@ -3,59 +3,14 @@ import {
   control, validation, visibility, disableable, submission,
   type InferValue, type BehaviorErrorInfo, type FocusTarget, type SubmitValue,
 } from "./index";
-import { it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
+import * as limits from "./test/fixtures/limits";
 import { sleep, deferred } from "./test/harness";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
 
-const shape = form(
-  object({
-    type: field<"person" | "company">(),
-    name: field<string>().meta(control()),
-    email: field<string>().meta(control()),
-    password: field<string>().meta(control()),
-    confirm: field<string>().meta(control()),
-    taxId: field<string>().meta(control()),
-    note: field<string>(),
-    company: object({
-      vat: field<string>().meta(control()),
-      secret: field<string>().meta(control({ validateHidden: true })),
-    }).meta(visibility()),
-    promo: field<string>().meta(control(), disableable()),
-    lines: array(
-      object({
-        sku: field<string>().meta(control()),
-        qty: field<number>().meta(control()),
-        total: field<number>().meta(validation()),
-      }),
-      { create: () => ({ sku: "", qty: 1, total: 0 }) }
-    ).meta(disableable()),
-  }).meta(submission())
-);
-type Values = InferValue<typeof shape>;
-const L = shape.lines.item;
-
-function initial(): Values {
-  return {
-    type: "person", name: "Ann", email: "ann@x.io", password: "secret", confirm: "secret",
-    taxId: "", note: "", company: { vat: "", secret: "" }, promo: "",
-    lines: [
-      { sku: "A", qty: 1, total: 0 },
-      { sku: "B", qty: 2, total: 0 },
-    ],
-  };
-}
-
-const required = <N extends typeof shape.name>(n: N, name = "required") =>
-  rule(n, (v) => (v ? undefined : "Required"), { name });
-const minLength = (n: typeof shape.name, min: number) =>
-  rule(n, (v) => (v.length >= min ? undefined : `At least ${min}`), { name: "minLength" });
-
-function errors() {
-  const list: { error: unknown; info: BehaviorErrorInfo }[] = [];
-  return { list, onError: (error: unknown, info: BehaviorErrorInfo) => list.push({ error, info }) };
-}
+import { shape, L, initial, required, minLength, errors, lookup, type Values } from "./test/fixtures/account";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -213,15 +168,6 @@ it("removing the last rule clears the error", () => {
 
 // ---------------------------------------------------------------------------
 // Async
-function lookup() {
-  const calls: { value: string; signal: AbortSignal; d: ReturnType<typeof deferred<string | undefined>> }[] = [];
-  const check = (value: string, ctx: { signal: AbortSignal }) => {
-    const d = deferred<string | undefined>();
-    calls.push({ value, signal: ctx.signal, d });
-    return d.promise;
-  };
-  return { calls, check };
-}
 
 it("async: starts on user changes, result arrives as a new batch", async () => {
   const { calls, check } = lookup();
@@ -387,83 +333,10 @@ it("validate: values leave out hidden and disabled nodes", async () => {
   expect(r.values.lines?.length).toBe(2);
 });
 
-it("focusFirst skips errors without a focus target", () => {
-  const s = createStore(shape, initial());
-  const focused: string[] = [];
-  const target = (id: string): FocusTarget => ({ focus: () => focused.push(id) });
-  s.set(shape.email.focusTarget, target("email"));
-  const entries = [
-    { path: "name", ref: shape.name, store: s },
-    { path: "email", ref: shape.email, store: s },
-  ];
-  expect(s.focusFirst(entries)?.path).toBe("email");
-  expect(focused).toEqual(["email"]);
-  expect(s.focus(shape.name)).toBe(false);
-});
 
-it("submit: counts, submitting, onValid with values, focus on errors", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
-  const submitted: unknown[] = [];
-  let submittingSeen = false;
-  const ok = await s.submit(async (values) => {
-    submittingSeen = s.get(shape.submitting);
-    submitted.push(values.name);
-  });
-  expect(ok.valid).toBe(true);
-  expect(submitted).toEqual(["Ann"]);
-  expect(submittingSeen).toBe(true);
-  expect(s.get(shape.submitting)).toBe(false);
-  expect(s.get(shape.submitCount)).toBe(1);
 
-  const focused: string[] = [];
-  s.set(shape.name.focusTarget, { focus: () => focused.push("name") });
-  s.set(shape.name, "", { origin: "user" });
-  const bad = await s.submit(() => submitted.push("never"));
-  expect(bad.valid).toBe(false);
-  expect(focused).toEqual(["name"]);
-  expect(s.get(shape.submitCount)).toBe(2);
-  expect(submitted.length).toBe(1);
-});
 
-it("submit reveals its subtree: existing rows yes, later rows no; reset clears", async () => {
-  const s = createStore(shape, initial());
-  const lines = s.substore(shape.lines);
-  expect(s.get(shape.name.revealed)).toBe(false);
-  await s.submit();
-  expect(s.get(shape.name.revealed)).toBe(true);
-  expect(lines.items().map((row) => row.get(L.sku.revealed))).toEqual([true, true]);
 
-  const added = lines.append();
-  expect(added.get(L.sku.revealed), "a row added after submit starts hidden").toBe(false);
-  await added.submit();
-  expect(added.get(L.sku.revealed), "a row's submit reveals the row").toBe(true);
-
-  s.reset();
-  expect(s.get(shape.name.revealed)).toBe(false);
-  expect(lines.items().map((row) => row.get(L.sku.revealed))).toEqual([false, false]);
-});
-
-it("a row's submit reveals only that row", async () => {
-  const s = createStore(shape, initial());
-  const [first, second] = s.substore(shape.lines).items();
-  await second.submit();
-  expect(first.get(L.sku.revealed)).toBe(false);
-  expect(second.get(L.sku.revealed)).toBe(true);
-  expect(s.get(shape.name.revealed)).toBe(false);
-});
-
-it("submit waits for a running async check", async () => {
-  const { calls, check } = lookup();
-  const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { debounce: 1000 }) });
-  s.set(shape.email, "late@x.io", { origin: "user" });
-  const pending = s.submit();
-  await sleep(0);
-  expect(calls.length, "debounce skipped on submit").toBe(1);
-  calls[0].d.resolve("Taken");
-  const r = await pending;
-  expect(r.valid).toBe(false);
-  expect(r.errors[0].error).toBe("Taken");
-});
 
 
 // ---------------------------------------------------------------------------
@@ -616,17 +489,6 @@ it("validate() on a row or a section: only that part's errors and values", async
   expect(section.values).toEqual({ vat: "", secret: "" });
 });
 
-// ---------------------------------------------------------------------------
-// submit without submission()
-it("submit works on a form whose root has no submission()", async () => {
-  const f = form({ name: field<string>().meta(control()) });
-  const s = createStore(f, { name: "x" });
-  const got: unknown[] = [];
-  const r = await s.submit((values) => void got.push(values));
-  expect(r.valid).toBe(true);
-  expect(got).toEqual([{ name: "x" }]);
-  expect(s.get(f.name.revealed)).toBe(true);
-});
 
 // ---------------------------------------------------------------------------
 it("validate() with a check pending on a row that is then removed: the row is not listed", async () => {
@@ -663,4 +525,21 @@ it.fails("validate(): removing a row aborts its pending check and validate() doe
   expect(calls[1].signal.aborted).toBe(true);
   const r = await Promise.race([pending, sleep(50).then(() => "hung" as const)]);
   expect(r).not.toBe("hung");
+});
+
+describe('M · server errors', () => {
+  const { shape, L, initial, targets } = limits;
+
+  // ---------------------------------------------------------------------------
+  // Server errors vs validation
+  it("a server error stays until the field's next validation run", () => {
+    const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
+    const target = s.resolvePath("name#error")!;
+    target.store.set(target.ref as never, "Taken on the server" as never);
+    expect(s.get(shape.name.error)).toBe("Taken on the server");
+    s.set(shape.code, "XY");
+    expect(s.get(shape.name.error), "unrelated changes don't clear it").toBe("Taken on the server");
+    s.set(shape.name, "Bob", { origin: "user" });
+    expect(s.get(shape.name.error), "the field's next validation replaces it").toBe(undefined);
+  });
 });

@@ -6,7 +6,8 @@ import {
   when, type AnyBehavior,
   type InferValue, type BehaviorBuilder,
 } from "./index";
-import { it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
+import * as limits from "./test/fixtures/limits";
 
 const shape = form({
   type: field<"person" | "company">(),
@@ -429,4 +430,53 @@ it("the `when` option on utilities behaves like a builder block", () => {
   ];
   expect(trace(viaOption)).toEqual(expected);
   expect(trace(viaBlock)).toEqual(expected);
+});
+
+describe('N · reference limits', () => {
+  const { shape, L, initial, targets } = limits;
+
+  // ---------------------------------------------------------------------------
+  // Reference limits
+  it("max with a reference limit: follows the reference, undefined passes", () => {
+    const s = createStore(shape, initial(), { behaviors: max(L.qty, L.qty.maxQty) });
+    const row = s.substore(shape.lines).itemAt(1);
+    expect(row.get(L.qty.error), "no limit yet").toBe(undefined);
+    row.set(L.qty.maxQty, 3);
+    expect(row.get(L.qty.error), "re-validated when the limit arrives").toBe("Must be at most 3");
+    row.set(L.qty.maxQty, 10);
+    expect(row.get(L.qty.error)).toBe(undefined);
+    s.reset();
+    expect(row.get(L.qty.maxQty), "kept by reset").toBe(10);
+    row.set(L.qty, 11, { origin: "user" });
+    expect(row.get(L.qty.error)).toBe("Must be at most 10");
+  });
+
+  it("minLength with a reference from an enclosing scope-less key", () => {
+    const s = createStore(shape, initial(), { behaviors: minLength(shape.code, shape.code.minCode, { message: "Too short" }) });
+    expect(s.get(shape.code.error)).toBe(undefined);
+    s.set(shape.code.minCode, 3);
+    expect(s.get(shape.code.error)).toBe("Too short");
+  });
+
+  it("number limits keep working", () => {
+    const s = createStore(shape, initial(), { behaviors: max(L.qty, 4) });
+    expect(s.substore(shape.lines).itemAt(1).get(L.qty.error)).toBe("Must be at most 4");
+  });
+
+  // ---------------------------------------------------------------------------
+  // A count as a rule limit
+  it("a count as a rule limit: re-checked whenever the count changes", () => {
+    const f = form({
+      wanted: field<number>().meta(control()),
+      rows: array(object({ v: field<string>().meta(control()) }), { create: () => ({ v: "" }) }),
+    });
+    const s = createStore(f, { wanted: 2, rows: [] }, { behaviors: max(f.wanted, countIn(f.rows, "dirty")) });
+    const rows = s.substore(f.rows);
+    expect(s.get(f.wanted.error)).toBe("Must be at most 0");
+    rows.append(); // a new row's field starts dirty
+    const second = rows.append();
+    expect(s.get(f.wanted.error)).toBe(undefined);
+    rows.remove(second);
+    expect(s.get(f.wanted.error), "the message uses the current limit").toBe("Must be at most 1");
+  });
 });

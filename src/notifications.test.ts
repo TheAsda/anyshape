@@ -1,5 +1,6 @@
 import { form, object, array, field, meta, createStore, type InferValue } from "./index";
-import { it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
+import * as company from "./test/fixtures/company";
 
 const address = object({
   street: field<string>(),
@@ -456,4 +457,18 @@ it("a flat form with 300 fields: one write calls only that field's listener", ()
   for (let i = 0; i < 300; i++) s.subscribeValue(nodes[`f${i}`], () => calls.push(`f${i}`));
   s.set(nodes.f150 as never, 1 as never);
   expect(calls).toEqual(["f150"]);
+});
+
+describe('F · meta-key subscriptions', () => {
+  const { shape, L, initial, originsOf } = company;
+
+  it("subscribe to a single meta key ignores other keys", () => {
+    const s = createStore(shape, initial());
+    let calls = 0;
+    s.subscribe(shape.name.error, () => calls++);
+    s.set(shape.name.touched, true);
+    expect(calls).toBe(0);
+    s.set(shape.name.error, "x");
+    expect(calls).toBe(1);
+  });
 });
