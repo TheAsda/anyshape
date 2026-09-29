@@ -1,129 +1,11 @@
 // ============================================================
 // Integration: one realistic form exercising the layers together.
-// A trip booking: a reused `person` block, traveler rows with a per-row
-// computed flag, a calculated pricing chain with a budget rule, a seat
-// count limited by a value synced from outside, a visa section shown for
-// some destinations, and promo code / voucher exclusivity.
+// The trip booking lives in ./test/trip.ts (shared with the React suite).
 // ============================================================
 
-import {
-  form, object, array, field, metaKey, createStore, countIn,
-  control, visibility, disableable, submission,
-  defineBehaviors, asyncRule, required, email, pattern, max,
-  calculate, visibleWhen, clearWhenHidden, exclusive,
-  type InferValue,
-} from "./index";
+import { createStore, countIn } from "./index";
+import { trip, T, tripBehaviors, emptyTrip, savedBooking, quiet } from "./test/trip";
 import { it, expect } from "vitest";
-
-const person = object({
-  name: field<string>().meta(control()),
-  email: field<string>().meta(control()),
-});
-
-const trip = form(
-  object({
-    contact: person,
-    emergencyContact: person,
-    destination: field<string>().meta(control()),
-    departDate: field<string>().meta(control()),
-    returnDate: field<string>().meta(control()),
-    nights: field<number | undefined>(),
-    travelers: array(
-      object({
-        name: field<string>().meta(control()),
-        birthDate: field<string>().meta(control()),
-        passport: field<string>().meta(control()),
-        isAdult: field<boolean>(),
-      }),
-      { create: () => ({ name: "", birthDate: "", passport: "", isAdult: true }) }
-    ),
-    seats: field<number>().meta(control(), {
-      seatsLeft: metaKey<number | undefined>(undefined, { keepOnReset: true }),
-    }),
-    pricePerNight: field<number>(),
-    price: field<number | undefined>(),
-    budget: field<number | undefined>(),
-    total: field<number | undefined>().meta(control()),
-    visa: object({
-      number: field<string>().meta(control()),
-      expires: field<string>().meta(control()),
-    }).meta(visibility()),
-    promo: field<string>().meta(control(), disableable()),
-    voucher: field<string>().meta(control(), disableable()),
-  }).meta(submission())
-);
-type Trip = InferValue<typeof trip>;
-const T = trip.travelers.item;
-
-// ---------------------------------------------------------------------------
-// Helpers
-const DAY = 86_400_000;
-const nightsBetween = (from: string, to: string) =>
-  from && to ? Math.max(0, Math.round((Date.parse(to) - Date.parse(from)) / DAY)) : undefined;
-const isAdultOn = (birth: string, on: string) =>
-  !birth || !on || (Date.parse(on) - Date.parse(birth)) / (365.25 * DAY) >= 18;
-const needsVisa = (country: string) => ["IN", "CN", "BR"].includes(country);
-
-/** The passport service: "X0000000" is reported lost. */
-async function checkPassport(value: string) {
-  await new Promise((r) => setTimeout(r, 1));
-  return value === "X0000000" ? "This passport is reported lost" : undefined;
-}
-
-/** The trip's logic. `runs` counts how often each calculation ran. */
-function tripBehaviors(runs: Record<string, number> = {}) {
-  const count = (k: string) => (runs[k] = (runs[k] ?? 0) + 1);
-  return defineBehaviors(trip, (b, t) => {
-    b.add(required(t.contact.name), required(t.contact.email), email(t.contact.email));
-    b.add(required(t.destination), required(t.departDate), required(t.returnDate));
-
-    b.each(t.travelers, (b, p) => {
-      b.add(required(p.name), required(p.passport));
-      b.add(pattern(p.passport, /^[A-Z0-9]{8}$/, { message: "8 letters or digits" }));
-      b.add(asyncRule(p.passport, checkPassport));
-      b.add(calculate(p.isAdult, [p.birthDate, t.departDate], (birth, dep) => (count("isAdult"), isAdultOn(birth, dep))));
-    });
-
-    b.add(calculate(t.nights, [t.departDate, t.returnDate], (a, z) => (count("nights"), nightsBetween(a, z))));
-    b.add(calculate(t.price, [t.nights, t.pricePerNight, t.travelers], (n, ppn, ts) =>
-      (count("price"), n === undefined ? undefined : n * ppn * ts.length)));
-    b.add(calculate(t.total, [t.price], (p) => (count("total"), p)));
-    b.add(max(t.total, t.budget, { message: "Over budget" }));
-
-    b.add(calculate(t.seats, [t.travelers], (ts) => ts.length));
-    b.add(max(t.seats, t.seats.seatsLeft, { message: "Not enough seats left" }));
-
-    b.add(visibleWhen(t.visa, [t.destination], needsVisa));
-    b.add(clearWhenHidden(t.visa));
-    b.add(required(t.visa.number), required(t.visa.expires));
-
-    b.add(exclusive([t.promo, t.voucher]));
-  });
-}
-
-const emptyPerson = () => ({ name: "", email: "" });
-function emptyTrip(): Trip {
-  return {
-    contact: emptyPerson(), emergencyContact: emptyPerson(),
-    destination: "", departDate: "", returnDate: "", nights: undefined,
-    travelers: [], seats: 0, pricePerNight: 100, price: undefined, budget: undefined, total: undefined,
-    visa: { number: "", expires: "" }, promo: "", voucher: "",
-  };
-}
-function savedBooking(): Trip {
-  return {
-    ...emptyTrip(),
-    contact: { name: "Ada", email: "ada@example.com" },
-    destination: "DE", departDate: "2026-10-01", returnDate: "2026-10-08",
-    // a saved booking stores its calculated values too, consistent with its data
-    nights: 7, seats: 2, price: 1400, total: 1400,
-    travelers: [
-      { name: "Ada", birthDate: "1990-01-01", passport: "X0000000", isAdult: true },
-      { name: "Tim", birthDate: "2015-05-05", passport: "", isAdult: false },
-    ],
-  };
-}
-const quiet = { onError: () => {} };
 
 // ---------------------------------------------------------------------------
 // INT1
@@ -265,4 +147,79 @@ it("INT5 a limit synced from outside: error while exceeded; reset keeps the limi
   expect(s.get(trip.seats.error), "still exceeded after reset: the error is recomputed, not just cleared").toBe(
     "Not enough seats left"
   );
+});
+
+// ---------------------------------------------------------------------------
+// INT6
+it("INT6 loaded data with both promo and voucher: both enabled and in error until one is cleared", () => {
+  const s = createStore(trip, { ...savedBooking(), promo: "SUMMER", voucher: "V-100" }, { behaviors: tripBehaviors(), ...quiet });
+  expect([s.get(trip.promo.disabled), s.get(trip.voucher.disabled)]).toEqual([false, false]);
+  expect(s.get(trip.promo.error)).toBe("Only one of promo, voucher can be set");
+  expect(s.get(trip.voucher.error)).toBe("Only one of promo, voucher can be set");
+
+  s.set(trip.promo, "", { origin: "user" });
+  expect([s.get(trip.promo.disabled), s.get(trip.voucher.disabled)]).toEqual([true, false]);
+  expect([s.get(trip.promo.error), s.get(trip.voucher.error)]).toEqual([undefined, undefined]);
+});
+
+// ---------------------------------------------------------------------------
+// INT7
+it("INT7 handleSubmit: waits for passport checks, focuses the first error, maps a server rejection onto its row", async () => {
+  const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
+  const [ada, tim] = s.substore(trip.travelers).items();
+  const focused: string[] = [];
+  ada.set(T.passport.focusTarget, { focus: () => focused.push("ada") });
+  tim.set(T.passport.focusTarget, { focus: () => focused.push("tim") });
+  tim.set(T.passport, "AB123456", { origin: "user" });
+
+  const sent: unknown[] = [];
+  const server = async (booking: unknown) => {
+    sent.push(booking);
+    return { "travelers[1].passport": "Already booked on this trip" };
+  };
+  const onSubmit = s.handleSubmit(async (values) => {
+    const rejected = await server(values);
+    for (const [path, message] of Object.entries(rejected)) {
+      const target = s.resolvePath(`${path}#error`)!;
+      target.store.set(target.ref as never, message as never);
+    }
+  });
+
+  let prevented = false;
+  const first = await onSubmit({ preventDefault: () => (prevented = true) });
+  expect(prevented).toBe(true);
+  expect(first.valid, "the async check ran and failed").toBe(false);
+  expect(ada.get(T.passport.error)).toBe("This passport is reported lost");
+  expect(focused).toEqual(["ada"]);
+  expect(sent).toEqual([]);
+
+  ada.set(T.passport, "CD123456", { origin: "user" });
+  const second = await onSubmit();
+  expect(second.valid).toBe(true);
+  expect(sent.length).toBe(1);
+  expect(tim.get(T.passport.error), "mapped onto the second traveler").toBe("Already booked on this trip");
+  expect(ada.get(T.passport.error)).toBe(undefined);
+  expect(s.get(countIn(trip, "error"))).toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// INT8
+it("INT8 a step submit reveals and validates only its section; the root submitCount still counts", async () => {
+  const s = createStore(trip, emptyTrip(), { behaviors: tripBehaviors(), ...quiet });
+  const step = s.substore(trip.contact);
+  const got: unknown[] = [];
+
+  const r = await step.submit((values) => void got.push(values));
+  expect(r.valid).toBe(false);
+  expect(r.errors.map((e) => e.path)).toEqual(["contact.name", "contact.email"]);
+  expect(s.get(trip.contact.name.revealed)).toBe(true);
+  expect(s.get(trip.destination.revealed), "outside the step").toBe(false);
+  expect(s.get(trip.destination.error), "errors elsewhere exist but are not the step's").toBe("Required");
+  expect(s.get(trip.submitCount)).toBe(1);
+
+  s.set(trip.contact.name, "Ada", { origin: "user" });
+  s.set(trip.contact.email, "ada@example.com", { origin: "user" });
+  expect((await step.submit((values) => void got.push(values))).valid).toBe(true);
+  expect(got).toEqual([{ name: "Ada", email: "ada@example.com" }]);
+  expect(s.get(trip.submitCount)).toBe(2);
 });
