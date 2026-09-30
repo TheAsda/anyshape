@@ -12,6 +12,10 @@ _Avoid_: base, kernel
 Consumer-owned code built only on the core's public interface that gives a metadata key or workflow one team's meaning (e.g. what `disabled` implies, when an error shows). Copied and adapted, not depended on.
 _Avoid_: preset, defaults, extras, utilities
 
+**Contribution**:
+A declaration that supplies one input to the single behavior owning a meta key, without writing the key itself. The key decides how its contributions combine; a contribution whose guard is false is absent.
+_Avoid_: provider, source, partial writer
+
 **Pending**:
 The state of a behavior target while a run that writes it is in flight or debounced. Derived by the core, never declared or written.
 _Avoid_: loading, validating, busy
