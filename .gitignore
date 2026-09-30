@@ -14,3 +14,5 @@ extension/dist/
 .omo/
 # Vitest browser mode (failure screenshots, traces)
 .vitest/
+# Raw AI conversation exports (local only)
+docs/*-conversation*.json
