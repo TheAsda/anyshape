@@ -61,7 +61,12 @@ export class MetaRef<V = unknown> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
 
-  constructor(readonly node: AnyNode, readonly key: string) {}
+  private constructor(readonly node: AnyNode, readonly key: string) {}
+
+  /** @internal Refs are attached to nodes (node.error); everything else reads them from there. */
+  static _create(node: AnyNode, key: string): MetaRef<any> {
+    return new MetaRef(node, key);
+  }
 
   /** e.g. "shipping.city#error" */
   get path(): string {
@@ -152,7 +157,7 @@ function setMeta(node: AnyNode, defs: Record<string, MetaKeyDef<any>>): void {
 
 /** Expose a MetaRef for every declared key on the node. */
 function attachMetaRefs(node: AnyNode): void {
-  for (const key of Object.keys(node[META_DEFS])) (node as any)[key] = new MetaRef(node, key);
+  for (const key of Object.keys(node[META_DEFS])) (node as any)[key] = MetaRef._create(node, key);
 }
 
 // ============================================================

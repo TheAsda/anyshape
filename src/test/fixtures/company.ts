@@ -1,27 +1,27 @@
-// A form with a nested company section (visibility and disableable at several
-// levels), rows with nested rows and touched(), and a root disableable().
+// A form with a nested company section (`visible` and `disabled` at several
+// levels), rows with nested rows and `touched`, and a root `disabled`.
 // Used by reference-API, origin, baseline, count and inheritance tests.
 import { form, object, array, field, type InferValue, type Origin } from "../../index";
-import { control, validation, touched, visibility, disableable } from "../features";
+import { control, validation, touched, visible, disabled, revealed } from "../features";
 
 export const shape = form(
   object({
     name: field<string>().meta(control()),
     email: field<string>().meta(control()),
     company: object({
-      vat: field<string>().meta(validation(), visibility(), disableable()),
-      address: object({ city: field<string>().meta(visibility(), disableable()) }).meta(visibility()),
-    }).meta(visibility(), disableable()),
+      vat: field<string>().meta(validation(), { visible, disabled }),
+      address: object({ city: field<string>().meta({ visible, disabled }) }).meta({ visible }),
+    }).meta({ visible, disabled }),
     lines: array(
       object({
-        sku: field<string>().meta(control(), disableable()),
+        sku: field<string>().meta(control(), { disabled }),
         qty: field<number>(),
-        notes: array(object({ text: field<string>().meta(validation()) })),
-      }).meta(touched()),
+        notes: array(object({ text: field<string>().meta(validation(), { revealed }) })),
+      }).meta({ touched }),
       { create: () => ({ sku: "", qty: 1, notes: [] }) }
-    ).meta(disableable()),
+    ).meta({ disabled }),
     tags: array(object({ text: field<string>() })),
-  }).meta(disableable())
+  }).meta({ disabled })
 );
 export type Values = InferValue<typeof shape>;
 export const L = shape.lines.item;

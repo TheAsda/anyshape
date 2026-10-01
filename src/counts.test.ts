@@ -3,7 +3,7 @@
 import {
   form, object, array, field, meta, metaKey, createStore, countIn, initialOf, when,
 } from "./index";
-import { control } from "./test/features";
+import { control, revealed } from "./test/features";
 import { test, test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";
@@ -58,15 +58,24 @@ describe("H · Counts and collect", () => {
     expect(seen).toEqual([1, 2, 1]);
   });
 
-  test("collect lists matching nodes with row indexes", ({ store: s, lines }) => {
-    s.set(shape.email.error, "e");
-    lines.itemAt(1).set(L.sku.error, "s");
-    lines.itemAt(0).substore(L.notes).itemAt(0).set(L.notes.item.text.error, "n");
-    const found = s.collect(shape, "error").map((e) => e.path);
-    expect(found).toEqual(["email", "lines[0].notes[0].text", "lines[1].sku"]);
-    const entry = s.collect(shape.lines, "error").find((e) => e.path === "lines[1].sku")!;
-    expect(entry.store).toBe(lines.itemAt(1));
-    expect(entry.ref).toBe(L.sku);
+  test("collect(node, def) lists every instance that declares the definition, whatever its value or name", () => {
+    const marked = metaKey(false);
+    const f = form({
+      a: field<string>().meta({ marked }),
+      b: field<string>().meta({ other: metaKey(false) }),
+      rows: array(object({ c: field<string>().meta({ flag: marked }) })),
+      d: field<string>().meta({ marked }),
+    });
+    const s = createStore(f, { a: "", b: "", rows: [{ c: "" }, { c: "" }], d: "" });
+    const rows = s.substore(f.rows);
+    rows.itemAt(1).set(f.rows.item.c.flag, true);
+
+    const found = s.collect(f, marked);
+    expect(found.map((e) => e.path)).toEqual(["a", "rows[0].c", "rows[1].c", "d"]);
+    expect(found[0].ref).toBe(f.a.marked);
+    expect(found[2].ref).toBe(f.rows.item.c.flag);
+    expect(found[2].store).toBe(rows.itemAt(1));
+    expect(found.map((e) => e.store.get(e.ref))).toEqual([false, false, true, false]);
   });
 
   test("countIn warns when nothing in the subtree can aggregate the key", () => {
@@ -100,19 +109,19 @@ describe("H · Counts and collect", () => {
 
   test("collect on a row store: paths from the root, only that row; nested rows", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
-    a.set(L.sku.error, "bad a");
-    b.set(L.sku.error, "bad b");
-    a.substore(L.notes).itemAt(0).set(L.notes.item.text.error, "bad note");
-    expect(b.collect(L, "error").map((e) => e.path)).toEqual(["lines[1].sku"]);
-    const inA = a.collect(L, "error");
+    a.substore(L.notes).itemAt(0).set(L.notes.item.text.revealed, true);
+    expect(b.collect(L, revealed).map((e) => e.path)).toEqual(["lines[1].sku"]);
+    const inA = a.collect(L, revealed);
     expect(inA.map((e) => e.path)).toEqual(["lines[0].sku", "lines[0].notes[0].text"]);
-    expect(inA[1].store.get(L.notes.item.text.error)).toBe("bad note");
+    expect(inA[1].ref).toBe(L.notes.item.text.revealed);
+    expect(inA[1].store.get(inA[1].ref)).toBe(true);
   });
 
   test("a custom counted key written by application code counts like the built-in ones", () => {
+    const flaggedKey = metaKey<boolean>(false, { aggregate: (v) => v });
     const f = form({
-      a: field<string>().meta({ flagged: metaKey<boolean>(false, { aggregate: (v) => v }) }),
-      rows: array(object({ b: field<string>().meta({ flagged: metaKey<boolean>(false, { aggregate: (v) => v }) }) })),
+      a: field<string>().meta({ flagged: flaggedKey }),
+      rows: array(object({ b: field<string>().meta({ flagged: flaggedKey }) })),
     });
     const s = createStore(f, { a: "", rows: [{ b: "" }, { b: "" }] });
     const flagged = countIn(f, "flagged");
@@ -123,12 +132,12 @@ describe("H · Counts and collect", () => {
     expect(s.get(countIn(f.rows, "flagged"))).toBe(1);
     rows.remove(rows.itemAt(1));
     expect(s.get(flagged)).toBe(1);
-    expect(s.collect(f, "flagged").map((e) => e.path)).toEqual(["a"]);
+    expect(s.collect(f, flaggedKey).filter((e) => e.store.get(e.ref)).map((e) => e.path)).toEqual(["a"]);
   });
 });
 
 describe("H · Stable count references", () => {
-  const { shape, L, initial, targets } = limits;
+  const { shape, L, initial } = limits;
 
   // ---------------------------------------------------------------------------
   // Stable references

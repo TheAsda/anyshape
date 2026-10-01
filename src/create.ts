@@ -21,7 +21,6 @@ export function createStore<N extends ObjectNode<any>>(
   runtime.rules = validation;
   store._runtime = runtime;
   store._validation = validation;
-  store._focusOrder = options.focusOrder;
   store._batch(() => {
     const defaults = defaultBehaviors(shape);
     if (defaults.length) runtime.add(store, defaults, true);

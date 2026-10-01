@@ -23,16 +23,15 @@
 //     results are dropped.
 //   • validate(node) forces all queues in a subtree (debounced and unchecked
 //     async runs start immediately), waits for them and returns
-//     { valid, errors, failures, values }. `values` leave out nodes that
-//     declare visible / disabled and are hidden / disabled.
+//     { valid, errors, failures }.
 // ============================================================
 
 import { Behavior, type Guard, type RuleLike, type RuleHooks, type QueueChange, type Registration, type BehaviorRuntime } from "./behaviors";
 import {
   refNode, refKey, refLabel, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
-  FIELDS, META_DEFS,
+  META_DEFS, metaRefOf,
 } from "./internal";
-import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue, type InferMeta } from "./shape";
+import { ShapeNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import type { BaseStore, AnyRef, RefValue, Origin, CollectEntry } from "./store";
 
 // ============================================================
@@ -116,13 +115,7 @@ export function asyncRule<N extends Validatable>(
   return new Rule(target, "async", check as AsyncCheck, options);
 }
 
-export interface ValidationError {
-  /** Concrete path, e.g. "lines[1].qty". */
-  path: string;
-  /** The node (template node for rows). */
-  ref: AnyNode;
-  /** A store that can address `ref`. */
-  store: BaseStore<any>;
+export interface ValidationError extends CollectEntry<string | undefined> {
   error: string;
 }
 
@@ -133,32 +126,17 @@ export interface ValidationFailure {
   error: unknown;
 }
 
-type Simplify<T> = { [K in keyof T]: T[K] } & {};
-type Omittable<N> = "visible" extends keyof InferMeta<N> ? true : "disabled" extends keyof InferMeta<N> ? true : false;
-
-/** Values for submitting: fields that can be hidden or disabled are optional. */
-export type SubmitValue<N> = N extends ObjectNode<infer F>
-  ? Simplify<
-      { [K in keyof F as Omittable<F[K]> extends true ? never : K]: SubmitValue<F[K]> } & {
-        [K in keyof F as Omittable<F[K]> extends true ? K : never]?: SubmitValue<F[K]>;
-      }
-    >
-  : N extends ArrayNode<infer I, any>
-    ? SubmitValue<I>[]
-    : InferValue<N>;
-
-export interface ValidationResult<N> {
+export interface ValidationResult {
   valid: boolean;
   /** In shape order: fields in definition order, rows in array order. */
   errors: ValidationError[];
   /** Async rules that threw. They make the result invalid without setting an error. */
   failures: ValidationFailure[];
-  values: SubmitValue<N>;
 }
 
 /** @internal Installed on the root store. */
 export interface ValidationHooks {
-  validate(store: BaseStore<any>, node: AnyNode): Promise<ValidationResult<any>>;
+  validate(store: BaseStore<any>, node: AnyNode): Promise<ValidationResult>;
 }
 
 // ============================================================
@@ -212,7 +190,7 @@ function sameKey(a: AsyncKey, b: AsyncKey): boolean {
 
 /** The meta key on `node` or its nearest ancestor that declares it (inherited keys). */
 function effectiveRef(node: AnyNode, key: string): MetaRef<boolean> | undefined {
-  for (let n: AnyNode | undefined = node; n; n = n.parent) if (key in n[META_DEFS]) return new MetaRef<boolean>(n, key);
+  for (let n: AnyNode | undefined = node; n; n = n.parent) if (key in n[META_DEFS]) return metaRefOf<boolean>(n, key);
   return undefined;
 }
 
@@ -314,8 +292,8 @@ export class ValidationLayer implements RuleHooks, ValidationHooks {
       ...(queue.disabled && !queue.options.validateDisabled ? [queue.disabled] : []),
     ]);
     const reads = unique(entries.flatMap((e) => [...(e.rule.options.reads ?? [])]));
-    const errorRef = new MetaRef<string | undefined>(node, "error");
-    const validatingRef = new MetaRef<boolean>(node, "validating");
+    const errorRef = node.error;
+    const validatingRef = node.validating;
     return new Behavior({
       name: `${node.path || "<root>"}#validation`,
       triggers,
@@ -485,15 +463,15 @@ export class ValidationLayer implements RuleHooks, ValidationHooks {
     if (!host.isAttached()) return;
     const origin: Origin = `behavior:${queue.node.path || "<root>"}#validation`;
     host.batch(() => {
-      host.set(new MetaRef<string | undefined>(queue.node, "error"), error, { origin });
-      host.set(new MetaRef<boolean>(queue.node, "validating"), validating, { origin });
+      host.set((queue.node as Validatable).error, error, { origin });
+      host.set((queue.node as Validatable).validating, validating, { origin });
     });
   }
 
   // ==========================================================
   // validate()
   // ==========================================================
-  async validate(store: BaseStore<any>, node: AnyNode): Promise<ValidationResult<any>> {
+  async validate(store: BaseStore<any>, node: AnyNode): Promise<ValidationResult> {
     const instances = this.instancesIn(store, node);
 
     store.batch(() => {
@@ -515,16 +493,19 @@ export class ValidationLayer implements RuleHooks, ValidationHooks {
       await Promise.all(running);
     }
 
-    const errors: ValidationError[] = store.collect(node, "error").map((e: CollectEntry) => ({
-      ...e,
-      error: (e.store.getMeta(e.ref) as Record<string, unknown>).error as string,
-    }));
+    // By name until `error` has one definition (#26).
+    const errors: ValidationError[] = [];
+    store._host._eachWithKey(node, "error", (host, n) => {
+      const ref = (n as Validatable).error;
+      const error = host.get(ref);
+      if (error !== undefined) errors.push({ path: concretePath(host, n), ref, store: host, error });
+    });
     const failures: ValidationFailure[] = [];
     for (const [host, queue] of instances) {
       const failed = this.stateOf(host, queue.node).failed;
       if (failed && host.isAttached()) failures.push({ path: concretePath(host, queue.node), ref: queue.node, error: failed.error });
     }
-    return { valid: errors.length === 0 && failures.length === 0, errors, failures, values: submitValues(store, node) };
+    return { valid: errors.length === 0 && failures.length === 0, errors, failures };
   }
 
   /** (scope host, queue) pairs for every queue instance inside `node`. */
@@ -545,35 +526,4 @@ export class ValidationLayer implements RuleHooks, ValidationHooks {
     }
     return out;
   }
-}
-
-// ============================================================
-// Submit values
-// ============================================================
-function omitted(host: BaseStore<any>, node: AnyNode): boolean {
-  if ("visible" in node[META_DEFS] && host.get(new MetaRef<boolean>(node, "visible")) === false) return true;
-  if ("disabled" in node[META_DEFS] && host.get(new MetaRef<boolean>(node, "disabled")) === true) return true;
-  return false;
-}
-
-/** The value of `node` without hidden / disabled nodes that declare those keys (the node itself is kept). */
-export function submitValues(store: BaseStore<any>, node: AnyNode): any {
-  const host = store._host;
-  const walk = (h: BaseStore<any>, n: AnyNode): any => {
-    const raw = h.getValue(n);
-    if (raw == null) return raw;
-    if (n instanceof ObjectNode) {
-      const out: Record<string, unknown> = {};
-      for (const [key, child] of Object.entries(n[FIELDS] as Record<string, AnyNode>)) {
-        if (omitted(h, child)) continue;
-        out[key] = walk(h, child);
-      }
-      return out;
-    }
-    if (n instanceof ArrayNode) {
-      return (h.substore(n) as any).items().map((row: BaseStore<any>) => walk(row, row.node));
-    }
-    return raw;
-  };
-  return walk(host, node);
 }

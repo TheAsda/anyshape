@@ -15,7 +15,7 @@ import {
   asyncRule, type FieldNode,
 } from "form-lib";
 import {
-  control, submission, visibility, required, minLength, calculate, visibleWhen,
+  control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen,
 } from "form-lib/recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
@@ -61,7 +61,7 @@ const shape = form(
       licenseExpiry: field<string>().meta(control()),
       pickupOn: field<string>().meta(control()),
       dropoffOn: field<string>().meta(control()),
-    }).meta(visibility()),
+    }).meta({ visible }),
     travelers: array(
       object({
         name: field<string>().meta(control()),
@@ -220,7 +220,7 @@ export function Stage() {
     <StoreProvider store={form}>
       <form
         className="stage-form"
-        onSubmit={form.handleSubmit(async (values) => {
+        onSubmit={handleSubmit(form, async (values) => {
           try {
             await save(values);
             setSubmitted(values);

@@ -5,7 +5,7 @@ import {
 } from "../index";
 import { control, submission } from "../test/features";
 import { max } from "../test/rules";
-import { StoreProvider, useForm, useSync, useField, useValue, domOrder } from "./index";
+import { StoreProvider, useForm, useSync, useField, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 
 const shape = form(
@@ -211,89 +211,6 @@ test("useSync under StrictMode ends with the synced value", async () => {
   );
   restore();
   expect(f.get(shape.name)).toBe("synced");
-});
-
-// ---------------------------------------------------------------------------
-// DOM order and handleSubmit
-/** An input registered as its node's focus target. */
-function Field(props: { node: typeof shape.name | typeof shape.code; id: string }) {
-  const c = useField(props.node);
-  const register = (el: HTMLInputElement | null) => void (el && c.store.set(props.node.focusTarget, el));
-  return <input data-testid={props.id} ref={register} value={c.value} onChange={(e) => c.onChange(e.target.value)} />;
-}
-
-test("submit focuses the first error in DOM order, not shape order", async () => {
-  let f!: RootStore<typeof shape>;
-  function App() {
-    f = useForm(shape, empty(), { behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")] });
-    // code is rendered before name, but name comes first in the shape
-    return (
-      <StoreProvider store={f}>
-        <Field node={shape.code} id="code" />
-        <Field node={shape.name} id="name" />
-      </StoreProvider>
-    );
-  }
-  const screen = await render(<App />);
-  await settle(() => f.submit());
-  await expect.element(screen.getByTestId("code")).toHaveFocus();
-});
-
-test("an explicit focusOrder overrides DOM order", async () => {
-  let f!: RootStore<typeof shape>;
-  function App() {
-    f = useForm(shape, empty(), {
-      behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")],
-      focusOrder: () => 0, // keep shape order
-    });
-    return (
-      <StoreProvider store={f}>
-        <Field node={shape.code} id="code" />
-        <Field node={shape.name} id="name" />
-      </StoreProvider>
-    );
-  }
-  const screen = await render(<App />);
-  await settle(() => f.submit());
-  await expect.element(screen.getByTestId("name")).toHaveFocus();
-});
-
-test("handleSubmit on a real <form>: default prevented, onValid gets values", async () => {
-  let f!: RootStore<typeof shape>;
-  const saved: string[] = [];
-  function App() {
-    f = useForm(shape, { ...empty(), name: "Ann" });
-    return (
-      <StoreProvider store={f}>
-        <form data-testid="form" onSubmit={f.handleSubmit((values) => void saved.push(values.name))}>
-          <button data-testid="go" type="submit">
-            Save
-          </button>
-        </form>
-      </StoreProvider>
-    );
-  }
-  const screen = await render(<App />);
-  // React handles the event at its root container; a document listener runs after it.
-  let defaultPrevented: boolean | undefined;
-  const onSubmit = (e: Event) => (defaultPrevented = e.defaultPrevented);
-  document.addEventListener("submit", onSubmit);
-  await screen.getByTestId("go").click();
-  document.removeEventListener("submit", onSubmit);
-  await expect.poll(() => saved).toEqual(["Ann"]);
-  expect(defaultPrevented).toBe(true);
-  expect(f.get(shape.submitCount)).toBe(1);
-});
-
-test("domOrder: nodes by document position, other targets equal", async () => {
-  const a = document.createElement("i");
-  const b = document.createElement("b");
-  document.body.append(a, b);
-  expect(domOrder(a, b)).toBe(-1);
-  expect(domOrder(b, a)).toBe(1);
-  expect(domOrder(a, { focus() {} })).toBe(0);
-  a.remove();
-  b.remove();
 });
 
 // ---------------------------------------------------------------------------

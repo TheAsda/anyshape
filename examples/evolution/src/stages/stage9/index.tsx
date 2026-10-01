@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { form, object, field, type InferValue, array, defineBehaviors } from "form-lib";
 import {
-  control, submission, visibility, required, minLength, calculate, visibleWhen,
+  control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen,
 } from "form-lib/recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
@@ -30,7 +30,7 @@ const shape = form(
     car: object({
       license: field<string>().meta(control()),
       licenseExpiry: field<string>().meta(control()),
-    }).meta(visibility()),
+    }).meta({ visible }),
     travelers: array(
       object({
         name: field<string>().meta(control()),
@@ -141,7 +141,7 @@ export function Stage() {
     <StoreProvider store={form}>
       <form
         className="stage-form"
-        onSubmit={form.handleSubmit((values) => setSubmitted(values))}
+        onSubmit={handleSubmit(form, (values) => setSubmitted(values))}
       >
         <TextField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <TextField node={shape.startDate} label="Departure" type="date" />

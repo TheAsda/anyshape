@@ -6,9 +6,9 @@
 
 import {
   form, object, array, field, metaKey, createStore, countIn, initialOf, rule,
-  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
+  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef,
 } from "./index";
-import { control, visibility, disableable, submission } from "./test/features";
+import { control, visible, disabled, submission } from "./test/features";
 import { test, expect, expectTypeOf } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -28,9 +28,9 @@ const t = form(
     }),
     count: field<number>().meta(control()),
     plain: field<number>(),
-    hidden: object({ x: field<string>() }).meta(visibility()),
-    off: field<string>().meta(control(), disableable()),
-    other: field<string>().meta(control(), disableable()),
+    hidden: object({ x: field<string>() }).meta({ visible }),
+    off: field<string>().meta(control(), { disabled }),
+    other: field<string>().meta(control(), { disabled }),
     withCreate: array(object({ k: field<string>(), n: field<number>() }), { create: () => ({ k: "", n: 0 }) }),
     noCreate: array(object({ k: field<string>() })),
   }).meta(submission())
@@ -53,11 +53,8 @@ type _m2 = Expect<Equal<M["seats"], number | undefined>>;
 type _m3 = Expect<Equal<M["error"], string | undefined>>;
 type _m4 = Expect<Equal<M["touched"], boolean>>;
 type _m5 = Expect<Equal<M["dirty"], boolean>>;
-type _m6 = Expect<Equal<InferMeta<typeof t>["submitCount"], number>>;
+type _m6 = Expect<Equal<InferMeta<typeof t>["submitting"], boolean>>;
 type _m7 = Expect<Equal<InferMeta<typeof t.hidden>["visible"], boolean>>;
-
-// A node without meta accepts no meta patch at all.
-type _p1 = Expect<Equal<MetaPatch<typeof t.plain>, Record<string, never>>>;
 
 // ---------------------------------------------------------------------------
 // References: every kind resolves to its value type
@@ -69,14 +66,6 @@ type _r3 = Expect<Equal<RefValue<typeof t.text.seats>, number | undefined>>;
 type _r4 = Expect<Equal<RefValue<typeof errorCount>, number>>;
 type _r5 = Expect<Equal<RefValue<typeof initialPlain>, number>>;
 type _r6 = Expect<Equal<RefValue<typeof t.text.touched>, boolean>>; // a MetaRef is never taken for a count
-
-// ---------------------------------------------------------------------------
-// Submitted values: exactly the nodes declaring visible / disabled are optional
-type S = SubmitValue<typeof t>;
-type _s1 = Expect<Equal<S["hidden"], { x: string } | undefined>>;
-type _s2 = Expect<Equal<S["off"], string | undefined>>;
-type _s3 = Expect<Equal<S["plain"], number>>;
-type _s4 = Expect<Equal<S["a"], { name: string; email: string }>>;
 
 // ---------------------------------------------------------------------------
 // Calls that must (and must not) compile. Never called.
@@ -95,8 +84,10 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
 
   // @ts-expect-error – the value type is checked
   s.set(t.plain, "x");
-  // @ts-expect-error – only declared meta keys exist
-  s.setMeta(t.text, { nope: 1 });
+  // @ts-expect-error – only declared meta keys have refs
+  s.set(t.text.nope, 1);
+  // @ts-expect-error – refs come from nodes (t.text.error) or collect, never constructed
+  new MetaRef(t.text, "error");
   // @ts-expect-error – counts are read-only
   s.set(countIn(t, "error"), 1);
 

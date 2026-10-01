@@ -10,7 +10,7 @@ import {
   form, object, array, field, metaKey, defineBehaviors, defineBehavior, rule, asyncRule, initialOf,
   type InferValue, type AnyNode, type AnyRef, type RefValue,
 } from "../index";
-import { control, visibility, disableable, submission } from "./features";
+import { control, visible, disabled, submission } from "./features";
 import { required, email, pattern, max } from "./rules";
 
 export const person = object({
@@ -45,9 +45,9 @@ export const trip = form(
     visa: object({
       number: field<string>().meta(control()),
       expires: field<string>().meta(control()),
-    }).meta(visibility()),
-    promo: field<string>().meta(control(), disableable()),
-    voucher: field<string>().meta(control(), disableable()),
+    }).meta({ visible }),
+    promo: field<string>().meta(control(), { disabled }),
+    voucher: field<string>().meta(control(), { disabled }),
   }).meta(submission())
 );
 export type Trip = InferValue<typeof trip>;
