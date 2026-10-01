@@ -25,7 +25,7 @@ export interface MetaKeyOptions<V> {
    * before the node exists.
    */
   behavior?: (self: any) => BehaviorConfig;
-  /** Counted per subtree: nodes for which this returns true (countIn / collect). */
+  /** Counted per subtree: nodes for which this returns true (countIn). */
   aggregate?: (value: V) => boolean;
   /** Feature-specific settings (e.g. validation options), read by the feature's runtime. */
   data?: Readonly<Record<string, unknown>>;

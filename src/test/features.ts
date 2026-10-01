@@ -2,14 +2,17 @@
 // Test-local features: the meta keys the core tests declare, with the same
 // behaviors as the features in recipes/, which the core tests never import.
 // ------------------------------------------------------------
-// The core still finds some of these keys by name, so the names are fixed:
-//   • error (with data.validation) and validating – the validation queue,
-//     until #26 replaces them with a test-local combined key;
-//   • revealed, submitCount, submitting, focusTarget – submit and focus (#32);
-//   • visible, disabled – SubmitValue.
+// The validation queue still finds some of these keys by name until #26, so
+// their names are fixed: error (with data.validation), validating, visible
+// and disabled.
 // ============================================================
 
-import { metaKey, initialOf, type FocusTarget } from "../index";
+import { metaKey, initialOf } from "../index";
+
+/** A focus target, as the focus recipe defines it: here only a non-reactive value. */
+export interface FocusTarget {
+  focus(): void;
+}
 
 export interface ValidationOptions {
   validateHidden?: boolean;
@@ -26,53 +29,49 @@ export const validation = (options: ValidationOptions = {}) => ({
 });
 
 /** true once the user changed the value; stays true. */
-export const touched = () => ({
-  touched: metaKey(false, {
-    owner: "feature",
-    aggregate: (t) => t,
-    behavior: (self) => ({
-      name: `${self.path || "<root>"}#touched`,
-      triggers: [self],
-      writes: [self.touched],
-      origins: ["user"],
-      runOn: { init: false },
-      run: (ctx) => ctx.set(self.touched, true),
-    }),
+export const touched = metaKey(false, {
+  owner: "feature",
+  aggregate: (t) => t,
+  behavior: (self) => ({
+    name: `${self.path || "<root>"}#touched`,
+    triggers: [self],
+    writes: [self.touched],
+    origins: ["user"],
+    runOn: { init: false },
+    run: (ctx) => ctx.set(self.touched, true),
   }),
 });
 
 /** true while the value differs (Object.is) from its initial value. */
-export const dirty = () => ({
-  dirty: metaKey(false, {
-    owner: "feature",
-    aggregate: (d) => d,
-    behavior: (self) => ({
-      name: `${self.path || "<root>"}#dirty`,
-      triggers: [self, initialOf(self)],
-      writes: [self.dirty],
-      run: (ctx) => ctx.set(self.dirty, !Object.is(ctx.get(self), ctx.initial(self))),
-    }),
+export const dirty = metaKey(false, {
+  owner: "feature",
+  aggregate: (d) => d,
+  behavior: (self) => ({
+    name: `${self.path || "<root>"}#dirty`,
+    triggers: [self, initialOf(self)],
+    writes: [self.dirty],
+    run: (ctx) => ctx.set(self.dirty, !Object.is(ctx.get(self), ctx.initial(self))),
   }),
 });
 
-export const visibility = () => ({
-  visible: metaKey(true, { inherit: "all" }),
-});
+export const visible = metaKey(true, { inherit: "all" });
 
-export const disableable = () => ({
-  disabled: metaKey(false, { inherit: "any" }),
-});
+export const disabled = metaKey(false, { inherit: "any" });
 
-export const submission = () => ({
-  submitCount: metaKey(0, { owner: "feature" }),
-  submitting: metaKey(false, { owner: "feature" }),
-});
+export const submitting = metaKey(false, { owner: "feature" });
+
+export const submission = () => ({ submitting });
+
+/** true once the field's error may be shown. */
+export const revealed = metaKey(false, { owner: "feature" });
+
+export const focusTarget = metaKey<FocusTarget | undefined>(undefined, { owner: "feature", reactive: false });
 
 /** validation, touched, dirty, revealed and a focus target. */
 export const control = (options?: ValidationOptions) => ({
   ...validation(options),
-  ...touched(),
-  ...dirty(),
-  revealed: metaKey(false, { owner: "feature" }),
-  focusTarget: metaKey<FocusTarget | undefined>(undefined, { owner: "feature", reactive: false }),
+  touched,
+  dirty,
+  revealed,
+  focusTarget,
 });

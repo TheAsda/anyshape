@@ -9,8 +9,8 @@
 import { useState } from "react";
 import { form, object, field, type InferValue, defineBehaviors } from "form-lib";
 import {
-  control, submission, visibility, required, minLength, calculate, visibleWhen,
-  clearWhen, disableable, disableWhen, exclusive,
+  control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
+  clearWhen, disabled, disableWhen, exclusive,
 } from "form-lib/recipes";
 import { StoreProvider, useForm, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
@@ -22,10 +22,10 @@ const shape = form(
     destination: field<string>().meta(control()),
     startDate: field<string>().meta(control()),
     endDate: field<string>().meta(control()),
-    nightlyRate: field<number | undefined>().meta(control(), disableable()),
+    nightlyRate: field<number | undefined>().meta(control(), { disabled }),
     employerPays: field<boolean>().meta(control()),
-    loyaltyNumber: field<string>().meta(control(), disableable()),
-    promoCode: field<string>().meta(control(), disableable()),
+    loyaltyNumber: field<string>().meta(control(), { disabled }),
+    promoCode: field<string>().meta(control(), { disabled }),
     notes: field<string>().meta(control()),
     nights: field<number | undefined>(),
     estimatedBudget: field<number | undefined>(),
@@ -33,7 +33,7 @@ const shape = form(
     car: object({
       license: field<string>().meta(control()),
       licenseExpiry: field<string>().meta(control()),
-    }).meta(visibility()),
+    }).meta({ visible }),
   }).meta(submission()),
 );
 
@@ -134,7 +134,7 @@ export function Stage() {
     <StoreProvider store={form}>
       <form
         className="stage-form"
-        onSubmit={form.handleSubmit((values) => setSubmitted(values))}
+        onSubmit={handleSubmit(form, async (values) => setSubmitted(values))}
       >
         <TextField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <TextField node={shape.startDate} label="Departure" type="date" />

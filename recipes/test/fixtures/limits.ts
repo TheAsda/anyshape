@@ -1,15 +1,16 @@
-// A form with limits kept across reset (minCode, maxQty), a disableable flag,
+// A form with limits kept across reset (minCode, maxQty), a `disabled` flag,
 // nested rows and submission(). Used by reset, submit, limit and replacement tests.
 import {
-  form, object, array, field, metaKey, createStore, type InferValue, type FocusTarget,
+  form, object, array, field, metaKey, createStore, type InferValue,
 } from "form-lib";
-import { control, submission, disableable } from "../../index";
+import type { FocusTarget } from "../../focus";
+import { control, submission, disabled } from "../../index";
 
 export const shape = form(
   object({
     name: field<string>().meta(control(), { note: "" }),
     code: field<string>().meta(control(), { minCode: metaKey<number | undefined>(undefined, { keepOnReset: true }) }),
-    flag: field<boolean>().meta(disableable()),
+    flag: field<boolean>().meta({ disabled }),
     lines: array(
       object({
         qty: field<number>().meta(control(), {

@@ -1,7 +1,7 @@
 import {
   form, object, array, field, meta, metaKey, MetaRef, createStore, type InferValue, type InferMeta,
 } from "./index";
-import { control, validation, touched, visibility, disableable, submission } from "./test/features";
+import { control, validation, touched, visible, disabled, submission } from "./test/features";
 import { META, META_DEFS, CREATE, PLAIN, defOf } from "./internal";
 import { test, describe, expect } from "vitest";
 
@@ -18,7 +18,7 @@ const shape = form(
   object({
     note: field<string>(),
     name: field<string>().meta(control(), { label: "Name" }),
-    company: object({ vat: field<string>().meta(control()) }).meta(visibility(), disableable()),
+    company: object({ vat: field<string>().meta(control()) }).meta({ visible, disabled }),
     shipping: address,
     billing: address,
     lines: array(object({ sku: field<string>().meta(control()), qty: field<number>() }), {
@@ -41,7 +41,7 @@ function values(): InferValue<typeof shape> {
 type _1 = Expect<Equal<InferValue<typeof shape.name.error>, string | undefined>>;
 type _2 = Expect<Equal<InferValue<typeof shape.name.touched>, boolean>>;
 type _3 = Expect<Equal<InferValue<typeof shape.name.label>, string>>;
-type _4 = Expect<Equal<InferValue<typeof shape.submitCount>, number>>;
+type _4 = Expect<Equal<InferValue<typeof shape.submitting>, boolean>>;
 type _5 = Expect<Equal<InferValue<typeof shape.company.visible>, boolean>>;
 type _6 = Expect<Equal<InferValue<typeof shape.lines.item.sku.error>, string | undefined>>;
 type _7 = Expect<Equal<typeof shape.lines._hasCreate, true>>;
@@ -64,7 +64,7 @@ describe("C · Declarations", () => {
     expect(s.getMeta(shape.name)).toEqual({
       error: undefined, validating: false, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
     });
-    expect(s.getMeta(shape)).toEqual({ submitCount: 0, submitting: false });
+    expect(s.getMeta(shape)).toEqual({ submitting: false });
   });
 
   test("key definitions keep their capabilities", () => {
@@ -79,7 +79,7 @@ describe("C · Declarations", () => {
   });
 
   test("variadic and chained .meta() merge", () => {
-    const a = field<string>().meta(validation(), { hint: "x" }).meta(touched());
+    const a = field<string>().meta(validation(), { hint: "x" }).meta({ touched });
     expect(Object.keys(a[META_DEFS]).sort()).toEqual(["error", "hint", "touched", "validating"]);
   });
 
@@ -95,7 +95,7 @@ describe("C · Declarations", () => {
 
   test("key definitions cannot be declared twice", () => {
     expect(() => field<string>().meta(validation()).meta(validation())).toThrow(/already declared/);
-    expect(() => field<string>().meta(control(), touched())).toThrow(/already declared/);
+    expect(() => field<string>().meta(control(), { touched })).toThrow(/already declared/);
     expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(/already declared/);
     expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(/already declared/);
   });
@@ -136,7 +136,7 @@ describe("C · Meta references", () => {
 
   test("container and root refs", () => {
     expect(shape.company.visible.node).toBe(shape.company);
-    expect(shape.submitCount.path).toBe("#submitCount");
+    expect(shape.submitting.path).toBe("#submitting");
   });
 
   test("a meta key cannot share a name with a child", () => {
@@ -155,14 +155,14 @@ describe("C · Meta references", () => {
 });
 
 describe("C · Closed meta in the store", () => {
-  test("setMeta accepts only declared keys", () => {
+  test("only declared keys have refs", () => {
     const s = createStore(shape, values());
-    s.setMeta(shape.name, { label: "Full name" });
+    s.set(shape.name.label, "Full name");
     expect(s.getMeta(shape.name).label).toBe("Full name");
     // @ts-expect-error – `hint` is not declared on `name`
-    expect(() => s.setMeta(shape.name, { hint: "x" })).toThrow(/no meta key "hint"/);
+    expect(shape.name.hint).toBe(undefined);
     // @ts-expect-error – `note` declares no meta at all
-    expect(() => s.setMeta(shape.note, { error: "x" })).toThrow(/no meta key "error"/);
+    expect(shape.note.error).toBe(undefined);
   });
 });
 

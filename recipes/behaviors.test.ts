@@ -4,7 +4,7 @@ import {
   type BehaviorBuilder,
 } from "form-lib";
 import {
-  visibility, disableable, required, maxLength, min, isEmpty, calculate, link, visibleWhen,
+  required, maxLength, min, isEmpty, calculate, link, visibleWhen,
   disableWhen, clearWhen, exclusive,
 } from "./index";
 import { test as base, describe, expect } from "vitest";
@@ -12,9 +12,9 @@ import { shape, L, initial, type Values } from "./test/fixtures/profile";
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {
-  // @ts-expect-error – `name` has no visibility()
+  // @ts-expect-error – `name` has no `visible`
   visibleWhen(shape.name, [shape.type], () => true);
-  // @ts-expect-error – exclusive fields need disableable()
+  // @ts-expect-error – exclusive fields need `disabled`
   exclusive([shape.name, shape.price]);
   // @ts-expect-error – the calculated value must match the target type
   calculate(shape.slug, [shape.title], (t) => t.length);
@@ -141,14 +141,6 @@ describe("N · exclusive", () => {
     expect(errorsOf(s)).toEqual(Array(3).fill("One of price, discount, promo is required"));
     s.set(shape.price, 5);
     expect(errorsOf(s), "the others are disabled and skipped").toEqual([undefined, undefined, undefined]);
-  });
-
-  test("exclusive: disabled fields are left out of the submit values", async () => {
-    const s = exclusiveStore();
-    s.set(shape.promo, "SAVE", { origin: "user" });
-    const r = await s.validate();
-    expect("price" in r.values).toBe(false);
-    expect(r.values.promo).toBe("SAVE");
   });
 });
 

@@ -2,7 +2,7 @@ import {
   form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule,
   type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
-import { control, visibility, disableable, touched, dirty } from "./test/features";
+import { control, visible, disabled, touched, dirty } from "./test/features";
 import { max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as limits from "./test/fixtures/limits";
@@ -20,13 +20,13 @@ const shape = form({
   total: field<number>(),
   name: field<string>().meta(control()),
   type: field<"person" | "company">(),
-  vat: field<string>().meta(visibility(), disableable(), { note: "" }),
+  vat: field<string>().meta({ visible, disabled, note: "" }),
   lines: array(
     object({
       price: field<number>(),
       qty: field<number>().meta(control()),
       lineTotal: field<number>().meta(control()),
-      sku: field<string>().meta(disableable(), { hint: "" }),
+      sku: field<string>().meta({ disabled, hint: "" }),
       notes: array(object({ text: field<string>(), len: field<number>() })),
     }),
     { create: () => ({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] }) }
@@ -460,7 +460,7 @@ describe("L · Default behaviors: touched, dirty", () => {
   });
 
   test("touched and dirty work on their own, without control()", () => {
-    const f = form({ a: field<string>().meta(touched(), dirty()) });
+    const f = form({ a: field<string>().meta({ touched, dirty }) });
     const s = createStore(f, { a: "" });
     s.set(f.a, "x", { origin: "user" });
     expect(s.get(f.a.touched)).toBe(true);
@@ -562,7 +562,7 @@ describe("K · Ordering edges", () => {
   test("inherited-meta edge: writing an ancestor's `visible` is ranked before the field's queue", () => {
     const f = form({
       kind: field<string>(),
-      section: object({ code: field<string>().meta(control()) }).meta(visibility()),
+      section: object({ code: field<string>().meta(control()) }).meta({ visible }),
     });
     const show = defineBehavior({
       name: "show", triggers: [f.kind], writes: [f.section.visible],
@@ -712,7 +712,7 @@ describe("J · Handles and the default onError", () => {
 });
 
 describe("J · Atomic replacement", () => {
-  const { shape, L, initial, targets } = limits;
+  const { shape, L, initial } = limits;
   const test = base
     .extend("store", () => createStore(shape, initial()));
 

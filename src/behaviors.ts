@@ -32,7 +32,6 @@
 // ============================================================
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
-import type { FocusTarget } from "./store";
 import {
   refNode, refKey, refLabel, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
   FIELDS, META_DEFS, defOf,
@@ -162,8 +161,6 @@ export interface BehaviorErrorInfo {
 
 export interface StoreOptions {
   behaviors?: AnyBehavior | readonly AnyBehavior[];
-  /** Default order for focusFirst / submit (e.g. document position). Default: shape order. */
-  focusOrder?: (a: FocusTarget, b: FocusTarget) => number;
   /** Called when a behavior throws. Default: console.error. */
   onError?: (error: unknown, info: BehaviorErrorInfo) => void;
 }
