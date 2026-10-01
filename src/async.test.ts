@@ -99,7 +99,7 @@ describe("J · Async runs", () => {
       }),
     ]);
     await flush();
-    expect(list[0]).toBe(failure);
+    expect((list[0] as Error).cause).toBe(failure);
     expect(String(list[1])).toMatch(/"name" is not declared/);
     expect(s.get(shape.name)).toBe("");
     expect(s.get(shape.rows)).toHaveLength(1);
@@ -588,5 +588,43 @@ describe("J · Kept work", () => {
 
     dispose();
     expect(root.starts.map((x) => x.signal.aborted)).toEqual([true, true]);
+  });
+});
+
+describe("J · Definition traces", () => {
+  const failing = () =>
+    defineBehavior({
+      triggers: [shape.code],
+      writes: [shape.name],
+      run: async () => {
+        await null;
+        throw new TypeError("lookup failed");
+      },
+    });
+
+  test("in dev, onError gets an error located where the behavior was defined, with the thrown error as cause", async () => {
+    const { list, onError } = errors();
+    const s = createStore(shape, initial(), { onError });
+    s.addBehavior(failing());
+    await s.settle();
+    const error = list[0] as Error;
+    expect(error.message).toBe("lookup failed");
+    expect((error.cause as Error).message).toBe("lookup failed");
+    expect(error.cause).toBeInstanceOf(TypeError);
+    const frames = error.stack!.split("\n").filter((l) => l.trim().startsWith("at "));
+    expect(frames[0]).toMatch(/async\.test\.ts/); // the call to defineBehavior in `failing`
+  });
+
+  test("in production, onError gets the thrown value itself", async () => {
+    const { list, onError } = errors();
+    const s = createStore(shape, initial(), { onError });
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      s.addBehavior(failing());
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    await s.settle();
+    expect(list[0]).toBeInstanceOf(TypeError);
   });
 });

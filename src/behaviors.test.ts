@@ -707,7 +707,7 @@ describe("J · Handles and the default onError", () => {
         '[form] "exploding" failed at "lines[0]"',
         '[form] "exploding" failed at "lines[1]"',
       ]);
-      expect(logged[0][1]).toBe(boom);
+      expect((logged[0][1] as Error).cause, "in dev: located where the behavior was defined").toBe(boom);
     } finally {
       console.error = original;
     }

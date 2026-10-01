@@ -94,7 +94,8 @@ function delegate(item: AnyBehavior, slot: Slot): AnyBehavior {
     return new Behavior(
       { ...item.config, when: guards, run: (ctx) => (slot.current as Behavior).config.run(ctx) },
       undefined,
-      item._branches
+      item._branches,
+      item._trace
     );
   }
   throw new Error("useBehaviors: expected behaviors and rules");
