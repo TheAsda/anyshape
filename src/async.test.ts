@@ -5,7 +5,7 @@ import {
   form, object, array, field, createStore, defineBehavior, when,
   type InferValue, type StoreOptions, type AnyRef, type AnyNode, type OriginKind,
 } from "./index";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { deferred, flush } from "./test/harness";
 
 const shape = form({
@@ -17,6 +17,17 @@ const shape = form({
 type Values = InferValue<typeof shape>;
 const R = shape.rows.item;
 const initial = (): Values => ({ code: "a", name: "", region: "", rows: [{ sku: "x", title: "" }] });
+
+/** Sleeps like a debounce: rejects with the signal's reason when it is aborted. */
+function sleep(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    });
+  });
+}
 
 function errors() {
   const list: unknown[] = [];
@@ -441,5 +452,71 @@ describe("J · Transactional state", () => {
     await flush();
     s.set(shape.code, "e");
     expect(seen).toEqual([undefined, undefined, undefined, true]);
+  });
+});
+
+describe("J · settle()", () => {
+  afterEach(() => void vi.useRealTimers());
+
+  test("waits for the runs in flight that write inside the node, reruns included", async () => {
+    vi.useFakeTimers();
+    const s = createStore(shape, initial());
+    s.addBehavior([
+      defineBehavior({
+        triggers: [shape.code],
+        writes: [shape.name],
+        runOn: { init: false },
+        run: async (ctx) => {
+          await sleep(100, ctx.signal);
+          ctx.set(shape.name, ctx.get(shape.code).toUpperCase());
+        },
+      }),
+      defineBehavior({
+        triggers: [shape.code],
+        writes: [shape.region],
+        runOn: { init: false },
+        run: async (ctx) => {
+          await sleep(1000, ctx.signal);
+          ctx.set(shape.region, "eu");
+        },
+      }),
+    ]);
+    s.set(shape.code, "b");
+    let named = false;
+    const name = s.settle(shape.name).then(() => (named = true));
+    await vi.advanceTimersByTimeAsync(50);
+    s.set(shape.code, "c");
+    await vi.advanceTimersByTimeAsync(99);
+    expect(named).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await name;
+    expect(s.get(shape.name)).toBe("C");
+    expect(s.get(shape.region)).toBe("");
+
+    const all = s.settle();
+    await vi.advanceTimersByTimeAsync(1000);
+    await all;
+    expect(s.get(shape.region)).toBe("eu");
+  });
+
+  test("does not wait for a removed row's run", async () => {
+    vi.useFakeTimers();
+    const s = createStore(shape, initial());
+    s.addBehavior(
+      defineBehavior({
+        triggers: [R.sku],
+        writes: [R.title],
+        run: async (ctx) => {
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // ignores the signal
+          ctx.set(R.title, "looked up");
+        },
+      })
+    );
+    let settled = false;
+    const done = s.settle().then(() => (settled = true));
+    const rows = s.substore(shape.rows);
+    rows.remove(rows.itemAt(0));
+    await done;
+    expect(settled).toBe(true);
   });
 });

@@ -42,7 +42,7 @@ import {
 } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 import { initialOf } from "./refs/initial";
-import { beginRun } from "./refs/pending";
+import { beginRun, pendingIn, type PendingRun } from "./refs/pending";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
 export type WritableRef = AnyNode | MetaRef<any>;
@@ -232,6 +232,8 @@ interface Flight {
   readonly controller: AbortController;
   /** What the run handles: passed on to its rerun when an input change cancels it. */
   readonly cause: Pending;
+  /** Its targets are pending until it ends. */
+  readonly tally: PendingRun;
   /** Subscriptions that cancel it (see watch()). */
   readonly offs: Unsubscribe[];
 }
@@ -288,6 +290,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
   private readonly pending = new Map<Binding, Pending>();
   private readonly flights = new Map<Binding, Flight>();
+  /** Resolved when a run in flight ends or is cancelled (settle()). */
+  private ended: { promise: Promise<void>; resolve: () => void } | undefined;
   /** @internal set by the validation layer */
   rules: RuleHooks | undefined;
 
@@ -390,6 +394,18 @@ export class BehaviorRuntime implements RuntimeHooks {
   private register(reg: Registration, host: BaseStore<any>): void {
     this.regs.push(reg);
     reg.root = this.bind(reg, host, reg.chain.indexOf(host.node), true);
+  }
+
+  async settle(store: BaseStore<any>, node: AnyNode): Promise<void> {
+    const pending = pendingIn(node);
+    while (store.get(pending) > 0) {
+      if (!this.ended) {
+        let resolve!: () => void;
+        const promise = new Promise<void>((r) => (resolve = r));
+        this.ended = { promise, resolve };
+      }
+      await this.ended.promise;
+    }
   }
 
   // ---- reset ----
@@ -662,6 +678,10 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (this.flights.get(leaf) !== flight) return;
     this.flights.delete(leaf);
     for (const off of flight.offs) off();
+    flight.tally.end();
+    const ended = this.ended;
+    this.ended = undefined;
+    ended?.resolve();
   }
 
   private mark(leaf: Binding, change: { init?: boolean; changed?: Iterable<string>; origins?: Iterable<Origin> }): void {
@@ -721,36 +741,41 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const guard of reg.guards) {
         if (!guard.test(...guard.refs.map(read))) return;
       }
-      const end = beginRun(leaf.host, reg.writes);
+      const tally = beginRun(leaf.host, reg.writes);
       let result: unknown;
       try {
         result = reg.config.run(ctx);
-      } finally {
-        end();
+      } catch (error) {
+        tally.end();
+        throw error;
       }
-      if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-        const flight: Flight = { controller, cause: p, offs: [] };
-        this.flights.set(leaf, flight);
-        this.watch(leaf, flight);
-        const settled = () => this.end(leaf, flight);
-        (result as PromiseLike<unknown>).then(
-          () => {
-            settled();
-            if (signal.aborted) return;
-            try {
-              this.store._batch(commit);
-            } catch (error) {
-              this.onError(error, info());
-            }
-          },
-          (error) => {
-            settled();
-            if (!signal.aborted) this.onError(error, info());
-          }
-        );
+      if (!(result && typeof (result as PromiseLike<unknown>).then === "function")) {
+        tally.end();
+        commit();
         return;
       }
-      commit();
+      tally.hold();
+      const flight: Flight = { controller, cause: p, tally, offs: [] };
+      this.flights.set(leaf, flight);
+      this.watch(leaf, flight);
+      (result as PromiseLike<unknown>).then(
+        () => {
+          if (signal.aborted) return;
+          try {
+            this.store._batch(() => {
+              this.end(leaf, flight);
+              commit();
+            });
+          } catch (error) {
+            this.onError(error, info());
+          }
+        },
+        (error) => {
+          if (signal.aborted) return;
+          this.store._batch(() => this.end(leaf, flight));
+          this.onError(error, info());
+        }
+      );
     } catch (error) {
       this.onError(error, info());
     }
