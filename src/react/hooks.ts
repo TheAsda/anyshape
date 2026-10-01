@@ -220,7 +220,7 @@ export interface ControlBinding<N extends ControlNode> {
 export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
   const store = useResolved(node, options);
   const value = useValue(node, { store }) as InferValue<N>;
-  const meta = useOwnMeta(store, node) as ControlMeta;
+  const meta = useOwnMeta(store, node) as InferMeta<ControlNode>;
   const onChange = useSetter(store, node);
 
   const registered = useRef<FocusTarget | null>(null);

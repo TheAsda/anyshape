@@ -29,8 +29,14 @@ export type AnyNode = ShapeNode<any>;
 export type ContainerNode = ObjectNode<any> | ArrayNode<any, any>;
 
 export type InferValue<N> = N extends ShapeNode<infer V> ? V : N extends MetaRef<infer V> ? V : never;
-/** The node's declared meta keys and their value types, read from its meta references. */
-export type InferMeta<N> = { [K in keyof N as N[K] extends MetaRef<any> ? K : never]: N[K] extends MetaRef<infer V> ? V : never };
+/**
+ * The node's declared meta keys and their value types, read from its meta
+ * references. Properties typed `any` (every property of a loose AnyNode) are
+ * not keys.
+ */
+export type InferMeta<N> = {
+  [K in keyof N as 0 extends 1 & N[K] ? never : N[K] extends MetaRef<any> ? K : never]: N[K] extends MetaRef<infer V> ? V : never;
+};
 
 /** Meta references for declared keys. */
 export type MetaRefs<M> = { readonly [K in keyof M]: MetaRef<M[K]> };
