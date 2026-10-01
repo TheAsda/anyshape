@@ -17,8 +17,10 @@
 //     store to the new reference. Each item store keeps its own initial value.
 //
 // References (stage 2):
-//   • get / set / subscribe / react accept a node (value), a MetaRef (one
-//     meta key) or a CountRef (countIn(node, key), read-only).
+//   • get / set / subscribe / react accept any reference: a node (value), a
+//     MetaRef (one meta key), and the read-only countIn, initialOf, pendingIn
+//     and pendingOf. Each kind is one module in src/refs/ and answers through
+//     RefKind (src/refs/kind.ts); the store keeps only the change channels.
 //   • Inherited keys (visible / disabled): get(ref) returns the effective
 //     value; getOwn(ref) the value written on the node itself.
 //   • Non-reactive keys (focusTarget) are stored in place: no flush, no
@@ -52,6 +54,10 @@ import {
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
 } from "./shape";
 import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf } from "./internal";
+import { kindOf } from "./refs/kind";
+import type { CountRef } from "./refs/count";
+import type { InitialRef } from "./refs/initial";
+import type { PendingInRef, PendingOfRef } from "./refs/pending";
 
 export type Listener = () => void;
 export type Unsubscribe = () => void;
@@ -73,75 +79,12 @@ export interface ChangeInfo {
 /** Live meta: exactly the keys declared on the node (meta is closed). */
 export type LiveMeta<N> = InferMeta<N>;
 
-// ============================================================
-// Count references
-// ============================================================
-/** Number of nodes in a subtree (the node itself included) whose `key` counts (see metaKey `aggregate`). */
-export class CountRef {
-  /** Nominal brand: a MetaRef has the same public shape and must not match. */
-  private readonly _countRef = true;
-  constructor(readonly node: AnyNode, readonly key: string) {}
-  get path(): string {
-    return `${this.node.path ?? ""}#count(${this.key})`;
-  }
-}
-
-const countRefs = new WeakMap<AnyNode, Map<string, CountRef>>();
-
-/**
- * Whether any node in the subtree declares `key` with an `aggregate`. Rows share
- * the array item template's declarations, so walking the template covers them.
- */
-function isCountable(node: AnyNode, key: string): boolean {
-  if (node[META_DEFS][key]?.options.aggregate) return true;
-  if (node instanceof ObjectNode) {
-    for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) if (isCountable(child, key)) return true;
-  } else if (node instanceof ArrayNode) {
-    return isCountable(node.item, key);
-  }
-  return false;
-}
-
-/** Count reference; the same instance for the same (node, key), so it can be used as a hook dependency. */
-export function countIn(node: AnyNode, key: string): CountRef {
-  let byKey = countRefs.get(node);
-  if (!byKey) countRefs.set(node, (byKey = new Map()));
-  let ref = byKey.get(key);
-  if (!ref) {
-    byKey.set(key, (ref = new CountRef(node, key)));
-    if (!isCountable(node, key)) {
-      console.warn(
-        `countIn: no node under "${node.path || "<root>"}" declares "${key}" with an aggregate – ` +
-          `the count is always 0. Counted keys are declared with metaKey(value, { aggregate }).`
-      );
-    }
-  }
-  return ref;
-}
-
-/** The initial (baseline) value of a node. Changes with { as: "initial" } writes. */
-export class InitialRef<V = unknown> {
-  /** Nominal brand. */
-  private readonly _initialRef = true;
-  /** Phantom type – never exists at runtime. */
-  declare readonly _value: V;
-  constructor(readonly node: AnyNode) {}
-  get path(): string {
-    return `${this.node.path ?? ""}#initial`;
-  }
-}
-
-const initialRefs = new WeakMap<AnyNode, InitialRef<any>>();
-
-/** Initial-value reference; the same instance for the same node. */
-export function initialOf<N extends AnyNode>(node: N): InitialRef<InferValue<N>> {
-  let ref = initialRefs.get(node);
-  if (!ref) initialRefs.set(node, (ref = new InitialRef(node)));
-  return ref;
-}
-
-export type AnyRef = AnyNode | MetaRef<any> | CountRef | InitialRef<any>;
-export type RefValue<R> = R extends CountRef ? number : R extends InitialRef<infer V> ? V : InferValue<R>;
+export type AnyRef = AnyNode | MetaRef<any> | CountRef | InitialRef<any> | PendingInRef | PendingOfRef;
+export type RefValue<R> =
+  R extends CountRef | PendingInRef ? number
+  : R extends PendingOfRef ? boolean
+  : R extends InitialRef<infer V> ? V
+  : InferValue<R>;
 
 export interface CollectEntry<V = unknown> {
   /** Concrete path of the node with row indexes, e.g. "lines[2].qty". */
@@ -167,7 +110,8 @@ export interface RuntimeHooks {
 // ============================================================
 // Internals: phases, subscriptions, write log
 // ============================================================
-type Phase = "reaction" | "ui";
+/** @internal */
+export type Phase = "reaction" | "ui";
 const PHASES: readonly Phase[] = ["reaction", "ui"];
 const NO_ORIGINS: ReadonlySet<Origin> = new Set();
 
@@ -181,6 +125,15 @@ interface Sub<V = any> {
   /** Origins of the log entries relevant to this subscription. */
   origins: (log: readonly WriteEntry[]) => Set<Origin>;
 }
+
+/** @internal */
+export type SubFn = Sub["fn"];
+
+/**
+ * @internal A subtree tally: a meta key name (aggregate counts), or an object
+ * owned by a reference kind (pending tallies), which never equals a name.
+ */
+export type Slot = string | object;
 
 interface Seen {
   focus: unknown;
@@ -311,8 +264,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal */ readonly _valueSubs = new Map<AnyNode, Set<Sub>>();
   /** @internal whole-meta subscriptions */ readonly _metaSubs = new Map<AnyNode, Set<Sub>>();
   /** @internal single-key subscriptions, registered on every source node */ readonly _keySubs = new Map<AnyNode, Set<Sub>>();
-  /** @internal scope hosts only */ readonly _countSubs = new Map<AnyNode, Map<string, Set<Sub>>>();
-  /** @internal scope hosts only: node → key → count (node itself + descendants) */ readonly _counts = new Map<AnyNode, Map<string, number>>();
+  /** @internal scope hosts only */ readonly _countSubs = new Map<AnyNode, Map<Slot, Set<Sub>>>();
+  /** @internal scope hosts only: node → slot → tally (node itself + descendants) */ readonly _counts = new Map<AnyNode, Map<Slot, number>>();
   /** @internal */ readonly _storeSubs = new Set<Listener>();
   /** @internal scope hosts only: subscriptions to initial values */ readonly _initialSubs = new Set<Sub>();
   /** @internal cached substores, keyed by node */ readonly _children = new Map<AnyNode, BaseStore<any>>();
@@ -356,17 +309,9 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   /** Value of a node, value of a meta key (effective for inherited keys) or a count. */
   get<R extends AnyRef>(ref: R): RefValue<R> {
-    if (ref instanceof CountRef) {
-      this.assertInScope(ref.node);
-      this.root._syncWalk();
-      return this._host._countOf(ref.node, ref.key) as RefValue<R>;
-    }
-    if (ref instanceof MetaRef) {
-      this.assertInScope(ref.node);
-      return this._readMetaRef(ref);
-    }
-    if (ref instanceof InitialRef) return this.getInitial(ref.node) as RefValue<R>;
-    return this.getValue(ref as AnyNode);
+    const kind = kindOf(ref);
+    this.assertInScope(kind.node(ref));
+    return kind.read(this, ref) as RefValue<R>;
   }
 
   /** The value written on the node itself, ignoring inheritance. */
@@ -375,13 +320,9 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   set<R extends AnyNode | MetaRef<any>>(ref: R, value: InferValue<R>, options?: WriteOptions): void {
-    if ((ref as unknown) instanceof CountRef) throw new Error("Counts are read-only");
-    if ((ref as unknown) instanceof InitialRef) throw new Error('Initial values are written with { as: "initial" }');
-    if (ref instanceof MetaRef) {
-      this._setMetaKey(ref, value, options);
-      return;
-    }
-    this.setValue(ref as ShapeNode<any>, value, options);
+    const kind = kindOf(ref);
+    if (!kind.writer) throw new Error(kind.readOnly);
+    kind.writer.write(this, ref, value, options);
   }
 
   // ==========================================================
@@ -462,7 +403,8 @@ export abstract class BaseStore<N extends ContainerNode> {
     return this._ownerOf(node)._metaOf(node) as LiveMeta<M>;
   }
 
-  private _setMetaKey(ref: MetaRef<any>, value: unknown, options: WriteOptions = {}): void {
+  /** @internal */
+  _setMetaKey(ref: MetaRef<any>, value: unknown, options: WriteOptions = {}): void {
     const { node, key } = ref;
     this.assertInScope(node);
     if (options.as) throw new Error('`as: "initial"` applies to values only');
@@ -542,7 +484,8 @@ export abstract class BaseStore<N extends ContainerNode> {
     return out;
   }
 
-  private _readMetaRef(ref: MetaRef<any>): any {
+  /** @internal effective value, no scope check */
+  _readMetaRef(ref: MetaRef<any>): any {
     const inherit = defOf(ref).options.inherit;
     if (!inherit) return (this.getMeta(ref.node) as Meta)[ref.key];
     const values = this._metaSources(ref).map((s) => (s.host.getMeta(s.node) as Meta)[ref.key]);
@@ -578,17 +521,17 @@ export abstract class BaseStore<N extends ContainerNode> {
   // Counts
   // ==========================================================
   /** @internal */
-  _countOf(node: AnyNode, key: string): number {
-    return this._counts.get(node)?.get(key) ?? 0;
+  _countOf(node: AnyNode, slot: Slot): number {
+    return this._counts.get(node)?.get(slot) ?? 0;
   }
 
   /** @internal */
-  _bumpCount(node: AnyNode, key: string, delta: number): void {
-    let byKey = this._counts.get(node);
-    if (!byKey) this._counts.set(node, (byKey = new Map()));
-    const value = (byKey.get(key) ?? 0) + delta;
-    if (value) byKey.set(key, value);
-    else byKey.delete(key);
+  _bumpCount(node: AnyNode, slot: Slot, delta: number): void {
+    let bySlot = this._counts.get(node);
+    if (!bySlot) this._counts.set(node, (bySlot = new Map()));
+    const value = (bySlot.get(slot) ?? 0) + delta;
+    if (value) bySlot.set(slot, value);
+    else bySlot.delete(slot);
   }
 
   /**
@@ -759,14 +702,13 @@ export abstract class BaseStore<N extends ContainerNode> {
     return this._addMetaSub(node, "reaction", fn as any);
   }
 
-  private _addRefSub(ref: AnyRef, phase: Phase, fn: Sub["fn"]): Unsubscribe {
-    if (ref instanceof CountRef) return this._addCountSub(ref, phase, fn);
-    if (ref instanceof MetaRef) return this._addKeySub(ref, phase, fn);
-    if (ref instanceof InitialRef) return this._addInitialSub(ref, phase, fn);
-    return this._addValueSub(ref, phase, fn);
+  private _addRefSub(ref: AnyRef, phase: Phase, fn: SubFn): Unsubscribe {
+    return kindOf(ref).subscribe(this, ref, phase, fn);
   }
 
-  private _addValueSub(node: AnyNode, phase: Phase, fn: Sub["fn"]): Unsubscribe {
+  // Change channels, used by the reference kinds (src/refs/).
+  /** @internal */
+  _addValueSub(node: AnyNode, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(node);
     const owner = this._ownerOf(node);
     const loc = locOf(owner._host, node);
@@ -780,7 +722,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     return register(owner._valueSubs, node, sub);
   }
 
-  private _addMetaSub(node: AnyNode, phase: Phase, fn: Sub["fn"]): Unsubscribe {
+  private _addMetaSub(node: AnyNode, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(node);
     const owner = this._ownerOf(node);
     const host = owner._host;
@@ -794,7 +736,8 @@ export abstract class BaseStore<N extends ContainerNode> {
     return register(owner._metaSubs, node, sub);
   }
 
-  private _addKeySub(ref: MetaRef<any>, phase: Phase, fn: Sub["fn"]): Unsubscribe {
+  /** @internal */
+  _addKeySub(ref: MetaRef<any>, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(ref.node);
     const sources = this._metaSources(ref);
     const sub: Sub = {
@@ -811,13 +754,14 @@ export abstract class BaseStore<N extends ContainerNode> {
     return () => offs.forEach((off) => off());
   }
 
-  private _addInitialSub(ref: InitialRef<any>, phase: Phase, fn: Sub["fn"]): Unsubscribe {
-    this.assertInScope(ref.node);
+  /** @internal baseline channel: marked by { as: "initial" } writes on this scope */
+  _addInitialSub(node: AnyNode, phase: Phase, fn: SubFn): Unsubscribe {
+    this.assertInScope(node);
     const host = this._host;
-    const loc = locOf(host, ref.node);
+    const loc = locOf(host, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
-      read: () => host.getInitial(ref.node),
+      read: () => host.getInitial(node),
       equals: Object.is,
       origins: (log) => originsWhere(log, (e) => e.origin === "initial" && e.key === undefined && related(e.loc, loc)),
     };
@@ -829,22 +773,28 @@ export abstract class BaseStore<N extends ContainerNode> {
     };
   }
 
-  private _addCountSub(ref: CountRef, phase: Phase, fn: Sub["fn"]): Unsubscribe {
-    this.assertInScope(ref.node);
+  /**
+   * @internal Tally channel: marks of `slot` at `node` on this scope host
+   * (_applyCountDelta moves subtree tallies with rows, _markCount marks any
+   * other value a kind keeps per slot). `read` defaults to the subtree tally.
+   * Origins: for a key name, the writes of that key inside the subtree.
+   */
+  _addTallySub(node: AnyNode, slot: Slot, phase: Phase, fn: SubFn, read?: (host: BaseStore<any>) => unknown): Unsubscribe {
+    this.assertInScope(node);
     this.root._syncWalk();
     const host = this._host;
-    const loc = locOf(host, ref.node);
+    const loc = locOf(host, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
-      read: () => host._countOf(ref.node, ref.key),
+      read: read ? () => read(host) : () => host._countOf(node, slot),
       equals: Object.is,
-      origins: (log) => originsWhere(log, (e) => e.key === ref.key && within(e.loc, loc)),
+      origins: (log) => (typeof slot === "string" ? originsWhere(log, (e) => e.key === slot && within(e.loc, loc)) : new Set()),
     };
     sub.last = sub.read();
-    let byKey = host._countSubs.get(ref.node);
-    if (!byKey) host._countSubs.set(ref.node, (byKey = new Map()));
-    let set = byKey.get(ref.key);
-    if (!set) byKey.set(ref.key, (set = new Set()));
+    let bySlot = host._countSubs.get(node);
+    if (!bySlot) host._countSubs.set(node, (bySlot = new Map()));
+    let set = bySlot.get(slot);
+    if (!set) bySlot.set(slot, (set = new Set()));
     set.add(sub);
     return () => {
       sub.active = false;
@@ -910,8 +860,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   /** @internal this = scope host */
-  _collectCount(node: AnyNode, key: string, phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
-    const subs = this._countSubs.get(node)?.get(key);
+  _collectCount(node: AnyNode, slot: Slot, phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
+    const subs = this._countSubs.get(node)?.get(slot);
     if (subs) for (const sub of subs) if (sub.phase === phase) check(sub, calls, log);
   }
 
@@ -976,7 +926,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   /** @internal */ _validation: ValidationHooks | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { reaction: new Set(), ui: new Set() };
   private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { reaction: new Map(), ui: new Map() };
-  private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<string>>>> = { reaction: new Map(), ui: new Map() };
+  private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { reaction: new Map(), ui: new Map() };
 
   constructor(shape: N, initialValues: InferValue<N>) {
     super(shape, undefined);
@@ -1064,14 +1014,14 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     for (const phase of PHASES) this.dirtyInitial[phase].add(host);
   }
 
-  /** @internal Add `delta` to `key` on `node` and every ancestor, across scopes. */
-  _applyCountDelta(host: BaseStore<any>, node: AnyNode, key: string, delta: number): void {
+  /** @internal Add `delta` to `slot` on `node` and every ancestor, across scopes. */
+  _applyCountDelta(host: BaseStore<any>, node: AnyNode, slot: Slot, delta: number): void {
     let h = host;
     let from: AnyNode = node;
     for (;;) {
       for (let n: AnyNode | undefined = from; n; n = n.parent) {
-        h._bumpCount(n, key, delta);
-        this._markCount(h, n, key);
+        h._bumpCount(n, slot, delta);
+        this._markCount(h, n, slot);
         if (n === h.node) break;
       }
       if (!(h instanceof ItemStore) || !h._countedInParent) break;
@@ -1080,14 +1030,15 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     }
   }
 
-  private _markCount(host: BaseStore<any>, node: AnyNode, key: string): void {
+  /** @internal the tally `slot` of `node` on `host` changed */
+  _markCount(host: BaseStore<any>, node: AnyNode, slot: Slot): void {
     for (const phase of PHASES) {
       const byHost = this.dirtyCounts[phase];
       let byNode = byHost.get(host);
       if (!byNode) byHost.set(host, (byNode = new Map()));
-      let keys = byNode.get(node);
-      if (!keys) byNode.set(node, (keys = new Set()));
-      keys.add(key);
+      let slots = byNode.get(node);
+      if (!slots) byNode.set(node, (slots = new Set()));
+      slots.add(slot);
     }
   }
 
@@ -1111,7 +1062,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     if (counts.size) {
       this.dirtyCounts[phase] = new Map();
       for (const [host, byNode] of counts) {
-        for (const [node, keys] of byNode) for (const key of keys) host._collectCount(node, key, phase, calls, log);
+        for (const [node, slots] of byNode) for (const slot of slots) host._collectCount(node, slot, phase, calls, log);
       }
     }
   }
@@ -1366,8 +1317,8 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     row._counted = attach;
     const totals = row._counts.get(row.node);
     if (!totals) return;
-    for (const [key, count] of totals) {
-      this.root._applyCountDelta(this._host, this.node, key, attach ? count : -count);
+    for (const [slot, count] of totals) {
+      this.root._applyCountDelta(this._host, this.node, slot, attach ? count : -count);
     }
   }
 

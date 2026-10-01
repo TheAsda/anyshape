@@ -12,12 +12,12 @@
 // ============================================================
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { MetaRef, type AnyNode, type InferValue, type ObjectNode } from "../shape";
+import type { AnyNode, InferValue, MetaRef, ObjectNode } from "../shape";
 import { createStore } from "../create";
 import type { StoreOptions } from "../behaviors";
 import type { RootStore, WriteOptions } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
-import { defOf } from "../internal";
+import { refLabel, targetOf } from "../internal";
 
 const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
 
@@ -78,9 +78,10 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
   const start = useStore(options);
   const store = resolveStore(start, ref);
 
-  if (isDev() && ref instanceof MetaRef && !defOf(ref).options.keepOnReset && !warned.has(ref)) {
+  const def = targetOf(ref)?.def;
+  if (isDev() && def && !def.options.keepOnReset && !warned.has(ref)) {
     warned.add(ref);
-    console.warn(`useSync: "${ref.path}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
+    console.warn(`useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
   }
 
   const origin = options.origin ?? "program";
@@ -94,7 +95,7 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
     if (!resetOnUnmount) return;
     return () => {
       if (!store.isAttached()) return;
-      const reset = ref instanceof MetaRef ? defOf(ref).defaultValue : store.getInitial(ref as AnyNode);
+      const reset = def ? def.defaultValue : store.getInitial(ref as AnyNode);
       store.set(ref as never, reset as never, { origin });
     };
   }, [store, ref, resetOnUnmount, origin]);
