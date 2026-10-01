@@ -80,6 +80,8 @@ export interface BehaviorContext {
   readonly state: Record<string, unknown>;
   /** The store of the instance's scope (root or row). */
   readonly store: BaseStore<any>;
+  /** Aborted when the run is cancelled (pass it to fetch). After that, get and set throw its reason. */
+  readonly signal: AbortSignal;
 }
 
 export interface BehaviorConfig {
@@ -97,7 +99,8 @@ export interface BehaviorConfig {
   origins?: readonly OriginKind[];
   /** All guards must pass; otherwise the run is skipped (previous writes stay). */
   when?: Guard | readonly Guard[];
-  run(ctx: BehaviorContext): void;
+  /** May return a promise: its writes apply when it resolves, unless the run was cancelled. */
+  run(ctx: BehaviorContext): void | Promise<void>;
 }
 
 /**
@@ -201,6 +204,8 @@ export interface Registration {
   scope: AnyNode;
   chain: AnyNode[];
   triggers: AnyRef[];
+  /** Read inputs that are not triggers: watched only while a run is in flight. */
+  reads: AnyRef[];
   inputs: AnyRef[];
   writes: WritableRef[];
   /** What each write changes, in the order of `writes`. */
@@ -220,6 +225,13 @@ interface Pending {
   init: boolean;
   changed: Set<string>;
   origins: Set<Origin>;
+}
+
+/** An async run in flight. */
+interface Flight {
+  readonly controller: AbortController;
+  /** Subscriptions that cancel it (see watch()). */
+  readonly offs: Unsubscribe[];
 }
 
 /**
@@ -272,6 +284,7 @@ const handles = new WeakMap<BehaviorHandle, HandleEntry>();
 export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
   private readonly pending = new Map<Binding, Pending>();
+  private readonly flights = new Map<Binding, Flight>();
   /** @internal set by the validation layer */
   rules: RuleHooks | undefined;
 
@@ -388,9 +401,13 @@ export class BehaviorRuntime implements RuntimeHooks {
       return false;
     };
     for (const reg of this.regs) {
-      if (reg.disposed || !reg.runInit || !reg.root) continue;
+      if (reg.disposed || !reg.root) continue;
       if (!reg.writes.some((w) => isAncestorOrSelf(node, refNode(w)))) continue;
-      for (const leaf of this.leaves(reg.root)) if (inside(leaf.host)) this.mark(leaf, { init: true });
+      for (const leaf of this.leaves(reg.root)) {
+        if (!inside(leaf.host)) continue;
+        this.cancel(leaf); // its cause is not passed on
+        if (reg.runInit) this.mark(leaf, { init: true });
+      }
     }
   }
 
@@ -456,7 +473,8 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     return {
       seq, name, behavior, config, feature, host, scope, chain,
-      triggers, inputs: [...triggers, ...reads], writes, targets, guards,
+      triggers, reads: reads.filter((r) => !triggers.some((t) => refKey(t) === refKey(r))),
+      inputs: [...triggers, ...reads], writes, targets, guards,
       declared: new Set(all.map(refKey)),
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
@@ -547,6 +565,8 @@ export class BehaviorRuntime implements RuntimeHooks {
           if (now === seq) return;
           seq = now;
           for (const row of now) this.child(binding, row);
+          // Removed rows: their runs in flight are cancelled.
+          for (const leaf of this.flights.keys()) if (leaf.reg === reg && !leaf.host.isAttached()) this.cancel(leaf);
         })
       );
     }
@@ -580,8 +600,49 @@ export class BehaviorRuntime implements RuntimeHooks {
       origins.delete(leaf.origin);
       if (info.origins.size > 0 && origins.size === 0) continue; // only its own writes
       if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) continue;
+      this.cancel(leaf);
       this.mark(leaf, { changed: key, origins });
     }
+  }
+
+  /**
+   * While a run is in flight, a change to one of its reads cancels and reruns
+   * it; another origin writing one of its targets only cancels it.
+   */
+  private watch(leaf: Binding, flight: Flight): void {
+    const reg = leaf.reg;
+    for (const ref of reg.writes) {
+      if (reg.inputs.some((i) => refKey(i) === refKey(ref))) continue; // an input change reruns it
+      flight.offs.push(
+        leaf.host.react(ref, () => {
+          if (this.flights.get(leaf) === flight) this.cancel(leaf);
+        })
+      );
+    }
+    for (const ref of reg.reads) {
+      const key = refKey(ref);
+      flight.offs.push(
+        hostFor(leaf.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => {
+          if (this.flights.get(leaf) !== flight) return;
+          this.cancel(leaf);
+          this.mark(leaf, { changed: key, origins: new Set(info.origins) });
+        })
+      );
+    }
+  }
+
+  /** Ends the leaf's run in flight, if any: unwatches it and aborts its signal. */
+  private cancel(leaf: Binding): void {
+    const flight = this.flights.get(leaf);
+    if (!flight) return;
+    this.end(leaf, flight);
+    flight.controller.abort();
+  }
+
+  private end(leaf: Binding, flight: Flight): void {
+    if (this.flights.get(leaf) !== flight) return;
+    this.flights.delete(leaf);
+    for (const off of flight.offs) off();
   }
 
   private mark(leaf: Binding, change: { init?: boolean; changed?: string; origins?: Set<Origin> }): void {
@@ -599,7 +660,10 @@ export class BehaviorRuntime implements RuntimeHooks {
     const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concreteScopePath(leaf.host) });
 
     const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
+    const controller = new AbortController();
+    const signal = controller.signal;
     const read = (ref: AnyRef): any => {
+      if (signal.aborted) throw signal.reason;
       const key = refKey(ref);
       if (!reg.declared.has(key)) {
         throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in triggers, reads, writes or when`);
@@ -611,6 +675,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const ctx: BehaviorContext = {
       get: read,
       set: (ref, value) => {
+        if (signal.aborted) throw signal.reason;
         const key = refKey(ref);
         if (!reg.writable.has(key)) throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in writes`);
         buffer.delete(key); // keep insertion order = last write
@@ -622,6 +687,13 @@ export class BehaviorRuntime implements RuntimeHooks {
       origins: p.origins,
       state: leaf.state,
       store: leaf.host,
+      signal,
+    };
+
+    const commit = () => {
+      for (const { ref, value } of buffer.values()) {
+        hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: leaf.origin });
+      }
     };
 
     try {
@@ -636,11 +708,28 @@ export class BehaviorRuntime implements RuntimeHooks {
         end();
       }
       if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-        throw new Error(`Behavior "${reg.name}": async behaviors are not supported yet`);
+        const flight: Flight = { controller, offs: [] };
+        this.flights.set(leaf, flight);
+        this.watch(leaf, flight);
+        const settled = () => this.end(leaf, flight);
+        (result as PromiseLike<unknown>).then(
+          () => {
+            settled();
+            if (signal.aborted) return;
+            try {
+              this.store._batch(commit);
+            } catch (error) {
+              this.onError(error, info());
+            }
+          },
+          (error) => {
+            settled();
+            if (!signal.aborted) this.onError(error, info());
+          }
+        );
+        return;
       }
-      for (const { ref, value } of buffer.values()) {
-        hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: leaf.origin });
-      }
+      commit();
     } catch (error) {
       this.onError(error, info());
     }
@@ -660,6 +749,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     reg.disposed = true;
     this.regs.splice(this.regs.indexOf(reg), 1);
     for (const leaf of this.pending.keys()) if (leaf.reg === reg) this.pending.delete(leaf);
+    for (const leaf of this.flights.keys()) if (leaf.reg === reg) this.cancel(leaf);
     if (reg.root) this.unbind(reg, reg.root, resetMeta);
     this.rank(this.regs);
   }
