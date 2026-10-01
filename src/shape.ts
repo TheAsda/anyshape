@@ -21,6 +21,9 @@ import {
   type Meta, type MetaInput, type MergeMetaInputs,
 } from "./meta";
 import { FIELDS, META_DEFS, META, CREATE, PLAIN } from "./internal";
+import { KIND, type RefKind } from "./refs/kind";
+import { valueKind } from "./refs/value";
+import { metaKind } from "./refs/meta";
 
 declare const FieldIdBrand: unique symbol;
 export type FieldId = string & { readonly [FieldIdBrand]: true };
@@ -73,6 +76,11 @@ export class MetaRef<V = unknown> {
     return `${this.node.path ?? ""}#${this.key}`;
   }
 
+  /** @internal */
+  get [KIND](): RefKind<MetaRef<any>> {
+    return metaKind;
+  }
+
 }
 
 /** A value reference (a node) or a meta reference. */
@@ -89,6 +97,11 @@ export abstract class ShapeNode<T = unknown> {
   declare readonly [META]: Meta;
   /** @internal Normalized declarations, one per meta key. */
   declare readonly [META_DEFS]: Readonly<Record<string, MetaKeyDef<any>>>;
+
+  /** @internal */
+  get [KIND](): RefKind<AnyNode> {
+    return valueKind;
+  }
 
   // ---- filled by form() ----
   id!: FieldId;

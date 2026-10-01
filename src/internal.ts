@@ -3,9 +3,10 @@
 // Not exported from the package index.
 // ============================================================
 
-import { ShapeNode, ArrayNode, MetaRef, type AnyNode } from "./shape";
+import { ArrayNode, type MetaRef, type AnyNode } from "./shape";
 import type { MetaKeyDef } from "./meta";
-import { BaseStore, ItemStore, CountRef, InitialRef, type AnyRef } from "./store";
+import { BaseStore, ItemStore, type AnyRef } from "./store";
+import { kindOf, type Target } from "./refs/kind";
 
 // ============================================================
 // Node internals, keyed by symbols so that every string name stays free for
@@ -35,19 +36,23 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
 }
 
 // ============================================================
+// References: every kind answers through its RefKind (src/refs/kind.ts).
+// ============================================================
 export function refNode(ref: AnyRef): AnyNode {
-  return ref instanceof ShapeNode ? ref : ref.node;
+  return kindOf(ref).node(ref);
 }
 
 export function refKey(ref: AnyRef): string {
-  if (ref instanceof MetaRef) return `m:${ref.node.id}:${ref.key}`;
-  if (ref instanceof CountRef) return `c:${ref.node.id}:${ref.key}`;
-  if (ref instanceof InitialRef) return `i:${ref.node.id}`;
-  return `v:${ref.id}`;
+  return kindOf(ref).id(ref);
 }
 
 export function refLabel(ref: AnyRef): string {
-  return ref instanceof ShapeNode ? ref.path || "<root>" : ref.path;
+  return kindOf(ref).label(ref);
+}
+
+/** What writing `ref` changes; undefined for read-only kinds. */
+export function targetOf(ref: AnyRef): Target | undefined {
+  return kindOf(ref).writer?.target(ref);
 }
 
 /** The scope a node belongs to: its row template, or the form root. */

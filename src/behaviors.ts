@@ -33,13 +33,16 @@
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
-  refNode, refKey, refLabel, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
-  FIELDS, META_DEFS, defOf,
+  refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
+  FIELDS, META_DEFS,
 } from "./internal";
 import {
-  RootStore, BaseStore, ItemStore, ArrayStore, CountRef, InitialRef, initialOf,
+  RootStore, BaseStore, ItemStore, ArrayStore,
   type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks,
 } from "./store";
+import { kindOf, type Target } from "./refs/kind";
+import { initialOf } from "./refs/initial";
+import { beginRun } from "./refs/pending";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
 export type WritableRef = AnyNode | MetaRef<any>;
@@ -165,31 +168,19 @@ export interface StoreOptions {
   onError?: (error: unknown, info: BehaviorErrorInfo) => void;
 }
 
-function kindOf(origin: Origin): OriginKind {
+function originKind(origin: Origin): OriginKind {
   return origin.startsWith("behavior:") ? "behavior" : (origin as OriginKind);
 }
 
 /** Does writing `w` possibly change the value of input `r`? */
-function affects(w: WritableRef, r: AnyRef): boolean {
-  if (r instanceof InitialRef) return false;
-  if (w instanceof ShapeNode) {
-    if (r instanceof ShapeNode) return isAncestorOrSelf(w, r) || isAncestorOrSelf(r, w);
-    if (r instanceof CountRef) return isAncestorOrSelf(w, r.node) || isAncestorOrSelf(r.node, w);
-    return false;
-  }
-  if (r instanceof MetaRef) {
-    if (w.key !== r.key) return false;
-    return w.node === r.node || (!!defOf(r).options.inherit && isAncestorOrSelf(w.node, r.node));
-  }
-  if (r instanceof CountRef) return w.key === r.key && isAncestorOrSelf(r.node, w.node);
-  return false;
+function affects(w: Target, r: AnyRef): boolean {
+  return kindOf(r).affectedBy(r, w);
 }
 
 /** Do two write targets overlap (the same data)? */
-function overlaps(a: WritableRef, b: WritableRef): boolean {
-  if (a instanceof ShapeNode && b instanceof ShapeNode) return isAncestorOrSelf(a, b) || isAncestorOrSelf(b, a);
-  if (a instanceof MetaRef && b instanceof MetaRef) return a.node === b.node && a.key === b.key;
-  return false;
+function overlaps(a: Target, b: Target): boolean {
+  if (a.key === undefined && b.key === undefined) return isAncestorOrSelf(a.node, b.node) || isAncestorOrSelf(b.node, a.node);
+  return a.key !== undefined && a.node === b.node && a.key === b.key;
 }
 
 // ============================================================
@@ -212,6 +203,8 @@ export interface Registration {
   triggers: AnyRef[];
   inputs: AnyRef[];
   writes: WritableRef[];
+  /** What each write changes, in the order of `writes`. */
+  targets: Target[];
   guards: Guard[];
   declared: Set<string>;
   writable: Set<string>;
@@ -427,9 +420,10 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     // Writes: nodes and meta keys only, never feature-owned keys (unless feature).
     for (const w of writes) {
-      if (!(w instanceof ShapeNode || w instanceof MetaRef)) fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
-      if (w instanceof MetaRef && defOf(w).options.owner === "feature" && !feature) {
-        fail(`"${w.path}" is owned by its feature and cannot be written by other behaviors`);
+      const target = targetOf(w as AnyRef);
+      if (!target) fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
+      if (target!.def?.options.owner === "feature" && !feature) {
+        fail(`"${refLabel(w)}" is owned by its feature and cannot be written by other behaviors`);
       }
     }
 
@@ -437,7 +431,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (behavior._self) {
       const self = behavior._self;
       for (const ref of all) {
-        if (refNode(ref) !== self || ref instanceof CountRef) fail(`default behaviors may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`);
+        if (refNode(ref) !== self || !kindOf(ref).local) fail(`default behaviors may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`);
       }
     }
 
@@ -461,7 +455,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     return {
       seq, name, behavior, config, feature, host, scope, chain,
-      triggers, inputs: [...triggers, ...reads], writes, guards,
+      triggers, inputs: [...triggers, ...reads], writes, targets: writes.map((w) => targetOf(w)!), guards,
       declared: new Set(all.map(refKey)),
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
@@ -478,15 +472,15 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const other of existing) {
         if (!(storeWithin(reg.host, other.host) || storeWithin(other.host, reg.host))) continue;
         if (exclusiveBranches(reg, other)) continue;
-        for (const w of reg.writes) {
-          const hit = other.writes.find((o) => overlaps(w, o));
-          if (hit) {
-            throw new Error(
-              `Behavior "${reg.name}": "${refLabel(w)}" is already written by "${other.name}"` +
-                (hit === w ? "" : ` (via "${refLabel(hit)}")`) + " – one writer per target"
-            );
-          }
-        }
+        reg.writes.forEach((w, i) => {
+          const at = other.targets.findIndex((o) => overlaps(reg.targets[i], o));
+          if (at === -1) return;
+          const hit = other.writes[at];
+          throw new Error(
+            `Behavior "${reg.name}": "${refLabel(w)}" is already written by "${other.name}"` +
+              (hit === w ? "" : ` (via "${refLabel(hit)}")`) + " – one writer per target"
+          );
+        });
       }
       existing.push(reg);
     }
@@ -499,7 +493,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const a of regs) {
       for (const b of regs) {
         if (a === b) continue;
-        if (a.writes.some((w) => b.inputs.some((r) => affects(w, r)))) {
+        if (a.targets.some((w) => b.inputs.some((r) => affects(w, r)))) {
           edges.get(a)!.push(b);
           indegree.set(b, indegree.get(b)! + 1);
         }
@@ -584,7 +578,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       const origins = new Set(info.origins);
       origins.delete(leaf.origin);
       if (info.origins.size > 0 && origins.size === 0) continue; // only its own writes
-      if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(kindOf(o)))) continue;
+      if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) continue;
       this.mark(leaf, { changed: key, origins });
     }
   }
@@ -633,7 +627,13 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const guard of reg.guards) {
         if (!guard.test(...guard.refs.map(read))) return;
       }
-      const result: unknown = reg.config.run(ctx);
+      const end = beginRun(leaf.host, reg.writes);
+      let result: unknown;
+      try {
+        result = reg.config.run(ctx);
+      } finally {
+        end();
+      }
       if (result && typeof (result as PromiseLike<unknown>).then === "function") {
         throw new Error(`Behavior "${reg.name}": async behaviors are not supported yet`);
       }
@@ -669,7 +669,8 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (!resetMeta || !binding.host.isAttached()) return;
       // Meta the behavior wrote goes back to its default.
       for (const w of reg.writes) {
-        if (w instanceof MetaRef) binding.host.set(w, defOf(w).defaultValue as never, { origin: binding.origin });
+        const def = targetOf(w)!.def;
+        if (def) binding.host.set(w, def.defaultValue as never, { origin: binding.origin });
       }
       return;
     }
