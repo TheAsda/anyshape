@@ -8,10 +8,10 @@ const test = base
   .extend("store", () => createStore(userShape, initial()));
 
 describe("D · Static meta", () => {
-  test("static meta incl. root meta", () => {
-    expect(userShape._meta.title).toBe("User");
-    expect(userShape.name._meta.label).toBe("Full name");
-    expect(userShape.items._meta.maxItems).toBe(10);
+  test("static meta incl. root meta", ({ store: s }) => {
+    expect(s.get(userShape.title)).toBe("User");
+    expect(s.get(userShape.name.label)).toBe("Full name");
+    expect(s.get(userShape.items.maxItems)).toBe(10);
   });
 });
 

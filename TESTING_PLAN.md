@@ -74,7 +74,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** parent links, reused shapes get distinct nodes, item template lenses, reserved field names, primitive arrays rejected, `.meta()` after `form()` rejected, `create` kept and must be a function.
 
 - [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `shape.test.ts`
-- [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `_fields`, …). Same for meta keys, plus `item`. → `meta.test.ts`
+- [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `constructor`, `_type`, `_hasCreate`). Same for meta keys, plus `item`. Node internals are symbol-keyed, so `_fields`, `_meta` and `_metaDefs` are ordinary names; a meta key that matches a child throws. → `meta.test.ts`
 - [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `store.test.ts`
 - [x] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
 
@@ -188,10 +188,10 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Utilities & builder
-**Covered:** `isEmpty`, `labelOf`, `required` (incl. `required` meta), format rules on empty values, `calculate` (+`stopOnUserEdit`, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhenHidden`, `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
+**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (+`stopOnUserEdit`, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen`, `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
 
-- [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `labelOf` uses a `label` meta key in `exclusive`'s default text. → `utilities.test.ts`
-- [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhenHidden` on a node with no `visibility()` on it or any ancestor throws; with visibility declared on an ancestor it works. → `utilities.test.ts`
+- [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `exclusive`'s default text uses `labelOf` (the last path segment). → `utilities.test.ts`
+- [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhen` takes its condition as explicit refs (`[s.car.visible]`). → `utilities.test.ts`
 - [x] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `utilities.test.ts`
 - [x] **N4 · P2** The `when` option on utilities (`calculate(…, { when })`, `required(…, { when })`) behaves like a builder block. → `utilities.test.ts`
 - [x] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
@@ -249,7 +249,7 @@ Type assertions are spread across the files today. Collect the public-API type c
 
 ## 3. Integration scenarios
 
-The unit suites test each mechanism in isolation. Add **`src/integration.test.ts`** with one realistic form exercising the layers together: a trip booking with contact, reused `person`, travelers rows with a per-row computed `isAdult`, dates → nights → price → total with a budget rule, `seats` limited by a synced `seatsLeft`, a visa section shown for some destinations with `clearWhenHidden`, and promo/voucher `exclusive`. (A verified version of this form exists from the architecture deck work; it can seed the file.)
+The unit suites test each mechanism in isolation. Add **`src/integration.test.ts`** with one realistic form exercising the layers together: a trip booking with contact, reused `person`, travelers rows with a per-row computed `isAdult`, dates → nights → price → total with a budget rule, `seats` limited by a synced `seatsLeft`, a visa section shown for some destinations with `clearWhen`, and promo/voucher `exclusive`. (A verified version of this form exists from the architecture deck work; it can seed the file.)
 
 - [x] **INT1 · P1** Load a saved booking with `{ as: "initial" }`: nothing dirty or touched, sync errors present, async rules unchecked, `validate()` runs them.
 - [x] **INT2 · P1** A user edit of `returnDate` updates nights → price → total → budget error, **each behavior running exactly once** (count runs with named behaviors).

@@ -24,7 +24,7 @@ import {
   asyncRule,
   calculate,
   visibleWhen,
-  clearWhenHidden,
+  clearWhen,
   isEmpty,
   metaKey,
   type InferValue,
@@ -55,7 +55,7 @@ const lookingUp = () => ({
 // Steps deliberately declare no visibility: everything stays part
 // of the submitted values, so the server still sees (and rejects)
 // step-1 fields at the end. The nested `address` and `approval`
-// groups DO use visibility + clearWhenHidden – that contrast is
+// groups DO use visibility + clearWhen – that contrast is
 // the point of the demo.
 export const shape = form(
   object({
@@ -330,7 +330,7 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   // Shipping somewhere else reveals the address; hiding it clears
   // the fields inside (hidden fields also skip validation).
   b.add(visibleWhen(s.logistics.address, [s.logistics.shipToOffice], (v) => !v));
-  b.add(clearWhenHidden(s.logistics.address));
+  b.add(clearWhen(s.logistics.address, [s.logistics.address.visible], (visible) => !visible));
   b.add(
     required(s.logistics.address.street),
     required(s.logistics.address.city),
@@ -340,7 +340,7 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   b.add(
     visibleWhen(s.logistics.approval, [s.order.total], (total) => total !== undefined && total > 10_000),
   );
-  b.add(clearWhenHidden(s.logistics.approval));
+  b.add(clearWhen(s.logistics.approval, [s.logistics.approval.visible], (visible) => !visible));
   b.add(required(s.logistics.approval.approver));
   b.add(required(s.logistics.approval.justification));
 });

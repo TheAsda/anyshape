@@ -19,6 +19,7 @@ import type { StoreOptions } from "../behaviors";
 import type { FocusTarget } from "../features";
 import type { RootStore, WriteOptions } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
+import { defOf } from "../internal";
 
 const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
 
@@ -100,7 +101,7 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
   const start = useStore(options);
   const store = resolveStore(start, ref);
 
-  if (isDev() && ref instanceof MetaRef && !ref.def.options.keepOnReset && !warned.has(ref)) {
+  if (isDev() && ref instanceof MetaRef && !defOf(ref).options.keepOnReset && !warned.has(ref)) {
     warned.add(ref);
     console.warn(`useSync: "${ref.path}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
   }
@@ -116,7 +117,7 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
     if (!resetOnUnmount) return;
     return () => {
       if (!store.isAttached()) return;
-      const reset = ref instanceof MetaRef ? ref.def.defaultValue : store.getInitial(ref as AnyNode);
+      const reset = ref instanceof MetaRef ? defOf(ref).defaultValue : store.getInitial(ref as AnyNode);
       store.set(ref as never, reset as never, { origin });
     };
   }, [store, ref, resetOnUnmount, origin]);
