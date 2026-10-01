@@ -105,6 +105,8 @@ export interface RuntimeHooks {
   replace(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle;
   /** After reset(node) on `store`: re-run (as init) every instance that writes inside the reset part. */
   reinit(store: BaseStore<any>, node: AnyNode): void;
+  /** The reactions settled: the end of the flush's reaction phase. */
+  flushed(): void;
   /** See BaseStore.settle. */
   settle(store: BaseStore<any>, node: AnyNode): Promise<void>;
 }
@@ -1101,6 +1103,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
           // writes are picked up as triggers in the next round.
           if (this._runtime?.hasWork()) this._runtime.runNext();
         }
+        this._runtime?.flushed();
       } finally {
         this.depth--;
       }
