@@ -2,6 +2,7 @@
 
 import { form, object, array, field, metaKey, createStore, defineBehavior, when, pendingIn, pendingOf } from "./index";
 import { describe, expect, test } from "vitest";
+import { deferred, flush } from "./test/harness";
 
 const checked = metaKey(false);
 const flagged = metaKey(false);
@@ -81,5 +82,89 @@ describe("Pending", () => {
     row.set(R.qty, 5);
     expect(row.get(R.qty.ok), "the run ran").toBe(true);
     expect(fired).toEqual([]);
+  });
+});
+
+describe("Pending · async runs", () => {
+  /** An async behavior writing `a.checked`, whose runs wait for their gates. */
+  function checkA(s: ReturnType<typeof createStore<typeof shape>>) {
+    const gates: ReturnType<typeof deferred<void>>[] = [];
+    const dispose = s.addBehavior(
+      defineBehavior({
+        triggers: [shape.a],
+        writes: [shape.a.checked],
+        run: async (ctx) => {
+          const gate = deferred<void>();
+          gates.push(gate);
+          await gate.promise;
+          ctx.set(shape.a.checked, true);
+        },
+      })
+    );
+    return { gates, dispose };
+  }
+
+  test("subscriptions fire when an async run starts, and when it ends or is cancelled", async () => {
+    const s = createStore(shape, initial());
+    const seen: unknown[] = [];
+    s.subscribe(pendingOf(shape.a.checked), () => seen.push(["of", s.get(pendingOf(shape.a.checked))]));
+    s.subscribe(pendingIn(shape, checked), () => seen.push(["in", s.get(pendingIn(shape, checked))]));
+
+    const { gates, dispose } = checkA(s);
+    expect(seen.splice(0)).toEqual([["of", true], ["in", 1]]);
+
+    gates[0].resolve();
+    await flush();
+    expect(seen.splice(0)).toEqual([["of", false], ["in", 0]]);
+
+    s.set(shape.a, "x");
+    s.set(shape.a, "y"); // cancelled and rerun: still pending
+    expect(seen.splice(0)).toEqual([["of", true], ["in", 1]]);
+
+    dispose();
+    expect(seen.splice(0)).toEqual([["of", false], ["in", 0]]);
+  });
+
+  test("removing a row subtracts its pending targets", async () => {
+    const s = createStore(shape, initial());
+    const seen: number[] = [];
+    s.subscribe(pendingIn(shape, checked), () => seen.push(s.get(pendingIn(shape, checked))));
+    s.addBehavior(
+      defineBehavior({
+        triggers: [R.qty],
+        writes: [R.qty.ok],
+        run: async () => {
+          await deferred<void>().promise;
+        },
+      })
+    );
+    const rows = s.substore(shape.rows);
+    rows.remove(rows.itemAt(0));
+    expect(s.get(pendingIn(shape, checked))).toBe(1);
+    rows.remove(rows.itemAt(0));
+    await flush();
+    expect(seen).toEqual([2, 1, 0]);
+  });
+
+  test("a reader of pendingOf converges without a ranking edge from the key's writer", async () => {
+    const s = createStore(shape, initial());
+    const runs: boolean[] = [];
+    // Registered first, so it runs before the writer and sees pending only once the tally changes.
+    s.addBehavior(
+      defineBehavior({
+        triggers: [pendingOf(shape.a.checked)],
+        writes: [shape.b.flagged],
+        run: (ctx) => {
+          runs.push(ctx.get(pendingOf(shape.a.checked)));
+          ctx.set(shape.b.flagged, ctx.get(pendingOf(shape.a.checked)));
+        },
+      })
+    );
+    const { gates } = checkA(s);
+    expect(s.get(shape.b.flagged)).toBe(true);
+    gates[0].resolve();
+    await flush();
+    expect(s.get(shape.b.flagged)).toBe(false);
+    expect(runs).toEqual([false, true, false]);
   });
 });
