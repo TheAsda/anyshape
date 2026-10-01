@@ -83,8 +83,7 @@ export class BehaviorBuilder {
       if (item._self) throw new Error("Default behaviors cannot be added through the builder");
       return new Behavior(
         { ...item.config, when: [...asArray(item.config.when), ...this.guards] },
-        undefined,
-        [...item._branches, ...this.branches]
+        { branches: [...item._branches, ...this.branches], trace: item._trace }
       );
     }
     throw new Error("Expected a behavior or a rule");

@@ -287,15 +287,6 @@ describe("L · Errors and access", () => {
       'Behavior "w": "city" is not declared',
     ]);
   });
-
-  test("async behaviors are reported (stage 4)", () => {
-    const { list, onError } = errors();
-    createStore(shape, initial(), {
-      onError,
-      behaviors: defineBehavior({ name: "a", triggers: [shape.title], run: (async () => {}) as any }),
-    });
-    expect(/not supported yet/.test((list[0].error as Error).message)).toBe(true);
-  });
 });
 
 describe("J · Registration checks", () => {
@@ -716,7 +707,7 @@ describe("J · Handles and the default onError", () => {
         '[form] "exploding" failed at "lines[0]"',
         '[form] "exploding" failed at "lines[1]"',
       ]);
-      expect(logged[0][1]).toBe(boom);
+      expect((logged[0][1] as Error).cause, "in dev: located where the behavior was defined").toBe(boom);
     } finally {
       console.error = original;
     }

@@ -17,8 +17,11 @@
 //   • Own writes never trigger the instance that made them (origins are
 //               per instance: "behavior:<name>@<instance>").
 //   • Writes  – buffered during a run and applied only when it completes.
+//               ctx.state is a copy, saved only when the run completes.
 //   • Errors  – caught per run and passed to onError (default console.error);
 //               the run's writes are dropped and the form keeps running.
+//               In dev, the error is located where defineBehavior was
+//               called, with the thrown value as its cause.
 //   • Writers – one behavior per target (value, or meta key). Keys owned by a
 //               feature can only be written by that feature's behaviors.
 //   • Access  – ctx.get / ctx.set only accept declared references.
@@ -28,7 +31,34 @@
 //               returns a dispose function; disposing resets the meta keys
 //               the behavior wrote to their defaults.
 //
-// Not in this stage: async runs (stage 4, with validation).
+// Async runs: run() may return a promise. The run is in flight, and its
+// targets pending (pendingOf / pendingIn), until it settles; its writes then
+// apply in one batch. The latest run wins. A run is cancelled (ctx.signal is
+// aborted; ctx.get / ctx.set throw its reason, which is never reported) when:
+//   • a trigger or a reads ref changes, whatever the origin: it is rerun with
+//     the cancelled run's cause (origins, changed, isInit) plus the change's,
+//     unless the origins filter ignores the change;
+//   • another origin writes one of its targets: no rerun;
+//   • a guard turns false: no rerun, earlier writes stay;
+//   • its row is removed, it is disposed, or reset() covers it: no rerun.
+// So a run that completes has read only values equal to those at its start.
+//
+// Contract (not enforced): a run may start, be cancelled and restart at any
+// time. It must be idempotent and change the form only through ctx.set;
+// reading the outside world (fetch) is fine.
+//
+// The cause of an async run covers everything since the last completed run:
+// an init run replaced in flight has isInit together with the user's origins.
+// Reactions and server checks should use runOn.init: false rather than an
+// isInit check.
+//
+// Kept work (ctx.keep(key, start)): async work a rerun can continue instead of
+// restarting, one slot per instance. It must depend only on its key; it gets
+// its own signal, never ctx. It is aborted on a different key, at the end of
+// the flush that cancelled its holder unless a rerun kept it, and on row
+// removal, dispose or reset().
+//
+// store.settle(node?) waits until no run writing inside the node is in flight.
 // ============================================================
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
@@ -42,7 +72,7 @@ import {
 } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 import { initialOf } from "./refs/initial";
-import { beginRun } from "./refs/pending";
+import { beginRun, pendingIn, type PendingRun } from "./refs/pending";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
 export type WritableRef = AnyNode | MetaRef<any>;
@@ -76,10 +106,19 @@ export interface BehaviorContext {
   readonly isInit: boolean;
   /** Origins of the changes that caused this run (own writes excluded). */
   readonly origins: ReadonlySet<Origin>;
-  /** Per-instance state, kept between runs (e.g. "the user overrode this"). */
+  /** Per-instance state, kept between runs (e.g. "the user overrode this"). A copy: saved only if the run completes. */
   readonly state: Record<string, unknown>;
   /** The store of the instance's scope (root or row). */
   readonly store: BaseStore<any>;
+  /** Aborted when the run is cancelled (pass it to fetch). After that, get and set throw its reason. */
+  readonly signal: AbortSignal;
+  /**
+   * Async work that a rerun can continue instead of restarting: with a key
+   * equal (element by element, Object.is) to the work in flight, returns that
+   * work; otherwise aborts it and calls `start`. One slot per instance.
+   * The work must depend only on its key: it gets its own signal, never ctx.
+   */
+  keep<T>(key: readonly unknown[], start: (signal: AbortSignal) => Promise<T>): Promise<T>;
 }
 
 export interface BehaviorConfig {
@@ -97,7 +136,8 @@ export interface BehaviorConfig {
   origins?: readonly OriginKind[];
   /** All guards must pass; otherwise the run is skipped (previous writes stay). */
   when?: Guard | readonly Guard[];
-  run(ctx: BehaviorContext): void;
+  /** May return a promise: its writes apply when it resolves, unless the run was cancelled. */
+  run(ctx: BehaviorContext): void | Promise<void>;
 }
 
 /**
@@ -109,15 +149,42 @@ export interface Branch {
   readonly side: 0 | 1;
 }
 
+/** @internal What the core attaches to a behavior besides its config. */
+export interface BehaviorInternals {
+  /** Set for feature (default) behaviors: the node the behavior is limited to. */
+  self?: AnyNode;
+  /** When / otherwise splits the behavior is inside of (builder). */
+  branches?: readonly Branch[];
+  /** Dev only: where defineBehavior was called. */
+  trace?: Error;
+}
+
 export class Behavior {
+  /** @internal */ readonly _self: AnyNode | undefined;
+  /** @internal */ readonly _branches: readonly Branch[];
+  /** @internal */ readonly _trace: Error | undefined;
+
   /** @internal */
-  constructor(
-    readonly config: BehaviorConfig,
-    /** @internal set for feature (default) behaviors: node the behavior is limited to */
-    readonly _self?: AnyNode,
-    /** @internal when / otherwise splits this behavior is inside of (builder) */
-    readonly _branches: readonly Branch[] = []
-  ) {}
+  constructor(readonly config: BehaviorConfig, internals: BehaviorInternals = {}) {
+    this._self = internals.self;
+    this._branches = internals.branches ?? [];
+    this._trace = internals.trace;
+  }
+}
+
+const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
+
+/**
+ * What onError receives for an error thrown by a run: in dev, for behaviors
+ * from defineBehavior, an error with the same message located where the
+ * behavior was defined, with the thrown value as its cause.
+ */
+function located(behavior: Behavior, error: unknown): unknown {
+  const trace = behavior._trace;
+  if (!trace?.stack) return error;
+  const located = new Error(error instanceof Error ? error.message : String(error), { cause: error });
+  located.stack = `Error: ${located.message}\n${trace.stack.split("\n").slice(1).join("\n")}`;
+  return located;
 }
 
 function exclusiveBranches(a: Registration, b: Registration): boolean {
@@ -153,7 +220,12 @@ export interface RuleHooks {
 
 export function defineBehavior(config: BehaviorConfig): Behavior {
   if (typeof config?.run !== "function") throw new Error("defineBehavior: `run` must be a function");
-  return new Behavior(config);
+  let trace: Error | undefined;
+  if (isDev()) {
+    trace = new Error();
+    (Error as { captureStackTrace?: (target: object, fn: Function) => void }).captureStackTrace?.(trace, defineBehavior);
+  }
+  return new Behavior(config, { trace });
 }
 
 export interface BehaviorErrorInfo {
@@ -201,7 +273,11 @@ export interface Registration {
   scope: AnyNode;
   chain: AnyNode[];
   triggers: AnyRef[];
+  /** Read inputs that are not triggers: watched only while a run is in flight. */
+  reads: AnyRef[];
   inputs: AnyRef[];
+  /** refKeys of `inputs`. */
+  inputKeys: Set<string>;
   writes: WritableRef[];
   /** What each write changes, in the order of `writes`. */
   targets: Target[];
@@ -222,6 +298,29 @@ interface Pending {
   origins: Set<Origin>;
 }
 
+/** Work handed to ctx.keep, in an instance's slot until it settles. */
+interface Kept {
+  readonly key: readonly unknown[];
+  readonly promise: Promise<unknown>;
+  readonly controller: AbortController;
+  /** The signal of the run that last kept it. */
+  holder: AbortSignal;
+}
+
+const sameKey = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
+
+/** An async run in flight. */
+interface Flight {
+  readonly controller: AbortController;
+  /** What the run handles: passed on to its rerun when an input change cancels it. */
+  readonly cause: Pending;
+  /** Its targets are pending until it ends. */
+  readonly tally: PendingRun;
+  /** Subscriptions that cancel it (see watch()). */
+  readonly offs: Unsubscribe[];
+}
+
 /**
  * One level of a registration's binding tree. The leaf level (host.node ===
  * reg.scope) is an instance; the levels above watch an array and hold one
@@ -231,7 +330,10 @@ class Binding {
   readonly offs: Unsubscribe[] = [];
   // leaf
   readonly id = instanceCounter++;
-  readonly state: Record<string, unknown> = {};
+  /** ctx.state as the last completed run left it. */
+  state: Record<string, unknown> = {};
+  /** The ctx.keep slot. */
+  kept: Kept | undefined;
   readonly origin: Origin;
   // non-leaf
   arrStore: ArrayStore<any> | undefined;
@@ -272,6 +374,13 @@ const handles = new WeakMap<BehaviorHandle, HandleEntry>();
 export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
   private readonly pending = new Map<Binding, Pending>();
+  private readonly flights = new Map<Binding, Flight>();
+  /** Instances whose kept-work slot holds work. */
+  private readonly keeping = new Set<Binding>();
+  /** Instances whose run in flight was cancelled while holding kept work: see flushed(). */
+  private readonly orphans = new Set<Binding>();
+  /** Resolved when a run in flight ends or is cancelled; settle() awaits it. */
+  private settledGate: { promise: Promise<void>; resolve: () => void } | undefined;
   /** @internal set by the validation layer */
   rules: RuleHooks | undefined;
 
@@ -376,6 +485,24 @@ export class BehaviorRuntime implements RuntimeHooks {
     reg.root = this.bind(reg, host, reg.chain.indexOf(host.node), true);
   }
 
+  /** End of a flush: kept work that no run holds any more (its holder was cancelled) is aborted. */
+  flushed(): void {
+    for (const leaf of this.orphans) if (leaf.kept?.holder.aborted) this.abortKept(leaf);
+    this.orphans.clear();
+  }
+
+  async settle(store: BaseStore<any>, node: AnyNode): Promise<void> {
+    const pending = pendingIn(node);
+    while (store.get(pending) > 0) {
+      if (!this.settledGate) {
+        let resolve!: () => void;
+        const promise = new Promise<void>((r) => (resolve = r));
+        this.settledGate = { promise, resolve };
+      }
+      await this.settledGate.promise;
+    }
+  }
+
   // ---- reset ----
   reinit(store: BaseStore<any>, node: AnyNode): void {
     const resetHost = store._host;
@@ -388,9 +515,13 @@ export class BehaviorRuntime implements RuntimeHooks {
       return false;
     };
     for (const reg of this.regs) {
-      if (reg.disposed || !reg.runInit || !reg.root) continue;
+      if (reg.disposed || !reg.root) continue;
       if (!reg.writes.some((w) => isAncestorOrSelf(node, refNode(w)))) continue;
-      for (const leaf of this.leaves(reg.root)) if (inside(leaf.host)) this.mark(leaf, { init: true });
+      for (const leaf of this.leaves(reg.root)) {
+        if (!inside(leaf.host)) continue;
+        this.drop(leaf); // its cause is not passed on
+        if (reg.runInit) this.mark(leaf, { init: true });
+      }
     }
   }
 
@@ -454,9 +585,12 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (scopeOf(refNode(w)) !== scope) fail(`"${refLabel(w)}" is outside the behavior's scope ("${scope.path || "<root>"}") – behaviors write only their own scope`);
     }
 
+    const triggerKeys = new Set(triggers.map(refKey));
     return {
       seq, name, behavior, config, feature, host, scope, chain,
-      triggers, inputs: [...triggers, ...reads], writes, targets, guards,
+      triggers, reads: reads.filter((r) => !triggerKeys.has(refKey(r))),
+      inputs: [...triggers, ...reads], inputKeys: new Set([...triggers, ...reads].map(refKey)),
+      writes, targets, guards,
       declared: new Set(all.map(refKey)),
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
@@ -547,6 +681,8 @@ export class BehaviorRuntime implements RuntimeHooks {
           if (now === seq) return;
           seq = now;
           for (const row of now) this.child(binding, row);
+          // Removed rows: their runs in flight are cancelled.
+          for (const leaf of this.busy(reg)) if (!leaf.host.isAttached()) this.drop(leaf);
         })
       );
     }
@@ -573,22 +709,106 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   private onTrigger(binding: Binding, ref: AnyRef, info: ChangeInfo): void {
     const reg = binding.reg;
-    if (reg.disposed || !reg.runChange) return;
+    if (reg.disposed) return;
     const key = refKey(ref);
-    for (const leaf of this.leaves(binding)) {
-      const origins = new Set(info.origins);
-      origins.delete(leaf.origin);
-      if (info.origins.size > 0 && origins.size === 0) continue; // only its own writes
-      if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) continue;
-      this.mark(leaf, { changed: key, origins });
+    for (const leaf of this.leaves(binding)) this.onInput(leaf, key, info, reg.runChange);
+  }
+
+  /**
+   * An input of `leaf` changed. A run in flight read the old value: it is
+   * cancelled and rerun with its cause, whatever the change's origin. The
+   * change adds to the cause unless the origins filter ignores it. Only a
+   * trigger change, with runOn.change, starts a run.
+   */
+  private onInput(leaf: Binding, key: string, info: ChangeInfo, starts: boolean): void {
+    const reg = leaf.reg;
+    const origins = new Set(info.origins);
+    origins.delete(leaf.origin);
+    if (info.origins.size > 0 && origins.size === 0) return; // only its own writes
+    const rerun = this.supersede(leaf);
+    if (!starts && !rerun) return;
+    if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) return;
+    this.mark(leaf, { changed: [key], origins });
+  }
+
+  /**
+   * While a run is in flight, a change to one of its reads cancels and reruns
+   * it; another origin writing one of its targets only cancels it.
+   */
+  private watch(leaf: Binding, flight: Flight): void {
+    const reg = leaf.reg;
+    for (const ref of reg.writes) {
+      if (reg.inputKeys.has(refKey(ref))) continue; // an input change reruns it
+      flight.offs.push(
+        leaf.host.react(ref, () => {
+          if (this.flights.get(leaf) === flight) this.cancel(leaf);
+        })
+      );
+    }
+    for (const ref of reg.reads) {
+      const key = refKey(ref);
+      flight.offs.push(
+        hostFor(leaf.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => {
+          if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info, false);
+        })
+      );
     }
   }
 
-  private mark(leaf: Binding, change: { init?: boolean; changed?: string; origins?: Set<Origin> }): void {
+  /** Ends the leaf's run in flight, if any: unwatches it and aborts its signal. Returns its cause. */
+  private cancel(leaf: Binding): Pending | undefined {
+    const flight = this.flights.get(leaf);
+    if (!flight) return;
+    this.end(leaf, flight);
+    flight.controller.abort();
+    if (leaf.kept) this.orphans.add(leaf);
+    return flight.cause;
+  }
+
+  /** Row removal, dispose, reset(): cancels the run in flight and aborts the instance's kept work. */
+  private drop(leaf: Binding): void {
+    this.cancel(leaf);
+    this.abortKept(leaf);
+  }
+
+  private abortKept(leaf: Binding): void {
+    const kept = leaf.kept;
+    if (!kept) return;
+    leaf.kept = undefined;
+    this.keeping.delete(leaf);
+    kept.controller.abort();
+  }
+
+  /** The registration's instances with a run in flight or kept work: what row removal and dispose stop. */
+  private busy(reg: Registration): Binding[] {
+    const out = new Set<Binding>();
+    for (const leaf of this.flights.keys()) if (leaf.reg === reg) out.add(leaf);
+    for (const leaf of this.keeping) if (leaf.reg === reg) out.add(leaf);
+    return [...out];
+  }
+
+  /** Cancels the run in flight and marks the rerun with its cause. Returns whether there was one. */
+  private supersede(leaf: Binding): boolean {
+    const cause = this.cancel(leaf);
+    if (cause) this.mark(leaf, cause);
+    return cause !== undefined;
+  }
+
+  private end(leaf: Binding, flight: Flight): void {
+    if (this.flights.get(leaf) !== flight) return;
+    this.flights.delete(leaf);
+    for (const off of flight.offs) off();
+    flight.tally.end();
+    const gate = this.settledGate;
+    this.settledGate = undefined;
+    gate?.resolve();
+  }
+
+  private mark(leaf: Binding, change: { init?: boolean; changed?: Iterable<string>; origins?: Iterable<Origin> }): void {
     let p = this.pending.get(leaf);
     if (!p) this.pending.set(leaf, (p = { init: false, changed: new Set(), origins: new Set() }));
     if (change.init) p.init = true;
-    if (change.changed) p.changed.add(change.changed);
+    if (change.changed) for (const k of change.changed) p.changed.add(k);
     if (change.origins) for (const o of change.origins) p.origins.add(o);
   }
 
@@ -599,7 +819,11 @@ export class BehaviorRuntime implements RuntimeHooks {
     const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concreteScopePath(leaf.host) });
 
     const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
+    const state = { ...leaf.state }; // saved only if the run completes
+    const controller = new AbortController();
+    const signal = controller.signal;
     const read = (ref: AnyRef): any => {
+      if (signal.aborted) throw signal.reason;
       const key = refKey(ref);
       if (!reg.declared.has(key)) {
         throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in triggers, reads, writes or when`);
@@ -611,38 +835,95 @@ export class BehaviorRuntime implements RuntimeHooks {
     const ctx: BehaviorContext = {
       get: read,
       set: (ref, value) => {
+        if (signal.aborted) throw signal.reason;
         const key = refKey(ref);
         if (!reg.writable.has(key)) throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in writes`);
         buffer.delete(key); // keep insertion order = last write
         buffer.set(key, { ref, value });
       },
       initial: (node) => read(initialOf(node)),
+      keep: <T>(key: readonly unknown[], start: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+        if (signal.aborted) throw signal.reason;
+        const slot = leaf.kept;
+        if (slot && sameKey(slot.key, key)) {
+          slot.holder = signal;
+          return slot.promise as Promise<T>;
+        }
+        this.abortKept(leaf);
+        const work = new AbortController();
+        let promise: Promise<T>;
+        try {
+          promise = Promise.resolve(start(work.signal));
+        } catch (error) {
+          promise = Promise.reject(error);
+        }
+        const kept: Kept = { key: [...key], promise, controller: work, holder: signal };
+        leaf.kept = kept;
+        this.keeping.add(leaf);
+        const empty = () => {
+          if (leaf.kept !== kept) return;
+          leaf.kept = undefined;
+          this.keeping.delete(leaf);
+        };
+        promise.then(empty, empty);
+        return promise;
+      },
       changed: (ref) => p.changed.has(refKey(ref)),
       isInit: p.init,
       origins: p.origins,
-      state: leaf.state,
+      state,
       store: leaf.host,
+      signal,
+    };
+
+    const commit = () => {
+      leaf.state = state;
+      for (const { ref, value } of buffer.values()) {
+        hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: leaf.origin });
+      }
     };
 
     try {
       for (const guard of reg.guards) {
         if (!guard.test(...guard.refs.map(read))) return;
       }
-      const end = beginRun(leaf.host, reg.writes);
+      const tally = beginRun(leaf.host, reg.writes);
       let result: unknown;
       try {
         result = reg.config.run(ctx);
-      } finally {
-        end();
+      } catch (error) {
+        tally.end();
+        throw error;
       }
-      if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-        throw new Error(`Behavior "${reg.name}": async behaviors are not supported yet`);
+      if (!(result && typeof (result as PromiseLike<unknown>).then === "function")) {
+        tally.end();
+        commit();
+        return;
       }
-      for (const { ref, value } of buffer.values()) {
-        hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: leaf.origin });
-      }
+      tally.hold();
+      const flight: Flight = { controller, cause: p, tally, offs: [] };
+      this.flights.set(leaf, flight);
+      this.watch(leaf, flight);
+      (result as PromiseLike<unknown>).then(
+        () => {
+          if (signal.aborted) return;
+          try {
+            this.store._batch(() => {
+              this.end(leaf, flight);
+              commit();
+            });
+          } catch (error) {
+            this.onError(located(reg.behavior, error), info());
+          }
+        },
+        (error) => {
+          if (signal.aborted) return;
+          this.store._batch(() => this.end(leaf, flight));
+          this.onError(located(reg.behavior, error), info());
+        }
+      );
     } catch (error) {
-      this.onError(error, info());
+      this.onError(located(reg.behavior, error), info());
     }
   }
 
@@ -660,6 +941,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     reg.disposed = true;
     this.regs.splice(this.regs.indexOf(reg), 1);
     for (const leaf of this.pending.keys()) if (leaf.reg === reg) this.pending.delete(leaf);
+    for (const leaf of this.busy(reg)) this.drop(leaf);
     if (reg.root) this.unbind(reg, reg.root, resetMeta);
     this.rank(this.regs);
   }
@@ -693,7 +975,7 @@ export function defaultBehaviors(root: AnyNode): Behavior[] {
       const factory = def.options.behavior;
       if (!factory) continue;
       const config = factory(node, metaRefOf(node, name)) as BehaviorConfig;
-      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, node));
+      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, { self: node }));
     }
     if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);
     if (node instanceof ArrayNode) visit(node.item);
