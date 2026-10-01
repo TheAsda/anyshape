@@ -35,16 +35,16 @@ export type FormSubmitHandler = (event?: { preventDefault?(): void }) => Promise
 const running = new WeakSet<BaseStore<any>>();
 
 /** Each store's own `submitting` ref: a store's node and its declarations never change. */
-const own = new WeakMap<BaseStore<any>, MetaRef<boolean>>();
+const ownRefs = new WeakMap<BaseStore<any>, MetaRef<boolean>>();
 
 function ownSubmitting(store: BaseStore<any>): MetaRef<boolean> {
-  let ref = own.get(store);
+  let ref = ownRefs.get(store);
   if (!ref) {
     // Only a node that declares submission() itself is submitted: its own
     // `submitting`, matched by definition (the types can't tell definitions apart).
     ref = store.collect(store.node, submitting).find((e) => e.ref.node === store.node)?.ref;
     if (!ref) throw new Error(`handleSubmit: "${store.node.path || "<root>"}" does not declare submission()`);
-    own.set(store, ref);
+    ownRefs.set(store, ref);
   }
   return ref;
 }

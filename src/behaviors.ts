@@ -689,11 +689,11 @@ export class BehaviorRuntime implements RuntimeHooks {
 export function defaultBehaviors(root: AnyNode): Behavior[] {
   const out: Behavior[] = [];
   const visit = (node: AnyNode) => {
-    for (const [key, def] of Object.entries(node[META_DEFS])) {
+    for (const [name, def] of Object.entries(node[META_DEFS])) {
       const factory = def.options.behavior;
       if (!factory) continue;
-      const config = factory(node, metaRefOf(node, key)) as BehaviorConfig;
-      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${key}` }, node));
+      const config = factory(node, metaRefOf(node, name)) as BehaviorConfig;
+      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, node));
     }
     if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);
     if (node instanceof ArrayNode) visit(node.item);

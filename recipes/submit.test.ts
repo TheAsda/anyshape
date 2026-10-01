@@ -145,10 +145,13 @@ describe("Submit: submittable nodes", () => {
     await expect(done, "no error from the detached row").resolves.toBeUndefined();
 
     const failing = deferred<void>();
-    const rejected = handleSubmit(b, () => failing.promise)();
+    const rejected = handleSubmit(b, async () => {
+      await failing.promise;
+      throw new Error("save failed");
+    })();
     await expect.poll(() => b.get(R.submitting)).toBe(true);
     rows.remove(b);
-    failing.reject(new Error("save failed"));
+    failing.resolve();
     await expect(rejected, "fn's error, not the detached store's").rejects.toThrow("save failed");
   });
 
@@ -170,6 +173,8 @@ describe("Submit: submittable nodes", () => {
     const plain = createStore(form({ name: field<string>().meta(control()) }), { name: "" });
     // @ts-expect-error – the root has no submission()
     expect(() => handleSubmit(plain, async () => {})).toThrow(/submission\(\)/);
+    // @ts-expect-error – still rejected on a second call: nothing is cached
+    expect(() => handleSubmit(plain, async () => {}), "a second call").toThrow(/submission\(\)/);
     const section = form({ step: object({ x: field<string>() }) });
     // @ts-expect-error – a section is submittable only if it declares submission() itself
     expect(() => handleSubmit(createStore(section, { step: { x: "" } }).substore(section.step), async () => {})).toThrow(/"step"/);
