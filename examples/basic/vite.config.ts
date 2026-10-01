@@ -14,6 +14,7 @@ export default defineConfig({
     alias: [
       // More specific entry first.
       { find: "form-lib/react", replacement: resolve(lib, "react/index.ts") },
+      { find: "form-lib/recipes/react", replacement: resolve(recipes, "react/index.ts") },
       { find: "form-lib/recipes", replacement: resolve(recipes, "index.ts") },
       { find: "form-lib", replacement: resolve(lib, "index.ts") },
     ],

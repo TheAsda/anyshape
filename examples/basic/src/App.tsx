@@ -11,7 +11,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { countIn, type RootStore } from "form-lib";
-import { StoreProvider, useForm, useStore, useValue, useControl } from "form-lib/react";
+import { StoreProvider, useForm, useStore, useValue } from "form-lib/react";
+import { useControl } from "form-lib/recipes/react";
 import {
   shape,
   initialValues,

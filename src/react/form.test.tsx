@@ -5,7 +5,7 @@ import {
 } from "../index";
 import { control, submission } from "../test/features";
 import { max } from "../test/rules";
-import { StoreProvider, useForm, useSync, useControl, useValue, fromInput, domOrder } from "./index";
+import { StoreProvider, useForm, useSync, useField, useValue, domOrder } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 
 const shape = form(
@@ -90,8 +90,8 @@ test("values: loading data becomes the baseline; same object keeps edits; a new 
     );
   }
   function Name() {
-    const c = useControl(shape.name);
-    return <span data-testid="name">{`${c.value}|${c.dirty}`}</span>;
+    const c = useField(shape.name);
+    return <span data-testid="name">{`${c.value}|${c.meta.dirty}`}</span>;
   }
   const screen = await render(<App />);
   const name = screen.getByTestId("name");
@@ -143,8 +143,8 @@ test("useSync feeds a limit from React; survives reset; writes only on change", 
     const [available, set] = useState<number | undefined>(undefined); // e.g. from a query
     setMax = set;
     useSync(L.qty.maxQty, available);
-    const qty = useControl(L.qty);
-    return <span data-testid="line">{qty.error ?? "ok"}</span>;
+    const error = useValue(L.qty.error);
+    return <span data-testid="line">{error ?? "ok"}</span>;
   }
   const screen = await render(<App />);
   const line = screen.getByTestId("line");
@@ -215,9 +215,11 @@ test("useSync under StrictMode ends with the synced value", async () => {
 
 // ---------------------------------------------------------------------------
 // DOM order and handleSubmit
+/** An input registered as its node's focus target. */
 function Field(props: { node: typeof shape.name | typeof shape.code; id: string }) {
-  const c = useControl(props.node);
-  return <input data-testid={props.id} ref={c.focusRef} value={c.value} onChange={fromInput(c.onChange)} />;
+  const c = useField(props.node);
+  const register = (el: HTMLInputElement | null) => void (el && c.store.set(props.node.focusTarget, el));
+  return <input data-testid={props.id} ref={register} value={c.value} onChange={(e) => c.onChange(e.target.value)} />;
 }
 
 test("submit focuses the first error in DOM order, not shape order", async () => {

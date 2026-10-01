@@ -9,7 +9,6 @@ import {
   type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
 } from "./index";
 import { control, visibility, disableable, submission } from "./test/features";
-import type { useControl } from "./react";
 import { test, expect, expectTypeOf } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -106,12 +105,6 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
 
   return [n, e, c];
 }
-
-test("useControl states the keys it needs through ref properties", () => {
-  type ControlTarget = Parameters<typeof useControl>[0];
-  expectTypeOf(t.text).toExtend<ControlTarget>();
-  expectTypeOf(t.plain).not.toExtend<ControlTarget>();
-});
 
 test("a loose node declares no known meta keys", () => {
   expectTypeOf<InferMeta<AnyNode>>().toEqualTypeOf<{}>();
