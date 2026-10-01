@@ -134,10 +134,47 @@ describe("Submit: submittable nodes", () => {
     expect(a.get(R.submitting)).toBe(false);
   });
 
+  test("a row removed while its submit runs: the handler settles with fn's outcome", async ({ store: s }) => {
+    const rows = s.substore(shape.rows);
+    const [a, b] = rows.items();
+    const gate = deferred<void>();
+    const done = handleSubmit(a, () => gate.promise)();
+    await expect.poll(() => a.get(R.submitting)).toBe(true);
+    rows.remove(a);
+    gate.resolve();
+    await expect(done, "no error from the detached row").resolves.toBeUndefined();
+
+    const failing = deferred<void>();
+    const rejected = handleSubmit(b, async () => {
+      await failing.promise;
+      throw new Error("save failed");
+    })();
+    await expect.poll(() => b.get(R.submitting)).toBe(true);
+    rows.remove(b);
+    failing.resolve();
+    await expect(rejected, "fn's error, not the detached store's").rejects.toThrow("save failed");
+  });
+
+  test("repeated handleSubmit calls on one store keep toggling its own submitting as rows come and go", async ({ store: s }) => {
+    const rows = s.substore(shape.rows);
+    const [a] = rows.items();
+    const seen: boolean[][] = [];
+    const watch = (row: typeof a) => async () => void seen.push([s.get(shape.submitting), row.get(R.submitting)]);
+    await handleSubmit(s, watch(a))();
+    const added = rows.append({ sku: "C" });
+    await handleSubmit(s, watch(added))();
+    await handleSubmit(added, watch(added))();
+    await handleSubmit(a, watch(a))();
+    expect(seen).toEqual([[true, false], [true, false], [false, true], [false, true]]);
+    expect([s.get(shape.submitting), a.get(R.submitting), added.get(R.submitting)]).toEqual([false, false, false]);
+  });
+
   test("a store whose own node does not declare submission() is rejected", ({ store: s }) => {
     const plain = createStore(form({ name: field<string>().meta(control()) }), { name: "" });
     // @ts-expect-error – the root has no submission()
     expect(() => handleSubmit(plain, async () => {})).toThrow(/submission\(\)/);
+    // @ts-expect-error – still rejected on a second call: nothing is cached
+    expect(() => handleSubmit(plain, async () => {}), "a second call").toThrow(/submission\(\)/);
     const section = form({ step: object({ x: field<string>() }) });
     // @ts-expect-error – a section is submittable only if it declares submission() itself
     expect(() => handleSubmit(createStore(section, { step: { x: "" } }).substore(section.step), async () => {})).toThrow(/"step"/);

@@ -8,6 +8,7 @@
 // ============================================================
 
 import type { BehaviorConfig } from "./behaviors";
+import type { MetaRef } from "./shape";
 import { PLAIN } from "./internal";
 
 export type Meta = Record<string, unknown>;
@@ -20,11 +21,12 @@ export interface MetaKeyOptions<V> {
   owner?: "feature";
   /**
    * Default behavior, registered once per node (per row for row templates)
-   * and limited to that node: `self` (its value), its meta keys and
-   * initialOf(self). The node is typed loosely because the key is declared
-   * before the node exists.
+   * and per name the node declares the key under, limited to that node:
+   * `self` (its value), its meta keys and initialOf(self). `key` is the
+   * node's ref under that name. The node is typed loosely because the key is
+   * declared before the node exists.
    */
-  behavior?: (self: any) => BehaviorConfig;
+  behavior?: (self: any, key: MetaRef<V>) => BehaviorConfig;
   /** Counted per subtree: nodes for which this returns true (countIn). */
   aggregate?: (value: V) => boolean;
   /** Feature-specific settings (e.g. validation options), read by the feature's runtime. */
