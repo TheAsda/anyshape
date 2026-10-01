@@ -1,8 +1,9 @@
 // ============================================================
 // Recipes build only on the core's public interface (AGENTS.md, "Core and
 // recipes"): a file under recipes/ imports the core entry (`form-lib`) or
-// another file under recipes/, never a core module. The core, its tests
-// included, imports no recipe.
+// another file under recipes/, never a core module; a file under
+// recipes/react/ may also import the core React entry (`form-lib/react`).
+// The core, its tests included, imports no recipe.
 // ============================================================
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -11,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { test, expect } from "vitest";
 
 const recipes = dirname(fileURLToPath(import.meta.url));
+const reactRecipes = resolve(recipes, "react");
 const core = resolve(recipes, "../src");
 
 /** The .ts / .tsx files under `dir`, as absolute paths. */
@@ -39,9 +41,13 @@ function violations(dir: string, allowed: (spec: string, file: string) => boolea
 }
 
 test("a recipe imports only the core entry or another recipe", () => {
-  // Packages (vitest, node:*) are not the core; `form-lib/<path>` reaches past the entry.
-  const allowed = (spec: string, file: string) =>
-    isRelative(spec) ? isInside(recipes, resolve(dirname(file), spec)) : !spec.startsWith("form-lib/");
+  // Packages (vitest, node:*) are not the core; `form-lib/<path>` reaches past
+  // the entry, except `form-lib/react` from a React recipe.
+  const allowed = (spec: string, file: string) => {
+    if (isRelative(spec)) return isInside(recipes, resolve(dirname(file), spec));
+    if (spec === "form-lib/react") return isInside(reactRecipes, file);
+    return !spec.startsWith("form-lib/");
+  };
   expect(violations(recipes, allowed)).toEqual([]);
 });
 

@@ -8,7 +8,8 @@
 
 import { useId, useRef } from "react";
 import { countIn } from "form-lib";
-import { StoreProvider, useArray, useControl, useValue } from "form-lib/react";
+import { StoreProvider, useArray, useValue } from "form-lib/react";
+import { useControl } from "form-lib/recipes/react";
 import { shape, CATALOG } from "./form";
 import { NumberField, ReadonlyField } from "./fields";
 

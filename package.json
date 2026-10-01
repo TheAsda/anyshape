@@ -8,6 +8,7 @@
     "test:unit": "vitest run --project unit",
     "test:react": "vitest run --project react",
     "test:recipes": "vitest run --project recipes",
+    "test:recipes-react": "vitest run --project recipes-react",
     "test:watch": "vitest",
     "bench": "vitest bench --run --project 'unit (bench)' --reporter=verbose",
     "test:memory": "vitest run --config vitest.memory.config.ts",
