@@ -40,7 +40,9 @@
 //   5. store.subscribe(listener) fires for anything inside the store's focus.
 //   6. Every write is a batch of one; batch(fn) groups writes; notifications
 //      run when the outermost batch ends.
-//   7. The flush is synchronous.
+//   7. The flush is synchronous: its reactions and sync behavior runs settle
+//      inside it. Async behavior runs may still be in flight after it, so the
+//      form is not final; code that needs that awaits store.settle().
 //   8. Reactions run first (repeating until settled, max MAX_REACTION_ROUNDS),
 //      then UI listeners once; writing during the UI phase throws.
 //   9. UI listeners are () => void; reactions get (next, prev, info).

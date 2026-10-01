@@ -17,8 +17,11 @@
 //   • Own writes never trigger the instance that made them (origins are
 //               per instance: "behavior:<name>@<instance>").
 //   • Writes  – buffered during a run and applied only when it completes.
+//               ctx.state is a copy, saved only when the run completes.
 //   • Errors  – caught per run and passed to onError (default console.error);
 //               the run's writes are dropped and the form keeps running.
+//               In dev, the error is located where defineBehavior was
+//               called, with the thrown value as its cause.
 //   • Writers – one behavior per target (value, or meta key). Keys owned by a
 //               feature can only be written by that feature's behaviors.
 //   • Access  – ctx.get / ctx.set only accept declared references.
@@ -28,7 +31,34 @@
 //               returns a dispose function; disposing resets the meta keys
 //               the behavior wrote to their defaults.
 //
-// Not in this stage: async runs (stage 4, with validation).
+// Async runs: run() may return a promise. The run is in flight, and its
+// targets pending (pendingOf / pendingIn), until it settles; its writes then
+// apply in one batch. The latest run wins. A run is cancelled (ctx.signal is
+// aborted; ctx.get / ctx.set throw its reason, which is never reported) when:
+//   • a trigger or a reads ref changes, whatever the origin: it is rerun with
+//     the cancelled run's cause (origins, changed, isInit) plus the change's,
+//     unless the origins filter ignores the change;
+//   • another origin writes one of its targets: no rerun;
+//   • a guard turns false: no rerun, earlier writes stay;
+//   • its row is removed, it is disposed, or reset() covers it: no rerun.
+// So a run that completes has read only values equal to those at its start.
+//
+// Contract (not enforced): a run may start, be cancelled and restart at any
+// time. It must be idempotent and change the form only through ctx.set;
+// reading the outside world (fetch) is fine.
+//
+// The cause of an async run covers everything since the last completed run:
+// an init run replaced in flight has isInit together with the user's origins.
+// Reactions and server checks should use runOn.init: false rather than an
+// isInit check.
+//
+// Kept work (ctx.keep(key, start)): async work a rerun can continue instead of
+// restarting, one slot per instance. It must depend only on its key; it gets
+// its own signal, never ctx. It is aborted on a different key, at the end of
+// the flush that cancelled its holder unless a rerun kept it, and on row
+// removal, dispose or reset().
+//
+// store.settle(node?) waits until no run writing inside the node is in flight.
 // ============================================================
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
