@@ -6,8 +6,7 @@
 //   • error (with data.validation) and validating – the validation queue,
 //     until #26 replaces them with a test-local combined key;
 //   • revealed, submitCount, submitting, focusTarget – submit and focus (#32);
-//   • visible, disabled – SubmitValue; error, touched, dirty, revealed,
-//     validating – useControl.
+//   • visible, disabled – SubmitValue.
 // ============================================================
 
 import { metaKey, initialOf, type FocusTarget } from "../index";

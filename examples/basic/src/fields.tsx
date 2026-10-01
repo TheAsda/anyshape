@@ -4,7 +4,7 @@
 // dirty, validating), a focusRef that registers the element
 // for submit-time error focusing, and onBlur / showError.
 //
-// showError follows the display policy of the StoreProvider: by
+// showError follows the nearest ErrorDisplayProvider's policy: by
 // default an error shows once the field was left (onBlur) or
 // covered by a submit, and then stays live while it's fixed.
 //

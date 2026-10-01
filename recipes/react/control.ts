@@ -14,13 +14,7 @@ import type { AnyNode, BaseStore, FocusTarget, InferValue, MetaRef } from "form-
 import { useField, type HookOptions } from "form-lib/react";
 
 /** What an error display policy decides on: a control's current state. */
-export interface ErrorDisplayState {
-  error: string | undefined;
-  touched: boolean;
-  dirty: boolean;
-  revealed: boolean;
-  validating: boolean;
-}
+export type ErrorDisplayState = Omit<ControlMeta, "focusTarget">;
 
 /** Decides whether a control shows its error (useControl's showError). */
 export type ErrorDisplayPolicy = (state: ErrorDisplayState) => boolean;
