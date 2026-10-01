@@ -7,10 +7,11 @@
 import {
   form, object, array, field, metaKey, createStore, countIn, initialOf,
   control, visibility, disableable, submission,
-  required, min, pattern, visibleWhen, exclusive, rule,
-  type InferValue, type InferMeta, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
+  required, min, pattern, visibleWhen, disableWhen, exclusive, rule,
+  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
 } from "./index";
-import { test, expect } from "vitest";
+import type { useControl } from "./react";
+import { test, expect, expectTypeOf } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
@@ -118,6 +119,36 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
 
   return [n, e, c];
 }
+
+test("recipes state the keys they need through ref properties", () => {
+  type VisibleTarget = Parameters<typeof visibleWhen>[0];
+  type DisableTarget = Parameters<typeof disableWhen>[0];
+  type ControlTarget = Parameters<typeof useControl>[0];
+  const named = form({ group: object({ visible: field<boolean>() }) });
+
+  expectTypeOf(t.hidden).toExtend<VisibleTarget>();
+  expectTypeOf(t.text).not.toExtend<VisibleTarget>();
+  expectTypeOf(named.group).not.toExtend<VisibleTarget>(); // a child named `visible` is not the key
+  expectTypeOf(t.off).toExtend<DisableTarget>();
+  expectTypeOf(t.text).not.toExtend<DisableTarget>();
+  expectTypeOf(t.text).toExtend<ControlTarget>();
+  expectTypeOf(t.plain).not.toExtend<ControlTarget>();
+});
+
+test("a loose node declares no known meta keys", () => {
+  expectTypeOf<InferMeta<AnyNode>>().toEqualTypeOf<{}>();
+});
+
+test("node internals are not part of a node's type", () => {
+  expectTypeOf(t.text).not.toHaveProperty("_meta");
+  expectTypeOf(t.text).not.toHaveProperty("_metaDefs");
+  expectTypeOf(t.a).not.toHaveProperty("_fields");
+  expectTypeOf(t.withCreate).not.toHaveProperty("_create");
+
+  const f = form({ _meta: field<number>(), _fields: field<string>() });
+  expectTypeOf(f._meta).toEqualTypeOf<FieldNode<number>>();
+  expectTypeOf(f._fields).toEqualTypeOf<FieldNode<string>>();
+});
 
 test("the type contract compiles (asserted by npm run typecheck)", () => {
   expect(t.a.name).not.toBe(t.b.name);

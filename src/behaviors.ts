@@ -35,6 +35,7 @@ import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValu
 import type { FocusTarget } from "./features";
 import {
   refNode, refKey, refLabel, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
+  FIELDS, META_DEFS, defOf,
 } from "./internal";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore, CountRef, InitialRef, initialOf,
@@ -181,7 +182,7 @@ function affects(w: WritableRef, r: AnyRef): boolean {
   }
   if (r instanceof MetaRef) {
     if (w.key !== r.key) return false;
-    return w.node === r.node || (!!r.def.options.inherit && isAncestorOrSelf(w.node, r.node));
+    return w.node === r.node || (!!defOf(r).options.inherit && isAncestorOrSelf(w.node, r.node));
   }
   if (r instanceof CountRef) return w.key === r.key && isAncestorOrSelf(r.node, w.node);
   return false;
@@ -430,7 +431,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     // Writes: nodes and meta keys only, never feature-owned keys (unless feature).
     for (const w of writes) {
       if (!(w instanceof ShapeNode || w instanceof MetaRef)) fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
-      if (w instanceof MetaRef && w.def.options.owner === "feature" && !feature) {
+      if (w instanceof MetaRef && defOf(w).options.owner === "feature" && !feature) {
         fail(`"${w.path}" is owned by its feature and cannot be written by other behaviors`);
       }
     }
@@ -543,7 +544,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (reg.runInit) this.mark(binding, { init: true });
     } else {
       const next = reg.chain[depth + 1];
-      const arrStore = host.substore(next.parent as ArrayNode<any, any, any>) as ArrayStore<any>;
+      const arrStore = host.substore(next.parent as ArrayNode<any, any>) as ArrayStore<any>;
       binding.arrStore = arrStore;
       let seq = arrStore.items();
       for (const row of seq) this.child(binding, row);
@@ -671,7 +672,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (!resetMeta || !binding.host.isAttached()) return;
       // Meta the behavior wrote goes back to its default.
       for (const w of reg.writes) {
-        if (w instanceof MetaRef) binding.host.set(w, w.def.defaultValue as never, { origin: binding.origin });
+        if (w instanceof MetaRef) binding.host.set(w, defOf(w).defaultValue as never, { origin: binding.origin });
       }
       return;
     }
@@ -689,13 +690,13 @@ export class BehaviorRuntime implements RuntimeHooks {
 export function defaultBehaviors(root: AnyNode): Behavior[] {
   const out: Behavior[] = [];
   const visit = (node: AnyNode) => {
-    for (const [key, def] of Object.entries(node._metaDefs)) {
+    for (const [key, def] of Object.entries(node[META_DEFS])) {
       const factory = def.options.behavior;
       if (!factory) continue;
       const config = factory(node) as BehaviorConfig;
       out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${key}` }, node));
     }
-    if (node instanceof ObjectNode) for (const child of Object.values(node._fields as Record<string, AnyNode>)) visit(child);
+    if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);
     if (node instanceof ArrayNode) visit(node.item);
   };
   visit(root);

@@ -2,7 +2,7 @@ import {
   form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
   control, visibility, disableable,
   required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf,
-  calculate, link, visibleWhen, disableWhen, clearWhenHidden, exclusive,
+  calculate, link, visibleWhen, disableWhen, clearWhen, exclusive,
   when, type AnyBehavior,
   type InferValue, type BehaviorBuilder,
 } from "./index";
@@ -78,7 +78,7 @@ const test = base
 describe("N · Rules", () => {
   test("isEmpty and labelOf", () => {
     expect([undefined, null, "", "  ", [], 0, "x", [1], false].map(isEmpty)).toEqual([true, true, true, true, true, false, false, false, false]);
-    expect(labelOf(shape.name)).toBe("Full name");
+    expect(labelOf(shape.name), "the `label` key is not read").toBe("name");
     expect(labelOf(shape.company.vat)).toBe("vat");
     expect(labelOf(L.qty)).toBe("qty");
   });
@@ -97,12 +97,12 @@ describe("N · Rules", () => {
     expect(s.get(shape.age.error)).toBe("Required");
   });
 
-  test("required follows the `required` meta key (switched by a behavior)", () => {
+  test("a switchable requirement is a guard on the `required` key", () => {
     const s = createStore(shape, initial(), {
-      behaviors: [
-        required(shape.taxId),
-        defineBehavior({ triggers: [shape.type], writes: [shape.taxId.required], run: (c) => c.set(shape.taxId.required, c.get(shape.type) === "company") }),
-      ],
+      behaviors: defineBehaviors(shape, (b) => {
+        b.when([shape.taxId.required], (r) => r, (b) => b.add(required(shape.taxId)));
+        b.add(defineBehavior({ triggers: [shape.type], writes: [shape.taxId.required], run: (c) => c.set(shape.taxId.required, c.get(shape.type) === "company") }));
+      }),
     });
     expect(s.get(shape.taxId.error)).toBe(undefined);
     s.set(shape.type, "company");
@@ -204,13 +204,14 @@ describe("N · Behaviors", () => {
     expect(s.get(shape.note.disabled)).toBe(true);
   });
 
-  test("clearWhenHidden: back to the initial value, or to a given value", () => {
+  test("clearWhen: back to the initial value, or to a given value", () => {
     const start = { ...initial(), type: "company" as const, company: { vat: "LV1", phone: "123" } };
+    const hidden = (visible: boolean) => !visible;
     const s = createStore(shape, start, {
       behaviors: [
         visibleWhen(shape.company, [shape.type], (t) => t === "company"),
-        clearWhenHidden(shape.company.vat, { to: "" }),
-        clearWhenHidden(shape.company.phone),
+        clearWhen(shape.company.vat, [shape.company.visible], hidden, { to: "" }),
+        clearWhen(shape.company.phone, [shape.company.visible], hidden),
       ],
     });
     s.set(shape.company.vat, "LV2");
@@ -220,7 +221,6 @@ describe("N · Behaviors", () => {
     expect(s.get(shape.company.phone)).toBe("123");
     s.set(shape.type, "company");
     expect(s.get(shape.company.vat), "not restored when shown again").toBe("");
-    expect(() => clearWhenHidden(shape.name)).toThrow(/declares visibility/);
   });
 });
 
@@ -250,7 +250,7 @@ describe("N · exclusive", () => {
   test("exclusive: several filled (loaded data) → all enabled, errors on the filled ones", () => {
     const s = exclusiveStore({ price: 10, promo: "SAVE" });
     expect(disabledOf(s)).toEqual([false, false, false]);
-    expect(errorsOf(s)).toEqual(["Only one of Price, Discount, Promo code can be set", undefined, "Only one of Price, Discount, Promo code can be set"]);
+    expect(errorsOf(s)).toEqual(["Only one of price, discount, promo can be set", undefined, "Only one of price, discount, promo can be set"]);
     s.set(shape.promo, "", { origin: "user" });
     expect(errorsOf(s)).toEqual([undefined, undefined, undefined]);
     expect(disabledOf(s)).toEqual([false, true, true]);
@@ -258,7 +258,7 @@ describe("N · exclusive", () => {
 
   test("exclusive: required", () => {
     const s = exclusiveStore({}, true);
-    expect(errorsOf(s)).toEqual(Array(3).fill("One of Price, Discount, Promo code is required"));
+    expect(errorsOf(s)).toEqual(Array(3).fill("One of price, discount, promo is required"));
     s.set(shape.price, 5);
     expect(errorsOf(s), "the others are disabled and skipped").toEqual([undefined, undefined, undefined]);
   });
@@ -288,8 +288,6 @@ describe("N · Builder", () => {
     expect(s.get(shape.taxId.error)).toBe(undefined);
     s.set(shape.type, "company");
     expect(s.get(shape.personalId.error)).toBe(undefined);
-    expect(s.get(shape.taxId.error), "taxId: required meta is false").toBe(undefined);
-    s.set(shape.taxId.required, true);
     expect(s.get(shape.taxId.error)).toBe("Required");
   });
 
@@ -346,7 +344,7 @@ describe("N · Builder", () => {
 });
 
 describe("N · Messages", () => {
-  test("messages as functions; exclusive's custom messages; labels in exclusive's default text", () => {
+  test("messages as functions; exclusive's custom messages; path segments in exclusive's default text", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
         min(shape.age, 18, { message: (v) => `${v} is too young` }),
@@ -366,19 +364,13 @@ describe("N · Messages", () => {
     expect(s.get(shape.discount.error)).toBe("Pick one");
 
     const d = createStore(shape, initial(), { behaviors: exclusive([shape.price, shape.promo], { required: true }) });
-    expect(d.get(shape.price.error), "labels, not paths").toBe("One of Price, Promo code is required");
+    expect(d.get(shape.price.error), "last path segments, not `label`").toBe("One of price, promo is required");
   });
 });
 
 describe("N · Misuse", () => {
-  test("exclusive needs two fields; clearWhenHidden needs visibility() on the node or an ancestor", () => {
+  test("exclusive needs two fields", () => {
     expect(() => exclusive([shape.price])).toThrow("exclusive() needs at least two fields");
-    expect(() => clearWhenHidden(shape.name)).toThrow(/neither the node nor an ancestor declares visibility/);
-
-    const s = createStore(shape, initial(), { behaviors: clearWhenHidden(shape.company.vat) });
-    s.set(shape.company.vat, "LV1", { origin: "user" });
-    s.set(shape.company.visible, false);
-    expect(s.get(shape.company.vat), "visibility declared on the ancestor").toBe("");
   });
 });
 

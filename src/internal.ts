@@ -4,7 +4,30 @@
 // ============================================================
 
 import { ShapeNode, ArrayNode, MetaRef, type AnyNode } from "./shape";
+import type { MetaKeyDef } from "./meta";
 import { BaseStore, ItemStore, CountRef, InitialRef, type AnyRef } from "./store";
+
+// ============================================================
+// Node internals, keyed by symbols so that every string name stays free for
+// fields and meta keys. Classes only `declare` these members and assign them
+// at runtime: this module and shape.ts import each other.
+// ============================================================
+
+/** ObjectNode: its children (also exposed as direct properties). */
+export const FIELDS: unique symbol = Symbol("form-lib.fields");
+/** ShapeNode: normalized declarations, one per meta key. */
+export const META_DEFS: unique symbol = Symbol("form-lib.metaDefs");
+/** ShapeNode: default values of all declared meta keys. */
+export const META: unique symbol = Symbol("form-lib.meta");
+/** ArrayNode: factory for new rows, if declared. */
+export const CREATE: unique symbol = Symbol("form-lib.create");
+/** MetaKeyDef: true when created from a plain value in .meta({...}). */
+export const PLAIN: unique symbol = Symbol("form-lib.plain");
+
+/** The declaration of the key a meta reference points at. */
+export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {
+  return ref.node[META_DEFS][ref.key];
+}
 
 // ============================================================
 export function refNode(ref: AnyRef): AnyNode {

@@ -7,11 +7,11 @@ export const meta: StageMeta = {
   bullets: [
     "visibility() on a group adds a `visible` flag, inherited by everything inside",
     "visibleWhen(node, [sources], fn) drives it from other fields",
-    "clearWhenHidden(node): the group's values are wiped while it's hidden",
+    "clearWhen(node, [node.visible], (v) => !v): the group's values are wiped while it's hidden",
     "Hidden ⇒ not validated, and submit() omits it from the values (watch the result card)",
     "Flip the checkbox off after typing: values cleared, not merely ignored",
   ],
   notes:
-    "Visibility is metadata on the subtree, inherited downward — fields inside don't know about it. The three properties compose: hidden fields aren't validated, aren't submitted, and (with clearWhenHidden) don't keep stale values. Submit with the box unchecked: the result card has no `car` key at all — that IS what the server receives.",
+    "Visibility is metadata on the subtree, inherited downward — fields inside don't know about it. The three properties compose: hidden fields aren't validated, aren't submitted, and (with clearWhen) don't keep stale values. Submit with the box unchecked: the result card has no `car` key at all — that IS what the server receives.",
 };
 

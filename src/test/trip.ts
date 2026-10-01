@@ -10,7 +10,7 @@ import {
   form, object, array, field, metaKey,
   control, visibility, disableable, submission,
   defineBehaviors, asyncRule, required, email, pattern, max,
-  calculate, visibleWhen, clearWhenHidden, exclusive,
+  calculate, visibleWhen, clearWhen, exclusive,
   type InferValue,
 } from "../index";
 
@@ -93,7 +93,7 @@ export function tripBehaviors(runs: Record<string, number> = {}) {
     b.add(max(t.seats, t.seats.seatsLeft, { message: "Not enough seats left" }));
 
     b.add(visibleWhen(t.visa, [t.destination], needsVisa));
-    b.add(clearWhenHidden(t.visa));
+    b.add(clearWhen(t.visa, [t.visa.visible], (visible) => !visible));
     b.add(required(t.visa.number), required(t.visa.expires));
 
     b.add(exclusive([t.promo, t.voucher]));

@@ -52,6 +52,7 @@ import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
 } from "./shape";
+import { FIELDS, META_DEFS, META, CREATE, defOf } from "./internal";
 
 export type Listener = () => void;
 export type Unsubscribe = () => void;
@@ -99,9 +100,9 @@ const countRefs = new WeakMap<AnyNode, Map<string, CountRef>>();
  * the array item template's declarations, so walking the template covers them.
  */
 function isCountable(node: AnyNode, key: string): boolean {
-  if (node._metaDefs[key]?.options.aggregate) return true;
+  if (node[META_DEFS][key]?.options.aggregate) return true;
   if (node instanceof ObjectNode) {
-    for (const child of Object.values(node._fields as Record<string, AnyNode>)) if (isCountable(child, key)) return true;
+    for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) if (isCountable(child, key)) return true;
   } else if (node instanceof ArrayNode) {
     return isCountable(node.item, key);
   }
@@ -397,18 +398,18 @@ export abstract class BaseStore<N extends ContainerNode> {
       this.setMeta(ref.node, { [ref.key]: value } as any, options);
       return;
     }
-    this.setValue(ref as ShapeNode<any, any>, value, options);
+    this.setValue(ref as ShapeNode<any>, value, options);
   }
 
   // ==========================================================
   // Values
   // ==========================================================
-  getValue<T>(node: ShapeNode<T, any>): T {
+  getValue<T>(node: ShapeNode<T>): T {
     this.assertInScope(node);
     return this._read(node);
   }
 
-  setValue<T>(node: ShapeNode<T, any>, value: T, options: WriteOptions = {}): void {
+  setValue<T>(node: ShapeNode<T>, value: T, options: WriteOptions = {}): void {
     this.assertInScope(node);
     const asInitial = options.as === "initial";
     const origin: Origin = asInitial ? "initial" : options.origin ?? "program";
@@ -421,7 +422,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     });
   }
 
-  getInitial<T>(node: ShapeNode<T, any>): T {
+  getInitial<T>(node: ShapeNode<T>): T {
     this.assertInScope(node);
     return node.lens.get(this.scope.getScopeInitial());
   }
@@ -485,7 +486,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     const quiet: string[] = [];
     const loud: string[] = [];
     for (const key of Object.keys(patch)) {
-      const def = node._metaDefs[key];
+      const def = node[META_DEFS][key];
       if (!def) throw new Error(`"${node.path || "<root>"}" has no meta key "${key}" – declare it with .meta()`);
       (def.options.reactive === false ? quiet : loud).push(key);
     }
@@ -517,7 +518,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     for (const key of Object.keys(next)) {
       if (Object.is(current[key], next[key])) continue;
       changed.push(key);
-      const aggregate = node._metaDefs[key]?.options.aggregate;
+      const aggregate = node[META_DEFS][key]?.options.aggregate;
       if (aggregate) {
         const delta = (aggregate(next[key]) ? 1 : 0) - (aggregate(current[key]) ? 1 : 0);
         if (delta) this.root._applyCountDelta(host, node, key, delta);
@@ -534,7 +535,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   _metaOf(node: AnyNode): Meta {
     let live = this._metaMap.get(node);
     if (!live) {
-      const seeded: Meta = { ...node._meta };
+      const seeded: Meta = { ...node[META] };
       this._metaMap.set(node, seeded);
       live = seeded;
     }
@@ -552,13 +553,13 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** Nodes whose `key` feeds the value of `ref`: the node itself, plus ancestors for inherited keys. */
   private _metaSources(ref: MetaRef<any>): LocLevel[] {
-    if (!ref.def.options.inherit) return [{ host: this._host, node: ref.node }];
+    if (!defOf(ref).options.inherit) return [{ host: this._host, node: ref.node }];
     const out: LocLevel[] = [];
     let host = this._host;
     let from: AnyNode = ref.node;
     for (;;) {
       for (let n: AnyNode | undefined = from; n; n = n.parent) {
-        if (ref.key in n._metaDefs) out.push({ host, node: n });
+        if (ref.key in n[META_DEFS]) out.push({ host, node: n });
         if (n === host.node) break;
       }
       if (!(host instanceof ItemStore)) break;
@@ -569,7 +570,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   private _readMetaRef(ref: MetaRef<any>): any {
-    const inherit = ref.def.options.inherit;
+    const inherit = defOf(ref).options.inherit;
     if (!inherit) return (this.getMeta(ref.node) as Meta)[ref.key];
     const values = this._metaSources(ref).map((s) => (s.host.getMeta(s.node) as Meta)[ref.key]);
     return inherit === "all" ? values.every(Boolean) : values.some(Boolean);
@@ -592,8 +593,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   _resetEntry(node: AnyNode): void {
     const current = this._metaMap.get(node);
     if (!current) return;
-    const next: Meta = { ...node._meta };
-    for (const [key, def] of Object.entries(node._metaDefs)) {
+    const next: Meta = { ...node[META] };
+    for (const [key, def] of Object.entries(node[META_DEFS])) {
       if (def.options.reactive === false || def.options.keepOnReset) next[key] = current[key];
     }
     if (shallowEqual(current, next)) return;
@@ -629,12 +630,12 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal this = scope host */
   _collectIn(node: AnyNode, key: string, out: CollectEntry[]): void {
     if (this._countOf(node, key) === 0) return;
-    const aggregate = node._metaDefs[key]?.options.aggregate;
+    const aggregate = node[META_DEFS][key]?.options.aggregate;
     if (aggregate && aggregate((this.getMeta(node) as Meta)[key])) {
       out.push({ path: concretePath(this, node), ref: node, store: this });
     }
     if (node instanceof ObjectNode) {
-      for (const child of Object.values(node._fields as Record<string, AnyNode>)) this._collectIn(child, key, out);
+      for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) this._collectIn(child, key, out);
     } else if (node instanceof ArrayNode && node !== this.node) {
       for (const row of (this.substore(node as any) as ArrayStore<any>).items()) row._collectIn(row.node, key, out);
     }
@@ -642,9 +643,9 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** @internal this = scope host: every node in the subtree that declares `key`, rows included */
   _eachWithKey(node: AnyNode, key: string, fn: (store: BaseStore<any>, node: AnyNode) => void): void {
-    if (key in node._metaDefs) fn(this, node);
+    if (key in node[META_DEFS]) fn(this, node);
     if (node instanceof ObjectNode) {
-      for (const child of Object.values(node._fields as Record<string, AnyNode>)) this._eachWithKey(child, key, fn);
+      for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) this._eachWithKey(child, key, fn);
     } else if (node instanceof ArrayNode && node !== this.node) {
       for (const row of (this.substore(node as any) as ArrayStore<any>).items()) row._eachWithKey(row.node, key, fn);
     }
@@ -696,7 +697,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** The node's registered focus target, if any. */
   focusTargetOf(node: AnyNode): FocusTarget | undefined {
     this.assertInScope(node);
-    if (!("focusTarget" in node._metaDefs)) return undefined;
+    if (!("focusTarget" in node[META_DEFS])) return undefined;
     return this._ownerOf(node)._metaOf(node).focusTarget as FocusTarget | undefined;
   }
 
@@ -769,7 +770,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   ): Promise<ValidationResult<N & AnyNode>> {
     const root = this.root;
     const rootNode = root.node as AnyNode;
-    const has = (key: string) => key in rootNode._metaDefs;
+    const has = (key: string) => key in rootNode[META_DEFS];
     const patch = (values: Meta) => root.setMeta(rootNode, values as never);
     root.batch(() => {
       if (has("submitCount")) patch({ submitCount: ((root.getMeta(rootNode) as Meta).submitCount as number) + 1 });
@@ -817,20 +818,20 @@ export abstract class BaseStore<N extends ContainerNode> {
         store = rows[index];
         node = node.item;
       } else {
-        if (!(node instanceof ObjectNode) || !Object.prototype.hasOwnProperty.call(node._fields, token)) return undefined;
-        node = (node._fields as Record<string, AnyNode>)[token];
+        if (!(node instanceof ObjectNode) || !Object.prototype.hasOwnProperty.call(node[FIELDS], token)) return undefined;
+        node = (node[FIELDS] as Record<string, AnyNode>)[token];
       }
     }
     if (key === undefined) return { store, ref: node };
-    if (!(key in node._metaDefs)) return undefined;
+    if (!(key in node[META_DEFS])) return undefined;
     return { store, ref: new MetaRef(node, key) };
   }
 
   // ==========================================================
   // Substores
   // ==========================================================
-  substore<S extends ObjectNode<any, any>>(node: S): ObjectStore<S>;
-  substore<S extends ArrayNode<any, any, any>>(node: S): ArrayStore<S>;
+  substore<S extends ObjectNode<any>>(node: S): ObjectStore<S>;
+  substore<S extends ArrayNode<any, any>>(node: S): ArrayStore<S>;
   substore(node: ContainerNode): BaseStore<any> {
     if (node === this.node) return this;
     this.assertInScope(node);
@@ -1087,7 +1088,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 // ============================================================
 // Root store – owns the value, the baseline, batching and the flush
 // ============================================================
-export class RootStore<N extends ObjectNode<any, any>> extends BaseStore<N> implements ScopeHost {
+export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
   private value: InferValue<N>;
   private initial: InferValue<N>;
   private depth = 0;
@@ -1298,7 +1299,7 @@ export class RootStore<N extends ObjectNode<any, any>> extends BaseStore<N> impl
 // ============================================================
 // Object substore – a view; reads through the parent's scope
 // ============================================================
-export class ObjectStore<N extends ObjectNode<any, any>> extends BaseStore<N> {
+export class ObjectStore<N extends ObjectNode<any>> extends BaseStore<N> {
   /** @internal – use store.substore(node) */
   constructor(node: N, parent: BaseStore<any>) {
     super(node, parent);
@@ -1308,18 +1309,18 @@ export class ObjectStore<N extends ObjectNode<any, any>> extends BaseStore<N> {
 // ============================================================
 // Array substore
 // ============================================================
-type ItemOf<N extends ArrayNode<any, any, any>> = N["item"];
-type ItemValue<N extends ArrayNode<any, any, any>> = InferValue<ItemOf<N>> & object;
+type ItemOf<N extends ArrayNode<any, any>> = N["item"];
+type ItemValue<N extends ArrayNode<any, any>> = InferValue<ItemOf<N>> & object;
 
 /** append / insert arguments: a partial item when the array has `create`, a complete one otherwise. */
-export type NewItemArgs<N extends ArrayNode<any, any, any>> = N["_hasCreate"] extends true
+export type NewItemArgs<N extends ArrayNode<any, any>> = N["_hasCreate"] extends true
   ? [partial?: Partial<ItemValue<N>>, options?: WriteOptions]
   : [item: ItemValue<N>, options?: WriteOptions];
 
 const EMPTY: readonly never[] = Object.freeze([]);
 let stableIdCounter = 0;
 
-export class ArrayStore<N extends ArrayNode<any, any, any>> extends BaseStore<N> {
+export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   private readonly itemStores = new WeakMap<object, ItemStore<ItemOf<N>>>();
   private sequence: readonly ItemStore<ItemOf<N>>[] = EMPTY;
   private syncedArray: readonly object[] | undefined;
@@ -1424,7 +1425,7 @@ export class ArrayStore<N extends ArrayNode<any, any, any>> extends BaseStore<N>
   }
 
   private newItem(input: ItemValue<N> | undefined): ItemValue<N> {
-    const create = this.node._create;
+    const create = this.node[CREATE];
     if (create) return { ...(create() as object), ...(input ?? {}) } as ItemValue<N>;
     if (input === undefined) {
       throw new Error(`"${this.node.path}" has no \`create\` factory – pass a complete item`);
@@ -1568,7 +1569,7 @@ export class ArrayStore<N extends ArrayNode<any, any, any>> extends BaseStore<N>
 // Item store – a scope: node lenses inside the item template are
 // resolved against the current item object (and its initial value).
 // ============================================================
-export class ItemStore<N extends ObjectNode<any, any>> extends BaseStore<N> implements ScopeHost {
+export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
   /** Stable for the lifetime of the item (survives edits and reordering). Use as React key. */
   readonly stableId: string;
   /** @internal */ _currentRef: unknown;
@@ -1638,7 +1639,7 @@ export function validateValue(node: AnyNode, value: unknown): void {
   }
 
   if (node instanceof ObjectNode && typeof value === "object") {
-    for (const [key, child] of Object.entries(node._fields as Record<string, AnyNode>)) {
+    for (const [key, child] of Object.entries(node[FIELDS] as Record<string, AnyNode>)) {
       validateValue(child, (value as any)[key]);
     }
   }
