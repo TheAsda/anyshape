@@ -17,7 +17,11 @@ const ANY: object = Object.freeze({});
 export class PendingInRef {
   /** Nominal brand. */
   private readonly _pendingInRef = true;
-  /** @internal */
+  /**
+   * @internal `_id` is a counter, not derived from (node, def) like the other
+   * kinds' ids: a definition has no name of its own. pendingIn caches one ref
+   * per (node, def), so equal refs still share it.
+   */
   constructor(readonly node: AnyNode, readonly def: MetaKeyDef<any> | undefined, readonly _id: string) {}
   get path(): string {
     return `${this.node.path ?? ""}#pendingIn`;

@@ -1,6 +1,6 @@
 // Pending: pendingIn(node, def?) / pendingOf(target), on the tally channel.
 
-import { form, object, array, field, metaKey, createStore, defineBehavior, pendingIn, pendingOf } from "./index";
+import { form, object, array, field, metaKey, createStore, defineBehavior, when, pendingIn, pendingOf } from "./index";
 import { describe, expect, test } from "vitest";
 
 const checked = metaKey(false);
@@ -69,7 +69,12 @@ describe("Pending", () => {
     s.react(pendingIn(shape), () => fired.push("react pendingIn"));
     row.subscribe(pendingOf(R.qty.ok), () => fired.push("subscribe pendingOf"));
     s.addBehavior(
-      defineBehavior({ triggers: [pendingIn(shape)], runOn: { init: false }, run: () => void fired.push("behavior") })
+      defineBehavior({
+        triggers: [pendingIn(shape)],
+        when: when([pendingOf(shape.a.checked)], (pending) => !pending),
+        runOn: { init: false },
+        run: () => void fired.push("behavior"),
+      })
     );
 
     row.set(R.qty, 5);

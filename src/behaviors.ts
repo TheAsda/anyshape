@@ -419,13 +419,14 @@ export class BehaviorRuntime implements RuntimeHooks {
     }
 
     // Writes: nodes and meta keys only, never feature-owned keys (unless feature).
-    for (const w of writes) {
+    const targets = writes.map((w) => {
       const target = targetOf(w as AnyRef);
-      if (!target) fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
-      if (target!.def?.options.owner === "feature" && !feature) {
+      if (!target) return fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
+      if (target.def?.options.owner === "feature" && !feature) {
         fail(`"${refLabel(w)}" is owned by its feature and cannot be written by other behaviors`);
       }
-    }
+      return target;
+    });
 
     // Feature (default) behaviors are limited to their own node.
     if (behavior._self) {
@@ -455,7 +456,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     return {
       seq, name, behavior, config, feature, host, scope, chain,
-      triggers, inputs: [...triggers, ...reads], writes, targets: writes.map((w) => targetOf(w)!), guards,
+      triggers, inputs: [...triggers, ...reads], writes, targets, guards,
       declared: new Set(all.map(refKey)),
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
@@ -668,10 +669,10 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (binding.isLeaf) {
       if (!resetMeta || !binding.host.isAttached()) return;
       // Meta the behavior wrote goes back to its default.
-      for (const w of reg.writes) {
-        const def = targetOf(w)!.def;
+      reg.writes.forEach((w, i) => {
+        const def = reg.targets[i].def;
         if (def) binding.host.set(w, def.defaultValue as never, { origin: binding.origin });
-      }
+      });
       return;
     }
     for (const row of binding.arrStore!.items()) {
