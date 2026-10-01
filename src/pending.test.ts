@@ -39,7 +39,7 @@ describe("Pending", () => {
         triggers: [R.qty],
         reads: [pendingIn(shape), pendingIn(shape, checked), pendingIn(shape, flagged), pendingIn(R, checked), pendingOf(R.qty.ok), pendingOf(R.qty)],
         writes: [R.qty.ok],
-        run: (ctx) =>
+        run: (ctx) => {
           seen.push([
             ctx.get(pendingIn(shape)),
             ctx.get(pendingIn(shape, checked)),
@@ -47,7 +47,8 @@ describe("Pending", () => {
             ctx.get(pendingIn(R, checked)),
             ctx.get(pendingOf(R.qty.ok)),
             ctx.get(pendingOf(R.qty)),
-          ]),
+          ]);
+        },
       })
     );
     // One instance per row; only the running row is in flight.
