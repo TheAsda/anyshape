@@ -34,7 +34,7 @@
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
-  FIELDS, META_DEFS,
+  FIELDS, META_DEFS, metaRefOf,
 } from "./internal";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
@@ -692,7 +692,7 @@ export function defaultBehaviors(root: AnyNode): Behavior[] {
     for (const [key, def] of Object.entries(node[META_DEFS])) {
       const factory = def.options.behavior;
       if (!factory) continue;
-      const config = factory(node) as BehaviorConfig;
+      const config = factory(node, metaRefOf(node, key)) as BehaviorConfig;
       out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${key}` }, node));
     }
     if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);

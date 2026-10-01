@@ -34,13 +34,12 @@ export const validation = (options: ValidationOptions = {}) => ({
 export const touched = metaKey(false, {
   owner: "feature",
   aggregate: (t) => t,
-  behavior: (self) => ({
-    name: `${self.path || "<root>"}#touched`,
+  behavior: (self, key) => ({
     triggers: [self],
-    writes: [self.touched],
+    writes: [key],
     origins: ["user"],
     runOn: { init: false },
-    run: (ctx) => ctx.set(self.touched, true),
+    run: (ctx) => ctx.set(key, true),
   }),
 });
 
@@ -48,11 +47,10 @@ export const touched = metaKey(false, {
 export const dirty = metaKey(false, {
   owner: "feature",
   aggregate: (d) => d,
-  behavior: (self) => ({
-    name: `${self.path || "<root>"}#dirty`,
+  behavior: (self, key) => ({
     triggers: [self, initialOf(self)],
-    writes: [self.dirty],
-    run: (ctx) => ctx.set(self.dirty, !Object.is(ctx.get(self), ctx.initial(self))),
+    writes: [key],
+    run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),
   }),
 });
 

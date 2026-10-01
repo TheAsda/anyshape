@@ -34,20 +34,32 @@ export type FormSubmitHandler = (event?: { preventDefault?(): void }) => Promise
 /** Stores with a submit running: one submit at a time per submittable node instance. */
 const running = new WeakSet<BaseStore<any>>();
 
+/** Each store's own `submitting` ref: a store's node and its declarations never change. */
+const own = new WeakMap<BaseStore<any>, MetaRef<boolean>>();
+
+function ownSubmitting(store: BaseStore<any>): MetaRef<boolean> {
+  let ref = own.get(store);
+  if (!ref) {
+    // Only a node that declares submission() itself is submitted: its own
+    // `submitting`, matched by definition (the types can't tell definitions apart).
+    ref = store.collect(store.node, submitting).find((e) => e.ref.node === store.node)?.ref;
+    if (!ref) throw new Error(`handleSubmit: "${store.node.path || "<root>"}" does not declare submission()`);
+    own.set(store, ref);
+  }
+  return ref;
+}
+
 export function handleSubmit<N extends Submittable>(
   store: BaseStore<N>,
   fn: (formData: InferValue<N>) => void | Promise<void>
 ): FormSubmitHandler {
-  // Only a node that declares submission() itself is submitted: its own
-  // `submitting`, matched by definition (the types can't tell definitions apart).
-  const own = store.collect(store.node, submitting).find((e) => e.ref.node === store.node);
-  if (!own) throw new Error(`handleSubmit: "${store.node.path || "<root>"}" does not declare submission()`);
+  const ref = ownSubmitting(store);
   return async (event) => {
     event?.preventDefault?.();
     if (running.has(store)) return;
     running.add(store);
     store.batch(() => {
-      store.set(own.ref, true);
+      store.set(ref, true);
       for (const e of store.collect(store.node, revealed)) e.store.set(e.ref, true);
     });
     try {
@@ -57,7 +69,8 @@ export function handleSubmit<N extends Submittable>(
       else focusFirst(errors);
     } finally {
       running.delete(store);
-      store.set(own.ref, false);
+      // A row removed during the submit has no `submitting` left to show.
+      if (store.isAttached()) store.set(ref, false);
     }
   };
 }
