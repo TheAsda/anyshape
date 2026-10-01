@@ -8,7 +8,7 @@ import {
   form, object, array, field, metaKey, createStore, countIn, initialOf,
   control, visibility, disableable, submission,
   required, min, pattern, visibleWhen, disableWhen, exclusive, rule,
-  type InferValue, type InferMeta, type FieldNode, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
+  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type MetaPatch, type SubmitValue, type RootStore,
 } from "./index";
 import type { useControl } from "./react";
 import { test, expect, expectTypeOf } from "vitest";
@@ -133,6 +133,10 @@ test("recipes state the keys they need through ref properties", () => {
   expectTypeOf(t.text).not.toExtend<DisableTarget>();
   expectTypeOf(t.text).toExtend<ControlTarget>();
   expectTypeOf(t.plain).not.toExtend<ControlTarget>();
+});
+
+test("a loose node declares no known meta keys", () => {
+  expectTypeOf<InferMeta<AnyNode>>().toEqualTypeOf<{}>();
 });
 
 test("node internals are not part of a node's type", () => {
