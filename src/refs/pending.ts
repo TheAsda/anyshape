@@ -150,16 +150,31 @@ function countAll(): void {
   uncounted.clear();
 }
 
+/** @internal A run whose targets are pending until it ends. */
+export interface PendingRun {
+  /** The run went async: put its targets on the tallies now, so that subscribers see it. */
+  hold(): void;
+  /** The run ended or was cancelled. Inside a batch, so that subscribers are notified. */
+  end(): void;
+}
+
 /**
  * @internal A run on scope host `host` that writes `writes` starts: its
- * targets are pending until the returned function is called (the run ended or
- * was cancelled).
+ * targets are pending until it ends.
  */
-export function beginRun(host: BaseStore<any>, writes: readonly AnyRef[]): () => void {
+export function beginRun(host: BaseStore<any>, writes: readonly AnyRef[]): PendingRun {
   const run: Run = { host, writes, counted: false };
   uncounted.add(run);
-  return () => {
-    if (run.counted) count(run, -1);
-    else uncounted.delete(run);
+  return {
+    hold: () => {
+      if (run.counted) return;
+      uncounted.delete(run);
+      run.counted = true;
+      count(run, 1);
+    },
+    end: () => {
+      if (run.counted) count(run, -1);
+      else uncounted.delete(run);
+    },
   };
 }

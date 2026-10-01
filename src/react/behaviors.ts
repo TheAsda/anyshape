@@ -93,8 +93,7 @@ function delegate(item: AnyBehavior, slot: Slot): AnyBehavior {
   if (item instanceof Behavior) {
     return new Behavior(
       { ...item.config, when: guards, run: (ctx) => (slot.current as Behavior).config.run(ctx) },
-      undefined,
-      item._branches
+      { branches: item._branches, trace: item._trace }
     );
   }
   throw new Error("useBehaviors: expected behaviors and rules");
