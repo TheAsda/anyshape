@@ -1,9 +1,11 @@
 // G · Origins, baselines (initial values) and reset.
 
 import {
-  form, object, array, field, meta, createStore, countIn, initialOf, defineBehavior, rule, control,
-  touched, disableable, max, type Origin, type FocusTarget,
+  form, object, array, field, meta, createStore, countIn, initialOf, defineBehavior, rule,
+  type Origin, type FocusTarget,
 } from "./index";
+import { control, touched, disableable } from "./test/features";
+import { max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";

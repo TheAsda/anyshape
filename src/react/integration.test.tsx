@@ -4,7 +4,8 @@
 
 import { test, expect } from "vitest";
 import { userEvent } from "vitest/browser";
-import { createStore, countIn, pattern, type ItemStore } from "../index";
+import { createStore, countIn, type ItemStore } from "../index";
+import { pattern } from "../test/rules";
 import { StoreProvider, useArray, useBehaviors, useControl, useValue, fromInput } from "./index";
 import { trip, T, tripBehaviors, savedBooking, quiet } from "../test/trip";
 import { render, renders } from "./test-utils";

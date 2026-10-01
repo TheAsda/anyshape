@@ -1,10 +1,8 @@
 // A form with a nested company section (visibility and disableable at several
 // levels), rows with nested rows and touched(), and a root disableable().
 // Used by reference-API, origin, baseline, count and inheritance tests.
-import {
-  form, object, array, field, control, validation, touched, visibility, disableable,
-  type InferValue, type Origin,
-} from "../../index";
+import { form, object, array, field, type InferValue, type Origin } from "../../index";
+import { control, validation, touched, visibility, disableable } from "../features";
 
 export const shape = form(
   object({
