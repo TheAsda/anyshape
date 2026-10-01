@@ -1,6 +1,6 @@
 // Submit recipe: handleSubmit(store, fn).
 
-import { form, object, array, field, createStore, rule } from "form-lib";
+import { form, object, array, field, metaKey, createStore, rule } from "form-lib";
 import { test as base, describe, expect } from "vitest";
 import { handleSubmit, submission } from "./submit";
 import { control } from "./features";
@@ -142,5 +142,19 @@ describe("Submit: submittable nodes", () => {
     // @ts-expect-error – a section is submittable only if it declares submission() itself
     expect(() => handleSubmit(createStore(section, { step: { x: "" } }).substore(section.step), async () => {})).toThrow(/"step"/);
     expect(() => handleSubmit(s.substore(shape.rows).itemAt(0), async () => {})).not.toThrow();
+  });
+
+  test("a section that declares submission() is submittable through its own store", async () => {
+    const wizard = form({ step: object({ x: field<string>().meta(control()) }).meta(submission()) });
+    const s = createStore(wizard, { step: { x: "a" } });
+    const got: unknown[] = [];
+    await handleSubmit(s.substore(wizard.step), (formData) => void got.push(formData))();
+    expect(got).toEqual([{ x: "a" }]);
+    expect(s.get(wizard.step.x.revealed)).toBe(true);
+  });
+
+  test("a node with its own `submitting` definition is not submittable: the key is matched by definition", () => {
+    const foreign = form(object({ name: field<string>() }).meta({ submitting: metaKey(false) }));
+    expect(() => handleSubmit(createStore(foreign, { name: "" }), async () => {})).toThrow(/submission\(\)/);
   });
 });

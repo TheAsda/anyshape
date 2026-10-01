@@ -7,7 +7,7 @@
 //     result's errors) whose node has a target, in document order by default.
 // ============================================================
 
-import { metaKey, type AnyNode, type BaseStore, type MetaRef } from "form-lib";
+import { metaKey, type AnyNode, type BaseStore, type CollectEntry } from "form-lib";
 
 /** Anything that can receive focus – an input, or a custom component's handle. */
 export interface FocusTarget {
@@ -20,11 +20,8 @@ export const focusTarget = metaKey<FocusTarget | undefined>(undefined, { owner: 
 
 export const focusable = () => ({ focusTarget });
 
-/** An entry to focus: a node, through any of its refs, and a store that can address it. */
-export interface FocusEntry {
-  ref: MetaRef<any>;
-  store: BaseStore<any>;
-}
+/** An entry to focus, as collect() and validate() return them: a node (ref.node) and its scope store. */
+export type FocusEntry = Pick<CollectEntry, "ref" | "store">;
 
 /**
  * Orders focus targets by their position in the document. Targets that are
@@ -42,8 +39,22 @@ export function domOrder(a: FocusTarget, b: FocusTarget): number {
 /** The target registered on the node; none for a removed row. */
 function targetOf(store: BaseStore<any>, node: AnyNode): FocusTarget | undefined {
   if (!store.isAttached()) return undefined;
-  const own = store.collect(node, focusTarget).find((e) => e.ref.node === node && e.store === store);
+  // The sweep starts at the node, so its own instance is the one entry for it.
+  const own = store.collect(node, focusTarget).find((e) => e.ref.node === node);
   return own && own.store.get(own.ref);
+}
+
+/** Every registered target in the form, by scope store and node: one sweep for a whole list of entries. */
+function targetsIn(store: BaseStore<any>): Map<BaseStore<any>, Map<AnyNode, FocusTarget>> {
+  const out = new Map<BaseStore<any>, Map<AnyNode, FocusTarget>>();
+  for (const e of store.root.collect(store.root.node, focusTarget)) {
+    const target = e.store.get(e.ref);
+    if (!target) continue;
+    let byNode = out.get(e.store);
+    if (!byNode) out.set(e.store, (byNode = new Map()));
+    byNode.set(e.ref.node, target);
+  }
+  return out;
 }
 
 function moveTo(target: FocusTarget): void {
@@ -61,11 +72,14 @@ export function focus(store: BaseStore<any>, node: AnyNode): boolean {
 
 /**
  * Focus the first entry whose node has a focus target, ordered by `compare`
- * (ties keep the entries' order). Returns the focused entry.
+ * (ties keep the entries' order). Entries of removed rows are skipped.
+ * Returns the focused entry.
  */
 export function focusFirst<E extends FocusEntry>(entries: readonly E[], compare = domOrder): E | undefined {
+  if (!entries.length) return undefined;
+  const targets = targetsIn(entries[0].store);
   const first = entries
-    .map((entry, index) => ({ entry, index, target: targetOf(entry.store, entry.ref.node) }))
+    .map((entry, index) => ({ entry, index, target: targets.get(entry.store)?.get(entry.ref.node) }))
     .filter((c): c is { entry: E; index: number; target: FocusTarget } => c.target !== undefined)
     .sort((a, b) => compare(a.target, b.target) || a.index - b.index)[0];
   if (!first) return undefined;
