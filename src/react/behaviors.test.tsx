@@ -2,9 +2,11 @@ import { useState, StrictMode, Component, type ReactNode } from "react";
 import { test, expect } from "vitest";
 import { cleanup } from "vitest-browser-react";
 import {
-  form, object, array, field, rule, defineBehavior, required, pattern, max, control, disableable, countIn,
-  createStore, type InferValue, type RootStore, type BaseStore,
+  form, object, array, field, rule, defineBehavior, countIn, createStore, type InferValue,
+  type RootStore, type BaseStore,
 } from "../index";
+import { control, disableable } from "../test/features";
+import { required, pattern, max } from "../test/rules";
 import { StoreProvider, useBehaviors, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 

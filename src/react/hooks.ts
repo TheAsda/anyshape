@@ -20,7 +20,7 @@ import {
 } from "react";
 import { ShapeNode, type AnyNode, type InferValue, type InferMeta, type MetaRef } from "../shape";
 import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store";
-import type { FocusTarget } from "../features";
+import type { FocusTarget } from "../store";
 import type { ArrayNode } from "../shape";
 import { refNode, refLabel, rootOf, scopeOf } from "../internal";
 

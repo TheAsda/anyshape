@@ -7,10 +7,11 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:react": "vitest run --project react",
+    "test:recipes": "vitest run --project recipes",
     "test:watch": "vitest",
     "bench": "vitest bench --run --project 'unit (bench)' --reporter=verbose",
     "test:memory": "vitest run --config vitest.memory.config.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p recipes",
     "dev": "vite"
   },
   "dependencies": {},

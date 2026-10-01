@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "form-lib": ["../src/index.ts"]
+    }
+  },
+  "include": ["./**/*"]
+}

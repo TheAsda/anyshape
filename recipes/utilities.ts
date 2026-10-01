@@ -13,10 +13,11 @@
 // Behaviors: calculate, link, visibleWhen, disableWhen, clearWhen, exclusive.
 // ============================================================
 
-import type { AnyNode, InferValue, MetaRef, Ref } from "./shape";
-import { defineBehavior, type AnyBehavior, type Behavior, type Guard } from "./behaviors";
-import { rule, type Rule, type Validatable } from "./validation";
-import { initialOf, type AnyRef, type RefValue, type CountRef } from "./store";
+import {
+  defineBehavior, rule, initialOf,
+  type AnyNode, type InferValue, type MetaRef, type Ref, type AnyBehavior, type Behavior, type Guard,
+  type Rule, type Validatable, type AnyRef, type RefValue, type CountRef,
+} from "form-lib";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
 type WithKey<K extends string, V> = AnyNode & { readonly [P in K]: MetaRef<V> };

@@ -32,7 +32,7 @@
 // ============================================================
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
-import type { FocusTarget } from "./features";
+import type { FocusTarget } from "./store";
 import {
   refNode, refKey, refLabel, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
   FIELDS, META_DEFS, defOf,

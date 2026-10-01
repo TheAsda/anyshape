@@ -1,9 +1,9 @@
 // O · Submit, handleSubmit, focus order, focus targets and resolvePath.
 
 import {
-  form, field, meta, MetaRef, createStore, countIn, rule, asyncRule, control, validation, submission,
-  type FocusTarget,
+  form, field, meta, MetaRef, createStore, countIn, rule, asyncRule, type FocusTarget,
 } from "./index";
+import { control, validation, submission } from "./test/features";
 import { test as base, describe, expect } from "vitest";
 import { flush, deferred } from "./test/harness";
 import * as account from "./test/fixtures/account";

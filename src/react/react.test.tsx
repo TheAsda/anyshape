@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { test, expect } from "vitest";
 import {
-  form, object, array, field, createStore, countIn, rule, control, type InferValue, type Origin, type ItemStore,
+  form, object, array, field, createStore, countIn, rule, type InferValue, type Origin,
+  type ItemStore,
 } from "../index";
+import { control } from "../test/features";
 import { StoreProvider, useStore, useValue, useField, useControl, useArray, fromInput, fromCheckbox, resolveStore } from "./index";
 import { render, settle, renders } from "./test-utils";
 

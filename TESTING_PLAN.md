@@ -27,23 +27,26 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/counts.test.ts` | H | `countIn`, `collect`, aggregate keys | 10 |
 | `src/inheritance.test.ts` | I | inherited `visible` / `disabled`, `get` vs `getOwn` | 4 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 49 |
-| `src/validation.test.ts` | M | rules, queues, async, `validate()` | 35 |
-| `src/utilities.test.ts` | N | ready-made rules and behaviors, reference limits, builder | 26 |
+| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 35 |
+| `recipes/utilities.test.ts` | N | ready-made rules and behaviors, reference limits, builder | 26 |
 | `src/submit.test.ts` | O | `submit`, `handleSubmit`, focus order and targets, `resolvePath` | 19 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
+| `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
+| `recipes/imports.test.ts` | — | recipes import only the core entry; the core imports no recipe | 2 |
 | `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
 | `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useControl`, adapters, `useArray` | 19 |
 | `src/react/form.test.tsx` | Q | `useForm`, `useSync`, DOM focus order, `handleSubmit` | 14 |
 | `src/react/behaviors.test.tsx` | R | `useBehaviors` | 13 |
 | `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
 
-Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`.
+Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`. The core tests declare their meta keys with the test-local features in `src/test/features.ts` and rules in `src/test/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`.
 
 **Conventions (keep them):**
 - **Projects** (`vitest.config.ts`):
   - `unit`: the core, in Node, with no DOM.
+  - `recipes`: `recipes/`, in Node, importing the core entry as `form-lib`.
   - `react`: the bindings in real Chromium, through Vitest browser mode (Playwright provider) and `vitest-browser-react`.
-  - Commands: `bun run test` runs both; also `test:unit`, `test:react`, `bench` (NF3), `test:memory` (NF4).
+  - Commands: `bun run test` runs all three; also `test:unit`, `test:react`, `test:recipes`, `bench` (NF3), `test:memory` (NF4).
   - First run on a machine: `bunx playwright install chromium`.
 - **Structure:** one file per layer (table above). Inside a file, a `describe` per section, named with the layer ID (`"F · Rule 3 – array structure channel"`). Test titles state the guarantee ("a removed row drops its async result"), not the function.
 - **Fixtures:**
