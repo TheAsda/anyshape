@@ -149,17 +149,27 @@ export interface Branch {
   readonly side: 0 | 1;
 }
 
+/** @internal What the core attaches to a behavior besides its config. */
+export interface BehaviorInternals {
+  /** Set for feature (default) behaviors: the node the behavior is limited to. */
+  self?: AnyNode;
+  /** When / otherwise splits the behavior is inside of (builder). */
+  branches?: readonly Branch[];
+  /** Dev only: where defineBehavior was called. */
+  trace?: Error;
+}
+
 export class Behavior {
+  /** @internal */ readonly _self: AnyNode | undefined;
+  /** @internal */ readonly _branches: readonly Branch[];
+  /** @internal */ readonly _trace: Error | undefined;
+
   /** @internal */
-  constructor(
-    readonly config: BehaviorConfig,
-    /** @internal set for feature (default) behaviors: node the behavior is limited to */
-    readonly _self?: AnyNode,
-    /** @internal when / otherwise splits this behavior is inside of (builder) */
-    readonly _branches: readonly Branch[] = [],
-    /** @internal dev only: where defineBehavior was called */
-    readonly _trace?: Error
-  ) {}
+  constructor(readonly config: BehaviorConfig, internals: BehaviorInternals = {}) {
+    this._self = internals.self;
+    this._branches = internals.branches ?? [];
+    this._trace = internals.trace;
+  }
 }
 
 const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
@@ -215,7 +225,7 @@ export function defineBehavior(config: BehaviorConfig): Behavior {
     trace = new Error();
     (Error as { captureStackTrace?: (target: object, fn: Function) => void }).captureStackTrace?.(trace, defineBehavior);
   }
-  return new Behavior(config, undefined, [], trace);
+  return new Behavior(config, { trace });
 }
 
 export interface BehaviorErrorInfo {
@@ -266,6 +276,8 @@ export interface Registration {
   /** Read inputs that are not triggers: watched only while a run is in flight. */
   reads: AnyRef[];
   inputs: AnyRef[];
+  /** refKeys of `inputs`. */
+  inputKeys: Set<string>;
   writes: WritableRef[];
   /** What each write changes, in the order of `writes`. */
   targets: Target[];
@@ -367,8 +379,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly keeping = new Set<Binding>();
   /** Instances whose run in flight was cancelled while holding kept work: see flushed(). */
   private readonly orphans = new Set<Binding>();
-  /** Resolved when a run in flight ends or is cancelled (settle()). */
-  private ended: { promise: Promise<void>; resolve: () => void } | undefined;
+  /** Resolved when a run in flight ends or is cancelled; settle() awaits it. */
+  private settledGate: { promise: Promise<void>; resolve: () => void } | undefined;
   /** @internal set by the validation layer */
   rules: RuleHooks | undefined;
 
@@ -482,12 +494,12 @@ export class BehaviorRuntime implements RuntimeHooks {
   async settle(store: BaseStore<any>, node: AnyNode): Promise<void> {
     const pending = pendingIn(node);
     while (store.get(pending) > 0) {
-      if (!this.ended) {
+      if (!this.settledGate) {
         let resolve!: () => void;
         const promise = new Promise<void>((r) => (resolve = r));
-        this.ended = { promise, resolve };
+        this.settledGate = { promise, resolve };
       }
-      await this.ended.promise;
+      await this.settledGate.promise;
     }
   }
 
@@ -573,10 +585,12 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (scopeOf(refNode(w)) !== scope) fail(`"${refLabel(w)}" is outside the behavior's scope ("${scope.path || "<root>"}") – behaviors write only their own scope`);
     }
 
+    const triggerKeys = new Set(triggers.map(refKey));
     return {
       seq, name, behavior, config, feature, host, scope, chain,
-      triggers, reads: reads.filter((r) => !triggers.some((t) => refKey(t) === refKey(r))),
-      inputs: [...triggers, ...reads], writes, targets, guards,
+      triggers, reads: reads.filter((r) => !triggerKeys.has(refKey(r))),
+      inputs: [...triggers, ...reads], inputKeys: new Set([...triggers, ...reads].map(refKey)),
+      writes, targets, guards,
       declared: new Set(all.map(refKey)),
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
@@ -724,7 +738,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private watch(leaf: Binding, flight: Flight): void {
     const reg = leaf.reg;
     for (const ref of reg.writes) {
-      if (reg.inputs.some((i) => refKey(i) === refKey(ref))) continue; // an input change reruns it
+      if (reg.inputKeys.has(refKey(ref))) continue; // an input change reruns it
       flight.offs.push(
         leaf.host.react(ref, () => {
           if (this.flights.get(leaf) === flight) this.cancel(leaf);
@@ -785,9 +799,9 @@ export class BehaviorRuntime implements RuntimeHooks {
     this.flights.delete(leaf);
     for (const off of flight.offs) off();
     flight.tally.end();
-    const ended = this.ended;
-    this.ended = undefined;
-    ended?.resolve();
+    const gate = this.settledGate;
+    this.settledGate = undefined;
+    gate?.resolve();
   }
 
   private mark(leaf: Binding, change: { init?: boolean; changed?: Iterable<string>; origins?: Iterable<Origin> }): void {
@@ -961,7 +975,7 @@ export function defaultBehaviors(root: AnyNode): Behavior[] {
       const factory = def.options.behavior;
       if (!factory) continue;
       const config = factory(node, metaRefOf(node, name)) as BehaviorConfig;
-      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, node));
+      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, { self: node }));
     }
     if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);
     if (node instanceof ArrayNode) visit(node.item);
