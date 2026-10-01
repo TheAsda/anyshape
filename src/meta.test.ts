@@ -1,8 +1,7 @@
 import {
-  form, object, array, field, meta, metaKey, MetaRef, createStore,
-  control, validation, touched, visibility, disableable, submission,
-  type InferValue, type InferMeta,
+  form, object, array, field, meta, metaKey, MetaRef, createStore, type InferValue, type InferMeta,
 } from "./index";
+import { control, validation, touched, visibility, disableable, submission } from "./test/features";
 import { META, META_DEFS, CREATE, PLAIN, defOf } from "./internal";
 import { test, describe, expect } from "vitest";
 

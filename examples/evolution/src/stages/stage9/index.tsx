@@ -7,11 +7,11 @@
 // ------------------------------------------------------------
 
 import { useState } from "react";
+import { form, object, field, type InferValue, array, defineBehaviors } from "form-lib";
 import {
-  form, object, field, type InferValue, array, control, submission, visibility,
-  defineBehaviors, required, minLength, calculate,
-  visibleWhen, clearWhen,
-} from "form-lib";
+  control, submission, visibility, required, minLength, calculate, visibleWhen,
+  clearWhen,
+} from "form-lib/recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 

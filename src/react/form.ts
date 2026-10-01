@@ -16,7 +16,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { MetaRef, type AnyNode, type InferValue, type ObjectNode } from "../shape";
 import { createStore } from "../create";
 import type { StoreOptions } from "../behaviors";
-import type { FocusTarget } from "../features";
+import type { FocusTarget } from "../store";
 import type { RootStore, WriteOptions } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
 import { defOf } from "../internal";

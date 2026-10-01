@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
@@ -13,6 +17,18 @@ export default defineConfig({
           environment: 'node',
           include: ['src/**/*.test.ts'],
           exclude: ['src/react/**'],
+        },
+      },
+      {
+        // Recipes: built only on the core entry, imported as `form-lib`.
+        extends: true,
+        resolve: {
+          alias: [{ find: /^form-lib$/, replacement: resolve(here, 'src/index.ts') }],
+        },
+        test: {
+          name: 'recipes',
+          environment: 'node',
+          include: ['recipes/**/*.test.ts'],
         },
       },
       {

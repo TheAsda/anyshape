@@ -11,10 +11,13 @@
 
 import { useState } from "react";
 import {
-  form, object, field, type InferValue, array, control, submission, visibility,
-  defineBehaviors, defineBehavior, required, minLength, calculate, rule, asyncRule,
-  visibleWhen, clearWhen, type FieldNode,
+  form, object, field, type InferValue, array, defineBehaviors, defineBehavior, rule,
+  asyncRule, type FieldNode,
 } from "form-lib";
+import {
+  control, submission, visibility, required, minLength, calculate, visibleWhen,
+  clearWhen,
+} from "form-lib/recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 

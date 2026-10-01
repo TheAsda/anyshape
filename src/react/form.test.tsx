@@ -1,9 +1,10 @@
 import { useState, StrictMode } from "react";
 import { test, expect } from "vitest";
 import {
-  form, object, array, field, metaKey, rule, max, control, submission, countIn, createStore,
-  type InferValue, type RootStore,
+  form, object, array, field, metaKey, rule, countIn, createStore, type InferValue, type RootStore,
 } from "../index";
+import { control, submission } from "../test/features";
+import { max } from "../test/rules";
 import { StoreProvider, useForm, useSync, useControl, useValue, fromInput, domOrder } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 

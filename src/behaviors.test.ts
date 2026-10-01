@@ -1,8 +1,9 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule, max,
-  control, visibility, disableable, touched, dirty,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule,
   type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
+import { control, visibility, disableable, touched, dirty } from "./test/features";
+import { max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as limits from "./test/fixtures/limits";
 
