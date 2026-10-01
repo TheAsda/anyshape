@@ -33,12 +33,13 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/submit.test.ts` | O | `submit`, `handleSubmit`, focus order and targets, `resolvePath` | 19 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
-| `recipes/imports.test.ts` | — | recipes import only the core entry; the core imports no recipe | 2 |
+| `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
 | `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
-| `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useControl`, adapters, `useArray` | 19 |
+| `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` | 12 |
 | `src/react/form.test.tsx` | Q | `useForm`, `useSync`, DOM focus order, `handleSubmit` | 14 |
 | `src/react/behaviors.test.tsx` | R | `useBehaviors` | 13 |
 | `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
+| `recipes/react/control.test.tsx` | P | `useControl`, error display policy, `focusRef`, adapters | 7 |
 
 Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`. The core tests declare their meta keys with the test-local features in `src/test/features.ts` and rules in `src/test/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`.
 
@@ -47,7 +48,8 @@ Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `acco
   - `unit`: the core, in Node, with no DOM.
   - `recipes`: `recipes/`, in Node, importing the core entry as `form-lib`.
   - `react`: the bindings in real Chromium, through Vitest browser mode (Playwright provider) and `vitest-browser-react`.
-  - Commands: `bun run test` runs all three; also `test:unit`, `test:react`, `test:recipes`, `bench` (NF3), `test:memory` (NF4).
+  - `recipes-react`: `recipes/react/`, in real Chromium like `react`, importing the core entries as `form-lib` and `form-lib/react` (both aliased to `src/`, so recipes and core hooks share one core copy).
+  - Commands: `bun run test` runs all four; also `test:unit`, `test:react`, `test:recipes`, `test:recipes-react`, `bench` (NF3), `test:memory` (NF4).
   - First run on a machine: `bunx playwright install chromium`.
 - **Structure:** one file per layer (table above). Inside a file, a `describe` per section, named with the layer ID (`"F · Rule 3 – array structure channel"`). Test titles state the guarantee ("a removed row drops its async result"), not the function.
 - **Fixtures:**
@@ -55,7 +57,7 @@ Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `acco
   - Repeated setup comes from `test.extend` builder fixtures: `store`, `lines`, `recorder`, `lookup`, e.g. `test("…", ({ store: s, lines }) => …)`.
   - Use a fixture only where it removes repetition without hiding the setup the test is about. A test with its own store options creates its store explicitly.
   - A `describe` that uses another file's fixture binds it at the top (`const { shape, L, initial } = company;`) and defines its own `test`.
-- **React tests** (`src/react/*.test.tsx`, helpers in `src/react/test-utils.tsx`):
+- **React tests** (`src/react/*.test.tsx` and `recipes/react/*.test.tsx`, each with its own copy of `test-utils.tsx`). The core React tests use only the core hooks; a field binding there is `useField` with inline handlers:
   - Render with `render()` from `vitest-browser-react`; it's async and cleaned up before each test.
   - Drive inputs through locators and `userEvent` (`fill`, `click`, `keyboard`); these are real browser events, so focus moves and blur fires as with a user.
   - Assert DOM with retrying `await expect.element(locator)`. `toHaveTextContent("…")` is an exact match in Vitest 5; `toMatchTextContent` is the substring/regex form.
@@ -208,11 +210,11 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **O3 · P2** `submit()` on a form whose root has **no** `submission()` works (no counters, no throw). → `validation.test.ts`
 - [x] **O4 · P3** `handleSubmit(...)()` called without an event. → `submit.test.ts`
 
-### P. React bindings (`react/hooks.ts`)
-**Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useControl` (state, user writes, `onBlur` reveal, default and custom policies), `focusRef`, adapters (real events, caching), `useArray` (re-render on structure only, nested arrays).
+### P. React bindings (`react/hooks.ts`, `recipes/react/`)
+**Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useArray` (re-render on structure only, nested arrays). In the recipes: `useControl` (state, user writes, `onBlur` reveal, default policy and `ErrorDisplayProvider`), `focusRef`, adapters (real events, caching).
 
-- [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `react/react.test.tsx`
-- [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `react/react.test.tsx`
+- [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `recipes/react/control.test.tsx`
+- [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `recipes/react/control.test.tsx`
 - [x] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.tsx`
 - [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.tsx`
 - [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.tsx`

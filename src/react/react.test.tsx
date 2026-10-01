@@ -5,7 +5,7 @@ import {
   type ItemStore,
 } from "../index";
 import { control } from "../test/features";
-import { StoreProvider, useStore, useValue, useField, useControl, useArray, fromInput, fromCheckbox, resolveStore } from "./index";
+import { StoreProvider, useStore, useValue, useField, useArray } from "./index";
 import { render, settle, renders } from "./test-utils";
 
 const shape = form({
@@ -33,15 +33,6 @@ function initial(): Values {
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {
-  // @ts-expect-error – `note` has no control() keys
-  useControl(shape.note);
-  const age = useControl(shape.age);
-  // @ts-expect-error – fromInput needs an onChange for strings
-  fromInput(age.onChange);
-  const agree = useControl(shape.agree);
-  // @ts-expect-error – fromCheckbox needs an onChange for booleans
-  fromCheckbox(useControl(shape.name).onChange);
-  fromCheckbox(agree.onChange);
   const n: number = useValue(countIn(shape, "error"));
   const e: string | undefined = useValue(shape.name.error);
   const len: number = useValue(shape.lines, (lines) => lines.length);
@@ -98,7 +89,7 @@ test("hooks subscribe per reference, not to the whole store", async () => {
   };
   function C() {
     useValue(shape.name);
-    useControl(shape.age);
+    useField(shape.age);
     useArray(shape.lines);
     return null;
   }
@@ -187,23 +178,29 @@ test("object substore provider and an explicit store", async () => {
 test("resolution errors", async () => {
   const s = createStore(shape, initial());
   const other = form({ x: field<string>() });
-  expect(() => resolveStore(s, L.qty)).toThrow(/inside a row that the provided store cannot reach/);
-  expect(() => resolveStore(s, other.x)).toThrow(/not part of this form/);
-  let caught: unknown;
-  function NoProvider() {
+  const caught: Record<string, string> = {};
+  function Read({ label, read }: { label: string; read: () => unknown }) {
     try {
-      useStore();
+      read();
     } catch (e) {
-      caught = e;
+      caught[label] = (e as Error).message;
     }
     return null;
   }
-  await render(<NoProvider />);
-  expect(/No store/.test((caught as Error).message)).toBe(true);
+  await render(
+    <StoreProvider store={s}>
+      <Read label="row" read={() => useValue(L.qty)} />
+      <Read label="other" read={() => useValue(other.x)} />
+    </StoreProvider>
+  );
+  await render(<Read label="none" read={() => useStore()} />);
+  expect(caught.row).toMatch(/inside a row that the provided store cannot reach/);
+  expect(caught.other).toMatch(/not part of this form/);
+  expect(caught.none).toMatch(/No store/);
 });
 
 // ---------------------------------------------------------------------------
-// useField / useControl
+// useField
 test("useField: value, onChange (origin user), own meta", async () => {
   const s = createStore(shape, initial());
   const origins: Origin[][] = [];
@@ -232,151 +229,17 @@ test("useField: value, onChange (origin user), own meta", async () => {
   await expect.element(f).toHaveTextContent("M:new");
 });
 
-test("useControl: state, user writes set touched/dirty, errors", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
-  function C() {
-    c = useControl(shape.name);
-    return <span data-testid="c">{`${c.value}|${c.error ?? "-"}|${c.touched}|${c.dirty}`}</span>;
-  }
-  const screen = await render(
-    <StoreProvider store={s}>
-      <C />
-    </StoreProvider>
-  );
-  const state = screen.getByTestId("c");
-  await expect.element(state).toHaveTextContent("Ann|-|false|false");
-  await settle(() => c.onChange("Al"));
-  await expect.element(state).toHaveTextContent("Al|Too short|true|true");
-  await settle(() => s.reset());
-  await expect.element(state).toHaveTextContent("Ann|-|false|false");
-});
-
-test("useControl: onBlur reveals, showError follows the default policy", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
-  function C() {
-    c = useControl(shape.name);
-    return <span data-testid="c">{`${c.error ?? "-"}|${c.revealed}|${c.showError}`}</span>;
-  }
-  const screen = await render(
-    <StoreProvider store={s}>
-      <C />
-    </StoreProvider>
-  );
-  const state = screen.getByTestId("c");
-  const onBlur = c.onBlur;
-  await settle(() => c.onChange("Al"));
-  await expect.element(state, { message: "error hidden while typing" }).toHaveTextContent("Too short|false|false");
-  expect(c.onBlur, "stable").toBe(onBlur);
-  await settle(() => c.onBlur());
-  await expect.element(state).toHaveTextContent("Too short|true|true");
-  await settle(() => c.onChange("Alice"));
-  await expect.element(state, { message: "live once revealed" }).toHaveTextContent("-|true|false");
-  await settle(() => s.reset());
-  await expect.element(state).toHaveTextContent("-|false|false");
-});
-
-test("useControl: onBlur after its row was removed does nothing", async () => {
-  const s = createStore(shape, initial());
-  const lines = s.substore(shape.lines);
-  const row = lines.items()[1];
-  let c!: ReturnType<typeof useControl<typeof L.sku>>;
-  function Sku() {
-    c = useControl(L.sku);
-    return <span data-testid="sku">{c.value ?? "-"}</span>;
-  }
-  await render(
-    <StoreProvider store={row}>
-      <Sku />
-    </StoreProvider>
-  );
-  const onBlur = c.onBlur;
-  await settle(() => lines.remove(row)); // e.g. a blur fired while the removed row unmounts
-  expect(row.isAttached()).toBe(false);
-  expect(() => onBlur()).not.toThrow();
-  expect(row.getMeta(L.sku).revealed, "nothing was written").toBe(false);
-});
-
-test("StoreProvider showError: a custom policy, inherited by nested row providers", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(L.sku, () => "bad") });
-  const row = s.substore(shape.lines).items()[0];
-  function Sku() {
-    const c = useControl(L.sku);
-    return <span data-testid="sku">{String(c.showError)}</span>;
-  }
-  const screen = await render(
-    <StoreProvider store={s} showError={(st) => st.error !== undefined}>
-      <StoreProvider store={row}>
-        <Sku />
-      </StoreProvider>
-    </StoreProvider>
-  );
-  await expect.element(screen.getByTestId("sku")).toHaveTextContent("true");
-});
-
-test("focusRef registers the element, focus() and submit use it, unmount clears it", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
-  function Input() {
-    const c = useControl(shape.name);
-    return <input data-testid="in" ref={c.focusRef} value={c.value} onChange={fromInput(c.onChange)} />;
-  }
-  const screen = await render(
-    <StoreProvider store={s}>
-      <Input />
-    </StoreProvider>
-  );
-  const input = screen.getByTestId("in");
-  expect(s.get(shape.name.focusTarget)).toBe(input.element());
-  await settle(() => s.submit());
-  await expect.element(input, { message: "submit focused the first error" }).toHaveFocus();
-  await screen.unmount();
-  expect(s.get(shape.name.focusTarget), "cleared on unmount").toBe(undefined);
-});
-
-// ---------------------------------------------------------------------------
-// Native adapters with real browser events
-test("fromInput / fromCheckbox with real events; handlers are cached", async () => {
-  const s = createStore(shape, initial());
-  let nameOnChange!: (v: string) => void;
-  function Inputs() {
-    const name = useControl(shape.name);
-    const agree = useControl(shape.agree);
-    nameOnChange = name.onChange;
-    return (
-      <div>
-        <input data-testid="name" value={name.value} onChange={fromInput(name.onChange)} />
-        <input data-testid="agree" type="checkbox" checked={agree.value} onChange={fromCheckbox(agree.onChange)} />
-      </div>
-    );
-  }
-  const screen = await render(
-    <StoreProvider store={s}>
-      <Inputs />
-    </StoreProvider>
-  );
-  const name = screen.getByTestId("name");
-  await name.fill("Zoe");
-  expect(s.get(shape.name)).toBe("Zoe");
-  expect(s.get(shape.name.touched), "written as the user").toBe(true);
-  await expect.element(name).toHaveValue("Zoe");
-  await screen.getByTestId("agree").click();
-  expect(s.get(shape.agree)).toBe(true);
-  await expect.element(screen.getByTestId("agree")).toBeChecked();
-  expect(fromInput(nameOnChange)).toBe(fromInput(nameOnChange));
-});
-
 // ---------------------------------------------------------------------------
 // useArray
 test("useArray: the list re-renders on structure only; a row edit re-renders that row", async () => {
   const s = createStore(shape, initial());
   const c = renders();
   function Line() {
-    const qty = useControl(L.qty);
+    const qty = useValue(L.qty);
     const sku = useValue(L.sku);
     c.hit(`row:${sku}`);
     useEffect(() => c.hit("mount"), []);
-    return <li>{`${sku}=${qty.value}`}</li>;
+    return <li>{`${sku}=${qty}`}</li>;
   }
   let lines!: ReturnType<typeof useArray<typeof shape.lines>>;
   function List() {
@@ -435,36 +298,6 @@ test("useArray inside a row provider resolves nested arrays", async () => {
     </StoreProvider>
   );
   await expect.element(screen.getByTestId("n")).toHaveTextContent("2");
-});
-
-// ---------------------------------------------------------------------------
-// focusRef: two inputs for one field
-test("focusRef: unmounting one of two inputs keeps the other's registration", async () => {
-  const s = createStore(shape, initial());
-  function Input({ id }: { id: string }) {
-    const c = useControl(shape.name);
-    return <input data-testid={id} ref={c.focusRef} value={c.value} onChange={fromInput(c.onChange)} />;
-  }
-  function Both({ showFirst }: { showFirst: boolean }) {
-    return (
-      <div>
-        {showFirst ? <Input key="a" id="a" /> : null}
-        <Input key="b" id="b" />
-      </div>
-    );
-  }
-  const app = (showFirst: boolean) => (
-    <StoreProvider store={s}>
-      <Both showFirst={showFirst} />
-    </StoreProvider>
-  );
-  const screen = await render(app(true));
-  const b = screen.getByTestId("b").element();
-  expect(s.get(shape.name.focusTarget), "the last one mounted wins").toBe(b);
-  await screen.rerender(app(false));
-  expect(s.get(shape.name.focusTarget)).toBe(b);
-  await screen.unmount();
-  expect(s.get(shape.name.focusTarget)).toBe(undefined);
 });
 
 // ---------------------------------------------------------------------------
