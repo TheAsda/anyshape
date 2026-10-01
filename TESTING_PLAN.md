@@ -28,7 +28,8 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/inheritance.test.ts` | I | inherited `visible` / `disabled`, `get` vs `getOwn` | 4 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 49 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 35 |
-| `recipes/utilities.test.ts` | N | ready-made rules and behaviors, reference limits, builder | 26 |
+| `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
+| `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 16 |
 | `src/submit.test.ts` | O | `submit`, `handleSubmit`, focus order and targets, `resolvePath` | 19 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
@@ -139,7 +140,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### H. Counts & collect
 **Covered:** counts across fields/objects/rows, rows removed and restored, count subscriptions, `collect` with row indexes, warning for non-countable keys, `aggregate(default)` must be false, stable `countIn` refs.
 
-- [x] **H1 · P2** A `CountRef` as a **behavior trigger** (re-runs when the count changes, including on row removal) and as a **rule limit** (`max(node, countIn(…))`). → `behaviors.test.ts`, `utilities.test.ts`
+- [x] **H1 · P2** A `CountRef` as a **behavior trigger** (re-runs when the count changes, including on row removal) and as a **rule limit** (`max(node, countIn(…))`). → `behaviors.test.ts`, `recipes/rules.test.ts`
 - [x] **H2 · P3** `collect` called on a row store (paths still from the root, only that row's entries); nested rows `a[1].b[0].c`. → `counts.test.ts`
 - [x] **H3 · P3** A custom counted key (`metaKey(…, { aggregate })`) written by application code updates counts like built-in keys. → `counts.test.ts`
 
@@ -184,19 +185,19 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - `validate()` lists it with path `"travelers"`;
   - it's skipped when the array is hidden.
 
-  If `minItems`/`maxItems` utilities are added, test them here. → `validation.test.ts`
+  If `minItems`/`maxItems` rules are added, test them here. → `validation.test.ts`
 - [x] **M2 · P2** An async rule with `triggers`/`reads`: a change of a read value makes `validate()` re-check (no stale reuse); identical inputs reuse the result. Guards on async rules: a false guard clears the error and aborts. → `validation.test.ts`
 - [x] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `validation.test.ts`
 - [x] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues, errors and values. → `validation.test.ts`
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
-### N. Utilities & builder
+### N. Ready-made rules, behaviors & builder
 **Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (+`stopOnUserEdit`, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen`, `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
 
-- [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `exclusive`'s default text uses `labelOf` (the last path segment). → `utilities.test.ts`
-- [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhen` takes its condition as explicit refs (`[s.car.visible]`). → `utilities.test.ts`
-- [x] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `utilities.test.ts`
-- [x] **N4 · P2** The `when` option on utilities (`calculate(…, { when })`, `required(…, { when })`) behaves like a builder block. → `utilities.test.ts`
+- [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `exclusive`'s default text uses `labelOf` (the last path segment). → `recipes/rules.test.ts`
+- [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhen` takes its condition as explicit refs (`[s.car.visible]`). → `recipes/behaviors.test.ts`
+- [x] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `recipes/behaviors.test.ts`
+- [x] **N4 · P2** The `when` option on rules and behaviors (`calculate(…, { when })`, `required(…, { when })`) works like a builder block. → `recipes/rules.test.ts`
 - [x] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
 
 ### O. Submit, focus, paths
