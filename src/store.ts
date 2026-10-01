@@ -47,7 +47,6 @@
 import type { Meta } from "./meta";
 import type { AnyBehavior, BehaviorHandle } from "./behaviors";
 import type { ValidationHooks, ValidationResult } from "./validation";
-import type { FocusTarget } from "./features";
 import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
@@ -124,6 +123,12 @@ export function countIn(node: AnyNode, key: string): CountRef {
     }
   }
   return ref;
+}
+
+/** Anything that can receive focus – an input, or a custom component's handle. */
+export interface FocusTarget {
+  focus(): void;
+  scrollIntoView?(): void;
 }
 
 export interface FocusOptions {

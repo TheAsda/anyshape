@@ -2,8 +2,8 @@
 // nested rows and submission(). Used by reset, submit, limit and replacement tests.
 import {
   form, object, array, field, metaKey, createStore, type InferValue, type FocusTarget,
-} from "../../index";
-import { control, submission, disableable } from "../features";
+} from "form-lib";
+import { control, submission, disableable } from "../../index";
 
 export const shape = form(
   object({

@@ -1,8 +1,8 @@
 import {
   form, object, array, field, createStore, defineBehavior, when, countIn, rule, asyncRule,
-  control, validation, visibility, disableable, submission,
   type InferValue, type BehaviorErrorInfo, type FocusTarget, type SubmitValue,
-} from "./index";
+} from "form-lib";
+import { control, validation, visibility, disableable, submission } from "./index";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
 import * as limits from "./test/fixtures/limits";
 import { sleep, flush } from "./test/harness";
@@ -10,7 +10,9 @@ import { sleep, flush } from "./test/harness";
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
 
-import { shape, L, initial, required, minLength, errors, lookup, type Values } from "./test/fixtures/account";
+import {
+  shape, L, initial, required, minLength, errors, lookup, type Values,
+} from "./test/fixtures/account";
 
 const test = base
   .extend("store", () => createStore(shape, initial()))

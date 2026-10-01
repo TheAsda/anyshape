@@ -7,12 +7,11 @@
 // ============================================================
 
 import {
-  form, object, array, field, metaKey,
-  control, visibility, disableable, submission,
-  defineBehaviors, asyncRule, required, email, pattern, max,
-  calculate, visibleWhen, clearWhen, exclusive,
-  type InferValue,
+  form, object, array, field, metaKey, defineBehaviors, defineBehavior, rule, asyncRule, initialOf,
+  type InferValue, type AnyNode, type AnyRef, type RefValue,
 } from "../index";
+import { control, visibility, disableable, submission } from "./features";
+import { required, email, pattern, max } from "./rules";
 
 export const person = object({
   name: field<string>().meta(control()),
@@ -69,6 +68,20 @@ export async function checkPassport(value: string) {
   return value === "X0000000" ? "This passport is reported lost" : undefined;
 }
 
+/** target = fn(...sources), recalculated when a source changes. */
+function calculate<N extends AnyNode, const Rs extends readonly AnyRef[]>(
+  target: N,
+  sources: Rs,
+  fn: (...values: { -readonly [K in keyof Rs]: RefValue<Rs[K]> }) => InferValue<N>
+) {
+  return defineBehavior({
+    name: `calculate(${target.path})`,
+    triggers: sources,
+    writes: [target],
+    run: (ctx) => ctx.set(target, fn(...(sources.map((r) => ctx.get(r)) as any))),
+  });
+}
+
 /** The trip's logic. `runs` counts how often each calculation ran. */
 export function tripBehaviors(runs: Record<string, number> = {}) {
   const count = (k: string) => (runs[k] = (runs[k] ?? 0) + 1);
@@ -92,11 +105,43 @@ export function tripBehaviors(runs: Record<string, number> = {}) {
     b.add(calculate(t.seats, [t.travelers], (ts) => ts.length));
     b.add(max(t.seats, t.seats.seatsLeft, { message: "Not enough seats left" }));
 
-    b.add(visibleWhen(t.visa, [t.destination], needsVisa));
-    b.add(clearWhen(t.visa, [t.visa.visible], (visible) => !visible));
+    // The visa section is shown for some destinations, and reset to its initial value while hidden.
+    const visaInitial = initialOf(t.visa);
+    b.add(defineBehavior({
+      name: "visa.visible",
+      triggers: [t.destination],
+      writes: [t.visa.visible],
+      run: (ctx) => ctx.set(t.visa.visible, needsVisa(ctx.get(t.destination))),
+    }));
+    b.add(defineBehavior({
+      name: "visa cleared while hidden",
+      triggers: [t.visa.visible, t.visa],
+      reads: [visaInitial],
+      writes: [t.visa],
+      run(ctx) {
+        if (ctx.get(t.visa.visible) || Object.is(ctx.get(t.visa), ctx.get(visaInitial))) return;
+        ctx.set(t.visa, ctx.get(visaInitial));
+      },
+    }));
     b.add(required(t.visa.number), required(t.visa.expires));
 
-    b.add(exclusive([t.promo, t.voucher]));
+    // At most one of promo and voucher: filling one disables the other; both filled is an error on each.
+    b.add(defineBehavior({
+      name: "promo or voucher",
+      triggers: [t.promo, t.voucher],
+      writes: [t.promo.disabled, t.voucher.disabled],
+      run(ctx) {
+        const promo = ctx.get(t.promo) !== "", voucher = ctx.get(t.voucher) !== "";
+        ctx.set(t.promo.disabled, voucher && !promo);
+        ctx.set(t.voucher.disabled, promo && !voucher);
+      },
+    }));
+    for (const [self, other] of [[t.promo, t.voucher], [t.voucher, t.promo]] as const) {
+      b.add(rule(self, (v, ctx) => (v !== "" && ctx.get(other) !== "" ? "Only one of promo, voucher can be set" : undefined), {
+        name: `only one:${self.path}`,
+        triggers: [other],
+      }));
+    }
   });
 }
 

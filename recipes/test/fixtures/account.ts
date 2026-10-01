@@ -3,8 +3,8 @@
 // disableable promo, disableable rows and submission().
 import {
   form, object, array, field, rule, type InferValue, type BehaviorErrorInfo,
-} from "../../index";
-import { control, validation, visibility, disableable, submission } from "../features";
+} from "form-lib";
+import { control, validation, visibility, disableable, submission } from "../../index";
 import { deferred } from "../harness";
 
 export const shape = form(

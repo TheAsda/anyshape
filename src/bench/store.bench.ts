@@ -4,9 +4,8 @@
 // ============================================================
 
 import { test, describe } from "vitest";
-import {
-  form, object, array, field, createStore, defineBehavior, countIn, rule, control,
-} from "../index";
+import { form, object, array, field, createStore, defineBehavior, countIn, rule } from "../index";
+import { control } from "../test/features";
 
 // ---------------------------------------------------------------------------
 // A flat form: 500 fields on the root, each with a UI listener

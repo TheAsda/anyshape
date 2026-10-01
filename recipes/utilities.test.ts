@@ -1,10 +1,10 @@
 import {
-  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
-  control, visibility, disableable,
-  required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf,
-  calculate, link, visibleWhen, disableWhen, clearWhen, exclusive,
-  when, type AnyBehavior,
-  type InferValue, type BehaviorBuilder,
+  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn, when,
+  type AnyBehavior, type InferValue, type BehaviorBuilder,
+} from "form-lib";
+import {
+  control, visibility, disableable, required, minLength, maxLength, min, max, pattern, email,
+  isEmpty, labelOf, calculate, link, visibleWhen, disableWhen, clearWhen, exclusive,
 } from "./index";
 import { test as base, describe, expect } from "vitest";
 import * as limits from "./test/fixtures/limits";

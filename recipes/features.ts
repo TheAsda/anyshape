@@ -1,19 +1,12 @@
 // ============================================================
-// Built-in features – bundles of meta key definitions.
+// Features – bundles of meta key definitions.
 // ------------------------------------------------------------
 // Stage 1 declares the keys and their capabilities. The default
 // behaviors of `touched` and `dirty` are attached in stage 3, and
 // the validation queue that owns `error` / `validating` in stage 4.
 // ============================================================
 
-import { metaKey } from "./meta";
-import { initialOf } from "./store";
-
-/** Anything that can receive focus – an input, or a custom component's handle. */
-export interface FocusTarget {
-  focus(): void;
-  scrollIntoView?(): void;
-}
+import { metaKey, initialOf, type FocusTarget } from "form-lib";
 
 export interface ValidationOptions {
   /** Keep validating while the field is effectively hidden. Default false. */

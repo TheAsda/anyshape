@@ -4,7 +4,10 @@
 // ============================================================
 
 import { it, expect } from "vitest";
-import { form, object, array, field, createStore, defineBehavior, asyncRule, rule, control, type ItemStore } from "../index";
+import {
+  form, object, array, field, createStore, defineBehavior, asyncRule, rule, type ItemStore,
+} from "../index";
+import { control } from "../test/features";
 
 const gc = (globalThis as { gc?: () => void }).gc;
 
