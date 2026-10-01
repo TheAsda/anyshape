@@ -520,3 +520,73 @@ describe("J · settle()", () => {
     expect(settled).toBe(true);
   });
 });
+
+describe("J · Kept work", () => {
+  /** Looks up the code's label in kept work keyed by the code; the region is label + name. */
+  function lookup(scope: { code: AnyRef; out: AnyRef; name?: AnyRef }) {
+    const starts: { key: string; signal: AbortSignal; result: ReturnType<typeof deferred<string>> }[] = [];
+    const behavior = defineBehavior({
+      triggers: [scope.code, ...(scope.name ? [scope.name] : [])],
+      writes: [scope.out as any],
+      run: async (ctx) => {
+        const code = ctx.get(scope.code) as string;
+        if (code === "") return;
+        const label = await ctx.keep([code], (signal) => {
+          const start = { key: code, signal, result: deferred<string>() };
+          starts.push(start);
+          return start.result.promise;
+        });
+        ctx.set(scope.out as any, label + (scope.name ? ctx.get(scope.name) : ""));
+      },
+    });
+    return { starts, behavior };
+  }
+
+  test("a trigger change outside the key keeps the work", async () => {
+    const s = createStore(shape, initial());
+    const { starts, behavior } = lookup({ code: shape.code, name: shape.name, out: shape.region });
+    s.addBehavior(behavior);
+    s.set(shape.name, "-n");
+    expect(starts.map((x) => [x.key, x.signal.aborted])).toEqual([["a", false]]);
+    starts[0].result.resolve("A");
+    await s.settle();
+    expect(s.get(shape.region)).toBe("A-n");
+  });
+
+  test("a key change aborts the work and starts new work", async () => {
+    const s = createStore(shape, initial());
+    const { starts, behavior } = lookup({ code: shape.code, out: shape.region });
+    s.addBehavior(behavior);
+    s.set(shape.code, "b");
+    expect(starts.map((x) => [x.key, x.signal.aborted])).toEqual([["a", true], ["b", false]]);
+    starts[1].result.resolve("B");
+    await s.settle();
+    expect(s.get(shape.region)).toBe("B");
+  });
+
+  test("the work is aborted at the end of the flush when the rerun doesn't keep it", () => {
+    const s = createStore(shape, initial());
+    const { starts, behavior } = lookup({ code: shape.code, out: shape.region });
+    s.addBehavior(behavior);
+    s.set(shape.code, ""); // the rerun returns before calling keep
+    expect(starts.map((x) => [x.key, x.signal.aborted])).toEqual([["a", true]]);
+  });
+
+  test("row removal, dispose and reset() abort the work", () => {
+    const s = createStore(shape, initial());
+    const row = lookup({ code: R.sku, out: R.title });
+    const root = lookup({ code: shape.code, out: shape.region });
+    s.addBehavior(row.behavior);
+    const dispose = s.addBehavior(root.behavior);
+
+    const rows = s.substore(shape.rows);
+    rows.remove(rows.itemAt(0));
+    expect(row.starts.map((x) => x.signal.aborted)).toEqual([true]);
+
+    s.reset(shape.region); // the init rerun keeps an equal key, but gets new work
+    expect(root.starts.map((x) => [x.key, x.signal.aborted])).toEqual([["a", true], ["a", false]]);
+
+    dispose();
+    expect(root.starts.map((x) => x.signal.aborted)).toEqual([true, true]);
+  });
+});

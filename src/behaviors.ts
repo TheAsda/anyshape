@@ -82,6 +82,13 @@ export interface BehaviorContext {
   readonly store: BaseStore<any>;
   /** Aborted when the run is cancelled (pass it to fetch). After that, get and set throw its reason. */
   readonly signal: AbortSignal;
+  /**
+   * Async work that a rerun can continue instead of restarting: with a key
+   * equal (element by element, Object.is) to the work in flight, returns that
+   * work; otherwise aborts it and calls `start`. One slot per instance.
+   * The work must depend only on its key: it gets its own signal, never ctx.
+   */
+  keep<T>(key: readonly unknown[], start: (signal: AbortSignal) => Promise<T>): Promise<T>;
 }
 
 export interface BehaviorConfig {
@@ -227,6 +234,18 @@ interface Pending {
   origins: Set<Origin>;
 }
 
+/** Work handed to ctx.keep, in an instance's slot until it settles. */
+interface Kept {
+  readonly key: readonly unknown[];
+  readonly promise: Promise<unknown>;
+  readonly controller: AbortController;
+  /** The signal of the run that last kept it. */
+  holder: AbortSignal;
+}
+
+const sameKey = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
+
 /** An async run in flight. */
 interface Flight {
   readonly controller: AbortController;
@@ -249,6 +268,8 @@ class Binding {
   readonly id = instanceCounter++;
   /** ctx.state as the last completed run left it. */
   state: Record<string, unknown> = {};
+  /** The ctx.keep slot. */
+  kept: Kept | undefined;
   readonly origin: Origin;
   // non-leaf
   arrStore: ArrayStore<any> | undefined;
@@ -290,6 +311,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
   private readonly pending = new Map<Binding, Pending>();
   private readonly flights = new Map<Binding, Flight>();
+  /** Instances whose run in flight was cancelled while holding kept work: see flushed(). */
+  private readonly orphans = new Set<Binding>();
   /** Resolved when a run in flight ends or is cancelled (settle()). */
   private ended: { promise: Promise<void>; resolve: () => void } | undefined;
   /** @internal set by the validation layer */
@@ -396,6 +419,18 @@ export class BehaviorRuntime implements RuntimeHooks {
     reg.root = this.bind(reg, host, reg.chain.indexOf(host.node), true);
   }
 
+  /** End of a flush: kept work that no run holds any more (its holder was cancelled) is aborted. */
+  flushed(): void {
+    for (const leaf of this.orphans) {
+      const kept = leaf.kept;
+      if (kept?.holder.aborted) {
+        leaf.kept = undefined;
+        kept.controller.abort();
+      }
+    }
+    this.orphans.clear();
+  }
+
   async settle(store: BaseStore<any>, node: AnyNode): Promise<void> {
     const pending = pendingIn(node);
     while (store.get(pending) > 0) {
@@ -424,7 +459,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (!reg.writes.some((w) => isAncestorOrSelf(node, refNode(w)))) continue;
       for (const leaf of this.leaves(reg.root)) {
         if (!inside(leaf.host)) continue;
-        this.cancel(leaf); // its cause is not passed on
+        this.drop(leaf); // its cause is not passed on
         if (reg.runInit) this.mark(leaf, { init: true });
       }
     }
@@ -585,7 +620,7 @@ export class BehaviorRuntime implements RuntimeHooks {
           seq = now;
           for (const row of now) this.child(binding, row);
           // Removed rows: their runs in flight are cancelled.
-          for (const leaf of this.flights.keys()) if (leaf.reg === reg && !leaf.host.isAttached()) this.cancel(leaf);
+          for (const leaf of this.flights.keys()) if (leaf.reg === reg && !leaf.host.isAttached()) this.drop(leaf);
         })
       );
     }
@@ -664,7 +699,16 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (!flight) return;
     this.end(leaf, flight);
     flight.controller.abort();
+    if (leaf.kept) this.orphans.add(leaf);
     return flight.cause;
+  }
+
+  /** Row removal, dispose, reset(): cancels the run in flight and aborts the instance's kept work. */
+  private drop(leaf: Binding): void {
+    this.cancel(leaf);
+    const kept = leaf.kept;
+    leaf.kept = undefined;
+    kept?.controller.abort();
   }
 
   /** Cancels the run in flight and marks the rerun with its cause. Returns whether there was one. */
@@ -722,6 +766,29 @@ export class BehaviorRuntime implements RuntimeHooks {
         buffer.set(key, { ref, value });
       },
       initial: (node) => read(initialOf(node)),
+      keep: <T>(key: readonly unknown[], start: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+        if (signal.aborted) throw signal.reason;
+        const slot = leaf.kept;
+        if (slot && sameKey(slot.key, key)) {
+          slot.holder = signal;
+          return slot.promise as Promise<T>;
+        }
+        slot?.controller.abort();
+        const work = new AbortController();
+        let promise: Promise<T>;
+        try {
+          promise = Promise.resolve(start(work.signal));
+        } catch (error) {
+          promise = Promise.reject(error);
+        }
+        const kept: Kept = { key: [...key], promise, controller: work, holder: signal };
+        leaf.kept = kept;
+        const empty = () => {
+          if (leaf.kept === kept) leaf.kept = undefined;
+        };
+        promise.then(empty, empty);
+        return promise;
+      },
       changed: (ref) => p.changed.has(refKey(ref)),
       isInit: p.init,
       origins: p.origins,
@@ -795,7 +862,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     reg.disposed = true;
     this.regs.splice(this.regs.indexOf(reg), 1);
     for (const leaf of this.pending.keys()) if (leaf.reg === reg) this.pending.delete(leaf);
-    for (const leaf of this.flights.keys()) if (leaf.reg === reg) this.cancel(leaf);
+    for (const leaf of this.flights.keys()) if (leaf.reg === reg) this.drop(leaf);
     if (reg.root) this.unbind(reg, reg.root, resetMeta);
     this.rank(this.regs);
   }
