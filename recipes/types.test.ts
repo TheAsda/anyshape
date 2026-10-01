@@ -7,6 +7,7 @@ import { form, object, field } from "form-lib";
 import {
   control, visibility, disableable, required, min, pattern, visibleWhen, disableWhen, exclusive,
 } from "./index";
+import type { useControl } from "./react";
 import { test, expectTypeOf } from "vitest";
 
 const t = form(
@@ -38,6 +39,7 @@ export function typeOnlyChecks() {
 test("recipes state the keys they need through ref properties", () => {
   type VisibleTarget = Parameters<typeof visibleWhen>[0];
   type DisableTarget = Parameters<typeof disableWhen>[0];
+  type ControlTarget = Parameters<typeof useControl>[0];
   const named = form({ group: object({ visible: field<boolean>() }) });
 
   expectTypeOf(t.hidden).toExtend<VisibleTarget>();
@@ -45,4 +47,6 @@ test("recipes state the keys they need through ref properties", () => {
   expectTypeOf(named.group).not.toExtend<VisibleTarget>(); // a child named `visible` is not the key
   expectTypeOf(t.off).toExtend<DisableTarget>();
   expectTypeOf(t.text).not.toExtend<DisableTarget>();
+  expectTypeOf(t.text).toExtend<ControlTarget>();
+  expectTypeOf(t.plain).not.toExtend<ControlTarget>();
 });

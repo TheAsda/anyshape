@@ -6,22 +6,23 @@ import { test, expect } from "vitest";
 import { userEvent } from "vitest/browser";
 import { createStore, countIn, type ItemStore } from "../index";
 import { pattern } from "../test/rules";
-import { StoreProvider, useArray, useBehaviors, useControl, useValue, fromInput } from "./index";
+import { StoreProvider, useArray, useBehaviors, useField, useValue } from "./index";
 import { trip, T, tripBehaviors, savedBooking, quiet } from "../test/trip";
 import { render, renders } from "./test-utils";
 
 const c = renders();
 
 function NameField({ who }: { who: string }) {
-  const f = useControl(T.name);
+  const f = useField(T.name);
   c.hit(`name:${who}`);
-  return <input data-testid={`name-${who}`} value={f.value} onChange={fromInput(f.onChange)} onBlur={f.onBlur} />;
+  const reveal = () => f.store.set(T.name.revealed, true, { origin: "user" });
+  return <input data-testid={`name-${who}`} value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={reveal} />;
 }
 function PassportField({ who }: { who: string }) {
   useBehaviors((b) => b.add(pattern(T.passport, /^[A-Z]/, { message: "Starts with a letter" })), []);
-  const f = useControl(T.passport);
+  const f = useField(T.passport);
   c.hit(`passport:${who}`);
-  return <input data-testid={`passport-${who}`} value={f.value} onChange={fromInput(f.onChange)} />;
+  return <input data-testid={`passport-${who}`} value={f.value} onChange={(e) => f.onChange(e.target.value)} />;
 }
 function TravelerRow({ who }: { who: string }) {
   c.hit(`row:${who}`);
@@ -51,9 +52,9 @@ function ErrorCounter() {
   return <span data-testid="errors">{String(n)}</span>;
 }
 function Destination() {
-  const f = useControl(trip.destination);
+  const f = useField(trip.destination);
   c.hit("destination");
-  return <input value={f.value} onChange={fromInput(f.onChange)} />;
+  return <input value={f.value} onChange={(e) => f.onChange(e.target.value)} />;
 }
 
 test("INT9 a keystroke in one traveler re-renders only that field, and the counter only when the count changes", async () => {

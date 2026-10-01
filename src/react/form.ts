@@ -4,8 +4,8 @@
 //   • useForm creates the store once per mount. Later changes to `shape` or
 //     `initialValues` are ignored (dev warning for a different shape).
 //     `options.values` loads data: every new object (by identity) is written
-//     as the new baseline ({ as: "initial" }) – not dirty, reset() returns to
-//     it. Re-rendering with the same object does nothing, so edits survive.
+//     as the new baseline ({ as: "initial" }), and reset() returns to it.
+//     Re-rendering with the same object does nothing, so edits survive.
 //   • Errors are focused in DOM order by default (domOrder).
 //   • useSync(ref, value) writes React data (query results, props, context)
 //     into the form when it changes. The written value stays after unmount
