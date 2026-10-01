@@ -36,7 +36,7 @@ const running = new WeakSet<BaseStore<any>>();
 
 export function handleSubmit<N extends Submittable>(
   store: BaseStore<N>,
-  fn: (formData: InferValue<N>) => Promise<void>
+  fn: (formData: InferValue<N>) => void | Promise<void>
 ): FormSubmitHandler {
   // For untyped callers: only a node that declares submission() itself is submitted.
   if (!((store.node as Partial<Submittable>).submitting instanceof MetaRef)) {
