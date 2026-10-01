@@ -467,6 +467,18 @@ describe("L · Default behaviors: touched, dirty", () => {
     expect(s.get(f.a.dirty)).toBe(true);
     expect(s.get(initialOf(f.a))).toBe("");
   });
+
+  test("a default behavior writes the name its key is declared under", () => {
+    const f = form({ a: field<string>().meta({ wasEdited: touched, changed: dirty, alsoChanged: dirty }) });
+    const s = createStore(f, { a: "" });
+    s.set(f.a, "x", { origin: "user" });
+    expect(s.get(f.a.wasEdited)).toBe(true);
+    expect(s.get(f.a.changed)).toBe(true);
+    expect(s.get(f.a.alsoChanged), "each name gets its own behavior").toBe(true);
+    s.set(f.a, "");
+    expect(s.get(f.a.changed), "back to the initial value").toBe(false);
+    expect(s.get(f.a.alsoChanged)).toBe(false);
+  });
 });
 
 describe("K · Rows created by the helpers while behaviors edit them", () => {
@@ -494,10 +506,10 @@ describe("J · Feature default behaviors", () => {
     let other: unknown;
     const mirror = () => ({
       mirror: metaKey("", {
-        behavior: (self) => ({
+        behavior: (self, key) => ({
           triggers: [self],
           reads: [other as typeof self],
-          writes: [self.mirror],
+          writes: [key],
           run: () => {},
         }),
       }),
