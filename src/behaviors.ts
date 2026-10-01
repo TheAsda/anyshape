@@ -76,7 +76,7 @@ export interface BehaviorContext {
   readonly isInit: boolean;
   /** Origins of the changes that caused this run (own writes excluded). */
   readonly origins: ReadonlySet<Origin>;
-  /** Per-instance state, kept between runs (e.g. "the user overrode this"). */
+  /** Per-instance state, kept between runs (e.g. "the user overrode this"). A copy: saved only if the run completes. */
   readonly state: Record<string, unknown>;
   /** The store of the instance's scope (root or row). */
   readonly store: BaseStore<any>;
@@ -230,6 +230,8 @@ interface Pending {
 /** An async run in flight. */
 interface Flight {
   readonly controller: AbortController;
+  /** What the run handles: passed on to its rerun when an input change cancels it. */
+  readonly cause: Pending;
   /** Subscriptions that cancel it (see watch()). */
   readonly offs: Unsubscribe[];
 }
@@ -243,7 +245,8 @@ class Binding {
   readonly offs: Unsubscribe[] = [];
   // leaf
   readonly id = instanceCounter++;
-  readonly state: Record<string, unknown> = {};
+  /** ctx.state as the last completed run left it. */
+  state: Record<string, unknown> = {};
   readonly origin: Origin;
   // non-leaf
   arrStore: ArrayStore<any> | undefined;
@@ -593,16 +596,26 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   private onTrigger(binding: Binding, ref: AnyRef, info: ChangeInfo): void {
     const reg = binding.reg;
-    if (reg.disposed || !reg.runChange) return;
+    if (reg.disposed) return;
     const key = refKey(ref);
-    for (const leaf of this.leaves(binding)) {
-      const origins = new Set(info.origins);
-      origins.delete(leaf.origin);
-      if (info.origins.size > 0 && origins.size === 0) continue; // only its own writes
-      if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) continue;
-      this.cancel(leaf);
-      this.mark(leaf, { changed: key, origins });
-    }
+    for (const leaf of this.leaves(binding)) this.onInput(leaf, key, info, reg.runChange);
+  }
+
+  /**
+   * An input of `leaf` changed. A run in flight read the old value: it is
+   * cancelled and rerun with its cause, whatever the change's origin. The
+   * change adds to the cause unless the origins filter ignores it. Only a
+   * trigger change, with runOn.change, starts a run.
+   */
+  private onInput(leaf: Binding, key: string, info: ChangeInfo, starts: boolean): void {
+    const reg = leaf.reg;
+    const origins = new Set(info.origins);
+    origins.delete(leaf.origin);
+    if (info.origins.size > 0 && origins.size === 0) return; // only its own writes
+    const rerun = this.supersede(leaf);
+    if (!starts && !rerun) return;
+    if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) return;
+    this.mark(leaf, { changed: [key], origins });
   }
 
   /**
@@ -623,20 +636,26 @@ export class BehaviorRuntime implements RuntimeHooks {
       const key = refKey(ref);
       flight.offs.push(
         hostFor(leaf.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => {
-          if (this.flights.get(leaf) !== flight) return;
-          this.cancel(leaf);
-          this.mark(leaf, { changed: key, origins: new Set(info.origins) });
+          if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info, false);
         })
       );
     }
   }
 
-  /** Ends the leaf's run in flight, if any: unwatches it and aborts its signal. */
-  private cancel(leaf: Binding): void {
+  /** Ends the leaf's run in flight, if any: unwatches it and aborts its signal. Returns its cause. */
+  private cancel(leaf: Binding): Pending | undefined {
     const flight = this.flights.get(leaf);
     if (!flight) return;
     this.end(leaf, flight);
     flight.controller.abort();
+    return flight.cause;
+  }
+
+  /** Cancels the run in flight and marks the rerun with its cause. Returns whether there was one. */
+  private supersede(leaf: Binding): boolean {
+    const cause = this.cancel(leaf);
+    if (cause) this.mark(leaf, cause);
+    return cause !== undefined;
   }
 
   private end(leaf: Binding, flight: Flight): void {
@@ -645,11 +664,11 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const off of flight.offs) off();
   }
 
-  private mark(leaf: Binding, change: { init?: boolean; changed?: string; origins?: Set<Origin> }): void {
+  private mark(leaf: Binding, change: { init?: boolean; changed?: Iterable<string>; origins?: Iterable<Origin> }): void {
     let p = this.pending.get(leaf);
     if (!p) this.pending.set(leaf, (p = { init: false, changed: new Set(), origins: new Set() }));
     if (change.init) p.init = true;
-    if (change.changed) p.changed.add(change.changed);
+    if (change.changed) for (const k of change.changed) p.changed.add(k);
     if (change.origins) for (const o of change.origins) p.origins.add(o);
   }
 
@@ -660,6 +679,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concreteScopePath(leaf.host) });
 
     const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
+    const state = { ...leaf.state }; // saved only if the run completes
     const controller = new AbortController();
     const signal = controller.signal;
     const read = (ref: AnyRef): any => {
@@ -685,12 +705,13 @@ export class BehaviorRuntime implements RuntimeHooks {
       changed: (ref) => p.changed.has(refKey(ref)),
       isInit: p.init,
       origins: p.origins,
-      state: leaf.state,
+      state,
       store: leaf.host,
       signal,
     };
 
     const commit = () => {
+      leaf.state = state;
       for (const { ref, value } of buffer.values()) {
         hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: leaf.origin });
       }
@@ -708,7 +729,7 @@ export class BehaviorRuntime implements RuntimeHooks {
         end();
       }
       if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-        const flight: Flight = { controller, offs: [] };
+        const flight: Flight = { controller, cause: p, offs: [] };
         this.flights.set(leaf, flight);
         this.watch(leaf, flight);
         const settled = () => this.end(leaf, flight);
