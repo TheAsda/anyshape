@@ -589,6 +589,32 @@ describe("J · Kept work", () => {
     dispose();
     expect(root.starts.map((x) => x.signal.aborted)).toEqual([true, true]);
   });
+
+  test("row removal and dispose abort work whose holder run has already ended", () => {
+    const s = createStore(shape, initial());
+    const signals: AbortSignal[] = [];
+    /** Keeps work without awaiting it: the run ends while the work is in flight. */
+    const prefetch = (code: AnyRef) =>
+      defineBehavior({
+        triggers: [code],
+        run: (ctx) => {
+          void ctx.keep([ctx.get(code)], (signal) => {
+            signals.push(signal);
+            return deferred<void>().promise;
+          });
+        },
+      });
+    s.addBehavior(prefetch(R.sku));
+    const dispose = s.addBehavior(prefetch(shape.code));
+    expect(signals.map((x) => x.aborted)).toEqual([false, false]);
+
+    const rows = s.substore(shape.rows);
+    rows.remove(rows.itemAt(0));
+    expect(signals.map((x) => x.aborted)).toEqual([true, false]);
+
+    dispose();
+    expect(signals.map((x) => x.aborted)).toEqual([true, true]);
+  });
 });
 
 describe("J · Definition traces", () => {

@@ -363,6 +363,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
   private readonly pending = new Map<Binding, Pending>();
   private readonly flights = new Map<Binding, Flight>();
+  /** Instances whose kept-work slot holds work. */
+  private readonly keeping = new Set<Binding>();
   /** Instances whose run in flight was cancelled while holding kept work: see flushed(). */
   private readonly orphans = new Set<Binding>();
   /** Resolved when a run in flight ends or is cancelled (settle()). */
@@ -473,13 +475,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   /** End of a flush: kept work that no run holds any more (its holder was cancelled) is aborted. */
   flushed(): void {
-    for (const leaf of this.orphans) {
-      const kept = leaf.kept;
-      if (kept?.holder.aborted) {
-        leaf.kept = undefined;
-        kept.controller.abort();
-      }
-    }
+    for (const leaf of this.orphans) if (leaf.kept?.holder.aborted) this.abortKept(leaf);
     this.orphans.clear();
   }
 
@@ -672,7 +668,7 @@ export class BehaviorRuntime implements RuntimeHooks {
           seq = now;
           for (const row of now) this.child(binding, row);
           // Removed rows: their runs in flight are cancelled.
-          for (const leaf of this.flights.keys()) if (leaf.reg === reg && !leaf.host.isAttached()) this.drop(leaf);
+          for (const leaf of this.busy(reg)) if (!leaf.host.isAttached()) this.drop(leaf);
         })
       );
     }
@@ -758,9 +754,23 @@ export class BehaviorRuntime implements RuntimeHooks {
   /** Row removal, dispose, reset(): cancels the run in flight and aborts the instance's kept work. */
   private drop(leaf: Binding): void {
     this.cancel(leaf);
+    this.abortKept(leaf);
+  }
+
+  private abortKept(leaf: Binding): void {
     const kept = leaf.kept;
+    if (!kept) return;
     leaf.kept = undefined;
-    kept?.controller.abort();
+    this.keeping.delete(leaf);
+    kept.controller.abort();
+  }
+
+  /** The registration's instances with a run in flight or kept work: what row removal and dispose stop. */
+  private busy(reg: Registration): Binding[] {
+    const out = new Set<Binding>();
+    for (const leaf of this.flights.keys()) if (leaf.reg === reg) out.add(leaf);
+    for (const leaf of this.keeping) if (leaf.reg === reg) out.add(leaf);
+    return [...out];
   }
 
   /** Cancels the run in flight and marks the rerun with its cause. Returns whether there was one. */
@@ -825,7 +835,7 @@ export class BehaviorRuntime implements RuntimeHooks {
           slot.holder = signal;
           return slot.promise as Promise<T>;
         }
-        slot?.controller.abort();
+        this.abortKept(leaf);
         const work = new AbortController();
         let promise: Promise<T>;
         try {
@@ -835,8 +845,11 @@ export class BehaviorRuntime implements RuntimeHooks {
         }
         const kept: Kept = { key: [...key], promise, controller: work, holder: signal };
         leaf.kept = kept;
+        this.keeping.add(leaf);
         const empty = () => {
-          if (leaf.kept === kept) leaf.kept = undefined;
+          if (leaf.kept !== kept) return;
+          leaf.kept = undefined;
+          this.keeping.delete(leaf);
         };
         promise.then(empty, empty);
         return promise;
@@ -914,7 +927,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     reg.disposed = true;
     this.regs.splice(this.regs.indexOf(reg), 1);
     for (const leaf of this.pending.keys()) if (leaf.reg === reg) this.pending.delete(leaf);
-    for (const leaf of this.flights.keys()) if (leaf.reg === reg) this.drop(leaf);
+    for (const leaf of this.busy(reg)) this.drop(leaf);
     if (reg.root) this.unbind(reg, reg.root, resetMeta);
     this.rank(this.regs);
   }
