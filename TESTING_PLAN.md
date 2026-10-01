@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 256 tests in 14 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 318 tests in 25 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -20,26 +20,29 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 |---|---|---|---|
 | `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
 | `src/lens.test.ts` | B | lens unit tests | 8 |
-| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 20 |
+| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 22 |
 | `src/store.test.ts` | D, E | stores, scopes, reference API, row identity, array helpers | 29 |
-| `src/notifications.test.ts` | F | the notification rules, flush | 33 |
+| `src/notifications.test.ts` | F | the notification rules, flush, non-reactive keys | 34 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
-| `src/counts.test.ts` | H | `countIn`, `collect`, aggregate keys | 10 |
+| `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
 | `src/inheritance.test.ts` | I | inherited `visible` / `disabled`, `get` vs `getOwn` | 4 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 49 |
-| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 35 |
+| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 34 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
-| `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 16 |
-| `src/submit.test.ts` | O | `submit`, `handleSubmit`, focus order and targets, `resolvePath` | 19 |
+| `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
+| `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
+| `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes | 7 |
+| `recipes/focus.test.ts` | O | the focus recipe: `focusFirst` order and skips, `focus(store, node)` | 4 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
 | `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
 | `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` | 12 |
-| `src/react/form.test.tsx` | Q | `useForm`, `useSync`, DOM focus order, `handleSubmit` | 14 |
+| `src/react/form.test.tsx` | Q | `useForm`, `useSync` | 10 |
 | `src/react/behaviors.test.tsx` | R | `useBehaviors` | 13 |
 | `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
 | `recipes/react/control.test.tsx` | P | `useControl`, error display policy, `focusRef`, adapters | 7 |
+| `recipes/react/submit.test.tsx` | O | DOM focus order, `handleSubmit` on a real `<form>`, `domOrder` | 3 |
 
 Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`. The core tests declare their meta keys with the test-local features in `src/test/features.ts` and rules in `src/test/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`.
 
@@ -82,7 +85,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `shape.test.ts`
 - [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `constructor`, `_type`, `_hasCreate`). Same for meta keys, plus `item`. Node internals are symbol-keyed, so `_fields`, `_meta` and `_metaDefs` are ordinary names; a meta key that matches a child throws. → `meta.test.ts`
 - [x] **A3 · P2** A `create` factory that returns the same object every time still gives distinct rows: `append` copies the factory result (`{ ...create(), ...partial }`) and never writes the factory's object. → `store.test.ts`
-- [x] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitCount`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
+- [x] **A4 · P3** Paths through nested arrays: `outer[].inner[].field`, and `MetaRef.path` for root keys (`#submitting`) and row keys (`travelers[].passport#error`). → `meta.test.ts`
 
 ### B. Lenses (`lens.ts`)
 **Covered:** only indirectly, through stores (structural sharing, no-op writes).
@@ -95,10 +98,10 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - a changed write copies only the path to the leaf (siblings keep their references).
 
 ### C. Meta declarations & references (`meta.ts`, `shape.ts`)
-**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, `inherit` on non-boolean throws, refs on instantiated / reused / row / container / root nodes, child field wins, closed `setMeta`.
+**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, `inherit` on non-boolean throws, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
 
 - [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
-- [x] **C2 · P2** `setMeta(node, …, { as: "initial" })` throws "applies to values only". → `origins.test.ts`
+- [x] **C2 · P2** A meta write with `{ as: "initial" }` throws "applies to values only". → `origins.test.ts`
 - [x] **C3 · P2** `store.set(initialOf(node), v)` throws "Initial values are written with { as: \"initial\" }"; confirm that `set(countIn(…))` throws "Counts are read-only" (assert the message, not only that it throws). → `origins.test.ts`
 
 ### D. Store structure & scopes (`store.ts`)
@@ -147,9 +150,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **H3 · P3** A custom counted key (`metaKey(…, { aggregate })`) written by application code updates counts like built-in keys. → `counts.test.ts`
 
 ### I. Inheritance (hidden & disabled)
-**Covered:** `visible` via ancestors, `disabled` from the root into rows, subscriptions fire on ancestor changes, hidden/disabled skipped by validation, `validateHidden`, values omit hidden and disabled.
+**Covered:** `visible` via ancestors, `disabled` from the root into rows, subscriptions fire on ancestor changes, hidden/disabled skipped by validation, `validateHidden`.
 
-- [x] **I1 · P1** Submitted values, the documented rule: a node that **declares** `visible`/`disabled` and is hidden/disabled is omitted; **descendants of a disabled ancestor that don't declare the key stay in `values`** (but are still skipped by validation). Add a matching `SubmitValue` type assertion. → `validation.test.ts`
+- [x] **I1 · P1** A disabled ancestor stops validating the fields below it, whether they declare `disabled` or not. (Submitted values are the store's value as it is: nothing is omitted, #22.) → `validation.test.ts`
 - [x] **I2 · P2** `validation({ validateDisabled: true })` keeps validating a disabled field. → `validation.test.ts`
 - [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `inheritance.test.ts`
 
@@ -179,7 +182,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **L4 · P3** The default `onError` logs `[form] "<name>" failed at "<scope>"` via `console.error` (spy). → `behaviors.test.ts`
 
 ### M. Validation
-**Covered:** queue order, feature required, guards, cross-field, rows, whole-array reads, runs after computing behaviors, hidden/disabled, row-scoped rules, removing the last rule, async (user start, unchecked, not while sync fails, debounce, abort, removed row, hidden abort, `origins: "any"`, throwing, result reuse), `validate()` errors and values, `focusFirst`, submit (counts, reveal scope, row submit, waits for async).
+**Covered:** queue order, feature required, guards, cross-field, rows, whole-array reads, runs after computing behaviors, hidden/disabled, row-scoped rules, removing the last rule, async (user start, unchecked, not while sync fails, debounce, abort, removed row, hidden abort, `origins: "any"`, throwing, result reuse), `validate()` errors.
 
 - [x] **M1 · P1** **Array-level rules** (works today, untested): `array(…).meta(validation())` with `rule(arrayNode, (rows) => rows.length === 0 ? "…" : undefined)`. Assert:
   - the error appears and clears as rows are added and removed;
@@ -190,7 +193,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   If `minItems`/`maxItems` rules are added, test them here. → `validation.test.ts`
 - [x] **M2 · P2** An async rule with `triggers`/`reads`: a change of a read value makes `validate()` re-check (no stale reuse); identical inputs reuse the result. Guards on async rules: a false guard clears the error and aborts. → `validation.test.ts`
 - [x] **M3 · P2** A server error written by application code (`resolvePath(…#error)` + `set`) stays until the field's next validation run, and is replaced by it on a user edit. → `validation.test.ts`
-- [x] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues, errors and values. → `validation.test.ts`
+- [x] **M4 · P2** `validate()` called on a row store and on an object substore: only that part's queues and errors. → `validation.test.ts`
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Ready-made rules, behaviors & builder
@@ -203,12 +206,12 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
 
 ### O. Submit, focus, paths
-**Covered:** `focusFirst` order and `compare`, `focusOrder` option, `handleSubmit`, `onInvalid`, the double-submit guard, errors in `onValid`, `focus: false`, `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors.
+**Covered:** `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors. The recipes: `handleSubmit` (`preventDefault`, no event, `formData` is the store's value, `submitting` and its reset when `fn` throws, reveal scope, focus on invalid, the per-store guard, independent submittable nodes, a non-submittable store rejected), `focusFirst` order and `compare`, skipped entries, `focus(store, node)`, DOM order in a real browser.
 
-- [x] **O1 · P2** `store.focus(node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `submit.test.ts`
-- [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `submit.test.ts`
-- [x] **O3 · P2** `submit()` on a form whose root has **no** `submission()` works (no counters, no throw). → `validation.test.ts`
-- [x] **O4 · P3** `handleSubmit(...)()` called without an event. → `submit.test.ts`
+- [x] **O1 · P2** `focus(store, node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `recipes/focus.test.ts`
+- [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `recipes/focus.test.ts`
+- [x] **O3 · P2** `handleSubmit` rejects a store whose own node doesn't declare `submission()`, at compile time and at run time. → `recipes/submit.test.ts`
+- [x] **O4 · P3** `handleSubmit(store, fn)()` called without an event. → `recipes/submit.test.ts`
 
 ### P. React bindings (`react/hooks.ts`, `recipes/react/`)
 **Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useArray` (re-render on structure only, nested arrays). In the recipes: `useControl` (state, user writes, `onBlur` reveal, default policy and `ErrorDisplayProvider`), `focusRef`, adapters (real events, caching).
@@ -220,7 +223,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.tsx`
 
 ### Q. Lifetime & outside data (`react/form.ts`)
-**Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, `resetOnUnmount`, StrictMode), DOM focus order, explicit `focusOrder`, `handleSubmit` on a real form, `domOrder`.
+**Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, `resetOnUnmount`, StrictMode). (DOM focus order and `handleSubmit` on a real form moved to `recipes/react/submit.test.tsx`.)
 
 - [x] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.tsx`
 - [x] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.tsx`
@@ -244,11 +247,12 @@ Type assertions are spread across the files today. Collect the public-API type c
   - `required`/`rule` on a node without `validation()`;
   - `min` on a string;
   - `pattern` on a number;
-  - `visibleWhen` without `visibility()`;
-  - `exclusive` without `disableable()`;
+  - `visibleWhen` without `visible`;
+  - `exclusive` without `disabled`;
   - `fromInput` with a number `onChange`;
   - `useControl` on a node without `control()`;
-  - `setMeta` with an undeclared key;
+  - a ref to an undeclared key (`node.nope`), or `new MetaRef(…)`;
+  - `handleSubmit` on a store whose node has no `submission()`;
   - `set` on a `CountRef`.
 
 ---
@@ -259,12 +263,12 @@ The unit suites test each mechanism in isolation. Add **`src/integration.test.ts
 
 - [x] **INT1 · P1** Load a saved booking with `{ as: "initial" }`: nothing dirty or touched, sync errors present, async rules unchecked, `validate()` runs them.
 - [x] **INT2 · P1** A user edit of `returnDate` updates nights → price → total → budget error, **each behavior running exactly once** (count runs with named behaviors).
-- [x] **INT3 · P1** Switching the destination shows the visa section (required errors appear); switching back hides it, clears its values and errors, and `validate().values` omits `visa` (type and runtime).
+- [x] **INT3 · P1** Switching the destination shows the visa section (required errors appear); switching back hides it, and clears its values and errors.
 - [x] **INT4 · P1** Travelers: append (new row dirty, `isAdult` computed before any UI notification), edit a middle row, remove the first, undo. Assert row identity, per-row meta, counts and `stableId`s throughout.
 - [x] **INT5 · P1** `seatsLeft` below the number of travelers: an error appears; `reset()` keeps `seatsLeft` (`keepOnReset`) and recomputes the error.
 - [x] **INT6 · P2** Loaded data with both promo and voucher: both enabled, both in error; clearing one disables the other and clears both errors.
-- [x] **INT7 · P2** `handleSubmit` on the whole form: waits for pending passport checks, focuses the first error, and on a server rejection maps `travelers[1].passport` via `resolvePath` onto the right row.
-- [x] **INT8 · P2** A step submit (`substore(section).submit`) reveals and validates only that section; root `submitCount` still increments.
+- [x] **INT7 · P2** `validate()` on the whole form waits for pending passport checks; a server rejection maps `travelers[1].passport` via `resolvePath` onto the right row.
+- [x] **INT8 · P2** `validate()` on a step section lists only that section's errors, each with the error's `MetaRef`.
 - [x] **INT9 · P2** React: render the whole booking (provider, traveler rows, a field with `useBehaviors` under a row provider); a keystroke in one traveler re-renders only that traveler's field and any counter whose value changed.
 
 ---

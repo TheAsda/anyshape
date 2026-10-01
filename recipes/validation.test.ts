@@ -1,14 +1,11 @@
 import {
   form, object, array, field, createStore, defineBehavior, when, countIn, rule, asyncRule,
-  type InferValue, type BehaviorErrorInfo, type FocusTarget, type SubmitValue,
+  type InferValue, type BehaviorErrorInfo,
 } from "form-lib";
-import { control, validation, visibility, disableable, submission } from "./index";
+import { control, validation, visible, disabled, submission } from "./index";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
 import * as limits from "./test/fixtures/limits";
 import { sleep, flush } from "./test/harness";
-
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
-type Expect<T extends true> = T;
 
 import {
   shape, L, initial, required, minLength, errors, lookup, type Values,
@@ -20,12 +17,6 @@ const test = base
 
 // ---------------------------------------------------------------------------
 // Types
-type Submit = SubmitValue<typeof shape>;
-type _1 = Expect<Equal<Submit["company"], { vat: string; secret: string } | undefined>>;
-type _2 = Expect<Equal<Submit["promo"], string | undefined>>;
-type _3 = Expect<Equal<Submit["name"], string>>;
-type _4 = Expect<Equal<Submit["lines"], { sku: string; qty: number; total: number }[] | undefined>>;
-
 export function typeOnlyChecks() {
   // @ts-expect-error – `note` has no validation() feature
   rule(shape.note, () => undefined);
@@ -304,7 +295,7 @@ describe("M · Async", () => {
   });
 });
 
-describe("M · validate() and submitted values", () => {
+describe("M · validate()", () => {
   test("validate: errors in shape order with concrete paths; subtrees", async () => {
     const s = createStore(shape, initial(), {
       behaviors: [rule(shape.name, () => "N"), rule(L.qty, (q) => (q > 1 ? "Q" : undefined)), rule(shape.company.vat, () => "V")],
@@ -314,36 +305,22 @@ describe("M · validate() and submitted values", () => {
     expect(r.errors[2].store).toBe(s.substore(shape.lines).itemAt(1));
     const lines = await s.validate(shape.lines);
     expect(lines.errors.map((e) => e.path)).toEqual(["lines[1].qty"]);
-    expect(lines.values).toEqual(initial().lines);
     const row = await s.substore(shape.lines).itemAt(0).validate();
     expect(row.valid).toBe(true);
   });
 
-  test("validate: values leave out hidden and disabled nodes", async ({ store: s }) => {
-    s.set(shape.company.visible, false);
-    s.set(shape.promo.disabled, true);
-    const r = await s.validate();
-    expect("company" in r.values).toBe(false);
-    expect("promo" in r.values).toBe(false);
-    expect(r.values.name).toBe("Ann");
-    expect(r.values.lines?.length).toBe(2);
-  });
 });
 
 const readOnly = form(
   object({
     name: field<string>().meta(control()),
-    promo: field<string>().meta(control(), disableable()),
+    promo: field<string>().meta(control(), { disabled }),
     section: object({ note: field<string>().meta(control()) }),
-  }).meta(disableable())
+  }).meta({ disabled })
 );
-type ReadOnlySubmit = SubmitValue<typeof readOnly>;
-type _ro1 = Expect<Equal<ReadOnlySubmit["name"], string>>;
-type _ro2 = Expect<Equal<ReadOnlySubmit["promo"], string | undefined>>;
-type _ro3 = Expect<Equal<ReadOnlySubmit["section"], { note: string }>>;
 
-describe("M · Submitted values under a disabled ancestor", () => {
-  test("values: a disabled ancestor keeps descendants that don't declare `disabled`, omits those that do", async () => {
+describe("M · A disabled ancestor", () => {
+  test("a disabled ancestor stops validating the fields below it", async () => {
     const s = createStore(readOnly, { name: "", promo: "P", section: { note: "" } }, {
       behaviors: [
         rule(readOnly.name, (v) => (v ? undefined : "Required")),
@@ -356,12 +333,7 @@ describe("M · Submitted values under a disabled ancestor", () => {
     expect(s.get(readOnly.promo.disabled), "effective value, inherited from the root").toBe(true);
     expect(s.get(countIn(readOnly, "error")), "effectively disabled fields are not validated").toBe(0);
 
-    const r = await s.validate();
-    expect(r.valid).toBe(true);
-    expect(r.values, "promo declares `disabled` and is omitted; the others stay").toEqual({
-      name: "",
-      section: { note: "" },
-    });
+    expect((await s.validate()).valid).toBe(true);
   });
 });
 
@@ -369,7 +341,7 @@ const party = form(
   object({
     travelers: array(object({ name: field<string>().meta(control()) }), { create: () => ({ name: "" }) }).meta(
       validation(),
-      visibility()
+      { visible }
     ),
   })
 );
@@ -400,7 +372,6 @@ describe("M · Rules on a whole array", () => {
     expect(s.get(party.travelers.error)).toBe(undefined);
     const r = await s.validate();
     expect(r.valid).toBe(true);
-    expect("travelers" in r.values).toBe(false);
     s.set(party.travelers.visible, true);
     expect(s.get(party.travelers.error), "re-validated when shown").toBe("Add at least one traveler");
   });
@@ -409,8 +380,8 @@ describe("M · Rules on a whole array", () => {
 describe("M · validateDisabled", () => {
   test("validation({ validateDisabled: true }) keeps validating a disabled field", () => {
     const f = form({
-      keep: field<string>().meta(control({ validateDisabled: true }), disableable()),
-      skip: field<string>().meta(control(), disableable()),
+      keep: field<string>().meta(control({ validateDisabled: true }), { disabled }),
+      skip: field<string>().meta(control(), { disabled }),
     });
     const s = createStore(f, { keep: "", skip: "" }, {
       behaviors: [rule(f.keep, (v) => (v ? undefined : "Required")), rule(f.skip, (v) => (v ? undefined : "Required"))],
@@ -460,7 +431,7 @@ describe("M · Async: inputs and guards", () => {
 });
 
 describe("M · validate() on a part", () => {
-  test("validate() on a row or a section: only that part's errors and values", async () => {
+  test("validate() on a row or a section: only that part's errors", async () => {
     const s = createStore(shape, initial(), {
       behaviors: [
         rule(shape.name, () => "name bad"),
@@ -470,11 +441,9 @@ describe("M · validate() on a part", () => {
     });
     const row = await s.substore(shape.lines).itemAt(1).validate();
     expect(row.errors.map((e) => [e.path, e.error])).toEqual([["lines[1].sku", "sku bad"]]);
-    expect(row.values).toEqual({ sku: "B", qty: 2, total: 0 });
 
     const section = await s.substore(shape.company).validate();
     expect(section.errors.map((e) => [e.path, e.error])).toEqual([["company.vat", "vat bad"]]);
-    expect(section.values).toEqual({ vat: "", secret: "" });
   });
 });
 
@@ -493,7 +462,6 @@ describe("M · validate() and removed rows", () => {
     const r = await pending;
     expect(r.valid).toBe(true);
     expect(r.errors).toEqual([]);
-    expect(r.values.lines).toEqual([{ sku: "A", qty: 1, total: 0 }]);
   });
 
   // BUG: the header of validation.ts says removing a row aborts its check, but

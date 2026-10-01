@@ -29,6 +29,11 @@ export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {
   return ref.node[META_DEFS][ref.key];
 }
 
+/** The node's own reference to a declared key (node.error), the one every reader shares. */
+export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
+  return (node as any)[key];
+}
+
 // ============================================================
 export function refNode(ref: AnyRef): AnyNode {
   return ref instanceof ShapeNode ? ref : ref.node;

@@ -5,7 +5,7 @@ import {
   form, object, array, field, rule, defineBehavior, countIn, createStore, type InferValue,
   type RootStore, type BaseStore,
 } from "../index";
-import { control, disableable } from "../test/features";
+import { control, disabled } from "../test/features";
 import { required, pattern, max } from "../test/rules";
 import { StoreProvider, useBehaviors, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
@@ -15,7 +15,7 @@ const shape = form({
   name: field<string>().meta(control(), { hint: "" }),
   phone: field<string>().meta(control()),
   vat: field<string>().meta(control()),
-  note: field<string>().meta(disableable()),
+  note: field<string>().meta({ disabled }),
   lines: array(object({ qty: field<number>().meta(control(), { hint: "" }) })),
 });
 type Values = InferValue<typeof shape>;

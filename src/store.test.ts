@@ -56,10 +56,10 @@ describe("D · Root + object substores", () => {
   test("meta: one owner per node, seeded from static meta", ({ store: s }) => {
     const shipping = s.substore(userShape.shipping);
     expect(s.getMeta(userShape.shipping.city).label).toBe("City");
-    shipping.setMeta(userShape.shipping.city, { error: "Bad city" });
+    shipping.set(userShape.shipping.city.error, "Bad city");
     expect(s.getMeta(userShape.shipping.city).error).toBe("Bad city");          // delegated to owner
     expect(s.getMeta(userShape.billing.city).error).toBe(undefined);            // reused shape, separate meta
-    s.setMeta(userShape.shipping, { collapsed: true });                  // section meta owned by root
+    s.set(userShape.shipping.collapsed, true);                  // section meta owned by root
     expect(shipping.getMeta(userShape.shipping).collapsed).toBe(true);
   });
 
@@ -86,7 +86,7 @@ describe("E · Arrays", () => {
     const items = s.substore(userShape.items);
     const a = items.itemAt(0);
     const oldRef = s.getValues().items[0];
-    a.setMeta(userShape.items.item.sku, { touched: true });
+    a.set(userShape.items.item.sku.touched, true);
 
     a.setValue(userShape.items.item.qty, 5);
 
@@ -101,10 +101,10 @@ describe("E · Arrays", () => {
 
   test("per-item meta is isolated", ({ store: s }) => {
     const [a, b] = s.substore(userShape.items).items();
-    a.setMeta(userShape.items.item.sku, { error: "Required" });
+    a.set(userShape.items.item.sku.error, "Required");
     expect(b.getMeta(userShape.items.item.sku).error).toBe(undefined);
     expect(b.getMeta(userShape.items.item.sku).required).toBe(true);   // static meta seeded per item
-    a.setMeta(userShape.items.item, { rowError: "Bad row" });   // whole-row meta on the item store
+    a.set(userShape.items.item.rowError, "Bad row");   // whole-row meta on the item store
     expect(b.getMeta(userShape.items.item).rowError).toBe(undefined);
   });
 
@@ -133,7 +133,7 @@ describe("E · Arrays", () => {
     expect(b.isAttached()).toBe(false);
     expect(b.getValue(userShape.items.item.sku)).toBe(undefined);
     expect(() => b.setValue(userShape.items.item.sku, "Z")).toThrow(/detached/);
-    expect(() => b.setMeta(userShape.items.item.sku, { error: "x" })).toThrow(/detached/);
+    expect(() => b.set(userShape.items.item.sku.error, "x")).toThrow(/detached/);
   });
 
   test("nested arrays: identity preserved at both levels", ({ store: s }) => {
@@ -167,7 +167,7 @@ describe("D · Meta delegation and substore arguments", () => {
   test("meta of a deep node is one object, whichever store is asked", ({ store: s }) => {
     const section = s.substore(userShape.shipping);
     expect(section.getMeta(userShape.shipping.city)).toBe(s.getMeta(userShape.shipping.city));
-    section.setMeta(userShape.shipping.city, { error: "Bad" });
+    section.set(userShape.shipping.city.error, "Bad");
     expect(s.getMeta(userShape.shipping.city).error).toBe("Bad");
     expect(s.get(userShape.shipping.city.error)).toBe("Bad");
     expect(s.getMeta(userShape.billing.city).error, "the reused shape's other copy is separate").toBe(undefined);

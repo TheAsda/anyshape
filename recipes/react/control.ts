@@ -10,8 +10,9 @@
 // ============================================================
 
 import { createContext, createElement, useCallback, useContext, useRef, type ReactNode } from "react";
-import type { AnyNode, BaseStore, FocusTarget, InferValue, MetaRef } from "form-lib";
+import type { AnyNode, BaseStore, InferValue, MetaRef } from "form-lib";
 import { useField, type HookOptions } from "form-lib/react";
+import type { FocusTarget } from "../focus";
 
 /** What an error display policy decides on: a control's current state. */
 export type ErrorDisplayState = Omit<ControlMeta, "focusTarget">;
