@@ -1,6 +1,7 @@
 // Focus recipe: focus(store, node), focusFirst(entries, compare).
 
-import { createStore, rule } from "form-lib";
+import { form, object, field, createStore, rule } from "form-lib";
+import { control } from "./features";
 import { test as base, describe, expect } from "vitest";
 import { focus, focusFirst, type FocusTarget } from "./focus";
 import * as limits from "./test/fixtures/limits";
@@ -54,5 +55,14 @@ describe("Focus", () => {
     s.set(shape.name.focusTarget, { focus: () => calls.push("focus"), scrollIntoView: () => calls.push("scroll") });
     expect(focus(s, shape.name)).toBe(true);
     expect(calls).toEqual(["focus", "scroll"]);
+  });
+
+  test("focus through a section's store", () => {
+    const f = form({ step: object({ x: field<string>().meta(control()) }) });
+    const s = createStore(f, { step: { x: "" } });
+    const calls: string[] = [];
+    s.set(f.step.x.focusTarget, { focus: () => calls.push("x") });
+    expect(focus(s.substore(f.step), f.step.x)).toBe(true);
+    expect(calls).toEqual(["x"]);
   });
 });

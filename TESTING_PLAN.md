@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 318 tests in 25 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 322 tests in 25 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -31,8 +31,8 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
 | `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
-| `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes | 7 |
-| `recipes/focus.test.ts` | O | the focus recipe: `focusFirst` order and skips, `focus(store, node)` | 4 |
+| `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
+| `recipes/focus.test.ts` | O | the focus recipe: `focusFirst` order and skips, `focus(store, node)` | 5 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |

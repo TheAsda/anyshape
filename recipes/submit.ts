@@ -11,7 +11,7 @@
 //   5. `submitting` off. If fn throws, the handler's promise rejects.
 // ============================================================
 
-import { metaKey, MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "form-lib";
+import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "form-lib";
 import { focusFirst } from "./focus";
 
 /** true while a submit of the node is running. */
@@ -38,16 +38,16 @@ export function handleSubmit<N extends Submittable>(
   store: BaseStore<N>,
   fn: (formData: InferValue<N>) => void | Promise<void>
 ): FormSubmitHandler {
-  // For untyped callers: only a node that declares submission() itself is submitted.
-  if (!((store.node as Partial<Submittable>).submitting instanceof MetaRef)) {
-    throw new Error(`handleSubmit: "${store.node.path || "<root>"}" does not declare submission()`);
-  }
+  // Only a node that declares submission() itself is submitted: its own
+  // `submitting`, matched by definition (the types can't tell definitions apart).
+  const own = store.collect(store.node, submitting).find((e) => e.ref.node === store.node);
+  if (!own) throw new Error(`handleSubmit: "${store.node.path || "<root>"}" does not declare submission()`);
   return async (event) => {
     event?.preventDefault?.();
     if (running.has(store)) return;
     running.add(store);
     store.batch(() => {
-      store.set(store.node.submitting, true);
+      store.set(own.ref, true);
       for (const e of store.collect(store.node, revealed)) e.store.set(e.ref, true);
     });
     try {
@@ -57,7 +57,7 @@ export function handleSubmit<N extends Submittable>(
       else focusFirst(errors);
     } finally {
       running.delete(store);
-      store.set(store.node.submitting, false);
+      store.set(own.ref, false);
     }
   };
 }
