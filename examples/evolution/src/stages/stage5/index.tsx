@@ -9,7 +9,7 @@ import { useState } from "react";
 import {
   form, object, field, type InferValue, control, submission, visibility,
   defineBehaviors, required, minLength, calculate,
-  visibleWhen, clearWhenHidden,
+  visibleWhen, clearWhen,
 } from "form-lib";
 import { StoreProvider, useForm, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
@@ -61,7 +61,7 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   ));
   // The car group exists only while the trip includes driving.
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
-  b.add(clearWhenHidden(s.car));
+  b.add(clearWhen(s.car, [s.car.visible], (visible) => !visible));
   b.add(required(s.car.license), minLength(s.car.license, 3));
   b.add(required(s.car.licenseExpiry));
 });

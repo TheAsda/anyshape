@@ -1,26 +1,25 @@
 // ============================================================
 // Ready-made rules and behaviors
 // ------------------------------------------------------------
-// Everything here is built on the public API (rule, defineBehavior, when).
+// Everything here is built on the public API (rule, defineBehavior).
 // Each utility states in its type which meta keys it needs, so using it on a
 // node without them is a compile error.
 //
 // Rules: required, minLength, maxLength, min, max, pattern, email.
 //   • Format rules pass on empty values – combine them with required.
-//   • required() follows the node's `required` meta key when it declares one
-//     (so a behavior can switch it); otherwise the field is always required.
+//   • required() always applies. A switchable requirement is a guard:
+//       b.when([s.x.required], (r) => r, (b) => b.add(required(s.x)))
 //
-// Behaviors: calculate, link, visibleWhen, disableWhen, clearWhenHidden,
-//            exclusive.
+// Behaviors: calculate, link, visibleWhen, disableWhen, clearWhen, exclusive.
 // ============================================================
 
-import { MetaRef, type AnyNode, type InferValue, type Ref } from "./shape";
-import { defineBehavior, when, type AnyBehavior, type Behavior, type Guard } from "./behaviors";
+import type { AnyNode, InferValue, MetaRef, Ref } from "./shape";
+import { defineBehavior, type AnyBehavior, type Behavior, type Guard } from "./behaviors";
 import { rule, type Rule, type Validatable } from "./validation";
 import { initialOf, type AnyRef, type RefValue, type CountRef } from "./store";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
-type WithKey<K extends string, V> = AnyNode & { readonly _meta: { [P in K]: V } };
+type WithKey<K extends string, V> = AnyNode & { readonly [P in K]: MetaRef<V> };
 
 export type Message<V = any> = string | ((value: V) => string);
 
@@ -47,10 +46,8 @@ export function isEmpty(value: unknown): boolean {
   return false;
 }
 
-/** The node's `label` meta when it is a string, otherwise the last path segment. */
+/** The last segment of the node's path. Pass `message` to a utility for real labels. */
 export function labelOf(node: AnyNode): string {
-  const label = (node._meta as Record<string, unknown>).label;
-  if (typeof label === "string") return label;
   const path = node.path ?? "";
   return path.slice(path.lastIndexOf(".") + 1).replace(/\[\]$/, "") || "<root>";
 }
@@ -59,13 +56,9 @@ export function labelOf(node: AnyNode): string {
 // Rules
 // ============================================================
 export function required<N extends Validatable>(node: N, options: RuleUtilOptions<InferValue<N>> = {}): Rule<N> {
-  const all = guards(options.when);
-  if ("required" in node._metaDefs) {
-    all.push(when([new MetaRef<boolean>(node, "required")], (r) => r !== false));
-  }
   return rule(node, (v) => (isEmpty(v) ? message(options.message, "Required", v) : undefined), {
     name: options.name ?? `required(${node.path})`,
-    when: all,
+    when: options.when,
   });
 }
 
@@ -204,12 +197,11 @@ export function visibleWhen<const Rs extends readonly AnyRef[]>(
   test: (...values: Values<Rs>) => boolean,
   options: { name?: string } = {}
 ): Behavior {
-  const ref = new MetaRef<boolean>(target, "visible");
   return defineBehavior({
     name: options.name ?? `visibleWhen(${target.path})`,
     triggers: refs,
-    writes: [ref],
-    run: (ctx) => ctx.set(ref, test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))),
+    writes: [target.visible],
+    run: (ctx) => ctx.set(target.visible, test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))),
   });
 }
 
@@ -220,33 +212,34 @@ export function disableWhen<const Rs extends readonly AnyRef[]>(
   test: (...values: Values<Rs>) => boolean,
   options: { name?: string } = {}
 ): Behavior {
-  const ref = new MetaRef<boolean>(target, "disabled");
   return defineBehavior({
     name: options.name ?? `disableWhen(${target.path})`,
     triggers: refs,
-    writes: [ref],
-    run: (ctx) => ctx.set(ref, test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))),
+    writes: [target.disabled],
+    run: (ctx) => ctx.set(target.disabled, test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))),
   });
 }
 
 /**
- * While the node is (effectively) hidden, its value is reset: to its initial
- * value, or to `to` when given. The node or an ancestor must declare `visible`.
+ * While test(...refs) holds, the target is reset: to its initial value, or to
+ * `to` when given. Edits are reset too, for as long as the test holds, e.g.
+ *   clearWhen(s.car, [s.car.visible], (visible) => !visible)
  */
-export function clearWhenHidden<N extends AnyNode>(target: N, options: { to?: InferValue<N>; name?: string } = {}): Behavior {
-  let declaring: AnyNode | undefined;
-  for (let n: AnyNode | undefined = target; n && !declaring; n = n.parent) if ("visible" in n._metaDefs) declaring = n;
-  if (!declaring) throw new Error(`clearWhenHidden(${target.path}): neither the node nor an ancestor declares visibility()`);
-  const visible = new MetaRef<boolean>(declaring, "visible");
+export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>(
+  target: N,
+  refs: Rs,
+  test: (...values: Values<Rs>) => boolean,
+  options: { to?: InferValue<N>; name?: string } = {}
+): Behavior {
   const hasTo = "to" in options;
   const initial = initialOf(target);
   return defineBehavior({
-    name: options.name ?? `clearWhenHidden(${target.path})`,
-    triggers: [visible, target],
+    name: options.name ?? `clearWhen(${target.path})`,
+    triggers: [...refs, target],
     reads: [initial],
     writes: [target],
     run(ctx) {
-      if (ctx.get(visible)) return;
+      if (!test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))) return;
       const next = hasTo ? options.to : ctx.get(initial);
       if (!Object.is(ctx.get(target), next)) ctx.set(target, next as InferValue<N>);
     },
@@ -283,11 +276,11 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
   const disabler = defineBehavior({
     name,
     triggers: fields,
-    writes: fields.map((f) => new MetaRef<boolean>(f, "disabled")),
+    writes: fields.map((f) => f.disabled),
     run(ctx) {
       const isFilled = fields.map((f) => filled(f, ctx.get(f)));
       const count = isFilled.filter(Boolean).length;
-      fields.forEach((f, i) => ctx.set(new MetaRef<boolean>(f, "disabled"), count === 1 && !isFilled[i]));
+      fields.forEach((f, i) => ctx.set(f.disabled, count === 1 && !isFilled[i]));
     },
   });
 

@@ -18,7 +18,7 @@ import {
   createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ShapeNode, type AnyNode, type InferValue, type InferMeta } from "../shape";
+import { ShapeNode, type AnyNode, type InferValue, type InferMeta, type MetaRef } from "../shape";
 import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store";
 import type { FocusTarget } from "../features";
 import type { ArrayNode } from "../shape";
@@ -184,17 +184,18 @@ export function useField<N extends AnyNode>(node: N, options?: HookOptions): Fie
   return { value, onChange, meta, store };
 }
 
+/** The control() keys and their values. */
+interface ControlMeta {
+  error: string | undefined;
+  validating: boolean;
+  touched: boolean;
+  dirty: boolean;
+  revealed: boolean;
+  focusTarget: FocusTarget | undefined;
+}
+
 /** A node with the control() keys. */
-export type ControlNode = AnyNode & {
-  readonly _meta: {
-    error: string | undefined;
-    validating: boolean;
-    touched: boolean;
-    dirty: boolean;
-    revealed: boolean;
-    focusTarget: FocusTarget | undefined;
-  };
-};
+export type ControlNode = AnyNode & { readonly [K in keyof ControlMeta]: MetaRef<ControlMeta[K]> };
 
 export interface ControlBinding<N extends ControlNode> {
   value: InferValue<N>;
@@ -219,7 +220,7 @@ export interface ControlBinding<N extends ControlNode> {
 export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
   const store = useResolved(node, options);
   const value = useValue(node, { store }) as InferValue<N>;
-  const meta = useOwnMeta(store, node) as ControlNode["_meta"];
+  const meta = useOwnMeta(store, node) as ControlMeta;
   const onChange = useSetter(store, node);
 
   const registered = useRef<FocusTarget | null>(null);
