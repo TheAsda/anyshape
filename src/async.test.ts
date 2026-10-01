@@ -1,18 +1,22 @@
 // Async behaviors: a run may return a promise. Cancellation, reruns with
 // cause inheritance, transactional ctx.state, kept work, settle().
 
-import { form, object, array, field, createStore, defineBehavior, when, type InferValue, type StoreOptions } from "./index";
+import {
+  form, object, array, field, createStore, defineBehavior, when,
+  type InferValue, type StoreOptions, type AnyRef, type AnyNode, type OriginKind,
+} from "./index";
 import { describe, expect, test } from "vitest";
 import { deferred, flush } from "./test/harness";
 
 const shape = form({
   code: field<string>(),
   name: field<string>(),
+  region: field<string>(),
   rows: array(object({ sku: field<string>(), title: field<string>() })),
 });
 type Values = InferValue<typeof shape>;
 const R = shape.rows.item;
-const initial = (): Values => ({ code: "a", name: "", rows: [{ sku: "x", title: "" }] });
+const initial = (): Values => ({ code: "a", name: "", region: "", rows: [{ sku: "x", title: "" }] });
 
 function errors() {
   const list: unknown[] = [];
@@ -325,9 +329,117 @@ describe("J · Cancellation", () => {
     await flush();
     expect(runs.map((r) => [r.isInit, r.origins, r.signal.aborted])).toEqual([
       [true, [], true],
-      [false, ["user"], true],
+      [true, ["user"], true], // replaced the init run in flight
       [true, [], false],
     ]);
     expect(s.get(shape.name)).toBe("b");
+  });
+});
+
+describe("J · Reruns", () => {
+  /** An async behavior that records each run's cause and waits for a gate. */
+  function recorder(config: { triggers: AnyRef[]; reads?: AnyRef[]; origins?: OriginKind[]; runOn?: { init?: boolean; change?: boolean } }) {
+    const runs: { isInit: boolean; origins: string[]; changed: string[]; signal: AbortSignal }[] = [];
+    const gate = deferred<void>();
+    const behavior = defineBehavior({
+      ...config,
+      writes: [shape.rows],
+      run: async (ctx) => {
+        runs.push({
+          isInit: ctx.isInit,
+          origins: [...ctx.origins].map((o) => o.replace(/^behavior:.*/, "behavior")),
+          changed: [...config.triggers, ...(config.reads ?? [])].filter((t) => ctx.changed(t)).map((t) => (t as AnyNode).path),
+          signal: ctx.signal,
+        });
+        await gate.promise;
+      },
+    });
+    return { runs, gate, behavior };
+  }
+
+  test("a user run cancelled by a behavior's trigger change is rerun with the user's cause too", () => {
+    const s = createStore(shape, initial());
+    const { runs, behavior } = recorder({ triggers: [shape.code, shape.name], runOn: { init: false } });
+    s.addBehavior([
+      behavior,
+      defineBehavior({ triggers: [shape.region], writes: [shape.name], runOn: { init: false }, run: (ctx) => ctx.set(shape.name, ctx.get(shape.region).toUpperCase()) }),
+    ]);
+    s.set(shape.code, "b", { origin: "user" });
+    s.set(shape.region, "eu");
+    expect(runs.map((r) => [r.origins, r.changed, r.signal.aborted])).toEqual([
+      [["user"], ["code"], true],
+      [["user", "behavior"], ["code", "name"], false],
+    ]);
+  });
+
+  test("a change the origins filter ignores cancels and reruns with only the cancelled run's cause", () => {
+    const s = createStore(shape, initial());
+    const { runs, behavior } = recorder({ triggers: [shape.code, shape.name], origins: ["user"] });
+    s.addBehavior(behavior);
+    s.set(shape.code, "b", { origin: "user" });
+    s.set(shape.name, "n"); // "program": filtered out
+    expect(runs.map((r) => [r.isInit, r.origins, r.changed, r.signal.aborted])).toEqual([
+      [true, [], [], true],
+      [true, ["user"], ["code"], true],
+      [true, ["user"], ["code"], false],
+    ]);
+  });
+
+  test("a reads change rerun takes the change's cause, minus what the origins filter ignores", () => {
+    const s = createStore(shape, initial());
+    const { runs, behavior } = recorder({ triggers: [shape.code], reads: [shape.name, shape.region], origins: ["user"], runOn: { init: false } });
+    s.addBehavior(behavior);
+    s.set(shape.code, "b", { origin: "user" });
+    s.set(shape.name, "n"); // "program": filtered out
+    s.set(shape.region, "eu", { origin: "user" });
+    expect(runs.map((r) => [r.origins, r.changed])).toEqual([
+      [["user"], ["code"]],
+      [["user"], ["code"]],
+      [["user"], ["code", "region"]],
+    ]);
+    s.set(shape.code, "c", { origin: "program" });
+    expect(runs).toHaveLength(4); // rerun, though the origins filter ignores the change
+  });
+
+  test("an init run replaced in flight keeps isInit, even with runOn.change: false", async () => {
+    const s = createStore(shape, initial());
+    const { runs, gate, behavior } = recorder({ triggers: [shape.code], runOn: { change: false } });
+    s.addBehavior(behavior);
+    s.set(shape.code, "b", { origin: "user" });
+    expect(runs.map((r) => [r.isInit, r.origins, r.changed, r.signal.aborted])).toEqual([
+      [true, [], [], true],
+      [true, ["user"], ["code"], false],
+    ]);
+    gate.resolve();
+    await flush();
+    s.set(shape.code, "c", { origin: "user" });
+    expect(runs).toHaveLength(2);
+  });
+});
+
+describe("J · Transactional state", () => {
+  test("ctx.state changed in place by a cancelled run is not saved; a completed run's is", async () => {
+    const s = createStore(shape, initial());
+    const seen: unknown[] = [];
+    s.addBehavior(
+      defineBehavior({
+        triggers: [shape.code],
+        writes: [shape.name],
+        runOn: { init: false },
+        run: async (ctx) => {
+          seen.push(ctx.state.overridden);
+          if (ctx.origins.has("user")) ctx.state.overridden = true; // in place, like calculate
+          await null;
+        },
+      })
+    );
+    s.set(shape.code, "b", { origin: "user" });
+    s.set(shape.name, "typed"); // another origin writes the target: cancelled, no rerun
+    s.set(shape.code, "c");
+    await flush();
+    s.set(shape.code, "d", { origin: "user" });
+    await flush();
+    s.set(shape.code, "e");
+    expect(seen).toEqual([undefined, undefined, undefined, true]);
   });
 });
