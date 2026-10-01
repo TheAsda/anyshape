@@ -126,8 +126,25 @@ export class Behavior {
     /** @internal set for feature (default) behaviors: node the behavior is limited to */
     readonly _self?: AnyNode,
     /** @internal when / otherwise splits this behavior is inside of (builder) */
-    readonly _branches: readonly Branch[] = []
+    readonly _branches: readonly Branch[] = [],
+    /** @internal dev only: where defineBehavior was called */
+    readonly _trace?: Error
   ) {}
+}
+
+const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
+
+/**
+ * What onError receives for an error thrown by a run: in dev, for behaviors
+ * from defineBehavior, an error with the same message located where the
+ * behavior was defined, with the thrown value as its cause.
+ */
+function located(behavior: Behavior, error: unknown): unknown {
+  const trace = behavior._trace;
+  if (!trace?.stack) return error;
+  const located = new Error(error instanceof Error ? error.message : String(error), { cause: error });
+  located.stack = `Error: ${located.message}\n${trace.stack.split("\n").slice(1).join("\n")}`;
+  return located;
 }
 
 function exclusiveBranches(a: Registration, b: Registration): boolean {
@@ -163,7 +180,12 @@ export interface RuleHooks {
 
 export function defineBehavior(config: BehaviorConfig): Behavior {
   if (typeof config?.run !== "function") throw new Error("defineBehavior: `run` must be a function");
-  return new Behavior(config);
+  let trace: Error | undefined;
+  if (isDev()) {
+    trace = new Error();
+    (Error as { captureStackTrace?: (target: object, fn: Function) => void }).captureStackTrace?.(trace, defineBehavior);
+  }
+  return new Behavior(config, undefined, [], trace);
 }
 
 export interface BehaviorErrorInfo {
@@ -834,17 +856,17 @@ export class BehaviorRuntime implements RuntimeHooks {
               commit();
             });
           } catch (error) {
-            this.onError(error, info());
+            this.onError(located(reg.behavior, error), info());
           }
         },
         (error) => {
           if (signal.aborted) return;
           this.store._batch(() => this.end(leaf, flight));
-          this.onError(error, info());
+          this.onError(located(reg.behavior, error), info());
         }
       );
     } catch (error) {
-      this.onError(error, info());
+      this.onError(located(reg.behavior, error), info());
     }
   }
 

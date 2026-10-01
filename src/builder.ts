@@ -84,7 +84,8 @@ export class BehaviorBuilder {
       return new Behavior(
         { ...item.config, when: [...asArray(item.config.when), ...this.guards] },
         undefined,
-        [...item._branches, ...this.branches]
+        [...item._branches, ...this.branches],
+        item._trace
       );
     }
     throw new Error("Expected a behavior or a rule");
