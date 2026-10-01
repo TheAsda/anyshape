@@ -130,7 +130,7 @@ export function Stage() {
     <StoreProvider store={form}>
       <form
         className="stage-form"
-        onSubmit={handleSubmit(form, async (values) => setSubmitted(values))}
+        onSubmit={handleSubmit(form, (values) => setSubmitted(values))}
       >
         <TextField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <TextField node={shape.startDate} label="Departure" type="date" />

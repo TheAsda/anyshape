@@ -101,7 +101,7 @@ function RequisitionWizard() {
   /** Continue = a submit of the current step's store. */
   const continueStep = (n: number) => {
     const stepNode = n === 0 ? shape.requester : n === 1 ? shape.order : shape.logistics;
-    void handleSubmit(form.substore(stepNode), async () => {
+    void handleSubmit(form.substore(stepNode), () => {
       // Passing the step's validation is what advances the wizard.
       form.set(shape.step, n + 1);
     })();

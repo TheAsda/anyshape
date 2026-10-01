@@ -35,6 +35,18 @@ describe("Submit", () => {
     expect(s.get(shape.submitting)).toBe(false);
   });
 
+  test("fn may be sync: it gets the value, and its throw rejects and resets submitting", async ({ store: s }) => {
+    const got: unknown[] = [];
+    await handleSubmit(s, (formData) => void got.push(formData))();
+    expect(got).toEqual([initial()]);
+
+    const failing = handleSubmit(s, () => {
+      throw new Error("save failed");
+    });
+    await expect(failing()).rejects.toThrow("save failed");
+    expect(s.get(shape.submitting)).toBe(false);
+  });
+
   test("an invalid form focuses the first error and does not call fn", async () => {
     const s = createStore(shape, initial(), { behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")] });
     const focused: string[] = [];
