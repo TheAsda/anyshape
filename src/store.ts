@@ -597,8 +597,9 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /**
    * Resolves once no behavior run that writes inside `node` (default: this
-   * store's node) is in flight, reruns included. Starts nothing; a cancelled
-   * run is not waited for.
+   * store's node) is in flight, reruns included: once pendingIn(node) is 0.
+   * Starts nothing; a cancelled run is not waited for, and neither is a run
+   * that writes nothing (it is inside no node).
    */
   settle(node: AnyNode = this.node): Promise<void> {
     this.assertInScope(node);
