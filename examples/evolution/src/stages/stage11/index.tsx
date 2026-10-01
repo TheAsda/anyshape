@@ -12,7 +12,7 @@ import { useState } from "react";
 import {
   form, object, field, type InferValue, array, control, submission, visibility,
   defineBehaviors, defineBehavior, required, minLength, calculate,
-  visibleWhen, clearWhenHidden, type FieldNode,
+  visibleWhen, clearWhen, type FieldNode,
 } from "form-lib";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
@@ -102,12 +102,13 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
         : undefined,
   ));
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
-  // One writer per field: clearWhenHidden(car) would claim the
+  // One writer per field: clearWhen(car, …) would claim the
   // dates too and the store rejects two owners — so the clearing
   // is scoped to the license fields, and twoDates owns the pair.
   // Hidden date values linger in the form; they are never
   // submitted, because hidden fields are stripped.
-  b.add(clearWhenHidden(s.car.license), clearWhenHidden(s.car.licenseExpiry));
+  const hidden = (visible: boolean) => !visible;
+  b.add(clearWhen(s.car.license, [s.car.visible], hidden), clearWhen(s.car.licenseExpiry, [s.car.visible], hidden));
   b.add(required(s.car.license), minLength(s.car.license, 3));
   b.add(required(s.car.licenseExpiry));
   b.each(s.travelers, (b, t) => {

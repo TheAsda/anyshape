@@ -18,7 +18,7 @@ import {
   createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ShapeNode, type AnyNode, type InferValue, type InferMeta } from "../shape";
+import { ShapeNode, type AnyNode, type InferValue, type InferMeta, type MetaRef } from "../shape";
 import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store";
 import type { FocusTarget } from "../features";
 import type { ArrayNode } from "../shape";
@@ -184,17 +184,18 @@ export function useField<N extends AnyNode>(node: N, options?: HookOptions): Fie
   return { value, onChange, meta, store };
 }
 
+/** The control() keys and their values. */
+interface ControlMeta {
+  error: string | undefined;
+  validating: boolean;
+  touched: boolean;
+  dirty: boolean;
+  revealed: boolean;
+  focusTarget: FocusTarget | undefined;
+}
+
 /** A node with the control() keys. */
-export type ControlNode = AnyNode & {
-  readonly _meta: {
-    error: string | undefined;
-    validating: boolean;
-    touched: boolean;
-    dirty: boolean;
-    revealed: boolean;
-    focusTarget: FocusTarget | undefined;
-  };
-};
+export type ControlNode = AnyNode & { readonly [K in keyof ControlMeta]: MetaRef<ControlMeta[K]> };
 
 export interface ControlBinding<N extends ControlNode> {
   value: InferValue<N>;
@@ -219,7 +220,7 @@ export interface ControlBinding<N extends ControlNode> {
 export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
   const store = useResolved(node, options);
   const value = useValue(node, { store }) as InferValue<N>;
-  const meta = useOwnMeta(store, node) as ControlNode["_meta"];
+  const meta = useOwnMeta(store, node) as InferMeta<ControlNode>;
   const onChange = useSetter(store, node);
 
   const registered = useRef<FocusTarget | null>(null);
@@ -294,9 +295,9 @@ export function fromCheckbox(onChange: (checked: boolean) => void): (event: { ta
 // ============================================================
 // useArray
 // ============================================================
-type RowOf<N extends ArrayNode<any, any, any>> = ItemStore<N["item"]>;
+type RowOf<N extends ArrayNode<any, any>> = ItemStore<N["item"]>;
 
-export interface ArrayBinding<N extends ArrayNode<any, any, any>> {
+export interface ArrayBinding<N extends ArrayNode<any, any>> {
   /** Row stores in order; the same array until rows are added, removed or reordered. */
   items: readonly RowOf<N>[];
   /** The helpers write with origin "user" unless options say otherwise. */
@@ -310,7 +311,7 @@ export interface ArrayBinding<N extends ArrayNode<any, any, any>> {
 const USER: WriteOptions = { origin: "user" };
 
 /** Rows of an array node; re-renders only when the sequence of rows changes. */
-export function useArray<N extends ArrayNode<any, any, any>>(node: N, options?: HookOptions): ArrayBinding<N> {
+export function useArray<N extends ArrayNode<any, any>>(node: N, options?: HookOptions): ArrayBinding<N> {
   const host = useResolved(node, options);
   const store = useMemo(() => host.substore(node) as ArrayStore<N>, [host, node]);
   const items = useSyncExternalStore(store.subscribeItems, store.items, store.items);

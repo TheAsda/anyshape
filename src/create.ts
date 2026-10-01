@@ -7,7 +7,7 @@ import { ValidationLayer } from "./validation";
 import { RootStore } from "./store";
 import type { ObjectNode, InferValue } from "./shape";
 
-export function createStore<N extends ObjectNode<any, any>>(
+export function createStore<N extends ObjectNode<any>>(
   shape: N,
   initialValues: InferValue<N>,
   options: StoreOptions = {}

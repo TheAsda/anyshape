@@ -8,6 +8,7 @@
 // ============================================================
 
 import type { BehaviorConfig } from "./behaviors";
+import { PLAIN } from "./internal";
 
 export type Meta = Record<string, unknown>;
 
@@ -46,7 +47,7 @@ export class MetaKeyDef<V = unknown> {
   readonly defaultValue: V;
   readonly options: Readonly<MetaKeyOptions<V>>;
   /** @internal true when created from a plain value in .meta({...}) */
-  readonly plain: boolean;
+  declare readonly [PLAIN]: boolean;
 
   constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, plain = false) {
     if (options.inherit !== undefined && typeof defaultValue !== "boolean") {
@@ -58,7 +59,7 @@ export class MetaKeyDef<V = unknown> {
     }
     this.defaultValue = defaultValue;
     this.options = Object.freeze({ ...options });
-    this.plain = plain;
+    (this as any)[PLAIN] = plain;
   }
 }
 

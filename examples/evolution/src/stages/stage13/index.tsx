@@ -11,7 +11,7 @@ import { useState } from "react";
 import {
   form, object, field, type InferValue, array, control, submission, visibility,
   defineBehaviors, defineBehavior, required, minLength, calculate, rule, asyncRule,
-  visibleWhen, clearWhenHidden, countIn, type FieldNode,
+  visibleWhen, clearWhen, countIn, type FieldNode,
 } from "form-lib";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard } from "../../ui";
@@ -138,7 +138,8 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
         : undefined,
   ));
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
-  b.add(clearWhenHidden(s.car.license), clearWhenHidden(s.car.licenseExpiry));
+  const hidden = (visible: boolean) => !visible;
+  b.add(clearWhen(s.car.license, [s.car.visible], hidden), clearWhen(s.car.licenseExpiry, [s.car.visible], hidden));
   b.add(required(s.car.license), minLength(s.car.license, 3));
   b.add(required(s.car.licenseExpiry));
   b.each(s.travelers, (b, t) => {

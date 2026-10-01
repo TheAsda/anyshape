@@ -12,5 +12,5 @@ export const meta: StageMeta = {
     "It's ordinary metadata — the component subscribes with useValue and decides what it looks like",
   ],
   notes:
-    "The counterpart to visibility, and the contrast is the point. Hiding removes the subtree from the screen (and, with clearWhenHidden, wipes its values); disabling keeps everything visible and just locks editing. What they SHARE is the submit contract: hidden and disabled fields are both skipped by validation and left out of the values the server receives — submit with the box checked and nightlyRate is gone from the result card, yet the budget was still computed from it. The `disabled` key inherits down ('any' ancestor), so disableWhen on a group locks the whole group at once.",
+    "The counterpart to visibility, and the contrast is the point. Hiding removes the subtree from the screen (and, with clearWhen, wipes its values); disabling keeps everything visible and just locks editing. What they SHARE is the submit contract: hidden and disabled fields are both skipped by validation and left out of the values the server receives — submit with the box checked and nightlyRate is gone from the result card, yet the budget was still computed from it. The `disabled` key inherits down ('any' ancestor), so disableWhen on a group locks the whole group at once.",
 };
