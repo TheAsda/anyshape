@@ -2,9 +2,9 @@
 
 import {
   form, object, array, field, meta, createStore, countIn, initialOf, defineBehavior, rule,
-  type Origin, type FocusTarget,
+  type Origin,
 } from "./index";
-import { control, touched, disableable } from "./test/features";
+import { control, touched, disabled, type FocusTarget } from "./test/features";
 import { max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
@@ -134,8 +134,8 @@ describe("G · Origins, baselines and reset", () => {
 
   // ---------------------------------------------------------------------------
   // Write options and read-only references
-  test("setMeta rejects { as: 'initial' }: baselines are for values", ({ store: s }) => {
-    expect(() => s.setMeta(shape.name, { touched: true }, { as: "initial" })).toThrow(/applies to values only/);
+  test("meta writes reject { as: 'initial' }: baselines are for values", ({ store: s }) => {
+    expect(() => s.set(shape.name.touched, true, { as: "initial" })).toThrow(/applies to values only/);
   });
 
   test("initial values and counts can't be set directly", ({ store: s }) => {
@@ -175,7 +175,7 @@ describe("G · Origins, baselines and reset", () => {
 });
 
 describe("G · Reset re-runs behaviors and keeps limits", () => {
-  const { shape, L, initial, targets } = limits;
+  const { shape, L, initial } = limits;
   const test = base
     .extend("store", () => createStore(shape, initial()));
 
@@ -254,7 +254,7 @@ describe("G · Reset re-runs behaviors and keeps limits", () => {
   test("reset of a section: only its values and meta, and only behaviors writing inside it re-run", () => {
     const f = form(
       object({
-        a: object({ x: field<string>().meta(control()), locked: field<boolean>().meta(disableable()) }),
+        a: object({ x: field<string>().meta(control()), locked: field<boolean>().meta({ disabled }) }),
         b: field<string>().meta(control()),
         flag: field<boolean>(),
       })

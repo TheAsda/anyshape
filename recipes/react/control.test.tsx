@@ -7,18 +7,21 @@ import { test, expect } from "vitest";
 import { form, object, array, field, createStore, rule, type InferValue } from "form-lib";
 import { StoreProvider } from "form-lib/react";
 import { control } from "../features";
+import { handleSubmit, submission } from "../submit";
 import { useControl, ErrorDisplayProvider, fromInput, fromCheckbox } from "./index";
 import { render, settle } from "./test-utils";
 
-const shape = form({
-  name: field<string>().meta(control()),
-  agree: field<boolean>().meta(control()),
-  age: field<number>().meta(control()),
-  note: field<string>(),
-  lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
-    create: () => ({ sku: "", qty: 1 }),
-  }),
-});
+const shape = form(
+  object({
+    name: field<string>().meta(control()),
+    agree: field<boolean>().meta(control()),
+    age: field<number>().meta(control()),
+    note: field<string>(),
+    lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
+      create: () => ({ sku: "", qty: 1 }),
+    }),
+  }).meta(submission())
+);
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 
@@ -139,7 +142,7 @@ test("focusRef registers the element, focus() and submit use it, unmount clears 
   );
   const input = screen.getByTestId("in");
   expect(s.get(shape.name.focusTarget)).toBe(input.element());
-  await settle(() => s.submit());
+  await settle(() => handleSubmit(s, async () => {})());
   await expect.element(input, { message: "submit focused the first error" }).toHaveFocus();
   await screen.unmount();
   expect(s.get(shape.name.focusTarget), "cleared on unmount").toBe(undefined);

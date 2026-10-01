@@ -44,14 +44,14 @@
 //   9. UI listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
-import type { Meta } from "./meta";
+import type { Meta, MetaKeyDef } from "./meta";
 import type { AnyBehavior, BehaviorHandle } from "./behaviors";
 import type { ValidationHooks, ValidationResult } from "./validation";
 import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
 } from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, defOf } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf } from "./internal";
 
 export type Listener = () => void;
 export type Unsubscribe = () => void;
@@ -72,12 +72,6 @@ export interface ChangeInfo {
 
 /** Live meta: exactly the keys declared on the node (meta is closed). */
 export type LiveMeta<N> = InferMeta<N>;
-
-/**
- * Accepted by setMeta: a subset of the declared keys. A node without declared
- * meta accepts no keys at all (a bare `{}` type would accept anything).
- */
-export type MetaPatch<N> = [keyof InferMeta<N>] extends [never] ? Record<string, never> : Partial<InferMeta<N>>;
 
 // ============================================================
 // Count references
@@ -125,22 +119,6 @@ export function countIn(node: AnyNode, key: string): CountRef {
   return ref;
 }
 
-/** Anything that can receive focus – an input, or a custom component's handle. */
-export interface FocusTarget {
-  focus(): void;
-  scrollIntoView?(): void;
-}
-
-export interface FocusOptions {
-  /** Order entries by their focus targets, e.g. by position on the page. */
-  compare?: (a: FocusTarget, b: FocusTarget) => number;
-}
-
-export interface SubmitOptions {
-  /** Focus the first error when invalid. Default true; FocusOptions to order the errors. */
-  focus?: boolean | FocusOptions;
-}
-
 /** The initial (baseline) value of a node. Changes with { as: "initial" } writes. */
 export class InitialRef<V = unknown> {
   /** Nominal brand. */
@@ -165,11 +143,11 @@ export function initialOf<N extends AnyNode>(node: N): InitialRef<InferValue<N>>
 export type AnyRef = AnyNode | MetaRef<any> | CountRef | InitialRef<any>;
 export type RefValue<R> = R extends CountRef ? number : R extends InitialRef<infer V> ? V : InferValue<R>;
 
-export interface CollectEntry {
-  /** Concrete path with row indexes, e.g. "lines[2].qty". */
+export interface CollectEntry<V = unknown> {
+  /** Concrete path of the node with row indexes, e.g. "lines[2].qty". */
   path: string;
-  /** The node (template node for rows). */
-  ref: AnyNode;
+  /** The node's reference to the key (template node for rows: the node is `ref.node`). */
+  ref: MetaRef<V>;
   /** A store that can address `ref` (root or item store). */
   store: BaseStore<any>;
 }
@@ -400,7 +378,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     if ((ref as unknown) instanceof CountRef) throw new Error("Counts are read-only");
     if ((ref as unknown) instanceof InitialRef) throw new Error('Initial values are written with { as: "initial" }');
     if (ref instanceof MetaRef) {
-      this.setMeta(ref.node, { [ref.key]: value } as any, options);
+      this._setMetaKey(ref, value, options);
       return;
     }
     this.setValue(ref as ShapeNode<any>, value, options);
@@ -484,35 +462,25 @@ export abstract class BaseStore<N extends ContainerNode> {
     return this._ownerOf(node)._metaOf(node) as LiveMeta<M>;
   }
 
-  setMeta<M extends AnyNode>(node: M, partial: MetaPatch<M>, options: WriteOptions = {}): void {
+  private _setMetaKey(ref: MetaRef<any>, value: unknown, options: WriteOptions = {}): void {
+    const { node, key } = ref;
     this.assertInScope(node);
     if (options.as) throw new Error('`as: "initial"` applies to values only');
-    const patch = partial as Meta;
-    const quiet: string[] = [];
-    const loud: string[] = [];
-    for (const key of Object.keys(patch)) {
-      const def = node[META_DEFS][key];
-      if (!def) throw new Error(`"${node.path || "<root>"}" has no meta key "${key}" – declare it with .meta()`);
-      (def.options.reactive === false ? quiet : loud).push(key);
-    }
     const owner = this._ownerOf(node);
 
     // Non-reactive keys: stored in place, never notify, allowed when detached.
-    if (quiet.length) {
-      const live = owner._metaOf(node);
-      for (const key of quiet) live[key] = patch[key];
+    if (defOf(ref).options.reactive === false) {
+      owner._metaOf(node)[key] = value;
+      return;
     }
-    if (!loud.length) return;
 
     const origin: Origin = options.origin ?? "program";
     this.root._batch(() => {
       this.root._assertWritable();
       this.assertAttached();
       const current = owner._metaOf(node);
-      if (loud.every((k) => Object.is(current[k], patch[k]))) return;
-      const next = { ...current };
-      for (const key of loud) next[key] = patch[key];
-      owner._commitMeta(node, current, next, origin);
+      if (Object.is(current[key], value)) return;
+      owner._commitMeta(node, current, { ...current, [key]: value }, origin);
     });
   }
 
@@ -623,26 +591,27 @@ export abstract class BaseStore<N extends ContainerNode> {
     else byKey.delete(key);
   }
 
-  /** Nodes in the subtree whose `key` currently counts, with concrete paths. Skips subtrees with count 0. */
-  collect(node: AnyNode, key: string): CollectEntry[] {
+  /**
+   * Every instance in the subtree that declares `def`, under whatever name,
+   * whatever its value: shape order, rows expanded, with concrete paths.
+   */
+  collect<V>(node: AnyNode, def: MetaKeyDef<V>): CollectEntry<V>[] {
     this.assertInScope(node);
     this.root._syncWalk();
-    const out: CollectEntry[] = [];
-    this._host._collectIn(node, key, out);
+    const out: CollectEntry<V>[] = [];
+    this._host._collectIn(node, def, out);
     return out;
   }
 
   /** @internal this = scope host */
-  _collectIn(node: AnyNode, key: string, out: CollectEntry[]): void {
-    if (this._countOf(node, key) === 0) return;
-    const aggregate = node[META_DEFS][key]?.options.aggregate;
-    if (aggregate && aggregate((this.getMeta(node) as Meta)[key])) {
-      out.push({ path: concretePath(this, node), ref: node, store: this });
+  _collectIn<V>(node: AnyNode, def: MetaKeyDef<V>, out: CollectEntry<V>[]): void {
+    for (const [key, declared] of Object.entries(node[META_DEFS])) {
+      if (declared === def) out.push({ path: concretePath(this, node), ref: metaRefOf(node, key), store: this });
     }
     if (node instanceof ObjectNode) {
-      for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) this._collectIn(child, key, out);
+      for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) this._collectIn(child, def, out);
     } else if (node instanceof ArrayNode && node !== this.node) {
-      for (const row of (this.substore(node as any) as ArrayStore<any>).items()) row._collectIn(row.node, key, out);
+      for (const row of (this.substore(node as any) as ArrayStore<any>).items()) row._collectIn(row.node, def, out);
     }
   }
 
@@ -684,116 +653,19 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   // ==========================================================
-  // Validation, focus, submit
+  // Validation
   // ==========================================================
   /**
    * Run every validation queue inside `node` (default: this store's node),
    * including async checks that are debounced or were never run, wait for
-   * them, and return { valid, errors, failures, values }.
+   * them, and return { valid, errors, failures }.
    */
-  validate<X extends AnyNode = N & AnyNode>(node?: X): Promise<ValidationResult<X>> {
+  validate(node?: AnyNode): Promise<ValidationResult> {
     const target = (node ?? this.node) as AnyNode;
     this.assertInScope(target);
     const hooks = this.root._validation;
     if (!hooks) throw new Error("This store has no validation – create it with createStore()");
-    return hooks.validate(this, target) as Promise<ValidationResult<X>>;
-  }
-
-  /** The node's registered focus target, if any. */
-  focusTargetOf(node: AnyNode): FocusTarget | undefined {
-    this.assertInScope(node);
-    if (!("focusTarget" in node[META_DEFS])) return undefined;
-    return this._ownerOf(node)._metaOf(node).focusTarget as FocusTarget | undefined;
-  }
-
-  /** Focus the node's registered focus target. Returns false when there is none. */
-  focus(node: AnyNode): boolean {
-    const target = this.focusTargetOf(node);
-    if (!target) return false;
-    target.focus();
-    target.scrollIntoView?.();
-    return true;
-  }
-
-  /**
-   * Focus the first entry (e.g. result.errors) that has a focus target. By
-   * default entries keep their order (shape order); `compare` orders them by
-   * their targets instead, e.g. by position on the page. Falls back to the
-   * store's `focusOrder` (createStore option).
-   */
-  focusFirst<E extends CollectEntry>(entries: readonly E[], options: FocusOptions = {}): E | undefined {
-    const compare = options.compare ?? this.root._focusOrder;
-    const candidates = entries
-      .map((entry, index) => ({ entry, index, target: entry.store.isAttached() ? entry.store.focusTargetOf(entry.ref) : undefined }))
-      .filter((c): c is { entry: E; index: number; target: FocusTarget } => c.target !== undefined);
-    if (compare) candidates.sort((a, b) => compare(a.target, b.target) || a.index - b.index);
-    const first = candidates[0];
-    if (!first) return undefined;
-    first.target.focus();
-    first.target.scrollIntoView?.();
-    return first.entry;
-  }
-
-  /**
-   * Submit flow: increments `submitCount` and sets `submitting` (when the root
-   * declares submission()), sets `revealed` on every node in this store's
-   * subtree that declares it (reveal()), validates the subtree, then calls
-   * `onValid(values)`, or focuses the first error and calls `onInvalid(result)`.
-   * While a submit of this store is running, further calls return it.
-   */
-  submit(
-    onValid?: (values: ValidationResult<N & AnyNode>["values"]) => unknown | Promise<unknown>,
-    onInvalid?: (result: ValidationResult<N & AnyNode>) => unknown | Promise<unknown>,
-    options: SubmitOptions = {}
-  ): Promise<ValidationResult<N & AnyNode>> {
-    if (this._submitRun) return this._submitRun;
-    const run = this._submit(onValid, onInvalid, options).finally(() => {
-      this._submitRun = undefined;
-    });
-    this._submitRun = run;
-    return run;
-  }
-
-  /** submit() as an event handler: calls event.preventDefault() first. */
-  handleSubmit(
-    onValid?: (values: ValidationResult<N & AnyNode>["values"]) => unknown | Promise<unknown>,
-    onInvalid?: (result: ValidationResult<N & AnyNode>) => unknown | Promise<unknown>,
-    options: SubmitOptions = {}
-  ): (event?: { preventDefault?(): void }) => Promise<ValidationResult<N & AnyNode>> {
-    return (event) => {
-      event?.preventDefault?.();
-      return this.submit(onValid, onInvalid, options);
-    };
-  }
-
-  private _submitRun: Promise<ValidationResult<N & AnyNode>> | undefined;
-
-  private async _submit(
-    onValid: ((values: any) => unknown) | undefined,
-    onInvalid: ((result: any) => unknown) | undefined,
-    options: SubmitOptions
-  ): Promise<ValidationResult<N & AnyNode>> {
-    const root = this.root;
-    const rootNode = root.node as AnyNode;
-    const has = (key: string) => key in rootNode[META_DEFS];
-    const patch = (values: Meta) => root.setMeta(rootNode, values as never);
-    root.batch(() => {
-      if (has("submitCount")) patch({ submitCount: ((root.getMeta(rootNode) as Meta).submitCount as number) + 1 });
-      if (has("submitting")) patch({ submitting: true });
-      this._host._eachWithKey(this.node, "revealed", (store, node) => store.setMeta(node, { revealed: true } as never));
-    });
-    try {
-      const result = await this.validate();
-      if (result.valid) {
-        await onValid?.(result.values);
-      } else {
-        if (options.focus !== false) this.focusFirst(result.errors, options.focus === true || options.focus === undefined ? {} : options.focus);
-        await onInvalid?.(result);
-      }
-      return result;
-    } finally {
-      if (has("submitting")) patch({ submitting: false });
-    }
+    return hooks.validate(this, target);
   }
 
   // ==========================================================
@@ -829,7 +701,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     }
     if (key === undefined) return { store, ref: node };
     if (!(key in node[META_DEFS])) return undefined;
-    return { store, ref: new MetaRef(node, key) };
+    return { store, ref: metaRefOf(node, key) };
   }
 
   // ==========================================================
@@ -1102,8 +974,6 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   private writeLog: WriteEntry[] = [];
   /** @internal */ _runtime: RuntimeHooks | undefined;
   /** @internal */ _validation: ValidationHooks | undefined;
-  /** @internal default order for focusFirst (createStore option `focusOrder`) */
-  _focusOrder: ((a: FocusTarget, b: FocusTarget) => number) | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { reaction: new Set(), ui: new Set() };
   private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { reaction: new Map(), ui: new Map() };
   private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<string>>>> = { reaction: new Map(), ui: new Map() };

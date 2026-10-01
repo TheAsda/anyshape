@@ -5,7 +5,7 @@ export const meta: StageMeta = {
   title: "Visibility",
   story: "Renting a car? Only then do we ask for license details.",
   bullets: [
-    "visibility() on a group adds a `visible` flag, inherited by everything inside",
+    "{ visible } on a group adds a `visible` flag, inherited by everything inside",
     "visibleWhen(node, [sources], fn) drives it from other fields",
     "clearWhen(node, [node.visible], (v) => !v): the group's values are wiped while it's hidden",
     "Hidden ⇒ not validated, and submit() omits it from the values (watch the result card)",

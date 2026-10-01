@@ -1,8 +1,8 @@
 // A profile form with a field for each ready-made rule and behavior: string,
-// array and number values, a visibility() section, disableable() fields for
+// array and number values, a `visible` section, `disabled` fields for
 // exclusive, and rows. Used by the rule and behavior recipe tests.
 import { form, object, array, field, type InferValue } from "form-lib";
-import { control, visibility, disableable } from "../../index";
+import { control, visible, disabled } from "../../index";
 
 export const shape = form({
   type: field<"person" | "company">(),
@@ -18,11 +18,11 @@ export const shape = form({
   start: field<number>(),
   end: field<number>(),
   plain: field<string>(),
-  company: object({ vat: field<string>().meta(control()), phone: field<string>() }).meta(visibility()),
-  price: field<number | undefined>().meta(control(), disableable(), { label: "Price" }),
-  discount: field<number | undefined>().meta(control(), disableable(), { label: "Discount" }),
-  promo: field<string>().meta(control(), disableable(), { label: "Promo code" }),
-  note: field<string>().meta({ hint: "" }, disableable()),
+  company: object({ vat: field<string>().meta(control()), phone: field<string>() }).meta({ visible }),
+  price: field<number | undefined>().meta(control(), { disabled, label: "Price" }),
+  discount: field<number | undefined>().meta(control(), { disabled, label: "Discount" }),
+  promo: field<string>().meta(control(), { disabled, label: "Promo code" }),
+  note: field<string>().meta({ hint: "", disabled }),
   lines: array(object({ qty: field<number>().meta(control()), sku: field<string>().meta(control()) })),
 });
 export type Values = InferValue<typeof shape>;

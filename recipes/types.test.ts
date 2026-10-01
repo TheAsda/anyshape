@@ -5,7 +5,7 @@
 
 import { form, object, field } from "form-lib";
 import {
-  control, visibility, disableable, required, min, pattern, visibleWhen, disableWhen, exclusive,
+  control, visible, disabled, required, min, pattern, visibleWhen, disableWhen, exclusive,
 } from "./index";
 import type { useControl } from "./react";
 import { test, expectTypeOf } from "vitest";
@@ -15,9 +15,9 @@ const t = form(
     text: field<string>().meta(control()),
     count: field<number>().meta(control()),
     plain: field<number>(),
-    hidden: object({ x: field<string>() }).meta(visibility()),
-    off: field<string>().meta(control(), disableable()),
-    other: field<string>().meta(control(), disableable()),
+    hidden: object({ x: field<string>() }).meta({ visible }),
+    off: field<string>().meta(control(), { disabled }),
+    other: field<string>().meta(control(), { disabled }),
   })
 );
 
@@ -29,9 +29,9 @@ export function typeOnlyChecks() {
   min(t.text, 1);
   // @ts-expect-error – pattern needs a string field
   pattern(t.count, /x/);
-  // @ts-expect-error – visibleWhen needs visibility()
+  // @ts-expect-error – visibleWhen needs `visible`
   visibleWhen(t.text, [t.plain], () => true);
-  // @ts-expect-error – exclusive needs disableable() on every field
+  // @ts-expect-error – exclusive needs `disabled` on every field
   exclusive([t.text, t.off]);
   exclusive([t.off, t.other]);
 }

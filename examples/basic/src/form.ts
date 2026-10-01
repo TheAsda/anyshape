@@ -17,12 +17,11 @@ import {
   metaKey,
   type InferValue,
   type FieldNode,
-  type ValidationResult,
 } from 'form-lib';
 import {
   control,
   submission,
-  visibility,
+  visible,
   required,
   minLength,
   email,
@@ -48,15 +47,16 @@ const lookingUp = () => ({
 // ------------------------------------------------------------
 // control()    = validation + touched + dirty + a focus target:
 //                everything an input needs.
-// visibility() = adds `visible` (inherited down the subtree);
+// { visible }  = adds `visible` (inherited down the subtree);
 //                hidden nodes skip validation by default.
-// submission() = adds the root-level submitCount / submitting keys.
+// submission() = adds `submitting`: the node can be submitted with
+//                handleSubmit(store, fn).
 //
-// The wizard steps are plain sibling objects; the App shows one at
-// a time and Continue is a submit scoped to that step's subtree.
-// Steps deliberately declare no visibility: everything stays part
-// of the submitted values, so the server still sees (and rejects)
-// step-1 fields at the end. The nested `address` and `approval`
+// The wizard steps are sibling objects that each declare submission();
+// the App shows one at a time and Continue submits that step's store.
+// Steps are not hidden when another step shows: a hidden step would
+// skip validation, and the final submit still checks (and the server
+// still rejects) step-1 fields. The nested `address` and `approval`
 // groups DO use visibility + clearWhen – that contrast is
 // the point of the demo.
 export const shape = form(
@@ -69,7 +69,7 @@ export const shape = form(
     department: field<string>().meta(control(), lookingUp()),
     /** Remaining budget of the department – filled by the app-side lookup. */
     budget: field<number | undefined>(),
-    }),
+    }).meta(submission()),
     order: object({
       items: array(
         object({
@@ -96,7 +96,7 @@ export const shape = form(
       tax: field<number | undefined>(),
       /** Carries control() because the budget rule targets it. */
       total: field<number | undefined>().meta(control()),
-    }),
+    }).meta(submission()),
     logistics: object({
       orderedOn: field<string>().meta(control()),
       neededBy: field<string>().meta(control()),
@@ -106,13 +106,13 @@ export const shape = form(
         street: field<string>().meta(control()),
         city: field<string>().meta(control()),
         zip: field<string>().meta(control()),
-      }).meta(visibility()),
+      }).meta({ visible }),
       /** Only total order values above €10,000 need an approval. */
       approval: object({
         approver: field<string>().meta(control()),
         justification: field<string>().meta(control()),
-      }).meta(visibility()),
-    }).meta(visibility()),
+      }).meta({ visible }),
+    }).meta({ visible }, submission()),
   }).meta(submission()),
 );
 
@@ -185,8 +185,8 @@ export class ServerRejection extends Error {
   }
 }
 
-/** What submit() hands back: hidden groups become optional, like on a real server. */
-export type Submitted = ValidationResult<typeof shape>['values'];
+/** What handleSubmit hands to the save callback: the form's value as it is. */
+export type Submitted = Values;
 
 /** Pretend to talk to a server. The sample data is rejected by path. */
 export async function save(values: Submitted): Promise<void> {

@@ -5,7 +5,7 @@
 
 import { test, describe } from "vitest";
 import { form, object, array, field, createStore, defineBehavior, countIn, rule } from "../index";
-import { control } from "../test/features";
+import { control, revealed } from "../test/features";
 
 // ---------------------------------------------------------------------------
 // A flat form: 500 fields on the root, each with a UI listener
@@ -91,8 +91,8 @@ describe("200 rows, one error", () => {
   const errors = countIn(order, "error");
   test("errors", async ({ bench }) => {
     await bench.compare(
-      bench("collect(root, 'error')", () => {
-        s.collect(order, "error");
+      bench("collect(root, revealed): every row's sku", () => {
+        s.collect(order, revealed);
       }),
       bench("get(countIn(root, 'error'))", () => {
         s.get(errors);

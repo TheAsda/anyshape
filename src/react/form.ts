@@ -1,12 +1,11 @@
 // ============================================================
-// Form lifetime, syncing React data, DOM focus order
+// Form lifetime, syncing React data
 // ------------------------------------------------------------
 //   • useForm creates the store once per mount. Later changes to `shape` or
 //     `initialValues` are ignored (dev warning for a different shape).
 //     `options.values` loads data: every new object (by identity) is written
 //     as the new baseline ({ as: "initial" }), and reset() returns to it.
 //     Re-rendering with the same object does nothing, so edits survive.
-//   • Errors are focused in DOM order by default (domOrder).
 //   • useSync(ref, value) writes React data (query results, props, context)
 //     into the form when it changes. The written value stays after unmount
 //     unless { resetOnUnmount: true }.
@@ -16,28 +15,11 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { MetaRef, type AnyNode, type InferValue, type ObjectNode } from "../shape";
 import { createStore } from "../create";
 import type { StoreOptions } from "../behaviors";
-import type { FocusTarget } from "../store";
 import type { RootStore, WriteOptions } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
 import { defOf } from "../internal";
 
 const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
-
-// ============================================================
-// DOM order
-// ============================================================
-/**
- * Orders focus targets by their position in the document. Targets that are
- * not DOM nodes (custom focus handles) compare equal, so they keep their
- * shape order relative to each other.
- */
-export function domOrder(a: FocusTarget, b: FocusTarget): number {
-  if (typeof Node === "undefined" || !(a instanceof Node) || !(b instanceof Node) || a === b) return 0;
-  const position = a.compareDocumentPosition(b);
-  if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-  if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-  return 0;
-}
 
 // ============================================================
 // useForm
@@ -56,12 +38,7 @@ export function useForm<N extends ObjectNode<any>>(
   initialValues: InferValue<N>,
   options: UseFormOptions<N> = {}
 ): RootStore<N> {
-  const [store] = useState(() =>
-    createStore(shape, options.values ?? initialValues, {
-      ...options,
-      focusOrder: options.focusOrder ?? domOrder,
-    })
-  );
+  const [store] = useState(() => createStore(shape, options.values ?? initialValues, options));
 
   if (isDev() && store.node !== shape) {
     console.warn("useForm: `shape` changed after the form was created – the change is ignored. Create shapes outside components.");

@@ -1,6 +1,7 @@
 import { form, object, array, field, meta, createStore, type InferValue } from "./index";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
+import type { FocusTarget } from "./test/features";
 
 const address = object({
   street: field<string>(),
@@ -79,7 +80,7 @@ describe("F · Rule 2 – separate channels, no meta bubbling", () => {
   test("rule 2: meta and value channels are separate", ({ store: s, recorder: r }) => {
     s.subscribeValue(shape.name, r.on("value"));
     s.subscribeMeta(shape.name, r.on("meta"));
-    s.setMeta(shape.name, { touched: true });
+    s.set(shape.name.touched, true);
     expect(r.take()).toEqual(["meta"]);
     s.setValue(shape.name, "Bob");
     expect(r.take()).toEqual(["value"]);
@@ -90,17 +91,17 @@ describe("F · Rule 2 – separate channels, no meta bubbling", () => {
     s.substore(shape.shipping).subscribe(r.on("shippingStore"));
     s.substore(shape.billing).subscribe(r.on("billingStore"));
     s.subscribe(r.on("root"));
-    s.setMeta(shape.shipping.city, { error: "Bad" });
+    s.set(shape.shipping.city.error, "Bad");
     expect(r.take()).toEqual(["root", "shippingStore"]);
   });
 
   test("rule 2: meta changed and changed back in one batch does not fire", ({ store: s }) => {
-    s.setMeta(shape.name, { touched: false });
+    s.set(shape.name.touched, false);
     const r = recorder();
     s.subscribeMeta(shape.name, r.on("meta"));
     s.batch(() => {
-      s.setMeta(shape.name, { touched: true });
-      s.setMeta(shape.name, { touched: false });
+      s.set(shape.name.touched, true);
+      s.set(shape.name.touched, false);
     });
     expect(r.take()).toEqual([]);
   });
@@ -158,7 +159,7 @@ describe("F · Rule 4 – attachment changes", () => {
 
   test("rule 4: restoring an old snapshot re-attaches the same store (undo)", ({ store: s, lines }) => {
     const row = lines.itemAt(0);
-    row.setMeta(L.sku, { touched: true });
+    row.set(L.sku.touched, true);
     row.setValue(L.qty, 7);                 // row now points at a new reference
     const snapshot = initial().lines;       // unrelated objects → would be new stores
     const undo = s.getValues().lines.slice();
@@ -207,7 +208,7 @@ describe("F · Rule 5 – store-wide", () => {
 
     a.setValue(L.qty, 3);
     expect(r.take()).toEqual(["a", "lines"]);
-    b.setMeta(L.sku, { error: "x" });
+    b.set(L.sku.error, "x");
     expect(r.take()).toEqual(["b", "lines"]);
   });
 });
@@ -283,10 +284,10 @@ describe("F · Rule 8 – reactions, then UI", () => {
 
   test("rule 8: meta reactions", ({ store: s }) => {
     s.reactMeta(shape.name, (next) => {
-      if (next.touched) s.setMeta(shape.name, { error: s.getValue(shape.name) ? undefined : "Required" });
+      if (next.touched) s.set(shape.name.error, s.getValue(shape.name) ? undefined : "Required");
     });
     s.setValue(shape.name, "");
-    s.setMeta(shape.name, { touched: true });
+    s.set(shape.name.touched, true);
     expect(s.getMeta(shape.name).error).toBe("Required");
   });
 
@@ -327,7 +328,7 @@ describe("F · Subscription housekeeping", () => {
 
   test("subscribing through any store in scope reaches the same owner", ({ store: s, recorder: r }) => {
     s.subscribeMeta(shape.shipping.city, r.on("viaRoot"));
-    s.substore(shape.shipping).setMeta(shape.shipping.city, { error: "x" });
+    s.substore(shape.shipping).set(shape.shipping.city.error, "x");
     expect(r.take()).toEqual(["viaRoot"]);
   });
 });
@@ -375,13 +376,13 @@ describe("F · Rule 5 on views", () => {
     s.substore(shape.shipping).subscribe(r.on("shipping"));
     const row = s.substore(shape.lines).itemAt(1);
 
-    row.setMeta(L.sku, { error: "Bad" });
+    row.set(L.sku.error, "Bad");
     expect(r.take(), "a row's meta").toEqual(["lines"]);
     row.set(L.qty, 9);
     expect(r.take(), "a row's value").toEqual(["lines"]);
-    s.setMeta(shape.shipping.city, { error: "x" });
+    s.set(shape.shipping.city.error, "x");
     expect(r.take()).toEqual(["shipping"]);
-    s.setMeta(shape.billing.city, { error: "y" });
+    s.set(shape.billing.city.error, "y");
     expect(r.take(), "the other copy of the reused shape").toEqual([]);
     s.set(shape.name, "Bob");
     expect(r.take()).toEqual([]);
@@ -423,5 +424,27 @@ describe("F · Meta-key subscriptions", () => {
     expect(calls).toBe(0);
     s.set(shape.name.error, "x");
     expect(calls).toBe(1);
+  });
+});
+
+describe("F · Non-reactive keys", () => {
+  const { shape, L, initial } = company;
+  const test = base
+    .extend("store", () => createStore(shape, initial()))
+    .extend("lines", ({ store }) => store.substore(shape.lines));
+
+  test("focus targets never notify and work on detached rows", ({ store: s, lines }) => {
+    const row = lines.itemAt(0);
+    let calls = 0;
+    s.subscribe(() => calls++);
+    row.subscribeMeta(L.sku, () => calls++);
+    const target: FocusTarget = { focus() {} };
+    row.set(L.sku.focusTarget, target);
+    expect(calls).toBe(0);
+    expect(row.get(L.sku.focusTarget)).toBe(target);
+    lines.remove(row);
+    calls = 0;
+    row.set(L.sku.focusTarget, undefined);        // unmount after removal must not throw
+    expect(calls).toBe(0);
   });
 });

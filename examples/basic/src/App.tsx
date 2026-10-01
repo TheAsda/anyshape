@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { countIn, type RootStore } from "form-lib";
 import { StoreProvider, useForm, useStore, useValue } from "form-lib/react";
+import { handleSubmit } from "form-lib/recipes";
 import { useControl } from "form-lib/recipes/react";
 import {
   shape,
@@ -97,16 +98,16 @@ function RequisitionWizard() {
 
   const goTo = (n: number) => form.set(shape.step, n);
 
-  /** Continue = a submit scoped to the current step's subtree. */
+  /** Continue = a submit of the current step's store. */
   const continueStep = (n: number) => {
     const stepNode = n === 0 ? shape.requester : n === 1 ? shape.order : shape.logistics;
-    form.substore(stepNode).submit(() => {
+    void handleSubmit(form.substore(stepNode), () => {
       // Passing the step's validation is what advances the wizard.
       form.set(shape.step, n + 1);
-    });
+    })();
   };
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmit = handleSubmit(form, async (values) => {
     // Enter in any input submits the form element; on early steps
     // that should behave like Continue, not like a save attempt.
     if (stepRef.current < 2) {
@@ -380,13 +381,13 @@ function FormStatePanel() {
   const validating = useValue(countIn(shape, "validating"));
   const dirty = useValue(countIn(shape, "dirty"));
   const lookups = useValue(countIn(shape, "lookingUp"));
-  const submitCount = useValue(shape.submitCount);
+  const submitting = useValue(shape.submitting);
   return (
     <div className="card">
       <h2>Live form state</h2>
       <dl className="stats">
-        <dt>submitCount</dt>
-        <dd>{String(submitCount)}</dd>
+        <dt>submitting</dt>
+        <dd>{String(submitting)}</dd>
         <dt>fields with errors</dt>
         <dd>{String(errors)}</dd>
         <dt>validating</dt>
