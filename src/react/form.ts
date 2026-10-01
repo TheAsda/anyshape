@@ -42,7 +42,7 @@ export function domOrder(a: FocusTarget, b: FocusTarget): number {
 // ============================================================
 // useForm
 // ============================================================
-export interface UseFormOptions<N extends ObjectNode<any, any>> extends StoreOptions {
+export interface UseFormOptions<N extends ObjectNode<any>> extends StoreOptions {
   /**
    * Data to load. Each new object is written as the baseline; while it is
    * undefined (e.g. still loading) the form shows `initialValues`.
@@ -51,7 +51,7 @@ export interface UseFormOptions<N extends ObjectNode<any, any>> extends StoreOpt
 }
 
 /** Create a form store once per mount. Render it with <StoreProvider store={form}>. */
-export function useForm<N extends ObjectNode<any, any>>(
+export function useForm<N extends ObjectNode<any>>(
   shape: N,
   initialValues: InferValue<N>,
   options: UseFormOptions<N> = {}

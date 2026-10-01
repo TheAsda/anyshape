@@ -69,7 +69,7 @@ export class BehaviorBuilder {
   }
 
   /** Rules for array items: `item` is the row template (behaviors on it run once per row). */
-  each<I extends ObjectNode<any, any>>(array: ArrayNode<I, any, any>, fn: (b: BehaviorBuilder, item: I) => void): this {
+  each<I extends ObjectNode<any>>(array: ArrayNode<I, any>, fn: (b: BehaviorBuilder, item: I) => void): this {
     fn(this, array.item);
     return this;
   }
@@ -92,7 +92,7 @@ export class BehaviorBuilder {
 }
 
 /** Build a list of behaviors and rules for `shape` (pass it to createStore or addBehavior). */
-export function defineBehaviors<S extends ObjectNode<any, any>>(shape: S, fn: (b: BehaviorBuilder, shape: S) => void): AnyBehavior[] {
+export function defineBehaviors<S extends ObjectNode<any>>(shape: S, fn: (b: BehaviorBuilder, shape: S) => void): AnyBehavior[] {
   const out: AnyBehavior[] = [];
   fn(new BehaviorBuilder(out, [], []), shape);
   return out;

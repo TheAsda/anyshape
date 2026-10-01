@@ -25,10 +25,10 @@ import { FIELDS, META_DEFS, META, CREATE, PLAIN } from "./internal";
 declare const FieldIdBrand: unique symbol;
 export type FieldId = string & { readonly [FieldIdBrand]: true };
 
-export type AnyNode = ShapeNode<any, any>;
-export type ContainerNode = ObjectNode<any, any> | ArrayNode<any, any, any>;
+export type AnyNode = ShapeNode<any>;
+export type ContainerNode = ObjectNode<any> | ArrayNode<any, any>;
 
-export type InferValue<N> = N extends ShapeNode<infer V, any> ? V : N extends MetaRef<infer V> ? V : never;
+export type InferValue<N> = N extends ShapeNode<infer V> ? V : N extends MetaRef<infer V> ? V : never;
 /** The node's declared meta keys and their value types, read from its meta references. */
 export type InferMeta<N> = { [K in keyof N as N[K] extends MetaRef<any> ? K : never]: N[K] extends MetaRef<infer V> ? V : never };
 
@@ -65,17 +65,17 @@ export class MetaRef<V = unknown> {
 }
 
 /** A value reference (a node) or a meta reference. */
-export type Ref<V = any> = ShapeNode<V, any> | MetaRef<V>;
+export type Ref<V = any> = ShapeNode<V> | MetaRef<V>;
 
 // ============================================================
 // Base node
 // ============================================================
-export abstract class ShapeNode<T = unknown, TMeta extends Meta = {}> {
+export abstract class ShapeNode<T = unknown> {
   /** Phantom type for inference – never exists at runtime. */
   declare readonly _type: T;
 
   /** @internal Default values of all declared meta keys. Live meta lives in the stores. */
-  declare readonly [META]: TMeta;
+  declare readonly [META]: Meta;
   /** @internal Normalized declarations, one per meta key. */
   declare readonly [META_DEFS]: Readonly<Record<string, MetaKeyDef<any>>>;
 
@@ -152,7 +152,7 @@ function attachMetaRefs(node: AnyNode): void {
 // ============================================================
 // Field (leaf)
 // ============================================================
-export class FieldNode<T = unknown, TMeta extends Meta = {}> extends ShapeNode<T, TMeta> {
+export class FieldNode<T = unknown> extends ShapeNode<T> {
   private constructor() {
     super();
   }
@@ -166,9 +166,8 @@ export class FieldNode<T = unknown, TMeta extends Meta = {}> extends ShapeNode<T
 // Object
 // ============================================================
 export class ObjectNode<
-  TFields extends Record<string, AnyNode> = any,
-  TMeta extends Meta = {}
-> extends ShapeNode<{ [K in keyof TFields]: InferValue<TFields[K]> }, TMeta> {
+  TFields extends Record<string, AnyNode> = any
+> extends ShapeNode<{ [K in keyof TFields]: InferValue<TFields[K]> }> {
   /** @internal – children; also exposed as direct properties. */
   declare readonly [FIELDS]: TFields;
 
@@ -192,16 +191,15 @@ export class ObjectNode<
 // ============================================================
 // Array (items must be object shapes)
 // ============================================================
-export interface ArrayOptions<TItem extends ObjectNode<any, any>> {
+export interface ArrayOptions<TItem extends ObjectNode<any>> {
   /** Factory for new rows (append / insert). Must return a new object every call. */
   create: () => InferValue<TItem>;
 }
 
 export class ArrayNode<
-  TItem extends ObjectNode<any, any> = any,
-  TMeta extends Meta = {},
+  TItem extends ObjectNode<any> = any,
   THasCreate extends boolean = boolean
-> extends ShapeNode<InferValue<TItem>[], TMeta> {
+> extends ShapeNode<InferValue<TItem>[]> {
   /** Item template. Its lens is relative to the item object itself. */
   declare readonly item: TItem;
   /** @internal Factory for new rows, if declared. */
@@ -221,10 +219,10 @@ export class ArrayNode<
     (this as any)[CREATE] = create;
   }
 
-  static create<TItem extends ObjectNode<any, any>>(
+  static create<TItem extends ObjectNode<any>>(
     item: TItem,
     create?: () => InferValue<TItem>
-  ): ArrayNode<TItem, {}, any> {
+  ): ArrayNode<TItem, any> {
     return new ArrayNode(item, create);
   }
 }
@@ -279,17 +277,17 @@ export function object<TFields extends Record<string, AnyNode>>(fields: TFields)
   return ObjectNode.create(fields);
 }
 
-export function array<TItem extends ObjectNode<any, any>>(item: TItem): ArrayNode<TItem, {}, false>;
-export function array<TItem extends ObjectNode<any, any>>(item: TItem, options: ArrayOptions<TItem>): ArrayNode<TItem, {}, true>;
+export function array<TItem extends ObjectNode<any>>(item: TItem): ArrayNode<TItem, false>;
+export function array<TItem extends ObjectNode<any>>(item: TItem, options: ArrayOptions<TItem>): ArrayNode<TItem, true>;
 export function array(item: any, options?: ArrayOptions<any>): any {
   return ArrayNode.create(item, options?.create);
 }
 
 /** Root entry point: builds (if needed) and instantiates the form shape. */
-export function form<N extends ObjectNode<any, any>>(root: N): N;
+export function form<N extends ObjectNode<any>>(root: N): N;
 export function form<TFields extends Record<string, AnyNode>>(fields: TFields): ObjectNode<TFields> & TFields;
 export function form(input: any): any {
-  const structural: ObjectNode<any, any> = input instanceof ObjectNode ? input : object(input);
+  const structural: ObjectNode<any> = input instanceof ObjectNode ? input : object(input);
   let counter = 0;
   return instantiate(structural, {
     path: "",

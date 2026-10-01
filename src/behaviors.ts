@@ -544,7 +544,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (reg.runInit) this.mark(binding, { init: true });
     } else {
       const next = reg.chain[depth + 1];
-      const arrStore = host.substore(next.parent as ArrayNode<any, any, any>) as ArrayStore<any>;
+      const arrStore = host.substore(next.parent as ArrayNode<any, any>) as ArrayStore<any>;
       binding.arrStore = arrStore;
       let seq = arrStore.items();
       for (const row of seq) this.child(binding, row);

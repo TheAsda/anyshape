@@ -39,7 +39,7 @@ import type { BaseStore, AnyRef, RefValue, Origin, CollectEntry } from "./store"
 // Types
 // ============================================================
 /** A node with the validation() feature. */
-export type Validatable = ShapeNode<any, any> & {
+export type Validatable = ShapeNode<any> & {
   readonly error: MetaRef<string | undefined>;
   readonly validating: MetaRef<boolean>;
 };
@@ -137,13 +137,13 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 type Omittable<N> = "visible" extends keyof InferMeta<N> ? true : "disabled" extends keyof InferMeta<N> ? true : false;
 
 /** Values for submitting: fields that can be hidden or disabled are optional. */
-export type SubmitValue<N> = N extends ObjectNode<infer F, any>
+export type SubmitValue<N> = N extends ObjectNode<infer F>
   ? Simplify<
       { [K in keyof F as Omittable<F[K]> extends true ? never : K]: SubmitValue<F[K]> } & {
         [K in keyof F as Omittable<F[K]> extends true ? K : never]?: SubmitValue<F[K]>;
       }
     >
-  : N extends ArrayNode<infer I, any, any>
+  : N extends ArrayNode<infer I, any>
     ? SubmitValue<I>[]
     : InferValue<N>;
 
@@ -538,7 +538,7 @@ export class ValidationLayer implements RuleHooks, ValidationHooks {
       if (level < 0) continue;
       let hosts: BaseStore<any>[] = [start];
       for (let i = level; i < chain.length - 1; i++) {
-        const arrayNode = chain[i + 1].parent as ArrayNode<any, any, any>;
+        const arrayNode = chain[i + 1].parent as ArrayNode<any, any>;
         hosts = hosts.flatMap((h) => [...h.substore(arrayNode).items()]);
       }
       for (const h of hosts) out.push([h, queue]);

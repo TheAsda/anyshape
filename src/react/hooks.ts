@@ -295,9 +295,9 @@ export function fromCheckbox(onChange: (checked: boolean) => void): (event: { ta
 // ============================================================
 // useArray
 // ============================================================
-type RowOf<N extends ArrayNode<any, any, any>> = ItemStore<N["item"]>;
+type RowOf<N extends ArrayNode<any, any>> = ItemStore<N["item"]>;
 
-export interface ArrayBinding<N extends ArrayNode<any, any, any>> {
+export interface ArrayBinding<N extends ArrayNode<any, any>> {
   /** Row stores in order; the same array until rows are added, removed or reordered. */
   items: readonly RowOf<N>[];
   /** The helpers write with origin "user" unless options say otherwise. */
@@ -311,7 +311,7 @@ export interface ArrayBinding<N extends ArrayNode<any, any, any>> {
 const USER: WriteOptions = { origin: "user" };
 
 /** Rows of an array node; re-renders only when the sequence of rows changes. */
-export function useArray<N extends ArrayNode<any, any, any>>(node: N, options?: HookOptions): ArrayBinding<N> {
+export function useArray<N extends ArrayNode<any, any>>(node: N, options?: HookOptions): ArrayBinding<N> {
   const host = useResolved(node, options);
   const store = useMemo(() => host.substore(node) as ArrayStore<N>, [host, node]);
   const items = useSyncExternalStore(store.subscribeItems, store.items, store.items);

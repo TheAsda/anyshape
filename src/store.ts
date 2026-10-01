@@ -398,18 +398,18 @@ export abstract class BaseStore<N extends ContainerNode> {
       this.setMeta(ref.node, { [ref.key]: value } as any, options);
       return;
     }
-    this.setValue(ref as ShapeNode<any, any>, value, options);
+    this.setValue(ref as ShapeNode<any>, value, options);
   }
 
   // ==========================================================
   // Values
   // ==========================================================
-  getValue<T>(node: ShapeNode<T, any>): T {
+  getValue<T>(node: ShapeNode<T>): T {
     this.assertInScope(node);
     return this._read(node);
   }
 
-  setValue<T>(node: ShapeNode<T, any>, value: T, options: WriteOptions = {}): void {
+  setValue<T>(node: ShapeNode<T>, value: T, options: WriteOptions = {}): void {
     this.assertInScope(node);
     const asInitial = options.as === "initial";
     const origin: Origin = asInitial ? "initial" : options.origin ?? "program";
@@ -422,7 +422,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     });
   }
 
-  getInitial<T>(node: ShapeNode<T, any>): T {
+  getInitial<T>(node: ShapeNode<T>): T {
     this.assertInScope(node);
     return node.lens.get(this.scope.getScopeInitial());
   }
@@ -830,8 +830,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Substores
   // ==========================================================
-  substore<S extends ObjectNode<any, any>>(node: S): ObjectStore<S>;
-  substore<S extends ArrayNode<any, any, any>>(node: S): ArrayStore<S>;
+  substore<S extends ObjectNode<any>>(node: S): ObjectStore<S>;
+  substore<S extends ArrayNode<any, any>>(node: S): ArrayStore<S>;
   substore(node: ContainerNode): BaseStore<any> {
     if (node === this.node) return this;
     this.assertInScope(node);
@@ -1088,7 +1088,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 // ============================================================
 // Root store – owns the value, the baseline, batching and the flush
 // ============================================================
-export class RootStore<N extends ObjectNode<any, any>> extends BaseStore<N> implements ScopeHost {
+export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
   private value: InferValue<N>;
   private initial: InferValue<N>;
   private depth = 0;
@@ -1299,7 +1299,7 @@ export class RootStore<N extends ObjectNode<any, any>> extends BaseStore<N> impl
 // ============================================================
 // Object substore – a view; reads through the parent's scope
 // ============================================================
-export class ObjectStore<N extends ObjectNode<any, any>> extends BaseStore<N> {
+export class ObjectStore<N extends ObjectNode<any>> extends BaseStore<N> {
   /** @internal – use store.substore(node) */
   constructor(node: N, parent: BaseStore<any>) {
     super(node, parent);
@@ -1309,18 +1309,18 @@ export class ObjectStore<N extends ObjectNode<any, any>> extends BaseStore<N> {
 // ============================================================
 // Array substore
 // ============================================================
-type ItemOf<N extends ArrayNode<any, any, any>> = N["item"];
-type ItemValue<N extends ArrayNode<any, any, any>> = InferValue<ItemOf<N>> & object;
+type ItemOf<N extends ArrayNode<any, any>> = N["item"];
+type ItemValue<N extends ArrayNode<any, any>> = InferValue<ItemOf<N>> & object;
 
 /** append / insert arguments: a partial item when the array has `create`, a complete one otherwise. */
-export type NewItemArgs<N extends ArrayNode<any, any, any>> = N["_hasCreate"] extends true
+export type NewItemArgs<N extends ArrayNode<any, any>> = N["_hasCreate"] extends true
   ? [partial?: Partial<ItemValue<N>>, options?: WriteOptions]
   : [item: ItemValue<N>, options?: WriteOptions];
 
 const EMPTY: readonly never[] = Object.freeze([]);
 let stableIdCounter = 0;
 
-export class ArrayStore<N extends ArrayNode<any, any, any>> extends BaseStore<N> {
+export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   private readonly itemStores = new WeakMap<object, ItemStore<ItemOf<N>>>();
   private sequence: readonly ItemStore<ItemOf<N>>[] = EMPTY;
   private syncedArray: readonly object[] | undefined;
@@ -1569,7 +1569,7 @@ export class ArrayStore<N extends ArrayNode<any, any, any>> extends BaseStore<N>
 // Item store – a scope: node lenses inside the item template are
 // resolved against the current item object (and its initial value).
 // ============================================================
-export class ItemStore<N extends ObjectNode<any, any>> extends BaseStore<N> implements ScopeHost {
+export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
   /** Stable for the lifetime of the item (survives edits and reordering). Use as React key. */
   readonly stableId: string;
   /** @internal */ _currentRef: unknown;
