@@ -822,14 +822,18 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   async settle(store: BaseStore<any>, node: AnyNode): Promise<void> {
     const pending = pendingIn(node);
-    while (store.get(pending) > 0) {
+    if (store.get(pending) === 0) return;
+    const probe = this.store._probe;
+    const start = probe ? performance.now() : 0;
+    do {
       if (!this.settledGate) {
         let resolve!: () => void;
         const promise = new Promise<void>((r) => (resolve = r));
         this.settledGate = { promise, resolve };
       }
       await this.settledGate.promise;
-    }
+    } while (store.get(pending) > 0);
+    probe?.settled(store, node, start, performance.now());
   }
 
   // ---- reset ----
