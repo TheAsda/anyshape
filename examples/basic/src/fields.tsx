@@ -1,12 +1,13 @@
 // ============================================================
 // Generic input components over useControl. `useControl` returns
 // value / onChange plus the control() state (error, touched,
-// dirty, validating), a focusRef that registers the element
+// dirty, pending), a focusRef that registers the element
 // for submit-time error focusing, and onBlur / showError.
 //
 // showError follows the nearest ErrorDisplayProvider's policy: by
 // default an error shows once the field was left (onBlur) or
-// covered by a submit, and then stays live while it's fixed.
+// covered by a submit and no check is pending, and then stays live
+// while it's fixed.
 //
 // Every field also takes an optional `hint`: static helper text
 // that tells the user up front what the rules are (and how to
@@ -100,7 +101,7 @@ export function TextField({ node, label, hint, type = "text", placeholder, autoC
       <FieldError show={show} id={errorId}>
         {c.error}
       </FieldError>
-      {c.validating && <p className="field__status">Checking…</p>}
+      {c.pending && <p className="field__status">Checking…</p>}
     </div>
   );
 }

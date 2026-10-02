@@ -1,9 +1,10 @@
 // Submit and focus in a real DOM: document order, and handleSubmit on a <form>.
 
 import { test, expect } from "vitest";
-import { form, object, field, rule, type InferValue, type RootStore } from "form-lib";
+import { form, object, field, type InferValue, type RootStore } from "form-lib";
 import { StoreProvider, useForm } from "form-lib/react";
 import { control } from "../features";
+import { rule } from "../validation";
 import { domOrder } from "../focus";
 import { handleSubmit, submission } from "../submit";
 import { useControl } from "./index";

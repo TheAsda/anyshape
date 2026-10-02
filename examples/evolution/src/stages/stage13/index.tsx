@@ -1,20 +1,20 @@
 // ------------------------------------------------------------
 // Stage 13 — Form-wide status.
 // The same control metadata that renders each field can be
-// AGGREGATED: countIn(shape, 'validating') tells you how many
-// fields are mid-check right now, countIn(shape, 'error') how
+// AGGREGATED: pendingIn(shape, error) tells you how many
+// fields are mid-check right now, countIn(shape, error) how
 // many need attention. The submit button and the error chip
 // below are just subscriptions to those numbers.
 // ------------------------------------------------------------
 
 import { useState } from "react";
 import {
-  form, object, field, type InferValue, array, defineBehaviors, defineBehavior, rule,
-  asyncRule, countIn, type FieldNode,
+  form, object, field, type InferValue, array, defineBehaviors, defineBehavior, countIn, pendingIn,
+  type FieldNode,
 } from "form-lib";
 import {
   control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
-  clearWhen,
+  clearWhen, rule, asyncRule, error,
 } from "form-lib/recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard } from "../../ui";
@@ -143,8 +143,11 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
   const hidden = (visible: boolean) => !visible;
   b.add(clearWhen(s.car.license, [s.car.visible], hidden), clearWhen(s.car.licenseExpiry, [s.car.visible], hidden));
-  b.add(required(s.car.license), minLength(s.car.license, 3));
-  b.add(required(s.car.licenseExpiry));
+  // The car rules apply only while the group is shown.
+  b.when([s.car.visible], (v) => v, (b) => {
+    b.add(required(s.car.license), minLength(s.car.license, 3));
+    b.add(required(s.car.licenseExpiry));
+  });
   b.each(s.travelers, (b, t) => {
     b.add(required(t.name));
   });
@@ -209,8 +212,8 @@ function Travelers() {
 
 /** The whole form's health, as two numbers. */
 function SmartSubmit() {
-  const validating = useValue(countIn(shape, "validating"));
-  const errors = useValue(countIn(shape, "error"));
+  const checking = useValue(pendingIn(shape, error));
+  const errors = useValue(countIn(shape, error));
   return (
     <div className="smart-submit">
       {errors > 0 && (
@@ -218,8 +221,8 @@ function SmartSubmit() {
           {errors} field{errors === 1 ? "" : "s"} to fix
         </span>
       )}
-      <button type="submit" className="button button--primary" disabled={validating > 0}>
-        {validating > 0 ? `Checking… (${validating})` : "Book it"}
+      <button type="submit" className="button button--primary" disabled={checking > 0}>
+        {checking > 0 ? `Checking… (${checking})` : "Book it"}
       </button>
     </div>
   );
@@ -238,9 +241,11 @@ export function Stage() {
             setSubmitted(values);
           } catch (e) {
             if (e instanceof ServerRejection) {
-              // Plant each server error onto its field, by path.
+              // Plant each server error onto its field: resolve the
+              // path to the field, then find its error key by definition.
               for (const [path, message] of Object.entries(e.fieldErrors)) {
-                const target = form.resolvePath(`${path}#error`);
+                const t = form.resolvePath(path);
+                const target = t && t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref);
                 if (target) target.store.set(target.ref, message);
               }
             }

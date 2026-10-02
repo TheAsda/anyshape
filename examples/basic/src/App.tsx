@@ -10,9 +10,9 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from "react";
-import { countIn, type RootStore } from "form-lib";
+import { countIn, pendingIn, type RootStore } from "form-lib";
 import { StoreProvider, useForm, useStore, useValue } from "form-lib/react";
-import { handleSubmit } from "form-lib/recipes";
+import { handleSubmit, error, dirty } from "form-lib/recipes";
 import { useControl } from "form-lib/recipes/react";
 import {
   shape,
@@ -20,6 +20,7 @@ import {
   behaviors,
   save,
   lookupDepartment,
+  lookingUp,
   ServerRejection,
   type Submitted,
   type Values,
@@ -119,12 +120,14 @@ function RequisitionWizard() {
       setResult(values);
     } catch (e) {
       if (e instanceof ServerRejection) {
-        // The server addressed fields by path; resolve each onto
-        // its field's own error key. The next validation run for
-        // a field replaces whatever lands here.
+        // The server addressed fields by path; resolve each to its
+        // field and write the field's own error key, found by its
+        // definition. The next validation run for a field replaces
+        // whatever lands here.
         let firstStep = 2;
         for (const [path, message] of Object.entries(e.fieldErrors)) {
-          const target = form.resolvePath(`${path}#error`);
+          const t = form.resolvePath(path);
+          const target = t && t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref);
           if (!target) continue;
           target.store.set(target.ref, message);
           const hit = STEP_OF_PATH.find(([prefix]) => path.startsWith(prefix));
@@ -273,7 +276,7 @@ function DepartmentField() {
         {budget !== undefined ? `€${budget.toLocaleString("en-US")}` : "not looked up yet"}
       </p>
       {c.showError && <p className="field__error">{c.error}</p>}
-      {c.validating && <p className="field__status">Checking…</p>}
+      {c.pending && <p className="field__status">Checking…</p>}
     </div>
   );
 }
@@ -377,10 +380,10 @@ function FailureTour() {
 }
 
 function FormStatePanel() {
-  const errors = useValue(countIn(shape, "error"));
-  const validating = useValue(countIn(shape, "validating"));
-  const dirty = useValue(countIn(shape, "dirty"));
-  const lookups = useValue(countIn(shape, "lookingUp"));
+  const errors = useValue(countIn(shape, error));
+  const checking = useValue(pendingIn(shape, error));
+  const dirtyFields = useValue(countIn(shape, dirty));
+  const lookups = useValue(countIn(shape, lookingUp));
   const submitting = useValue(shape.submitting);
   return (
     <div className="card">
@@ -390,10 +393,10 @@ function FormStatePanel() {
         <dd>{String(submitting)}</dd>
         <dt>fields with errors</dt>
         <dd>{String(errors)}</dd>
-        <dt>validating</dt>
-        <dd>{String(validating)}</dd>
+        <dt>checks in flight</dt>
+        <dd>{String(checking)}</dd>
         <dt>dirty</dt>
-        <dd>{String(dirty)}</dd>
+        <dd>{String(dirtyFields)}</dd>
         <dt>lookups in flight</dt>
         <dd>{String(lookups)}</dd>
       </dl>
@@ -412,7 +415,7 @@ function SubmittedValues({ values }: { values: Submitted }) {
 
 function SubmitButton() {
   const submitting = useValue(shape.submitting);
-  const lookups = useValue(countIn(shape, "lookingUp"));
+  const lookups = useValue(countIn(shape, lookingUp));
   return (
     <button type="submit" className="primary" disabled={submitting === true || lookups > 0}>
       {submitting === true ? "Saving…" : "Submit requisition"}

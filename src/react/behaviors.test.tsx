@@ -2,11 +2,11 @@ import { useState, StrictMode, Component, type ReactNode } from "react";
 import { test, expect } from "vitest";
 import { cleanup } from "vitest-browser-react";
 import {
-  form, object, array, field, rule, defineBehavior, countIn, createStore, contribute, metaKey, type InferValue,
+  form, object, array, field, defineBehavior, countIn, createStore, contribute, metaKey, type InferValue,
   type RootStore, type BaseStore,
 } from "../index";
-import { control, disabled } from "../test/features";
-import { required, pattern, max } from "../test/rules";
+import { control, disabled, error } from "../test/features";
+import { rule, required, pattern, max } from "../test/rules";
 import { StoreProvider, useBehaviors, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 
@@ -294,7 +294,7 @@ test("changing the provided store moves the registration", async () => {
   await screen.rerender(app(b));
   expect(a.get(L.qty.error)).toBe(undefined);
   expect(b.get(L.qty.error)).toBe("Must be at most 0");
-  expect(s.get(countIn(shape, "error"))).toBe(1);
+  expect(s.get(countIn(shape, error))).toBe(1);
 });
 
 test("explicit { store } option", async () => {

@@ -1,5 +1,5 @@
 // ============================================================
-// useBehaviors – behaviors, contributions and rules defined in components
+// useBehaviors – behaviors and contributions defined in components
 // ------------------------------------------------------------
 //   useBehaviors((b) => {
 //     if (strict) b.add(pattern(shape.phone, E164));   // props: plain if + deps
@@ -11,7 +11,7 @@
 //     scope: under a row provider, for that row only.
 //   • Registered in a layout effect (before paint), removed on unmount.
 //   • deps change → the registration is replaced atomically (no flicker).
-//   • Latest props: run / check / guard functions and contribution payloads
+//   • Latest props: run and guard functions and contribution payloads
 //     always come from the most recent build, without re-registering. Only
 //     those are refreshed: put
 //     everything the result depends on in deps (a refreshed function runs the
@@ -27,7 +27,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { Behavior, Contribution, type AnyBehavior, type BehaviorHandle, type Guard } from "../behaviors";
 import { defineBehaviors, type BehaviorBuilder } from "../builder";
-import { Rule } from "../validation";
 import { refKey } from "../internal";
 import type { BaseStore } from "../store";
 import { useStore, type HookOptions } from "./hooks";
@@ -51,8 +50,7 @@ function asArray<T>(v: T | readonly T[] | undefined): T[] {
 }
 
 function guardsOf(item: AnyBehavior): Guard[] {
-  if (item instanceof Contribution) return asArray(item.decl.when);
-  return item instanceof Rule ? asArray(item.options.when) : asArray((item as Behavior).config.when);
+  return item instanceof Contribution ? asArray(item.decl.when) : asArray(item.config.when);
 }
 
 /** What was declared (not the functions): if it changes, the registration must change. */
@@ -61,10 +59,6 @@ function signature(list: readonly AnyBehavior[]): string {
   const guards = (item: AnyBehavior) => guardsOf(item).map((g) => keys(g.refs)).join(";");
   return list
     .map((item) => {
-      if (item instanceof Rule) {
-        const o = item.options;
-        return ["R", item.kind, refKey(item.target), keys(o.triggers), keys(o.reads), guards(item), o.debounce ?? "", o.origins ?? "", o.name ?? ""].join("|");
-      }
       if (item instanceof Contribution) {
         const d = item.decl;
         return ["C", refKey(item.target), keys(d.triggers), keys(d.reads), guards(item), d.name ?? ""].join("|");
@@ -81,12 +75,6 @@ function delegate(item: AnyBehavior, slot: Slot): AnyBehavior {
     refs: g.refs,
     test: (...values: any[]) => guardsOf(slot.current)[j].test(...values),
   }));
-  if (item instanceof Rule) {
-    return new Rule(item.target, item.kind, ((value: any, ctx: any) => (slot.current as Rule).check(value, ctx)) as any, {
-      ...item.options,
-      when: guards,
-    });
-  }
   if (item instanceof Contribution) {
     // The core reads `payload` on every run, so a getter gives the latest
     // props without the core knowing what is inside it.
@@ -100,7 +88,7 @@ function delegate(item: AnyBehavior, slot: Slot): AnyBehavior {
       { branches: item._branches, trace: item._trace }
     );
   }
-  throw new Error("useBehaviors: expected behaviors, contributions and rules");
+  throw new Error("useBehaviors: expected behaviors and contributions");
 }
 
 function prepare(host: BaseStore<any>, build: (b: BehaviorBuilder) => void) {
@@ -120,7 +108,7 @@ function withHint(error: unknown): unknown {
 }
 
 /**
- * Register behaviors, contributions and rules from a component. `build` uses the same
+ * Register behaviors and contributions from a component. `build` uses the same
  * builder as defineBehaviors; `deps` re-register (atomically) when they change.
  */
 export function useBehaviors(build: (b: BehaviorBuilder) => void, deps: readonly unknown[], options: UseBehaviorsOptions = {}): void {

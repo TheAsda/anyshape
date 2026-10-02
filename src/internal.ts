@@ -1,5 +1,5 @@
 // ============================================================
-// Internal helpers shared by the behavior runtime and validation.
+// Internal helpers shared by the store, the behavior runtime and the reference kinds.
 // Not exported from the package index.
 // ============================================================
 
@@ -28,6 +28,18 @@ export const PLAIN: unique symbol = Symbol("form-lib.plain");
 /** The declaration of the key a meta reference points at. */
 export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {
   return ref.node[META_DEFS][ref.key];
+}
+
+const countSlots = new WeakMap<MetaKeyDef<any, any>, object>();
+
+/**
+ * The tally slot of a definition's aggregate counts (countIn). Not the
+ * definition itself: pendingIn tallies under that.
+ */
+export function countSlotOf(def: MetaKeyDef<any, any>): object {
+  let slot = countSlots.get(def);
+  if (!slot) countSlots.set(def, (slot = {}));
+  return slot;
 }
 
 /** The node's own reference to a declared key (node.error), the one every reader shares. */

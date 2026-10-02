@@ -79,8 +79,11 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   ));
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
   b.add(clearWhen(s.car, [s.car.visible], (visible) => !visible));
-  b.add(required(s.car.license), minLength(s.car.license, 3));
-  b.add(required(s.car.licenseExpiry));
+  // The car rules apply only while the group is shown.
+  b.when([s.car.visible], (v) => v, (b) => {
+    b.add(required(s.car.license), minLength(s.car.license, 3));
+    b.add(required(s.car.licenseExpiry));
+  });
 });
 
 function Derived() {

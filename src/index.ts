@@ -6,6 +6,5 @@ export { CountRef, countIn } from "./refs/count";
 export { InitialRef, initialOf } from "./refs/initial";
 export { PendingInRef, PendingOfRef, pendingIn, pendingOf } from "./refs/pending";
 export * from "./behaviors";
-export * from "./validation";
 export * from "./create";
 export * from "./builder";

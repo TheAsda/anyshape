@@ -5,7 +5,7 @@ import {
 } from "form-lib";
 import {
   required, maxLength, min, isEmpty, calculate, link, visibleWhen,
-  disableWhen, clearWhen, exclusive,
+  disableWhen, clearWhen, exclusive, error,
 } from "./index";
 import { test as base, describe, expect } from "vitest";
 import { shape, L, initial, type Values } from "./test/fixtures/profile";
@@ -68,16 +68,16 @@ describe("N · Behaviors", () => {
     expect([s.get(shape.start), s.get(shape.end)], "both changed together: left alone").toEqual([1, 9]);
   });
 
-  test("visibleWhen and disableWhen; hidden fields skip validation", () => {
+  test("visibleWhen and disableWhen; a hidden section's rules are guarded on its visibility", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
         visibleWhen(shape.company, [shape.type], (t) => t === "company"),
         disableWhen(shape.note, [shape.name], (n) => n === ""),
-        required(shape.company.vat),
+        required(shape.company.vat, { when: when([shape.company.visible], (v) => v) }),
       ],
     });
     expect(s.get(shape.company.visible)).toBe(false);
-    expect(s.get(shape.company.vat.error), "hidden: skipped").toBe(undefined);
+    expect(s.get(shape.company.vat.error), "hidden: the rule is absent").toBe(undefined);
     s.set(shape.type, "company");
     expect(s.get(shape.company.vat.error)).toBe("Required");
     s.set(shape.name, "");
@@ -144,6 +144,43 @@ describe("N · exclusive", () => {
   });
 });
 
+describe("N · disabled: reasons OR together", () => {
+  test("disableWhen and exclusive on one field: disabled while either applies", () => {
+    const s = createStore(shape, initial(), {
+      behaviors: [
+        ...exclusive([shape.price, shape.promo]),
+        disableWhen(shape.promo, [shape.type], (t) => t === "company"),
+      ],
+    });
+    expect(s.get(shape.promo.disabled)).toBe(false);
+    s.set(shape.price, 10, { origin: "user" });
+    expect(s.get(shape.promo.disabled), "exclusive").toBe(true);
+    s.set(shape.type, "company");
+    expect(s.get(shape.promo.disabled), "both").toBe(true);
+    s.set(shape.price, undefined, { origin: "user" });
+    expect(s.get(shape.promo.disabled), "disableWhen still applies").toBe(true);
+    s.set(shape.type, "person");
+    expect(s.get(shape.promo.disabled), "neither").toBe(false);
+  });
+
+  test("two disableWhen on one field", () => {
+    const s = createStore(shape, initial(), {
+      behaviors: [
+        disableWhen(shape.note, [shape.name], (n) => n === ""),
+        disableWhen(shape.note, [shape.type], (t) => t === "company"),
+      ],
+    });
+    expect(s.get(shape.note.disabled)).toBe(false);
+    s.set(shape.type, "company");
+    expect(s.get(shape.note.disabled)).toBe(true);
+    s.set(shape.name, "");
+    s.set(shape.type, "person");
+    expect(s.get(shape.note.disabled)).toBe(true);
+    s.set(shape.name, "Ann");
+    expect(s.get(shape.note.disabled)).toBe(false);
+  });
+});
+
 describe("N · Builder", () => {
   test("builder: when / otherwise with rules", () => {
     const behaviors = defineBehaviors(shape, (b) => {
@@ -197,13 +234,13 @@ describe("N · Builder", () => {
       b.each(shape.lines, lineRules);
       b.add(exclusive([shape.price, shape.promo]));
     });
-    expect(behaviors.length).toBe(5);
+    expect(behaviors.length, "2 row rules + exclusive: a reason and a rule per field").toBe(6);
     const s = createStore(shape, initial(), { behaviors });
     const row = s.substore(shape.lines).itemAt(1);
     row.set(L.qty, 0);
     row.set(L.sku, "");
     expect(row.get(L.qty.error)).toBe("Must be at least 1");
-    expect(s.get(countIn(shape.lines, "error"))).toBe(2);
+    expect(s.get(countIn(shape.lines, error))).toBe(2);
   });
 
   test("builder output works with addBehavior (component rules)", ({ store: s }) => {

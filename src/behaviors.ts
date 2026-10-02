@@ -251,32 +251,8 @@ function exclusiveBranches(a: Registration, b: Registration): boolean {
   return a.behavior._branches.some((x) => b.behavior._branches.some((y) => x.group === y.group && x.side !== y.side));
 }
 
-/** Anything addBehavior / createStore accept: behaviors, contributions and validation rules. */
-export type AnyBehavior = Behavior | Contribution<any> | RuleLike;
-
-/** @internal Validation rules are handled by the validation layer (validation.ts). */
-export interface RuleLike {
-  readonly _rule: true;
-}
-
-function isRule(x: unknown): x is RuleLike {
-  return typeof x === "object" && x !== null && (x as RuleLike)._rule === true;
-}
-
-/** @internal A change of validation queues, applied atomically with other registrations. */
-export interface QueueChange {
-  /** Queue registrations to remove; `resetMeta` clears what they wrote. */
-  remove: { reg: Registration; resetMeta: boolean }[];
-  /** Queue behaviors to register on the root. */
-  add: { behavior: Behavior; registered(reg: Registration): void }[];
-  /** Update rule lists – called after all checks passed, before registering. */
-  commit(): void;
-}
-
-/** @internal Installed by the validation layer. */
-export interface RuleHooks {
-  change(host: BaseStore<any>, added: readonly RuleLike[], removed: readonly RuleLike[]): QueueChange;
-}
+/** Anything addBehavior / createStore accept: behaviors and contributions. */
+export type AnyBehavior = Behavior | Contribution<any>;
 
 export function defineBehavior(config: BehaviorConfig): Behavior {
   if (typeof config?.run !== "function") throw new Error("defineBehavior: `run` must be a function");
@@ -498,7 +474,6 @@ interface HandleEntry {
   runtime: BehaviorRuntime;
   host: BaseStore<any>;
   regs: Registration[];
-  rules: RuleLike[];
   entries: Entry[];
   /** Sequence number of the addBehavior call; replaceBehavior keeps it. */
   seq: number;
@@ -520,8 +495,6 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly orphans = new Set<Binding>();
   /** Resolved when a run in flight ends or is cancelled; settle() awaits it. */
   private settledGate: { promise: Promise<void>; resolve: () => void } | undefined;
-  /** @internal set by the validation layer */
-  rules: RuleHooks | undefined;
   /** Owners of combined keys, by refKey of the key. */
   private readonly owners = new Map<string, Owner>();
   /** combine(self, key) results: called once per node and key. */
@@ -566,33 +539,26 @@ export class BehaviorRuntime implements RuntimeHooks {
   private swap(host: BaseStore<any>, previous: HandleEntry | undefined, behaviors: AnyBehavior | readonly AnyBehavior[], feature: boolean): BehaviorHandle {
     const list = (Array.isArray(behaviors) ? behaviors : [behaviors]) as readonly AnyBehavior[];
     if (!host.isAttached()) throw new Error("Cannot add behaviors to a detached row");
-    const rules = list.filter(isRule);
     const contributions = list.filter((b): b is Contribution => b instanceof Contribution);
-    const plain = list.filter((b): b is Behavior => !isRule(b) && !(b instanceof Contribution));
-    const oldRules = previous?.rules ?? [];
-    if ((rules.length || oldRules.length) && !this.rules) throw new Error("Validation rules need a store created with createStore()");
-
-    const change = rules.length || oldRules.length ? this.rules!.change(host, rules, oldRules) : undefined;
+    const plain = list.filter((b): b is Behavior => !(b instanceof Contribution));
     const seq = previous?.seq ?? callCounter++;
     const owners = this.ownerChange(host, contributions, previous?.entries ?? [], seq);
     const regs = this.apply(
       host,
       plain.map((b) => ({ behavior: b, feature: feature || b._self !== undefined })),
-      change,
       previous?.regs ?? [],
       owners.change
     );
     if (previous) previous.disposed = true;
 
     const entries = owners.added;
-    const entry: HandleEntry = { runtime: this, host, regs, rules, entries, seq, disposed: false };
+    const entry: HandleEntry = { runtime: this, host, regs, entries, seq, disposed: false };
     const handle = (() => {
       if (entry.disposed) return;
       entry.disposed = true;
       this.store._batch(() => {
         this.dispose(regs);
-        if (rules.length) this.apply(host, [], this.rules!.change(host, [], rules), []);
-        if (entries.length) this.apply(host, [], undefined, [], this.ownerChange(host, [], entries, seq).change);
+        if (entries.length) this.apply(host, [], [], this.ownerChange(host, [], entries, seq).change);
       });
     }) as BehaviorHandle;
     handles.set(handle, entry);
@@ -600,40 +566,31 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   /**
-   * Registers behaviors, removes `removing` and applies a queue change as one
+   * Registers behaviors, removes `removing` and applies owner changes as one
    * transaction: every check (scope, writers, cycles) runs before anything changes.
    */
   private apply(
     host: BaseStore<any>,
     items: { behavior: Behavior; feature: boolean }[],
-    change: QueueChange | undefined,
     removing: readonly Registration[],
     owners: OwnerChange = []
   ): Registration[] {
     const regs = items.map((i) => this.prepare(host, i.behavior, i.feature));
-    const queueRegs = (change?.add ?? []).map((a) => this.prepare(this.store, a.behavior, true));
     // A fresh registration per changed owner, used for every check; an owner
     // already registered then takes over its declarations in place.
     const live = owners.filter((o) => o.size);
     const ownerRegs = live.map((delta) => this.prepare(this.store, this.ownerBehavior(delta), true, delta.owner));
     const removed = new Set([
-      ...(change?.remove ?? []).map((r) => r.reg),
       ...removing,
       ...owners.flatMap((o) => (o.owner.reg ? [o.owner.reg] : [])),
     ]);
     const kept = this.regs.filter((r) => !removed.has(r));
-    this.checkWriters([...regs, ...queueRegs, ...ownerRegs], kept);
-    this.rank([...kept, ...regs, ...queueRegs, ...ownerRegs]); // throws on cycles, before any state change
+    this.checkWriters([...regs, ...ownerRegs], kept);
+    this.rank([...kept, ...regs, ...ownerRegs]); // throws on cycles, before any state change
 
     this.store._batch(() => {
       for (const reg of removing) this.unregister(reg, true);
-      for (const { reg, resetMeta } of change?.remove ?? []) this.unregister(reg, resetMeta);
-      change?.commit();
       for (const reg of regs) this.register(reg, host);
-      queueRegs.forEach((reg, i) => {
-        this.register(reg, this.store);
-        change!.add[i].registered(reg);
-      });
       for (const delta of owners) {
         const owner = delta.owner;
         this.commitOwner(delta);
