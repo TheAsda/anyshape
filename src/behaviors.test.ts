@@ -1,9 +1,8 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, rule,
-  type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
 } from "./index";
 import { control, visible, disabled, touched, dirty } from "./test/features";
-import { max } from "./test/rules";
+import { rule, max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as limits from "./test/fixtures/limits";
 
@@ -433,12 +432,12 @@ describe("L · Default behaviors: touched, dirty", () => {
   });
 
   test("dirty: new rows are dirty, counts aggregate", ({ store: s }) => {
-    expect(s.get(countIn(shape, "dirty"))).toBe(0);
+    expect(s.get(countIn(shape, dirty))).toBe(0);
     const row = s.substore(shape.lines).append();
     expect(row.get(L.qty.dirty)).toBe(true);
-    expect(s.get(countIn(shape, "dirty")), "qty and lineTotal of the new row").toBe(2);
+    expect(s.get(countIn(shape, dirty)), "qty and lineTotal of the new row").toBe(2);
     s.substore(shape.lines).remove(row);
-    expect(s.get(countIn(shape, "dirty"))).toBe(0);
+    expect(s.get(countIn(shape, dirty))).toBe(0);
   });
 
   test("dirty and touched after reset", ({ store: s }) => {
@@ -511,7 +510,7 @@ describe("J · Feature default behaviors", () => {
 
 describe("L · Counts as triggers", () => {
   test("a count as a trigger re-runs when the count changes, including on row removal", () => {
-    const dirtyCount = countIn(shape, "dirty");
+    const dirtyCount = countIn(shape, dirty);
     const mirror = defineBehavior({
       name: "dirtyCount", triggers: [dirtyCount], writes: [shape.subtotal],
       run: (ctx) => ctx.set(shape.subtotal, ctx.get(dirtyCount)),
@@ -528,7 +527,7 @@ describe("L · Counts as triggers", () => {
 
 describe("J · More registration checks", () => {
   test("only values and meta keys can be written", () => {
-    const writeCount = defineBehavior({ name: "c", writes: [countIn(shape, "dirty") as never], run: () => {} });
+    const writeCount = defineBehavior({ name: "c", writes: [countIn(shape, dirty) as never], run: () => {} });
     const writeInitial = defineBehavior({ name: "i", writes: [initialOf(shape.total) as never], run: () => {} });
     expect(() => createStore(shape, initial(), { behaviors: writeCount })).toThrow(/only values and meta keys are writable/);
     expect(() => createStore(shape, initial(), { behaviors: writeInitial })).toThrow(/only values and meta keys are writable/);
@@ -560,7 +559,7 @@ describe("K · Ordering edges", () => {
     expect(s.get(shape.subtotal)).toBe(30 + 20);
   });
 
-  test("inherited-meta edge: writing an ancestor's `visible` is ranked before the field's queue", () => {
+  test("inherited-meta edge: writing an ancestor's `visible` is ranked before an owner guarded on it", () => {
     const f = form({
       kind: field<string>(),
       section: object({ code: field<string>().meta(control()) }).meta({ visible }),
@@ -569,14 +568,14 @@ describe("K · Ordering edges", () => {
       name: "show", triggers: [f.kind], writes: [f.section.visible],
       run: (c) => c.set(f.section.visible, c.get(f.kind) === "x"),
     });
-    const req = rule(f.section.code, (v) => (v ? undefined : "Required"));
+    const req = rule(f.section.code, (v) => (v ? undefined : "Required"), { when: when([f.section.visible], (v) => v) });
     const s = createStore(f, { kind: "y", section: { code: "" } }, { behaviors: [req, show] });
-    // Internal check: the queue is registered by the validation layer, so compare ranks.
+    // Internal check: the owner is registered by the runtime, so compare ranks.
     const regs = (s as any)._runtime.regs as { name: string; rank: number }[];
     const rank = (name: string) => regs.find((r) => r.name === name)!.rank;
-    expect(rank("section.code#validation")).toBeGreaterThan(rank("show"));
+    expect(rank("section.code#error")).toBeGreaterThan(rank("show"));
 
-    expect(s.get(f.section.code.error), "hidden: skipped").toBe(undefined);
+    expect(s.get(f.section.code.error), "hidden: the rule is absent").toBe(undefined);
     s.set(f.kind, "x");
     expect(s.get(f.section.code.error), "shown: validated in the same flush").toBe("Required");
   });

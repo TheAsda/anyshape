@@ -28,8 +28,6 @@ export interface MetaKeyOptions<V> {
   owner?: "feature";
   /** Counted per subtree: nodes for which this returns true (countIn). */
   aggregate?: (value: V) => boolean;
-  /** Feature-specific settings (e.g. validation options), read by the feature's runtime. */
-  data?: Readonly<Record<string, unknown>>;
   /** Kept by reset(): for keys fed from outside the form (e.g. useSync), not user input. */
   keepOnReset?: boolean;
   /** false: stored and readable, but writing it never notifies, triggers or counts. */

@@ -3,25 +3,33 @@
 // ------------------------------------------------------------
 //   Built on useField: the value, a user onChange and the node's own
 //   control() keys, written through the node's refs.
+//   • `pending` while a check of the field runs (pendingOf(node.error)).
 //   • When a control's error is shown is a display policy (showError), set
 //     once with <ErrorDisplayProvider policy={...}> and inherited by nested
-//     providers. The default shows an error once the field is revealed: on
-//     blur (onBlur) or by a submit.
+//     providers, or per field with useControl(node, { errorDisplay }). The
+//     default shows an error once the field is revealed – on blur (onBlur)
+//     or by a submit – and no check is pending.
 // ============================================================
 
 import { createContext, createElement, useCallback, useContext, useRef, type ReactNode } from "react";
-import type { AnyNode, BaseStore, InferValue, MetaRef } from "form-lib";
-import { useField, type HookOptions } from "form-lib/react";
+import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "form-lib";
+import { useField, useValue, type HookOptions } from "form-lib/react";
 import type { FocusTarget } from "../focus";
 
 /** What an error display policy decides on: a control's current state. */
-export type ErrorDisplayState = Omit<ControlMeta, "focusTarget">;
+export type ErrorDisplayState = Omit<ControlMeta, "focusTarget"> & {
+  /** A check of the field is running: `error` is the last completed result. */
+  pending: boolean;
+};
 
 /** Decides whether a control shows its error (useControl's showError). */
 export type ErrorDisplayPolicy = (state: ErrorDisplayState) => boolean;
 
-/** Show an error once the field is revealed (blurred, or covered by a submit); then it stays live. */
-export const defaultErrorDisplay: ErrorDisplayPolicy = (s) => s.error !== undefined && s.revealed;
+/**
+ * Show an error once the field is revealed (blurred, or covered by a submit)
+ * and no check is pending; then it stays live.
+ */
+export const defaultErrorDisplay: ErrorDisplayPolicy = (s) => s.error !== undefined && s.revealed && !s.pending;
 
 const ErrorDisplayContext = createContext<ErrorDisplayPolicy>(defaultErrorDisplay);
 
@@ -39,7 +47,6 @@ export function ErrorDisplayProvider(props: ErrorDisplayProviderProps): ReactNod
 /** The control() keys and their values. */
 interface ControlMeta {
   error: string | undefined;
-  validating: boolean;
   touched: boolean;
   dirty: boolean;
   revealed: boolean;
@@ -56,7 +63,8 @@ export interface ControlBinding<N extends ControlNode> {
   error: string | undefined;
   touched: boolean;
   dirty: boolean;
-  validating: boolean;
+  /** A check of the field is running: `error` is the last completed result. */
+  pending: boolean;
   /** Set on blur (onBlur) and by submit; cleared by reset. */
   revealed: boolean;
   /** Whether to show the error now, per the provided display policy. */
@@ -68,10 +76,16 @@ export interface ControlBinding<N extends ControlNode> {
   store: BaseStore<any>;
 }
 
+export interface UseControlOptions extends HookOptions {
+  /** This field's error display policy, in place of the provided one. */
+  errorDisplay?: ErrorDisplayPolicy;
+}
+
 /** A node with control(): value, onChange and the control state. */
-export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
+export function useControl<N extends ControlNode>(node: N, options?: UseControlOptions): ControlBinding<N> {
   const { value, onChange, meta, store } = useField(node, options);
   const own = meta as unknown as ControlMeta;
+  const pending = useValue(pendingOf(node.error), { store });
 
   const registered = useRef<FocusTarget | null>(null);
   const focusRef = useCallback(
@@ -95,7 +109,8 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
     if (store.isAttached()) store.set(node.revealed, true, { origin: "user" });
   }, [store, node]);
 
-  const policy = useContext(ErrorDisplayContext);
+  const provided = useContext(ErrorDisplayContext);
+  const policy = options?.errorDisplay ?? provided;
 
   return {
     value,
@@ -103,9 +118,9 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
     error: own.error,
     touched: own.touched,
     dirty: own.dirty,
-    validating: own.validating,
+    pending,
     revealed: own.revealed,
-    showError: policy(own),
+    showError: policy({ error: own.error, touched: own.touched, dirty: own.dirty, revealed: own.revealed, pending }),
     onBlur,
     focusRef,
     store,

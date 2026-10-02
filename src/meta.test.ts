@@ -62,14 +62,14 @@ describe("C · Declarations", () => {
   test("defaults from plain values and key definitions", () => {
     const s = createStore(shape, values());
     expect(s.getMeta(shape.name)).toEqual({
-      error: undefined, validating: false, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
+      error: undefined, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
     });
     expect(s.getMeta(shape)).toEqual({ submitting: false });
   });
 
   test("key definitions keep their capabilities", () => {
     const defs = shape.name[META_DEFS];
-    expect(defs.error.options.owner).toBe("feature");
+    expect(defs.touched.options.owner).toBe("feature");
     expect(defs.error.options.aggregate!("x")).toBe(true);
     expect(defs.error.options.aggregate!(undefined)).toBe(false);
     expect(defs.focusTarget.options.reactive).toBe(false);
@@ -80,7 +80,7 @@ describe("C · Declarations", () => {
 
   test("variadic and chained .meta() merge", () => {
     const a = field<string>().meta(validation(), { hint: "x" }).meta({ touched });
-    expect(Object.keys(a[META_DEFS]).sort()).toEqual(["error", "hint", "touched", "validating"]);
+    expect(Object.keys(a[META_DEFS]).sort()).toEqual(["error", "hint", "touched"]);
   });
 
   test("MetaBuilder still works", () => {

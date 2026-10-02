@@ -108,12 +108,15 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   // One writer per field: clearWhen(car, …) would claim the
   // dates too and the store rejects two owners — so the clearing
   // is scoped to the license fields, and twoDates owns the pair.
-  // Hidden date values linger in the form; they are never
-  // submitted, because hidden fields are stripped.
+  // Hidden date values linger in the form and are submitted as
+  // they are; no rule checks them while the group is hidden.
   const hidden = (visible: boolean) => !visible;
   b.add(clearWhen(s.car.license, [s.car.visible], hidden), clearWhen(s.car.licenseExpiry, [s.car.visible], hidden));
-  b.add(required(s.car.license), minLength(s.car.license, 3));
-  b.add(required(s.car.licenseExpiry));
+  // The car rules apply only while the group is shown.
+  b.when([s.car.visible], (v) => v, (b) => {
+    b.add(required(s.car.license), minLength(s.car.license, 3));
+    b.add(required(s.car.licenseExpiry));
+  });
   b.each(s.travelers, (b, t) => {
     b.add(required(t.name));
   });

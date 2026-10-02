@@ -4,9 +4,10 @@
 // ============================================================
 
 import { test, expect } from "vitest";
-import { form, object, array, field, createStore, rule, type InferValue } from "form-lib";
+import { form, object, array, field, createStore, type InferValue } from "form-lib";
 import { StoreProvider } from "form-lib/react";
 import { control } from "../features";
+import { rule, asyncRule } from "../validation";
 import { handleSubmit, submission } from "../submit";
 import { useControl, ErrorDisplayProvider, fromInput, fromCheckbox } from "./index";
 import { render, settle } from "./test-utils";
@@ -87,6 +88,53 @@ test("useControl: onBlur reveals, showError follows the default policy", async (
   await expect.element(state, { message: "live once revealed" }).toHaveTextContent("-|true|false");
   await settle(() => s.reset());
   await expect.element(state).toHaveTextContent("-|false|false");
+});
+
+/** An async check the test resolves: `resolve(error)`. */
+function gate() {
+  let resolve!: (error: string | undefined) => void;
+  const check = () => new Promise<string | undefined>((r) => (resolve = r));
+  return { check, resolve: (error: string | undefined) => resolve(error) };
+}
+
+test("useControl: pending while a check runs; by default the error shows when revealed and not pending", async () => {
+  const lookup = gate();
+  const s = createStore(shape, initial(), { behaviors: asyncRule(shape.name, lookup.check) });
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  function C() {
+    c = useControl(shape.name);
+    return <span data-testid="c">{`${c.pending}|${c.error ?? "-"}|${c.showError}`}</span>;
+  }
+  const screen = await render(
+    <StoreProvider store={s}>
+      <C />
+    </StoreProvider>
+  );
+  const state = screen.getByTestId("c");
+  await settle(() => c.onBlur());
+  await settle(() => c.onChange("Bob"));
+  await expect.element(state).toHaveTextContent("true|-|false");
+  await settle(() => lookup.resolve("Taken"));
+  await expect.element(state).toHaveTextContent("false|Taken|true");
+  await settle(() => c.onChange("Bobby"));
+  await expect.element(state, { message: "the last result is hidden while a new check runs" }).toHaveTextContent("true|Taken|false");
+});
+
+test("useControl: a per-field errorDisplay overrides the policy", async () => {
+  const lookup = gate();
+  const s = createStore(shape, initial(), { behaviors: [rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")), asyncRule(shape.name, lookup.check)] });
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  function C() {
+    c = useControl(shape.name, { errorDisplay: (st) => st.error !== undefined });
+    return <span data-testid="c">{`${c.error ?? "-"}|${c.showError}`}</span>;
+  }
+  const screen = await render(
+    <StoreProvider store={s}>
+      <C />
+    </StoreProvider>
+  );
+  await settle(() => c.onChange("Al"));
+  await expect.element(screen.getByTestId("c"), { message: "shown without a reveal" }).toHaveTextContent("Too short|true");
 });
 
 test("useControl: onBlur after its row was removed does nothing", async () => {

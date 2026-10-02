@@ -1,9 +1,10 @@
 // Submit recipe: handleSubmit(store, fn).
 
-import { form, object, array, field, metaKey, createStore, rule } from "form-lib";
+import { form, object, array, field, metaKey, createStore } from "form-lib";
 import { test as base, describe, expect } from "vitest";
 import { handleSubmit, submission } from "./submit";
 import { control } from "./features";
+import { rule } from "./validation";
 import { deferred } from "./test/harness";
 import * as limits from "./test/fixtures/limits";
 
