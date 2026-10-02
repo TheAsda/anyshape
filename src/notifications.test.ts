@@ -1,4 +1,4 @@
-import { form, object, array, field, meta, createStore, type InferValue } from "./index";
+import { form, object, array, field, createStore, type InferValue } from "./index";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import type { FocusTarget } from "./test/features";
@@ -9,7 +9,7 @@ const address = object({
 });
 
 const shape = form({
-  name: field<string>().meta(meta().required(), { touched: false, error: undefined as string | undefined }),
+  name: field<string>().meta({ required: true, touched: false, error: undefined as string | undefined }),
   total: field<number>(),
   shipping: address,
   billing: address,

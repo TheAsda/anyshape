@@ -133,60 +133,11 @@ export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOpti
 }
 
 // ============================================================
-// MetaBuilder – fluent helper for plain values (unchanged API)
-// ============================================================
-export class MetaBuilder<T extends Meta = {}> {
-  /** Phantom type for inference. */
-  declare readonly _metaType: T;
-
-  private constructor(private readonly data: T) {}
-
-  static create(): MetaBuilder {
-    return new MetaBuilder({});
-  }
-
-  required(value = true): MetaBuilder<T & { required: boolean }> {
-    return new MetaBuilder({ ...this.data, required: value });
-  }
-
-  disabled(value = true): MetaBuilder<T & { disabled: boolean }> {
-    return new MetaBuilder({ ...this.data, disabled: value });
-  }
-
-  visible(value = true): MetaBuilder<T & { visible: boolean }> {
-    return new MetaBuilder({ ...this.data, visible: value });
-  }
-
-  label(value: string): MetaBuilder<T & { label: string }> {
-    return new MetaBuilder({ ...this.data, label: value });
-  }
-
-  placeholder(value: string): MetaBuilder<T & { placeholder: string }> {
-    return new MetaBuilder({ ...this.data, placeholder: value });
-  }
-
-  custom<K extends string, V>(key: K, value: V): MetaBuilder<T & { [P in K]: V }> {
-    return new MetaBuilder({ ...this.data, [key]: value } as any);
-  }
-
-  build(): T {
-    return this.data;
-  }
-}
-
-export function meta(): MetaBuilder {
-  return MetaBuilder.create();
-}
-
-// ============================================================
 // Type mapping: declarations → meta references
 // ============================================================
-export type MetaInput = Meta | MetaBuilder<any>;
-
-type RefsOfEntries<T> = {
+type RefsOf<T> = {
   readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;
 };
-type RefsOf<I> = I extends MetaBuilder<infer T> ? RefsOfEntries<T> : RefsOfEntries<I>;
 
 /** Meta references declared by all inputs of one .meta(a, b, c) call, typed with their payloads. */
 export type MergeMetaRefs<Is extends readonly unknown[]> =

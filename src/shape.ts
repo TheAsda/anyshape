@@ -17,8 +17,8 @@
 
 import { type Lens, identityLens, propLens, composeLens } from "./lens";
 import {
-  MetaBuilder, MetaKeyDef,
-  type Meta, type MetaInput, type MergeMetaRefs,
+  MetaKeyDef,
+  type Meta, type MergeMetaRefs,
 } from "./meta";
 import { FIELDS, META_DEFS, META, CREATE, PLAIN } from "./internal";
 import { KIND, type RefKind } from "./refs/kind";
@@ -115,14 +115,14 @@ export abstract class ShapeNode<T = unknown> {
   }
 
   /**
-   * Declare meta keys. Accepts plain objects, MetaBuilders and features, e.g.
+   * Declare meta keys. Accepts plain objects and features, e.g.
    *   field<string>().meta(control(), { label: "Name" })
    * Returns a new node; the original stays reusable.
    *
    * A key declared by a key definition (metaKey / feature) cannot be declared
    * again. Plain values may be overridden by plain values.
    */
-  meta<Is extends readonly MetaInput[]>(
+  meta<Is extends readonly Meta[]>(
     ...inputs: Is
   ): this & MergeMetaRefs<Is> {
     if (this.id !== undefined) {
@@ -134,8 +134,7 @@ export abstract class ShapeNode<T = unknown> {
 
     const defs: Record<string, MetaKeyDef<any>> = { ...this[META_DEFS] };
     for (const input of inputs) {
-      const entries = input instanceof MetaBuilder ? input.build() : input;
-      for (const [key, raw] of Object.entries(entries)) {
+      for (const [key, raw] of Object.entries(input)) {
         if (RESERVED_META_KEYS.has(key)) {
           throw new Error(`"${key}" is a reserved name and cannot be used as a meta key`);
         }

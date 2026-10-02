@@ -1,7 +1,7 @@
 // H · Counts: countIn, collect, aggregate keys, counts across rows.
 
 import {
-  form, object, array, field, meta, metaKey, createStore, countIn, initialOf, when,
+  form, object, array, field, metaKey, createStore, countIn, initialOf, when,
 } from "./index";
 import { control, revealed, dirty, error } from "./test/features";
 import { test, test as base, describe, expect } from "vitest";
