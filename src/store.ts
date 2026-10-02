@@ -137,6 +137,8 @@ export interface Probe {
   registrationStart(at: number): void;
   /** It is committed; its flush is next. `describe` reads the committed state: call it now or never. */
   registrationEnd(at: number, describe: () => RegistrationChange): void;
+  /** store.settle(node) waited from `start` to `end` (a settle that doesn't wait isn't reported). */
+  settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void;
 }
 
 /** @internal A registration change, for the registration track. */

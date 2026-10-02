@@ -4,7 +4,7 @@
 
 import { form, object, array, field, createStore, defineBehavior, type InferValue, type RootStore, type AnyRef, type AnyNode } from "./index";
 import type { ProbedInstance } from "./store";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from "vitest";
 import { concretePath } from "./internal";
 import { deferred, flush } from "./test/harness";
 import { validation } from "./test/features";
@@ -258,6 +258,179 @@ describe("T · Flush budget", () => {
     expect(warn.mock.calls[1][0]).toBe(
       '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in reactions, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms.'
     );
+  });
+});
+
+
+describe("T · DevTools tracks", () => {
+  let stamp: Mock<(...args: unknown[]) => void>;
+  let measure: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    // Vitest's console has no timeStamp.
+    console.timeStamp = stamp = vi.fn<(...args: unknown[]) => void>();
+    measure = vi.spyOn(performance, "measure").mockImplementation(() => undefined as never);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    delete (console as Partial<Console>).timeStamp;
+  });
+  /** The detail.devtools of each performance.measure call, with its name, start and end. */
+  const measured = () =>
+    measure.mock.calls.map(([name, options]: any) => ({ name, start: options.start, end: options.end, ...options.detail.devtools }));
+
+  test("each flush and each run is an entry in the form-lib group: label, start, end, track, color", () => {
+    const s = createStore(shape, initial());
+    s.addBehavior(
+      defineBehavior({
+        name: "title", triggers: [R.sku], writes: [R.title],
+        run: (ctx) => {
+          t += 4;
+          ctx.set(R.title, ctx.get(R.sku).toUpperCase());
+        },
+      })
+    );
+    stamp.mockClear();
+    t = 10;
+    s.set(shape.rows, [...s.get(shape.rows), { sku: "z", title: "" }]);
+    expect(stamp.mock.calls).toEqual([
+      ["title @rows[2]", 10, 14, "behaviors", "form-lib", "primary"],
+      ["flush", 10, 14, "flush", "form-lib", "tertiary"],
+    ]);
+  });
+
+  test("a flush over budget is a detailed entry in the error color, with its split and slowest behaviors", () => {
+    const s = createStore(shape, initial(), {
+      behaviors: defineBehavior({ name: "title", triggers: [R.sku], writes: [R.title], run: () => void (t += 20) }),
+    });
+    s.subscribe(shape.rows, () => void (t += 1));
+    stamp.mockClear();
+    measure.mockClear();
+    t = 10;
+    s.set(shape.rows, s.get(shape.rows).map((r) => ({ ...r, sku: r.sku + "!" })));
+    expect(stamp.mock.calls.filter((c) => c[3] === "flush")).toEqual([]);
+    expect(measured()).toEqual([
+      {
+        name: "flush over budget", start: 10, end: 51,
+        dataType: "track-entry", track: "flush", trackGroup: "form-lib", color: "error",
+        tooltipText: "A flush took 41.0 ms, over the 33.3 ms budget",
+        properties: [
+          ["Reactions", "40.0 ms"],
+          ["UI listeners", "1.0 ms"],
+          ["1. title", "40.0 ms (2 runs)"],
+        ],
+      },
+    ]);
+  });
+
+  test("each run in flight is an entry on the async track from its start to its completion or cancellation; cancelled ones marked", async () => {
+    const s = createStore(shape, initial());
+    const replies: ReturnType<typeof deferred<string>>[] = [];
+    s.addBehavior(
+      defineBehavior({
+        name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+        run: async (ctx) => {
+          t += 1;
+          const reply = deferred<string>();
+          replies.push(reply);
+          ctx.set(shape.name, await reply.promise);
+        },
+      })
+    );
+    stamp.mockClear();
+    t = 10;
+    s.set(shape.code, "b");
+    t = 20;
+    s.set(shape.code, "c");
+    t = 50;
+    replies[1].resolve("Gamma");
+    await flush();
+    const tracks = (track: string) => stamp.mock.calls.filter((c) => c[3] === track).map((c) => [c[0], c[1], c[2], c[5]]);
+    expect(tracks("async")).toEqual([
+      ["lookup @<root> (cancelled)", 10, 20, "secondary-light"],
+      ["lookup @<root>", 20, 50, "secondary"],
+    ]);
+    expect(tracks("behaviors")).toEqual([
+      ["lookup @<root>", 10, 11, "primary"],
+      ["lookup @<root>", 20, 21, "primary"],
+      ["lookup @<root> (apply)", 50, 50, "primary"],
+    ]);
+  });
+
+  test("a registration change is a detailed entry listing, per combined key it changed, the owner's triggers and contributions", () => {
+    const s = createStore(signup, signupValues());
+    s.substore(signup.lines).itemAt(1).addBehavior(rule(L.email, () => undefined, { name: "unique" }));
+    measure.mockClear();
+    t = 10;
+    const handle = s.addBehavior([
+      required(L.email),
+      defineBehavior({ name: "copy", triggers: [signup.email], writes: [signup.copy], run: (ctx) => void (t += 3) }),
+    ]);
+    handle();
+    expect(measured()).toEqual([
+      {
+        name: "registration @<root>", start: 10, end: 10,
+        dataType: "track-entry", track: "registration", trackGroup: "form-lib", color: "tertiary-dark",
+        tooltipText: "1 behavior added, 0 removed, 1 combined key changed",
+        properties: [
+          ["Added", "copy"],
+          ["lines[].email#error triggers", "lines[].email"],
+          ["lines[].email#error contributions", "unique @lines[1], required(lines[].email) @<root>"],
+        ],
+      },
+      {
+        name: "registration @<root>", start: 13, end: 13,
+        dataType: "track-entry", track: "registration", trackGroup: "form-lib", color: "tertiary-dark",
+        tooltipText: "0 behaviors added, 1 removed, 1 combined key changed",
+        properties: [
+          ["Removed", "copy"],
+          ["lines[].email#error triggers", "lines[].email"],
+          ["lines[].email#error contributions", "unique @lines[1]"],
+        ],
+      },
+    ]);
+  });
+
+  test("settle() is a detailed entry on the async track while it waits; one that doesn't wait is none", async () => {
+    const s = createStore(shape, initial());
+    const reply = deferred<string>();
+    s.addBehavior(
+      defineBehavior({
+        name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+        run: async (ctx) => ctx.set(shape.name, await reply.promise),
+      })
+    );
+    await s.settle();
+    s.set(shape.code, "b");
+    measure.mockClear();
+    t = 10;
+    const settled = s.settle();
+    t = 30;
+    reply.resolve("Beta");
+    await settled;
+    expect(measured()).toEqual([
+      {
+        name: "settle @<root>", start: 10, end: 30,
+        dataType: "track-entry", track: "async", trackGroup: "form-lib", color: "secondary-dark",
+        tooltipText: "settle() waited 20.0 ms for the runs in flight inside <root>",
+        properties: [],
+      },
+    ]);
+  });
+
+  test("without console.timeStamp or performance.measure there are no entries, and the budget still warns", () => {
+    delete (console as Partial<Console>).timeStamp;
+    Object.defineProperty(performance, "measure", { value: undefined, configurable: true });
+    try {
+      const s = createStore(shape, initial(), {
+        behaviors: defineBehavior({ name: "title", triggers: [R.sku], writes: [R.title], run: () => void (t += 40) }),
+      });
+      expect(console.warn).toHaveBeenCalledTimes(1);
+      s.settle();
+    } finally {
+      delete (performance as Partial<Performance>).measure;
+    }
+    expect(stamp).not.toHaveBeenCalled();
+    expect(measure).not.toHaveBeenCalled();
   });
 });
 

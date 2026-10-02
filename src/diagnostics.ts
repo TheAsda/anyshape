@@ -6,13 +6,18 @@
 //   • the flush budget: a flush over FLUSH_BUDGET logs one console.warn with
 //     its time in reactions and in UI listeners, and the three behaviors that
 //     took the most time across their instances;
-//   • the DevTools performance tracks.
+//   • the DevTools performance tracks (track group "form-lib"): frequent
+//     entries through the extended console.timeStamp, rare detailed ones
+//     through performance.measure with detail.devtools. Both are
+//     feature-detected; other tools ignore the extra arguments and detail.
 // Time counted against the budget: everything inside the flush, plus applying
 // an async run's writes (in the batch that starts the flush). A run in flight
 // is not: it is mostly waiting.
 // ============================================================
 
-import type { Probe, ProbedInstance, RunPart, RegistrationChange } from "./store";
+import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store";
+import type { AnyNode } from "./shape";
+import { concretePath } from "./internal";
 
 /** One frame at 30 fps, in ms. */
 export const FLUSH_BUDGET = 1000 / 30;
@@ -99,10 +104,11 @@ class FlushBudget {
 
 const ms = (n: number) => `${n.toFixed(1)} ms`;
 
+/** "40.0 ms (2 runs)"; the runs are left out for writes applied alone. */
+const spent = (t: Tally) => `${ms(t.time)}${t.runs ? ` (${t.runs} ${t.runs === 1 ? "run" : "runs"})` : ""}`;
+
 function overBudget(report: FlushReport): string {
-  const slowest = report.slowest
-    .map((t) => `"${t.reg.name}" ${ms(t.time)}${t.runs ? ` (${t.runs} ${t.runs === 1 ? "run" : "runs"})` : ""}`)
-    .join(", ");
+  const slowest = report.slowest.map((t) => `"${t.reg.name}" ${spent(t)}`).join(", ");
   return (
     `[form] A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget: ` +
     `${ms(report.reactions)} in reactions, ${ms(report.ui)} in UI listeners.` +
@@ -110,12 +116,114 @@ function overBudget(report: FlushReport): string {
   );
 }
 
+// ============================================================
+// DevTools tracks (https://developer.chrome.com/docs/devtools/performance/extension)
+// ============================================================
+const GROUP = "form-lib";
+type Track = "flush" | "behaviors" | "async" | "registration";
+type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "tertiary" | "tertiary-dark" | "error";
+
+/** console.timeStamp with the extended arguments (Chrome 136+). */
+type TimeStamp = (label: string, start: number, end: number, track: Track, group: string, color: Color) => void;
+
+const where = (instance: ProbedInstance) => `${instance.reg.name} @${concretePath(instance.host, instance.host.node) || "<root>"}`;
+
+class Tracks {
+  private flushAt = 0;
+  private runAt = 0;
+  private registrationAt = 0;
+  /** Runs in flight: their start and label. */
+  private readonly flights = new Map<ProbedInstance, { start: number; label: string }>();
+
+  private constructor(
+    private readonly stamp: TimeStamp | undefined,
+    private readonly measure: Performance["measure"] | undefined
+  ) {}
+
+  /** Undefined when neither API exists. */
+  static detect(): Tracks | undefined {
+    const stamp = typeof console.timeStamp === "function" ? (console.timeStamp.bind(console) as unknown as TimeStamp) : undefined;
+    const measure = typeof performance.measure === "function" ? performance.measure.bind(performance) : undefined;
+    return stamp || measure ? new Tracks(stamp, measure) : undefined;
+  }
+
+  flushStart(at: number): void {
+    this.flushAt = at;
+  }
+
+  flushEnd(at: number, report: FlushReport | undefined): void {
+    if (!report) return this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
+    this.detail("flush over budget", this.flushAt, at, "flush", "error", {
+      tooltipText: `A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget`,
+      properties: [
+        ["Reactions", ms(report.reactions)],
+        ["UI listeners", ms(report.ui)],
+        ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.reg.name}`, spent(t)]),
+      ],
+    });
+  }
+
+  runStart(at: number): void {
+    this.runAt = at;
+  }
+
+  runEnd(instance: ProbedInstance, at: number, part: RunPart): void {
+    if (!this.stamp) return;
+    const label = where(instance);
+    this.stamp(part === "apply" ? `${label} (apply)` : label, this.runAt, at, "behaviors", GROUP, "primary");
+    if (part === "async") this.flights.set(instance, { start: this.runAt, label });
+  }
+
+  flightEnd(instance: ProbedInstance, at: number, cancelled: boolean): void {
+    const flight = this.flights.get(instance);
+    if (!flight) return;
+    this.flights.delete(instance);
+    const [label, color]: [string, Color] = cancelled ? [`${flight.label} (cancelled)`, "secondary-light"] : [flight.label, "secondary"];
+    this.stamp!(label, flight.start, at, "async", GROUP, color);
+  }
+
+  registrationStart(at: number): void {
+    this.registrationAt = at;
+  }
+
+  registrationEnd(at: number, describe: () => RegistrationChange): void {
+    if (!this.measure) return;
+    const { store, added, removed, owners } = describe();
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    this.detail(`registration @${store}`, this.registrationAt, at, "registration", "tertiary-dark", {
+      tooltipText: `${plural(added.length, "behavior")} added, ${removed.length} removed, ${plural(owners.length, "combined key")} changed`,
+      properties: [
+        ...(added.length ? [["Added", added.join(", ")] as [string, string]] : []),
+        ...(removed.length ? [["Removed", removed.join(", ")] as [string, string]] : []),
+        ...owners.flatMap((o): [string, string][] => [
+          [`${o.key} triggers`, o.triggers.join(", ")],
+          [`${o.key} contributions`, o.parts.join(", ") || "none: the key is back to its default"],
+        ]),
+      ],
+    });
+  }
+
+  settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void {
+    const at = concretePath(store._host, node) || "<root>";
+    this.detail(`settle @${at}`, start, end, "async", "secondary-dark", {
+      tooltipText: `settle() waited ${ms(end - start)} for the runs in flight inside ${at}`,
+      properties: [],
+    });
+  }
+
+  private detail(name: string, start: number, end: number, track: Track, color: Color, entry: { tooltipText: string; properties: [string, string][] }): void {
+    this.measure?.(name, { start, end, detail: { devtools: { dataType: "track-entry", track, trackGroup: GROUP, color, ...entry } } });
+  }
+}
+
 /** The probe createStore installs in dev. */
 export class Diagnostics implements Probe {
   private readonly budget = new FlushBudget();
+  private readonly tracks = Tracks.detect();
 
   flushStart(at: number): void {
     this.budget.flushStart(at);
+    this.tracks?.flushStart(at);
   }
   reactionsEnd(at: number): void {
     this.budget.reactionsEnd(at);
@@ -123,14 +231,26 @@ export class Diagnostics implements Probe {
   flushEnd(at: number): void {
     const report = this.budget.flushEnd(at);
     if (report) console.warn(overBudget(report));
+    this.tracks?.flushEnd(at, report);
   }
   runStart(_instance: ProbedInstance, at: number): void {
     this.budget.runStart(at);
+    this.tracks?.runStart(at);
   }
   runEnd(instance: ProbedInstance, at: number, part: RunPart): void {
     this.budget.runEnd(instance, at, part);
+    this.tracks?.runEnd(instance, at, part);
   }
-  flightEnd(_instance: ProbedInstance, _at: number, _cancelled: boolean): void {}
-  registrationStart(_at: number): void {}
-  registrationEnd(_at: number, _describe: () => RegistrationChange): void {}
+  flightEnd(instance: ProbedInstance, at: number, cancelled: boolean): void {
+    this.tracks?.flightEnd(instance, at, cancelled);
+  }
+  registrationStart(at: number): void {
+    this.tracks?.registrationStart(at);
+  }
+  registrationEnd(at: number, describe: () => RegistrationChange): void {
+    this.tracks?.registrationEnd(at, describe);
+  }
+  settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void {
+    this.tracks?.settled(store, node, start, end);
+  }
 }
