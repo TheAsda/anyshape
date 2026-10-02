@@ -197,7 +197,7 @@ class Tracks {
         ...(removed.length ? [["Removed", removed.join(", ")] as [string, string]] : []),
         ...owners.flatMap((o): [string, string][] => [
           [`${o.key} triggers`, o.triggers.join(", ")],
-          [`${o.key} contributions`, o.parts.join(", ") || "none: the key is back to its default"],
+          [`${o.key} contributions`, [...o.parts, ...(o.more ? [`… and ${o.more} more`] : [])].join(", ") || "none: the key is back to its default"],
         ]),
       ],
     });

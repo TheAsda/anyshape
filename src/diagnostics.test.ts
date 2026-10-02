@@ -164,7 +164,7 @@ describe("T · Probe", () => {
         store: "<root>",
         added: ["copy"],
         removed: [],
-        owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]", "required(lines[].email) @<root>"] }],
+        owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]", "required(lines[].email) @<root>"], more: 0 }],
       },
     ]);
 
@@ -175,7 +175,7 @@ describe("T · Probe", () => {
       store: "<root>",
       added: [],
       removed: ["copy"],
-      owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]"] }],
+      owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]"], more: 0 }],
     });
   });
 });
@@ -388,6 +388,16 @@ describe("T · DevTools tracks", () => {
         ],
       },
     ]);
+  });
+
+  test("an owner's contributions are listed up to 20, then counted", () => {
+    const s = createStore(signup, signupValues());
+    s.substore(signup.lines).itemAt(1).addBehavior(rule(L.email, () => undefined, { name: "unique" }));
+    measure.mockClear();
+    s.addBehavior(Array.from({ length: 21 }, (_, i) => rule(L.email, () => undefined, { name: `r${i}` })));
+    const listed = Object.fromEntries(measured()[0].properties)["lines[].email#error contributions"];
+    const first = ["unique @lines[1]", ...Array.from({ length: 19 }, (_, i) => `r${i} @<root>`)];
+    expect(listed).toBe(`${first.join(", ")}, … and 2 more`);
   });
 
   test("settle() is a detailed entry on the async track while it waits; one that doesn't wait is none", async () => {

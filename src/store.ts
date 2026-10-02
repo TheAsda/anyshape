@@ -150,10 +150,22 @@ export interface RegistrationChange {
   readonly removed: readonly string[];
   /**
    * Each combined key whose contributions changed: its owner's merged triggers
-   * and its contributions in ctx.parts order, as "name @store".
+   * and its first LISTED_PARTS contributions in ctx.parts order, as
+   * "name @store", with the number of the others.
    */
-  readonly owners: readonly { readonly key: string; readonly triggers: readonly string[]; readonly parts: readonly string[] }[];
+  readonly owners: readonly {
+    readonly key: string;
+    readonly triggers: readonly string[];
+    readonly parts: readonly string[];
+    readonly more: number;
+  }[];
 }
+
+/**
+ * @internal An owner's contributions listed per registration entry. Rows that
+ * each contribute on mount would otherwise list every row on every mount.
+ */
+export const LISTED_PARTS = 20;
 
 /** @internal A behavior instance as a probe sees it: instances of one registration share `reg`. */
 export interface ProbedInstance {
