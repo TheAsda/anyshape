@@ -167,12 +167,12 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **J4 · P3** `replaceBehavior` with a handle from another store / runtime throws; with an already-disposed handle throws. → `behaviors.test.ts`
 
 ### K. Ordering & ownership
-**Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), one writer, opposite `when/otherwise` branches may share a target.
+**Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), nor do siblings' writes of the same behavior, one writer, opposite `when/otherwise` branches may share a target.
 
 - [x] **K1 · P2** **Container edge:** a row behavior writing a row field runs before a root behavior that triggers on the whole array (assert run order with a log, not only final values). → `behaviors.test.ts`
 - [x] **K2 · P2** **Inherited-meta edge:** a behavior writing an ancestor's `visible` runs before a field's validation queue that triggers on its effective visibility. → `behaviors.test.ts`
 - [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
-- [x] **K4 · P3** Pin the constraint: a row behavior that reads the whole array can run more than once per flush when a sibling row's instance writes (document the expected count). → `behaviors.test.ts`
+- [x] **K4 · P3** A row behavior triggered by its whole array runs once per row: siblings' writes don't re-trigger it (sync) or cancel its runs in flight (async, one `settle()` round), and a change that mixes them with another origin still runs it (#3). → `behaviors.test.ts`, `async.test.ts`
 - [x] **K5 · P3** Pin the constraint: two component behaviors on different rows that would only form a cycle across rows are rejected at registration. → `behaviors.test.ts`
 
 ### L. Runtime lifecycle

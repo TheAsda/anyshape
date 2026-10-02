@@ -519,6 +519,38 @@ describe("J · settle()", () => {
     await done;
     expect(settled).toBe(true);
   });
+
+  test("a row behavior triggered by its whole array settles in one round: siblings' writes cancel nothing", async () => {
+    vi.useFakeTimers();
+    const rows = [{ sku: "a", title: "" }, { sku: "b", title: "" }, { sku: "c", title: "" }];
+    const s = createStore(shape, { ...initial(), rows });
+    const started: string[] = [];
+    const aborted: string[] = [];
+    s.addBehavior(
+      defineBehavior({
+        triggers: [shape.rows],
+        reads: [R.sku],
+        writes: [R.title],
+        run: async (ctx) => {
+          const sku = ctx.get(R.sku);
+          started.push(sku);
+          ctx.signal.addEventListener("abort", () => aborted.push(sku));
+          const all = ctx.get(shape.rows);
+          // Rows finish one after another: each commit changes the array while the later rows are in flight.
+          await sleep(100 * (all.findIndex((r) => r.sku === sku) + 1), ctx.signal);
+          ctx.set(R.title, `${sku} of ${all.length}`);
+        },
+      })
+    );
+    let settled = false;
+    const done = s.settle().then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(300);
+    expect(settled, "after one round").toBe(true);
+    await done;
+    expect(started).toEqual(["a", "b", "c"]);
+    expect(aborted).toEqual([]);
+    expect(s.get(shape.rows).map((r) => r.title)).toEqual(["a of 3", "b of 3", "c of 3"]);
+  });
 });
 
 describe("J · Kept work", () => {

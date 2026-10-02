@@ -14,8 +14,11 @@
 //               Each flush runs the lowest pending rank, then the next, so
 //               every instance runs at most once per flush and sees final
 //               values. Cycles between registrations are rejected.
-//   • Own writes never trigger the instance that made them (origins are
-//               per instance: "behavior:<name>@<instance>").
+//   • Own writes never trigger the behavior that made them, in any of its
+//               instances (origins are per registration:
+//               "behavior:<name>@<registration>"). So a row behavior
+//               triggered by its whole array runs once per row, not again
+//               for each sibling's write.
 //   • Writes  – buffered during a run and applied only when it completes.
 //               ctx.state is a copy, saved only when the run completes.
 //   • Errors  – caught per run and passed to onError (default console.error);
@@ -108,7 +111,7 @@ export interface BehaviorContext {
   changed(ref: AnyRef): boolean;
   /** true for the run made when the instance is created. */
   readonly isInit: boolean;
-  /** Origins of the changes that caused this run (own writes excluded). */
+  /** Origins of the changes that caused this run (writes of this behavior, from any of its instances, excluded). */
   readonly origins: ReadonlySet<Origin>;
   /** Per-instance state, kept between runs (e.g. "the user overrode this"). A copy: saved only if the run completes. */
   readonly state: Record<string, unknown>;
@@ -309,6 +312,8 @@ export interface Registration {
   feature: boolean;
   /** Store the behavior was registered on (a scope host). */
   host: BaseStore<any>;
+  /** Origin of every instance's writes: they never trigger the registration's own instances. */
+  origin: Origin;
   scope: AnyNode;
   chain: AnyNode[];
   triggers: AnyRef[];
@@ -447,7 +452,6 @@ class Binding {
   state: Record<string, unknown> = {};
   /** The ctx.keep slot. */
   kept: Kept | undefined;
-  readonly origin: Origin;
   // non-leaf
   arrStore: ArrayStore<any> | undefined;
   readonly rows = new WeakMap<ItemStore<any>, Binding>();
@@ -456,9 +460,7 @@ class Binding {
     readonly reg: Registration,
     readonly host: BaseStore<any>,
     readonly depth: number
-  ) {
-    this.origin = `behavior:${reg.name}@${this.id}`;
-  }
+  ) {}
 
   get isLeaf(): boolean {
     return this.host.node === this.reg.scope;
@@ -707,7 +709,7 @@ export class BehaviorRuntime implements RuntimeHooks {
    * references stay in the target's scope chain.
    */
   private update(reg: Registration, fresh: Registration, hosts: readonly BaseStore<any>[]): void {
-    Object.assign(reg, { ...fresh, seq: reg.seq, root: reg.root, disposed: reg.disposed });
+    Object.assign(reg, { ...fresh, seq: reg.seq, origin: reg.origin, root: reg.root, disposed: reg.disposed });
     const seen = new Set<Binding>();
     for (const host of hosts) {
       const path = this.pathTo(reg, host);
@@ -899,7 +901,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     const triggerKeys = new Set(triggers.map(refKey));
     return {
-      seq, name, behavior, config, feature, host, scope, chain,
+      seq, name, behavior, config, feature, host, origin: `behavior:${name}@${seq}`, scope, chain,
       triggers, reads: reads.filter((r) => !triggerKeys.has(refKey(r))),
       inputs: [...triggers, ...reads], inputKeys: new Set([...triggers, ...reads].map(refKey)),
       writes, targets, guards,
@@ -1051,8 +1053,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   private onInput(leaf: Binding, key: string, info: ChangeInfo, starts: boolean): void {
     const reg = leaf.reg;
     const origins = new Set(info.origins);
-    origins.delete(leaf.origin);
-    if (info.origins.size > 0 && origins.size === 0) return; // only its own writes
+    origins.delete(reg.origin);
+    if (info.origins.size > 0 && origins.size === 0) return; // only its own writes, from any instance
     const rerun = this.supersede(leaf);
     if (!starts && !rerun) return;
     if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) return;
@@ -1207,7 +1209,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const commit = () => {
       leaf.state = state;
       for (const { ref, value } of buffer.values()) {
-        hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: leaf.origin });
+        hostFor(leaf.host, scopeOf(refNode(ref))).set(ref as any, value as never, { origin: reg.origin });
       }
     };
 
@@ -1295,7 +1297,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       // Meta the behavior wrote goes back to its default.
       reg.writes.forEach((w, i) => {
         const def = reg.targets[i].def;
-        if (def) binding.host.set(w, def.defaultValue as never, { origin: binding.origin });
+        if (def) binding.host.set(w, def.defaultValue as never, { origin: reg.origin });
       });
       return;
     }
