@@ -1,17 +1,22 @@
-// countIn(node, key): nodes in a subtree whose `key` counts (metaKey `aggregate`).
-// Read-only, on the tally channel.
+// countIn(node, def): nodes in a subtree whose key declared with `def` counts
+// (metaKey `aggregate`), under whatever name. Read-only, on the tally channel.
 
 import { ObjectNode, ArrayNode, type AnyNode } from "../shape";
-import { FIELDS, META_DEFS, isAncestorOrSelf } from "../internal";
+import type { MetaKeyDef } from "../meta";
+import { FIELDS, META_DEFS, isAncestorOrSelf, countSlotOf } from "../internal";
 import { KIND, type RefKind } from "./kind";
 
-/** Number of nodes in a subtree (the node itself included) whose `key` counts (see metaKey `aggregate`). */
+/** Number of nodes in a subtree (the node itself included) whose key declared with `def` counts (see metaKey `aggregate`). */
 export class CountRef {
   /** Nominal brand: a MetaRef has the same public shape and must not match. */
   private readonly _countRef = true;
-  constructor(readonly node: AnyNode, readonly key: string) {}
+  /**
+   * @internal `_id` is a counter: a definition has no name of its own.
+   * countIn caches one ref per (node, def), so equal refs share it.
+   */
+  constructor(readonly node: AnyNode, readonly def: MetaKeyDef<any, any>, readonly _id: string) {}
   get path(): string {
-    return `${this.node.path ?? ""}#count(${this.key})`;
+    return `${this.node.path ?? ""}#count`;
   }
   /** @internal */
   get [KIND](): RefKind<CountRef> {
@@ -21,47 +26,50 @@ export class CountRef {
 
 const countKind: RefKind<CountRef> = {
   node: (ref) => ref.node,
-  id: (ref) => `c:${ref.node.id}:${ref.key}`,
+  id: (ref) => ref._id,
   label: (ref) => ref.path,
   read: (store, ref) => {
     store.root._syncWalk();
-    return store._host._countOf(ref.node, ref.key);
+    return store._host._countOf(ref.node, countSlotOf(ref.def));
   },
-  subscribe: (store, ref, phase, fn) => store._addTallySub(ref.node, ref.key, phase, fn),
+  subscribe: (store, ref, phase, fn) => store._addTallySub(ref.node, countSlotOf(ref.def), phase, fn),
   affectedBy: (ref, t) =>
-    t.key === undefined ? isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node) : t.key === ref.key && isAncestorOrSelf(ref.node, t.node),
+    t.key === undefined ? isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node) : t.def === ref.def && isAncestorOrSelf(ref.node, t.node),
   local: false,
   readOnly: "Counts are read-only",
 };
 
-const countRefs = new WeakMap<AnyNode, Map<string, CountRef>>();
+const countRefs = new WeakMap<AnyNode, Map<MetaKeyDef<any, any>, CountRef>>();
+let countIds = 0;
 
 /**
- * Whether any node in the subtree declares `key` with an `aggregate`. Rows share
- * the array item template's declarations, so walking the template covers them.
+ * Whether any node in the subtree declares `def`. Rows share the array item
+ * template's declarations, so walking the template covers them.
  */
-function isCountable(node: AnyNode, key: string): boolean {
-  if (node[META_DEFS][key]?.options.aggregate) return true;
+function isDeclared(node: AnyNode, def: MetaKeyDef<any, any>): boolean {
+  if (Object.values(node[META_DEFS]).includes(def)) return true;
   if (node instanceof ObjectNode) {
-    for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) if (isCountable(child, key)) return true;
+    for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) if (isDeclared(child, def)) return true;
   } else if (node instanceof ArrayNode) {
-    return isCountable(node.item, key);
+    return isDeclared(node.item, def);
   }
   return false;
 }
 
-/** Count reference; the same instance for the same (node, key), so it can be used as a hook dependency. */
-export function countIn(node: AnyNode, key: string): CountRef {
-  let byKey = countRefs.get(node);
-  if (!byKey) countRefs.set(node, (byKey = new Map()));
-  let ref = byKey.get(key);
+/** Count reference; the same instance for the same (node, def), so it can be used as a hook dependency. */
+export function countIn(node: AnyNode, def: MetaKeyDef<any, any>): CountRef {
+  let byDef = countRefs.get(node);
+  if (!byDef) countRefs.set(node, (byDef = new Map()));
+  let ref = byDef.get(def);
   if (!ref) {
-    byKey.set(key, (ref = new CountRef(node, key)));
-    if (!isCountable(node, key)) {
-      console.warn(
-        `countIn: no node under "${node.path || "<root>"}" declares "${key}" with an aggregate – ` +
-          `the count is always 0. Counted keys are declared with metaKey(value, { aggregate }).`
-      );
+    byDef.set(def, (ref = new CountRef(node, def, `c:${countIds++}`)));
+    const problem = !def.options.aggregate
+      ? "the key has no aggregate"
+      : !isDeclared(node, def)
+        ? `no node under "${node.path || "<root>"}" declares it`
+        : undefined;
+    if (problem) {
+      console.warn(`countIn: ${problem} – the count is always 0. Counted keys are declared with metaKey(value, { aggregate }).`);
     }
   }
   return ref;

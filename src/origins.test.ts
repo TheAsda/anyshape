@@ -1,11 +1,10 @@
 // G · Origins, baselines (initial values) and reset.
 
 import {
-  form, object, array, field, meta, createStore, countIn, initialOf, defineBehavior, rule,
-  type Origin,
+  form, object, array, field, meta, createStore, countIn, initialOf, defineBehavior, type Origin,
 } from "./index";
-import { control, touched, disabled, type FocusTarget } from "./test/features";
-import { max } from "./test/rules";
+import { control, touched, disabled, type FocusTarget, dirty, error } from "./test/features";
+import { rule, max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";
@@ -120,7 +119,7 @@ describe("G · Origins, baselines and reset", () => {
     expect(lines.itemAt(0), "same row store after reset").toBe(row);
     expect(row.get(L.qty)).toBe(1);
     expect(row.get(L.sku.error)).toBe(undefined);
-    expect(s.get(countIn(shape, "error"))).toBe(0);
+    expect(s.get(countIn(shape, error))).toBe(0);
   });
 
   test("reset of one row", ({ store: s }) => {
@@ -140,7 +139,7 @@ describe("G · Origins, baselines and reset", () => {
 
   test("initial values and counts can't be set directly", ({ store: s }) => {
     expect(() => s.set(initialOf(shape.name) as never, "x" as never)).toThrow(/Initial values are written with \{ as: "initial" \}/);
-    expect(() => s.set(countIn(shape, "error") as never, 1 as never)).toThrow(/Counts are read-only/);
+    expect(() => s.set(countIn(shape, error) as never, 1 as never)).toThrow(/Counts are read-only/);
   });
 
   test("saving (a root baseline write) makes every current row clean; rows added later start dirty", ({ store: s, lines }) => {
@@ -153,7 +152,7 @@ describe("G · Origins, baselines and reset", () => {
     s.setValues(s.getValues(), { as: "initial" });
     expect(a.get(L.sku.dirty)).toBe(false);
     expect(added.get(L.sku.dirty), "the added row is part of the new baseline").toBe(false);
-    expect(s.get(countIn(shape, "dirty"))).toBe(0);
+    expect(s.get(countIn(shape, dirty))).toBe(0);
     expect(added.get(initialOf(L.sku))).toBe("N");
 
     const later = lines.append({ sku: "L" });

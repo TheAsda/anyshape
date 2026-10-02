@@ -5,6 +5,7 @@
 import { test, expect } from "vitest";
 import { userEvent } from "vitest/browser";
 import { createStore, countIn, type ItemStore } from "../index";
+import { error } from "../test/features";
 import { pattern } from "../test/rules";
 import { StoreProvider, useArray, useBehaviors, useField, useValue } from "./index";
 import { trip, T, tripBehaviors, savedBooking, quiet } from "../test/trip";
@@ -47,7 +48,7 @@ function Travelers() {
   );
 }
 function ErrorCounter() {
-  const n = useValue(countIn(trip, "error"));
+  const n = useValue(countIn(trip, error));
   c.hit("counter");
   return <span data-testid="errors">{String(n)}</span>;
 }

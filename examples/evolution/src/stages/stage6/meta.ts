@@ -7,10 +7,10 @@ export const meta: StageMeta = {
   bullets: [
     "{ disabled } adds a `disabled` key to a field (or a whole group — it inherits)",
     "disableWhen(node, [sources], fn) drives it exactly like visibleWhen",
-    "Same contract as hidden: skipped by validation, omitted from submitted values",
-    "…but the value stays in the store — the estimated budget keeps computing from the locked rate",
+    "Same contract as hidden: nothing implicit — rules that should pause are guarded on it, and the value is still submitted",
+    "The value stays in the store — the estimated budget keeps computing from the locked rate",
     "It's ordinary metadata — the component subscribes with useValue and decides what it looks like",
   ],
   notes:
-    "The counterpart to visibility, and the contrast is the point. Hiding removes the subtree from the screen (and, with clearWhen, wipes its values); disabling keeps everything visible and just locks editing. What they SHARE is the submit contract: hidden and disabled fields are both skipped by validation and left out of the values the server receives — submit with the box checked and nightlyRate is gone from the result card, yet the budget was still computed from it. The `disabled` key inherits down ('any' ancestor), so disableWhen on a group locks the whole group at once.",
+    "The counterpart to visibility, and the contrast is the point. Hiding removes the subtree from the screen (and, with clearWhen, wipes its values); disabling keeps everything visible and just locks editing. What they SHARE is that neither does anything implicitly: validation and submit treat them like any other field unless a rule is guarded on them — submit with the box checked and nightlyRate is in the result card, locked but intact, and the budget was computed from it. The `disabled` key inherits down ('any' ancestor), so disableWhen on a group locks the whole group at once.",
 };

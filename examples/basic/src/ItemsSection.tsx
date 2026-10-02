@@ -10,7 +10,7 @@ import { useId, useRef } from "react";
 import { countIn } from "form-lib";
 import { StoreProvider, useArray, useValue } from "form-lib/react";
 import { useControl } from "form-lib/recipes/react";
-import { shape, CATALOG } from "./form";
+import { shape, CATALOG, lookingUp } from "./form";
 import { NumberField, ReadonlyField } from "./fields";
 
 // The row template: fields inside a StoreProvider row are addressed
@@ -83,7 +83,7 @@ function SkuField() {
       {c.showError && (
         <p className="field__error">{c.error}</p>
       )}
-      {c.validating && <p className="field__status">Checking…</p>}
+      {c.pending && <p className="field__status">Checking…</p>}
     </div>
   );
 }
@@ -116,7 +116,7 @@ function TotalField() {
 
 export function ItemsSection() {
   const { items, append, remove } = useArray(shape.order.items);
-  const lookups = useValue(countIn(shape, "lookingUp"));
+  const lookups = useValue(countIn(shape, lookingUp));
   const budget = useValue(shape.requester.budget);
 
   return (

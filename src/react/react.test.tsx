@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { test, expect } from "vitest";
 import {
-  form, object, array, field, createStore, countIn, rule, type InferValue, type Origin,
+  form, object, array, field, createStore, countIn, type InferValue, type Origin,
   type ItemStore,
 } from "../index";
-import { control } from "../test/features";
+import { control, error } from "../test/features";
+import { rule } from "../test/rules";
 import { StoreProvider, useStore, useValue, useField, useArray } from "./index";
 import { render, settle, renders } from "./test-utils";
 
@@ -33,7 +34,7 @@ function initial(): Values {
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {
-  const n: number = useValue(countIn(shape, "error"));
+  const n: number = useValue(countIn(shape, error));
   const e: string | undefined = useValue(shape.name.error);
   const len: number = useValue(shape.lines, (lines) => lines.length);
   const hint: string = useField(shape.label).meta.hint;
@@ -55,9 +56,9 @@ test("useValue: values, meta keys and counts; only affected components re-render
   }
   function Errors() {
     c.hit("errors");
-    const count = useValue(countIn(shape, "error"));
-    const error = useValue(shape.name.error);
-    return <span data-testid="errors">{`${count}:${error ?? "-"}`}</span>;
+    const count = useValue(countIn(shape, error));
+    const nameError = useValue(shape.name.error);
+    return <span data-testid="errors">{`${count}:${nameError ?? "-"}`}</span>;
   }
   const screen = await render(
     <StoreProvider store={s}>

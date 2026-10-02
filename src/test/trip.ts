@@ -2,16 +2,17 @@
 // The trip booking used by the integration suites (core and React).
 // A reused `person` block, traveler rows with a per-row computed flag, a
 // calculated pricing chain with a budget rule, a seat count limited by a
-// value synced from outside, a visa section shown for some destinations,
-// and promo code / voucher exclusivity.
+// value synced from outside, a visa section shown (and required) for some
+// destinations, and promo code / voucher exclusivity. Rules are the
+// test-local contributions to `error` (./rules).
 // ============================================================
 
 import {
-  form, object, array, field, metaKey, defineBehaviors, defineBehavior, rule, asyncRule, initialOf,
+  form, object, array, field, metaKey, defineBehaviors, defineBehavior, initialOf,
   type InferValue, type AnyNode, type AnyRef, type RefValue,
 } from "../index";
 import { control, visible, disabled, submission } from "./features";
-import { required, email, pattern, max } from "./rules";
+import { rule, required, email, pattern, max } from "./rules";
 
 export const person = object({
   name: field<string>().meta(control()),
@@ -62,12 +63,6 @@ export const isAdultOn = (birth: string, on: string) =>
   !birth || !on || (Date.parse(on) - Date.parse(birth)) / (365.25 * DAY) >= 18;
 export const needsVisa = (country: string) => ["IN", "CN", "BR"].includes(country);
 
-/** The passport service: "X0000000" is reported lost. */
-export async function checkPassport(value: string) {
-  await new Promise((r) => setTimeout(r, 1));
-  return value === "X0000000" ? "This passport is reported lost" : undefined;
-}
-
 /** target = fn(...sources), recalculated when a source changes. */
 function calculate<N extends AnyNode, const Rs extends readonly AnyRef[]>(
   target: N,
@@ -92,7 +87,6 @@ export function tripBehaviors(runs: Record<string, number> = {}) {
     b.each(t.travelers, (b, p) => {
       b.add(required(p.name), required(p.passport));
       b.add(pattern(p.passport, /^[A-Z0-9]{8}$/, { message: "8 letters or digits" }));
-      b.add(asyncRule(p.passport, checkPassport));
       b.add(calculate(p.isAdult, [p.birthDate, t.departDate], (birth, dep) => (count("isAdult"), isAdultOn(birth, dep))));
     });
 
@@ -123,7 +117,7 @@ export function tripBehaviors(runs: Record<string, number> = {}) {
         ctx.set(t.visa, ctx.get(visaInitial));
       },
     }));
-    b.add(required(t.visa.number), required(t.visa.expires));
+    b.when([t.visa.visible], (v) => v, (b) => b.add(required(t.visa.number), required(t.visa.expires)));
 
     // At most one of promo and voucher: filling one disables the other; both filled is an error on each.
     b.add(defineBehavior({

@@ -5,10 +5,11 @@
 // ============================================================
 
 import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, rule, contribute,
+  form, object, array, field, metaKey, createStore, countIn, initialOf, contribute,
   type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef,
 } from "./index";
-import { control, visible, disabled, submission } from "./test/features";
+import { control, visible, disabled, submission, error } from "./test/features";
+import { rule } from "./test/rules";
 import { test, expect, expectTypeOf } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -59,7 +60,7 @@ type _m7 = Expect<Equal<InferMeta<typeof t.hidden>["visible"], boolean>>;
 // ---------------------------------------------------------------------------
 // References: every kind resolves to its value type
 const initialPlain = initialOf(t.plain);
-const errorCount = countIn(t, "error");
+const errorCount = countIn(t, error);
 type _r1 = Expect<Equal<RefValue<typeof t.text>, string>>;
 type _r2 = Expect<Equal<RefValue<typeof t.text.error>, string | undefined>>;
 type _r3 = Expect<Equal<RefValue<typeof t.text.seats>, number | undefined>>;
@@ -73,7 +74,7 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   // Store reads are typed by the reference.
   const n: number = s.get(t.count);
   const e: string | undefined = s.get(t.text.error);
-  const c: number = s.get(countIn(t, "error"));
+  const c: number = s.get(countIn(t, error));
 
   // Array helpers: a partial item with `create`, a complete one without.
   s.substore(t.withCreate).append();
@@ -89,7 +90,7 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   // @ts-expect-error – refs come from nodes (t.text.error) or collect, never constructed
   new MetaRef(t.text, "error");
   // @ts-expect-error – counts are read-only
-  s.set(countIn(t, "error"), 1);
+  s.set(countIn(t, error), 1);
 
   // @ts-expect-error – `plain` has no validation()
   rule(t.plain, () => undefined);
@@ -191,5 +192,5 @@ test("the type contract compiles (asserted by npm run typecheck)", () => {
     a: { name: "", email: "" }, b: { name: "", email: "" }, grid: [], optional: undefined,
     text: "", count: 0, plain: 0, hidden: { x: "" }, off: "", other: "", withCreate: [], noCreate: [],
   });
-  expect(s.get(countIn(t, "error"))).toBe(0);
+  expect(s.get(countIn(t, error))).toBe(0);
 });

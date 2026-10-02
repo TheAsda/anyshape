@@ -5,7 +5,7 @@ import {
 } from "form-lib";
 import {
   control, required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf, calculate,
-  exclusive,
+  exclusive, error, dirty,
 } from "./index";
 import { test as base, describe, expect } from "vitest";
 import { shape, L, initial } from "./test/fixtures/profile";
@@ -169,7 +169,7 @@ describe("N · Reference limits", () => {
       wanted: field<number>().meta(control()),
       rows: array(object({ v: field<string>().meta(control()) }), { create: () => ({ v: "" }) }),
     });
-    const s = createStore(f, { wanted: 2, rows: [] }, { behaviors: max(f.wanted, countIn(f.rows, "dirty")) });
+    const s = createStore(f, { wanted: 2, rows: [] }, { behaviors: max(f.wanted, countIn(f.rows, dirty)) });
     const rows = s.substore(f.rows);
     expect(s.get(f.wanted.error)).toBe("Must be at most 0");
     rows.append(); // a new row's field starts dirty

@@ -1,8 +1,9 @@
 // ------------------------------------------------------------
 // Stage 5 — Visibility.
 // Renting a car? Then we need license details. The car group
-// is hidden until the checkbox is on: while hidden it is not
-// validated, and submit() omits it from the values entirely.
+// is hidden until the checkbox is on: its rules are guarded on
+// its visibility, so a hidden group isn't validated, and
+// clearWhen resets its values while it's hidden.
 // ------------------------------------------------------------
 
 import { useState } from "react";
@@ -62,8 +63,11 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   // The car group exists only while the trip includes driving.
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
   b.add(clearWhen(s.car, [s.car.visible], (visible) => !visible));
-  b.add(required(s.car.license), minLength(s.car.license, 3));
-  b.add(required(s.car.licenseExpiry));
+  // The car rules apply only while the group is shown.
+  b.when([s.car.visible], (v) => v, (b) => {
+    b.add(required(s.car.license), minLength(s.car.license, 3));
+    b.add(required(s.car.licenseExpiry));
+  });
 });
 
 function Derived() {

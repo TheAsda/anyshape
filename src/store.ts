@@ -50,12 +50,11 @@
 
 import type { Meta, MetaKeyDef } from "./meta";
 import type { AnyBehavior, BehaviorHandle } from "./behaviors";
-import type { ValidationHooks, ValidationResult } from "./validation";
 import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
 } from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf } from "./internal";
 import { kindOf } from "./refs/kind";
 import type { CountRef } from "./refs/count";
 import type { InitialRef } from "./refs/initial";
@@ -135,11 +134,8 @@ interface Sub<V = any> {
 /** @internal */
 export type SubFn = Sub["fn"];
 
-/**
- * @internal A subtree tally: a meta key name (aggregate counts), or an object
- * owned by a reference kind (pending tallies), which never equals a name.
- */
-export type Slot = string | object;
+/** @internal A subtree tally: an object owned by a reference kind (aggregate counts, pending tallies). */
+export type Slot = object;
 
 interface Seen {
   focus: unknown;
@@ -439,10 +435,11 @@ export abstract class BaseStore<N extends ContainerNode> {
     for (const key of Object.keys(next)) {
       if (Object.is(current[key], next[key])) continue;
       changed.push(key);
-      const aggregate = node[META_DEFS][key]?.options.aggregate;
+      const def = node[META_DEFS][key];
+      const aggregate = def?.options.aggregate;
       if (aggregate) {
         const delta = (aggregate(next[key]) ? 1 : 0) - (aggregate(current[key]) ? 1 : 0);
-        if (delta) this.root._applyCountDelta(host, node, key, delta);
+        if (delta) this.root._applyCountDelta(host, node, countSlotOf(def), delta);
       }
     }
     if (!changed.length) return;
@@ -564,15 +561,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     }
   }
 
-  /** @internal this = scope host: every node in the subtree that declares `key`, rows included */
-  _eachWithKey(node: AnyNode, key: string, fn: (store: BaseStore<any>, node: AnyNode) => void): void {
-    if (key in node[META_DEFS]) fn(this, node);
-    if (node instanceof ObjectNode) {
-      for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) this._eachWithKey(child, key, fn);
-    } else if (node instanceof ArrayNode && node !== this.node) {
-      for (const row of (this.substore(node as any) as ArrayStore<any>).items()) row._eachWithKey(row.node, key, fn);
-    }
-  }
+
 
   // ==========================================================
   // Behaviors
@@ -613,36 +602,17 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   // ==========================================================
-  // Validation
-  // ==========================================================
-  /**
-   * Run every validation queue inside `node` (default: this store's node),
-   * including async checks that are debounced or were never run, wait for
-   * them, and return { valid, errors, failures }.
-   */
-  validate(node?: AnyNode): Promise<ValidationResult> {
-    const target = (node ?? this.node) as AnyNode;
-    this.assertInScope(target);
-    const hooks = this.root._validation;
-    if (!hooks) throw new Error("This store has no validation – create it with createStore()");
-    return hooks.validate(this, target);
-  }
-
-  // ==========================================================
   // Paths
   // ==========================================================
   /**
-   * Resolve a concrete path from the form root – "lines[1].qty", or with a
-   * meta key "lines[1].qty#error" – to a store that can address it and its
-   * reference. undefined when the path does not exist (unknown field, row
-   * index out of range).
+   * Resolve a concrete value path from the form root – "lines[1].qty" – to
+   * the node and a store that can address it. undefined when the path does
+   * not exist (unknown field, row index out of range). Meta keys are reached
+   * through the node, by definition (e.g. collect(ref, error) on that store).
    */
-  resolvePath(path: string): { store: BaseStore<any>; ref: AnyNode | MetaRef<any> } | undefined {
-    const hash = path.indexOf("#");
-    const valuePath = hash === -1 ? path : path.slice(0, hash);
-    const key = hash === -1 ? undefined : path.slice(hash + 1);
-    if (valuePath !== "" && !/^[^.[\]]+(?:\[\d+\])*(?:\.[^.[\]]+(?:\[\d+\])*)*$/.test(valuePath)) return undefined;
-    const tokens = valuePath.match(/[^.[\]]+|\[\d+\]/g) ?? [];
+  resolvePath(path: string): { store: BaseStore<any>; ref: AnyNode } | undefined {
+    if (path !== "" && !/^[^.[\]#]+(?:\[\d+\])*(?:\.[^.[\]#]+(?:\[\d+\])*)*$/.test(path)) return undefined;
+    const tokens = path.match(/[^.[\]]+|\[\d+\]/g) ?? [];
 
     let store: BaseStore<any> = this.root;
     let node: AnyNode = this.root.node;
@@ -659,9 +629,7 @@ export abstract class BaseStore<N extends ContainerNode> {
         node = (node[FIELDS] as Record<string, AnyNode>)[token];
       }
     }
-    if (key === undefined) return { store, ref: node };
-    if (!(key in node[META_DEFS])) return undefined;
-    return { store, ref: metaRefOf(node, key) };
+    return { store, ref: node };
   }
 
   // ==========================================================
@@ -940,7 +908,6 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   private phase: "idle" | Phase = "idle";
   private writeLog: WriteEntry[] = [];
   /** @internal */ _runtime: RuntimeHooks | undefined;
-  /** @internal */ _validation: ValidationHooks | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { reaction: new Set(), ui: new Set() };
   private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { reaction: new Map(), ui: new Map() };
   private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { reaction: new Map(), ui: new Map() };
