@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Only superseded PR runs: every push to master keeps its full run.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    # All four Vitest projects: unit and recipes in Node, react and
+    # recipes-react in Chromium (browser mode).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test
+      - name: Upload failure screenshots
+        # Both browser projects write their screenshots under .vitest/.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-failure-screenshots
+          path: .vitest/
+          # .vitest/ is a dot-directory: skipped unless hidden files are on.
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  typecheck:
+    # The type-level tests (typeOnlyChecks, @ts-expect-error) run only here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+
+  examples:
+    # The examples import the library's source through aliases, so their
+    # build catches broken aliases and recipe imports as well as types.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [basic, evolution]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      # The library source resolves its own imports from the root node_modules.
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: examples/${{ matrix.example }}
+      - run: bun run build
+        working-directory: examples/${{ matrix.example }}
+
+  bench:
+    # Informational: CI timing is too noisy to fail the build on.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run bench | tee bench.txt
+        shell: bash
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench
+          path: bench.txt
+          if-no-files-found: ignore
