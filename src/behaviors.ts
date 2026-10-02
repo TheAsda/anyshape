@@ -588,7 +588,10 @@ export class BehaviorRuntime implements RuntimeHooks {
     ]);
     this.checkWriters([...regs, ...ownerRegs], removed);
     const ranked = this.order.plan(
-      [...regs.map((reg) => ({ id: reg, decl: reg })), ...live.map(({ owner }, i) => ({ id: owner.reg ?? ownerRegs[i], decl: ownerRegs[i] }))],
+      [
+        ...regs.map((reg) => ({ reg, declaredBy: reg })),
+        ...live.map(({ owner }, i) => ({ reg: owner.reg ?? ownerRegs[i], declaredBy: ownerRegs[i] })),
+      ],
       removed
     ); // throws on cycles, before any state change
 
@@ -704,12 +707,11 @@ export class BehaviorRuntime implements RuntimeHooks {
   /**
    * In-place update of an owner: `reg` keeps its state (`root`, its binding
    * tree with each instance's ctx.state; `disposed`; `rank`, set by the run
-   * order) and takes everything
-   * else from `fresh`, prepared with the same `seq` and origin, then rewires its
-   * trigger subscriptions and reruns the instances inside `hosts`, where
-   * contributions were added or removed. A run in flight there is cancelled
-   * and rerun with its cause. The scope never changes: contributions'
-   * references stay in the target's scope chain.
+   * order) and takes everything else from `fresh`, prepared with the same
+   * `seq` and origin, then rewires its trigger subscriptions and reruns the
+   * instances inside `hosts`, where contributions were added or removed. A
+   * run in flight there is cancelled and rerun with its cause. The scope
+   * never changes: contributions' references stay in the target's scope chain.
    */
   private update(reg: Registration, fresh: Registration, hosts: readonly BaseStore<any>[]): void {
     Object.assign(reg, { ...fresh, root: reg.root, disposed: reg.disposed, rank: reg.rank });
