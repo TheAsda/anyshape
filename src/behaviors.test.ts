@@ -669,6 +669,23 @@ describe("K · Run order across registration changes", () => {
     expect(log, "independent again: registration order").toEqual(["a", "b"]);
   });
 
+  test("disposing a link of a dependent's longest chain leaves it after the next longest", () => {
+    const log: string[] = [];
+    // `a` is registered first: with too low a rank it would run before `s2`.
+    const s = createStore(shape, initial(), { behaviors: step(log, "a", [shape.discount, shape.subtotal, shape.tax], shape.total) });
+    s.addBehavior(step(log, "p0", [shape.start], shape.discount));
+    s.addBehavior(step(log, "s1", [shape.start], shape.end));
+    s.addBehavior(step(log, "s2", [shape.end], shape.subtotal));
+    const dispose = s.addBehavior(step(log, "g", [shape.subtotal], shape.tax));
+    dispose();
+    log.length = 0;
+    s.batch(() => {
+      s.set(shape.discount, 1);
+      s.set(shape.end, 1);
+    });
+    expect(log, "a still waits for s2").toEqual(["s2", "a"]);
+  });
+
   test("replacing a behavior checks cycles without it: the reverse link replaces it", () => {
     const log: string[] = [];
     const s = createStore(shape, initial());
@@ -697,7 +714,7 @@ describe("K · Run order across registration changes", () => {
     s.addBehavior(
       defineBehavior({ name: "w", triggers: [shape.title], writes: [shape.country], run: (c) => (log.push("w"), c.set(shape.country, c.get(shape.title))) })
     );
-    s.addBehavior(rule(shape.name, () => "Not x", { when: when([shape.country], (c) => c !== "x") }));
+    const dispose = s.addBehavior(rule(shape.name, () => "Not x", { when: when([shape.country], (c) => c !== "x") }));
     log.length = 0;
     s.batch(() => {
       s.set(shape.title, "x");
@@ -705,6 +722,14 @@ describe("K · Run order across registration changes", () => {
     });
     expect(log, "the owner, registered before w, now runs after it, once").toEqual(["w", "owner"]);
     expect(s.get(shape.name.error)).toBe(undefined);
+
+    dispose();
+    log.length = 0;
+    s.batch(() => {
+      s.set(shape.title, "y");
+      s.set(shape.name, "Al");
+    });
+    expect(log, "without the contribution: independent again, registration order").toEqual(["owner", "w"]);
   });
 });
 
