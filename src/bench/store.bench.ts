@@ -3,7 +3,7 @@
 // Timings are tracked over time, not asserted: compare runs on the same machine.
 // ============================================================
 
-import { test, describe, expect } from "vitest";
+import { test, describe, expect, vi } from "vitest";
 import { form, object, array, field, createStore, defineBehavior, countIn, metaKey, contribute } from "../index";
 import { control, revealed, error } from "../test/features";
 import { rule } from "../test/rules";
@@ -82,6 +82,36 @@ describe("200 rows", () => {
       bench("createStore with behaviors", () => {
         createStore(order, orderValues(), { behaviors: orderBehaviors });
       })
+    );
+  });
+});
+
+// Dev diagnostics (#17): the same edits on a store created in production
+// (no probe) and in dev (budget check and DevTools tracks). Vitest's console
+// has no timeStamp: a no-op one stands in for Chrome's, so the dev store also
+// builds every entry's label.
+describe("dev diagnostics overhead", () => {
+  console.timeStamp ??= () => {};
+  vi.stubEnv("NODE_ENV", "production");
+  const prodFlat = createStore(flat, flatValues());
+  const prodOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
+  vi.unstubAllEnvs();
+  const devFlat = createStore(flat, flatValues());
+  const devOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
+  expect([prodFlat._probe, prodOrder._probe, devFlat._probe && devOrder._probe].map(Boolean)).toEqual([false, false, true]);
+  const prodRow = prodOrder.substore(order.lines).itemAt(100);
+  const devRow = devOrder.substore(order.lines).itemAt(100);
+  let n = 0;
+  test("keystroke", async ({ bench }) => {
+    await bench.compare(
+      bench("keystroke, production", () => prodFlat.set(flatNodes.f250, `v${n++}`, { origin: "user" })),
+      bench("keystroke, dev diagnostics", () => devFlat.set(flatNodes.f250, `v${n++}`, { origin: "user" }))
+    );
+  });
+  test("row edit", async ({ bench }) => {
+    await bench.compare(
+      bench("edit one of 200 rows, production", () => prodRow.set(O.qty, (n++ % 5) + 1, { origin: "user" })),
+      bench("edit one of 200 rows, dev diagnostics", () => devRow.set(O.qty, (n++ % 5) + 1, { origin: "user" }))
     );
   });
 });
