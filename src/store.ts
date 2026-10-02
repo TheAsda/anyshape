@@ -54,7 +54,8 @@ import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
 } from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf, concretePath } from "./internal";
+import { isAncestorOrSelf } from "./tree";
 import { kindOf } from "./refs/kind";
 import type { CountRef } from "./refs/count";
 import type { InitialRef } from "./refs/initial";
@@ -167,11 +168,6 @@ interface ScopeHost {
   isAttached(): boolean;
 }
 
-function isAncestorOrSelf(ancestor: AnyNode, node: AnyNode): boolean {
-  for (let n: AnyNode | undefined = node; n; n = n.parent) if (n === ancestor) return true;
-  return false;
-}
-
 /** Do two locations overlap (one contains the other)? */
 function related(a: Loc, b: Loc): boolean {
   for (let i = 0; i < a.length && i < b.length; i++) {
@@ -217,15 +213,6 @@ function locOf(host: BaseStore<any>, node: AnyNode): Loc {
     h = parentHost;
   }
   return out;
-}
-
-/** Concrete path with row indexes, e.g. "lines[2].notes[0].text". */
-function concretePath(host: BaseStore<any>, node: AnyNode): string {
-  if (!(host instanceof ItemStore)) return node.path;
-  const arr = host.arrayStore;
-  const index = (arr.current() as readonly unknown[]).indexOf(host._currentRef);
-  const relative = node.path.slice(host.node.path.length);
-  return `${concretePath(arr._host, arr.node)}[${index}]${relative}`;
 }
 
 function register(map: Map<AnyNode, Set<Sub>>, node: AnyNode, sub: Sub): Unsubscribe {

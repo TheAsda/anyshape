@@ -66,9 +66,10 @@
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
-  refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
+  refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
   FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween,
 } from "./internal";
+import { isAncestorOrSelf } from "./tree";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
   type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks,
@@ -1143,7 +1144,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private run(leaf: Binding, p: Pending): void {
     const reg = leaf.reg;
     if (reg.disposed || !leaf.host.isAttached()) return;
-    const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concreteScopePath(leaf.host) });
+    const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concretePath(leaf.host, leaf.host.node) });
 
     const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
     const state = { ...leaf.state }; // saved only if the run completes
