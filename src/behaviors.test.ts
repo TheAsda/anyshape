@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext,
 } from "./index";
 import { control, visible, disabled, touched, dirty } from "./test/features";
 import { rule, max } from "./test/rules";
@@ -186,48 +186,43 @@ describe("K · Own writes, two-way links, state", () => {
     expect(s.get(shape.slug)).toBe("custom");
   });
 
-  test("a row behavior triggered by its whole array: siblings' writes do not re-trigger it", () => {
+  /** Three lines whose row behavior "share" sets each line's percentage of the total price; `spy` sees every run. */
+  function shares(spy: (ctx: BehaviorContext) => void) {
     const f = form({ lines: array(object({ price: field<number>(), share: field<number>() })) });
     const R = f.lines.item;
-    let runs = 0;
     const share = defineBehavior({
       name: "share", triggers: [f.lines], reads: [R.price], writes: [R.share],
       run: (ctx) => {
-        runs++;
+        spy(ctx);
         const sum = ctx.get(f.lines).reduce((s, l) => s + l.price, 0);
         ctx.set(R.share, sum ? Math.round((ctx.get(R.price) / sum) * 100) : 0);
       },
     });
     const s = createStore(f, { lines: [{ price: 10, share: 0 }, { price: 30, share: 0 }, { price: 60, share: 0 }] }, { behaviors: share });
+    return { R, lines: s.substore(f.lines), values: () => s.get(f.lines).map((l) => l.share) };
+  }
+
+  test("a row behavior triggered by its whole array: siblings' writes do not re-trigger it", () => {
+    let runs = 0;
+    const { R, lines, values } = shares(() => runs++);
     expect(runs, "init: once per row").toBe(3);
-    expect(s.get(f.lines).map((l) => l.share)).toEqual([10, 30, 60]);
+    expect(values()).toEqual([10, 30, 60]);
     runs = 0;
-    s.substore(f.lines).itemAt(0).set(R.price, 40, { origin: "user" });
+    lines.itemAt(0).set(R.price, 40, { origin: "user" });
     expect(runs, "an edit: once per row").toBe(3);
-    expect(s.get(f.lines).map((l) => l.share)).toEqual([31, 23, 46]);
+    expect(values()).toEqual([31, 23, 46]);
   });
 
   test("a change mixing siblings' writes with another origin still runs it, with only that origin", () => {
-    const f = form({ lines: array(object({ price: field<number>(), share: field<number>() })) });
-    const R = f.lines.item;
     const seen: string[][] = [];
-    const share = defineBehavior({
-      name: "share", triggers: [f.lines], reads: [R.price], writes: [R.share],
-      runOn: { init: false },
-      run: (ctx) => {
-        seen.push([...ctx.origins]);
-        const sum = ctx.get(f.lines).reduce((s, l) => s + l.price, 0);
-        ctx.set(R.share, sum ? Math.round((ctx.get(R.price) / sum) * 100) : 0);
-      },
-    });
-    const s = createStore(f, { lines: [{ price: 10, share: 0 }, { price: 30, share: 0 }, { price: 60, share: 0 }] }, { behaviors: share });
-    const lines = s.substore(f.lines);
+    const { R, lines, values } = shares((ctx) => seen.push([...ctx.origins]));
+    seen.length = 0;
     // A reaction to the user's edit writes in the same round as the share runs:
     // the next change of the array carries both the program's and the siblings' origins.
     lines.itemAt(0).react(R.price, () => void lines.itemAt(2).set(R.price, 50));
     lines.itemAt(0).set(R.price, 40, { origin: "user" });
     expect(seen).toEqual([["user"], ["user"], ["user"], ["program"], ["program"], ["program"]]);
-    expect(s.get(f.lines).map((l) => l.share)).toEqual([33, 25, 42]);
+    expect(values()).toEqual([33, 25, 42]);
   });
 });
 

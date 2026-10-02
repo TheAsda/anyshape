@@ -700,16 +700,16 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   /**
-   * In-place update of an owner: `reg` keeps its identity (`seq`, which
-   * orders runs; `root`, its binding tree with each instance's ctx.state;
-   * `disposed`) and takes everything else from `fresh`, then rewires its
+   * In-place update of an owner: `reg` keeps its state (`root`, its binding
+   * tree with each instance's ctx.state; `disposed`) and takes everything
+   * else from `fresh`, prepared with the same `seq` and origin, then rewires its
    * trigger subscriptions and reruns the instances inside `hosts`, where
    * contributions were added or removed. A run in flight there is cancelled
    * and rerun with its cause. The scope never changes: contributions'
    * references stay in the target's scope chain.
    */
   private update(reg: Registration, fresh: Registration, hosts: readonly BaseStore<any>[]): void {
-    Object.assign(reg, { ...fresh, seq: reg.seq, origin: reg.origin, root: reg.root, disposed: reg.disposed });
+    Object.assign(reg, { ...fresh, root: reg.root, disposed: reg.disposed });
     const seen = new Set<Binding>();
     for (const host of hosts) {
       const path = this.pathTo(reg, host);
@@ -840,7 +840,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private prepare(host: BaseStore<any>, behavior: Behavior, feature: boolean, owner?: Owner): Registration {
     if (!(behavior instanceof Behavior)) throw new Error("Expected a behavior created with defineBehavior()");
     const config = behavior.config;
-    const seq = regCounter++;
+    const seq = owner?.reg?.seq ?? regCounter++; // an owner refreshed in place keeps its run order and origin
     const name = config.name ?? (behavior._self ? `feature` : `b${seq}`);
     const guards = guardsOf(config);
     const triggers = [...(config.triggers ?? []), ...guards.flatMap((g) => g.refs)];
