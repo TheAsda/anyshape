@@ -102,11 +102,6 @@ export function rootOf(node: AnyNode): AnyNode {
   return n;
 }
 
-export function isAncestorOrSelf(a: AnyNode, b: AnyNode): boolean {
-  for (let n: AnyNode | undefined = b; n; n = n.parent) if (n === a) return true;
-  return false;
-}
-
 export function storeWithin(inner: BaseStore<any>, outer: BaseStore<any>): boolean {
   for (let s: BaseStore<any> | undefined = inner; s; s = s.parentStore) if (s === outer) return true;
   return false;
@@ -134,12 +129,12 @@ export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemSt
   return rows;
 }
 
-export function concreteScopePath(host: BaseStore<any>): string {
-  if (!(host instanceof ItemStore)) return "";
+/** Concrete path with row indexes, e.g. "lines[2].notes[0].text". `host` is the scope host of `node`. */
+export function concretePath(host: BaseStore<any>, node: AnyNode): string {
+  if (!(host instanceof ItemStore)) return node.path;
   const arr = host.arrayStore;
   const index = (arr.current() as readonly unknown[]).indexOf(host._currentRef);
-  const outer = concreteScopePath(arr._host);
-  const relative = arr.node.path.slice(arr._host.node.path.length).replace(/^\./, "");
-  return `${outer}${outer && relative ? "." : ""}${relative}[${index}]`;
+  const relative = node.path.slice(host.node.path.length);
+  return `${concretePath(arr._host, arr.node)}[${index}]${relative}`;
 }
 

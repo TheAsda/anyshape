@@ -1,7 +1,8 @@
 // node.key: one meta key of one node (effective value for inherited keys).
 
 import type { MetaRef } from "../shape";
-import { isAncestorOrSelf, defOf } from "../internal";
+import { defOf } from "../internal";
+import { isAncestorOrSelf } from "../tree";
 import type { RefKind } from "./kind";
 
 export const metaKind: RefKind<MetaRef<any>> = {
