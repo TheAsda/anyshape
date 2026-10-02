@@ -17,19 +17,21 @@ export type Check = (value: any, ctx: Pick<BehaviorContext, "get">) => string | 
  * A test-local combined key: its owner writes the first failing check of the
  * node's contributions (test/rules.ts), in order. Counted per subtree.
  */
-export const error = metaKey<string | undefined, Check>(undefined).aggregate((e) => e !== undefined).combine((self, key) => ({
-  name: `${self.path || "<root>"}#error`,
-  triggers: [self],
-  writes: [key],
-  run(ctx) {
-    const value = ctx.get(self);
-    for (const p of ctx.parts) {
-      const found = p.payload(value, ctx);
-      if (found !== undefined) return ctx.set(key, found);
-    }
-    ctx.set(key, undefined);
-  },
-}));
+export const error = metaKey<string | undefined, Check>(undefined)
+  .aggregate((e) => e !== undefined)
+  .combine((self, key) => ({
+    name: `${self.path || "<root>"}#error`,
+    triggers: [self],
+    writes: [key],
+    run(ctx) {
+      const value = ctx.get(self);
+      for (const p of ctx.parts) {
+        const found = p.payload(value, ctx);
+        if (found !== undefined) return ctx.set(key, found);
+      }
+      ctx.set(key, undefined);
+    },
+  }));
 
 export const validation = () => ({ error });
 
