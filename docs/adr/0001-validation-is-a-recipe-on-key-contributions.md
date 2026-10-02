@@ -18,6 +18,11 @@ Confirmed by a prototype ([#23](https://github.com/TheAsda/form-lib/issues/23), 
   - rules declared on the key can't reference other fields
   - multiple writers merged by a reducer lose "sync before async" and "a guarded rule is absent"
 - **Reconfigurable handles** (`addRule(store, …)` / `useRules`). Rejected: they push an imperative registry onto consumers. Rules must stay declarative: plain lists built before React.
+- **A fold over part slots**, reviewed on 2026-10-02 ([research](https://github.com/TheAsda/form-lib/blob/research/lazy-fold/docs/research/lazy-fold.md)). Each rule is its own behavior writing a private slot, and the key's definition folds the slots into the key's value. A plain fold only sees results, so every rule runs and async requests start after a sync rule has failed. There are two lazy versions:
+  - **gated slots:** each rule reads the prefix of the slots before it;
+  - **demand-scheduled slots:** the runtime parks the writers the fold didn't reach.
+
+  Both stop at the first error and rerun less than `combine`. But they lose the shared debounce, turn forcing into a token nobody resets, need incremental ranking, and add more core than they remove. Every version that keeps the policies spanning several rules (one debounce, one force flag, a start decision from the run's cause) needs one evaluator per instance with a `ctx`, which is the owner, so it turns back into `combine`. A fold suits order-free keys like `disabled`, but that isn't worth a second mechanism. Rejected.
 
 ## Consequences
 
@@ -25,5 +30,7 @@ Confirmed by a prototype ([#23](https://github.com/TheAsda/form-lib/issues/23), 
 - Neither the core nor the validation recipe skips hidden or disabled fields. A team writes that as guarded rules (`b.when([s.car.visible], …)`), and absent rules clear the error ([#21](https://github.com/TheAsda/form-lib/issues/21)).
 - Contributions are grouped per root store, never per shape node: shapes are shared across stores, rows and tests. Each contribution applies only to instances inside the store it was added on.
 - When contributions change while an owner run is in flight, the run is cancelled and rerun with **the cancelled run's cause** (its origins, changed inputs and init flag), and `ctx.state` is kept. The async check runs in kept work (`ctx.keep`), so mounting an unrelated rule mid-flight, or an edit to a field only a sync rule reads, re-checks the sync rules and leaves the request in flight running ([#28](https://github.com/TheAsda/form-lib/issues/28)).
+- An owner's triggers are the union of its contributions' inputs, so any input change reruns the whole owner. Each combined key's recipe pays for that by making a rerun cheap (`ctx.changed`, results in `ctx.state` keyed on `Part.inputs`, `ctx.keep`).
+- An owner that needs other keys of its node declares them by definition with `.uses(…)`, a pipeline step before `.combine(…)` or `.behavior(…)` ([ADR 0002](0002-pipelines-type-calls-with-explicit-type-arguments.md)). The core resolves them under whatever names the node declares them with, and hands their refs to the step as a typed tuple. `createStore` throws when one is missing or declared twice. No code finds a sibling key by name ([#45](https://github.com/TheAsda/form-lib/issues/45)).
 - Recipes are copied and adapted, not depended on, so a fix to the validation queue no longer reaches every form automatically.
 - The shipped validation recipe hardcodes `string` errors ([#24](https://github.com/TheAsda/form-lib/issues/24)). A team that adapts it to typed errors must infer the error type from the key's ref with `const E` (`rule<V, const E>(node: { _type: V; error: MetaRef<E | undefined, RulePart<E>> }, …)`). Otherwise literal-union errors widen and are rejected.
