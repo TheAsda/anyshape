@@ -149,6 +149,10 @@ describe("Uses", () => {
     expect(() => metaKey(0).behavior(() => ({ run() {} })).uses(forced)).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
   });
 
+  test(".uses() is declared once: a second call throws instead of dropping the first one's keys", () => {
+    expect(() => metaKey(0).uses(forced).uses(metaKey(""))).toThrow(/\.uses\(\) is declared once – list every used key in one call/);
+  });
+
   test("a used key the node declares twice is ambiguous and throws in createStore", () => {
     const sh = form(object({ f: field<string>().meta({ problem: checked, recheck: forced }).meta({ again: forced }) }));
     expect(() => createStore(sh, { f: "" })).toThrow(

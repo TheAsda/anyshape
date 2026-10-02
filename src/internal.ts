@@ -110,6 +110,18 @@ export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
   return h;
 }
 
+/** The row stores from `outer` (excluded) down to `host` (included): every scope host on the way is a row. */
+export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemStore<any>[] {
+  const rows: ItemStore<any>[] = [];
+  let h = host;
+  while (h !== outer) {
+    if (!(h instanceof ItemStore)) throw new Error(`"${host.node.path || "<root>"}" is not inside "${outer.node.path || "<root>"}"`);
+    rows.unshift(h);
+    h = h.arrayStore._host;
+  }
+  return rows;
+}
+
 export function concreteScopePath(host: BaseStore<any>): string {
   if (!(host instanceof ItemStore)) return "";
   const arr = host.arrayStore;
