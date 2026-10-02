@@ -6,7 +6,7 @@
 
 import {
   form, object, array, field, metaKey, createStore, countIn, initialOf, contribute,
-  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef,
+  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef, type NoPayload,
 } from "./index";
 import { control, visible, disabled, submission, error } from "./test/features";
 import { rule } from "./test/rules";
@@ -154,6 +154,30 @@ metaKey(0).combine((_self, _key, uses) => {
   type _none = Expect<Equal<typeof uses, readonly []>>;
   return { run() {} };
 });
+
+// `aggregate` is a step: V is fixed by metaKey(), so a literal default widens as without it.
+const flaggedKey = metaKey(false).aggregate((v) => {
+  type _v = Expect<Equal<typeof v, boolean>>;
+  return v;
+});
+type _w1 = Expect<Equal<typeof flaggedKey, MetaKeyDef<boolean, NoPayload, []>>>;
+const countKey = metaKey(0).aggregate((v) => v > 0);
+type _w2 = Expect<Equal<typeof countKey, MetaKeyDef<number, NoPayload, []>>>;
+const labelKey = metaKey("").aggregate((v) => v !== "");
+type _w3 = Expect<Equal<typeof labelKey, MetaKeyDef<string, NoPayload, []>>>;
+// Spelled-out type arguments are kept as written.
+const issueKey = metaKey<string | undefined, { reason: string }>(undefined).aggregate((v) => v !== undefined);
+type _w4 = Expect<Equal<typeof issueKey, MetaKeyDef<string | undefined, { reason: string }, []>>>;
+// @ts-expect-error – `aggregate` is a step, not an option
+metaKey(false, { aggregate: (v: boolean) => v });
+// The steps after `aggregate` are typed by the widened value.
+metaKey(false)
+  .aggregate((v) => v)
+  .uses(countKey)
+  .combine((_self, key, [count]) => {
+    type _u = Expect<Equal<[RefValue<typeof key>, RefValue<typeof count>], [boolean, number]>>;
+    return { triggers: [count], writes: [key], run: (ctx) => ctx.set(key, true) };
+  });
 
 export function contributionChecks() {
   contribute(c.n.total, { weight: 2 });
