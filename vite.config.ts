@@ -12,7 +12,7 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: ['zod', 'react', 'react-dom', 'devtools-protocol'],
+      external: ['react', 'react-dom'],
     },
   },
   plugins: [
