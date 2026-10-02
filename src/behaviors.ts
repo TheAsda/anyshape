@@ -76,7 +76,7 @@ import {
 import { isAncestorOrSelf } from "./tree";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
-  type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks,
+  type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks, type RegistrationChange,
 } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 import { initialOf } from "./refs/initial";
@@ -556,10 +556,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const handle = (() => {
       if (entry.disposed) return;
       entry.disposed = true;
-      this.store._batch(() => {
-        this.dispose(regs);
-        if (entries.length) this.apply(host, [], [], this.ownerChange(host, [], entries, seq).change);
-      });
+      this.apply(host, [], regs, entries.length ? this.ownerChange(host, [], entries, seq).change : []);
     }) as BehaviorHandle;
     handles.set(handle, entry);
     return handle;
@@ -575,6 +572,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     removing: readonly Registration[],
     owners: OwnerChange = []
   ): Registration[] {
+    const probe = this.store._probe;
+    probe?.registrationStart(performance.now());
     const regs = items.map((i) => this.prepare(host, i.behavior, i.feature));
     // A fresh registration per changed owner, used for every check; an owner
     // already registered then takes over its declarations in place.
@@ -612,8 +611,24 @@ export class BehaviorRuntime implements RuntimeHooks {
         this.owners.set(refKey(owner.ref), owner);
         this.register(ownerRegs[i], this.store);
       });
+      probe?.registrationEnd(performance.now(), () => this.describe(host, regs, removing, owners));
     });
     return regs;
+  }
+
+  /** A committed registration change, for the probe. */
+  private describe(host: BaseStore<any>, added: readonly Registration[], removed: readonly Registration[], owners: OwnerChange): RegistrationChange {
+    const at = (store: BaseStore<any>) => concretePath(store, store.node) || "<root>";
+    return {
+      store: at(host),
+      added: added.map((r) => r.name),
+      removed: removed.map((r) => r.name),
+      owners: owners.map(({ owner }) => ({
+        key: refLabel(owner.ref),
+        triggers: owner.reg?.triggers.map(refLabel) ?? [],
+        parts: [...owner.byHost.values()].flat().sort(partOrder).map((e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`),
+      })),
+    };
   }
 
   // ---- combined keys ----
@@ -1072,7 +1087,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private cancel(leaf: Binding): Pending | undefined {
     const flight = this.flights.get(leaf);
     if (!flight) return;
-    this.end(leaf, flight);
+    this.end(leaf, flight, true);
     flight.controller.abort();
     if (leaf.kept) this.orphans.add(leaf);
     return flight.cause;
@@ -1107,9 +1122,10 @@ export class BehaviorRuntime implements RuntimeHooks {
     return cause !== undefined;
   }
 
-  private end(leaf: Binding, flight: Flight): void {
+  private end(leaf: Binding, flight: Flight, cancelled: boolean): void {
     if (this.flights.get(leaf) !== flight) return;
     this.flights.delete(leaf);
+    this.store._probe?.flightEnd(leaf, performance.now(), cancelled);
     for (const off of flight.offs) off();
     flight.tally.end();
     const gate = this.settledGate;
@@ -1127,8 +1143,19 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   // ---- running ----
   private run(leaf: Binding, p: Pending): void {
+    if (leaf.reg.disposed || !leaf.host.isAttached()) return;
+    const probe = this.store._probe;
+    if (!probe) return this.execute(leaf, p);
+    probe.runStart(leaf, performance.now());
+    try {
+      this.execute(leaf, p);
+    } finally {
+      probe.runEnd(leaf, performance.now(), this.flights.has(leaf) ? "async" : "sync");
+    }
+  }
+
+  private execute(leaf: Binding, p: Pending): void {
     const reg = leaf.reg;
-    if (reg.disposed || !leaf.host.isAttached()) return;
     const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concretePath(leaf.host, leaf.host.node) });
 
     const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
@@ -1235,8 +1262,15 @@ export class BehaviorRuntime implements RuntimeHooks {
           if (signal.aborted) return;
           try {
             this.store._batch(() => {
-              this.end(leaf, flight);
-              commit();
+              this.end(leaf, flight, false);
+              const probe = this.store._probe;
+              if (!probe) return commit();
+              probe.runStart(leaf, performance.now());
+              try {
+                commit();
+              } finally {
+                probe.runEnd(leaf, performance.now(), "apply");
+              }
             });
           } catch (error) {
             this.onError(located(reg.behavior, error), info());
@@ -1244,7 +1278,7 @@ export class BehaviorRuntime implements RuntimeHooks {
         },
         (error) => {
           if (signal.aborted) return;
-          this.store._batch(() => this.end(leaf, flight));
+          this.store._batch(() => this.end(leaf, flight, false));
           this.onError(located(reg.behavior, error), info());
         }
       );
@@ -1254,16 +1288,6 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   // ---- disposal ----
-  private dispose(regs: Registration[]): void {
-    const live = regs.filter((r) => !r.disposed);
-    if (!live.length) return;
-    const commitOrder = this.order.plan([], new Set(live)); // a removal never forms a cycle
-    commitOrder();
-    this.store._batch(() => {
-      for (const reg of live) this.unregister(reg, true);
-    });
-  }
-
   private unregister(reg: Registration, resetMeta: boolean): void {
     if (reg.disposed) return;
     reg.disposed = true;
