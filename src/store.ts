@@ -561,8 +561,6 @@ export abstract class BaseStore<N extends ContainerNode> {
     }
   }
 
-
-
   // ==========================================================
   // Behaviors
   // ==========================================================
@@ -608,7 +606,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * Resolve a concrete value path from the form root – "lines[1].qty" – to
    * the node and a store that can address it. undefined when the path does
    * not exist (unknown field, row index out of range). Meta keys are reached
-   * through the node, by definition (e.g. collect(ref, error) on that store).
+   * through the node, by definition (e.g. collect(node, error) on that store).
    */
   resolvePath(path: string): { store: BaseStore<any>; ref: AnyNode } | undefined {
     if (path !== "" && !/^[^.[\]#]+(?:\[\d+\])*(?:\.[^.[\]#]+(?:\[\d+\])*)*$/.test(path)) return undefined;

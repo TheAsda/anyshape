@@ -30,7 +30,6 @@ export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {
   return ref.node[META_DEFS][ref.key];
 }
 
-/** The node's own reference to a declared key (node.error), the one every reader shares. */
 const countSlots = new WeakMap<MetaKeyDef<any, any>, object>();
 
 /**
@@ -43,6 +42,7 @@ export function countSlotOf(def: MetaKeyDef<any, any>): object {
   return slot;
 }
 
+/** The node's own reference to a declared key (node.error), the one every reader shares. */
 export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
   return (node as any)[key];
 }
