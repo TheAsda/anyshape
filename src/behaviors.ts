@@ -13,7 +13,8 @@
 //               declarations (A writes what B triggers on / reads → A first).
 //               Each flush runs the lowest pending rank, then the next, so
 //               every instance runs at most once per flush and sees final
-//               values. Cycles between registrations are rejected.
+//               values. Cycles between registrations are rejected. A
+//               registration change reranks only what it reaches (order.ts).
 //   • Own writes never trigger the behavior that made them, in any of its
 //               instances (origins are per registration:
 //               "behavior:<name>@<registration>"). So a row behavior
@@ -80,6 +81,7 @@ import {
 import { kindOf, type Target } from "./refs/kind";
 import { initialOf } from "./refs/initial";
 import { beginRun, pendingIn, type PendingRun } from "./refs/pending";
+import { RunOrder, NodeIndex, type Write } from "./order";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
 export type WritableRef = AnyNode | MetaRef<any>;
@@ -284,11 +286,6 @@ function originKind(origin: Origin): OriginKind {
   return origin.startsWith("behavior:") ? "behavior" : (origin as OriginKind);
 }
 
-/** Does writing `w` possibly change the value of input `r`? */
-function affects(w: Target, r: AnyRef): boolean {
-  return kindOf(r).affectedBy(r, w);
-}
-
 /** Do two write targets overlap (the same data)? */
 function overlaps(a: Target, b: Target): boolean {
   if (a.key === undefined && b.key === undefined) return isAncestorOrSelf(a.node, b.node) || isAncestorOrSelf(b.node, a.node);
@@ -490,6 +487,8 @@ const handles = new WeakMap<BehaviorHandle, HandleEntry>();
 // ============================================================
 export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
+  /** Dependency edges and ranks of `regs`. */
+  private readonly order = new RunOrder<Registration>();
   private readonly pending = new Map<Binding, Pending>();
   private readonly flights = new Map<Binding, Flight>();
   /** Instances whose kept-work slot holds work. */
@@ -587,11 +586,14 @@ export class BehaviorRuntime implements RuntimeHooks {
       ...removing,
       ...owners.flatMap((o) => (o.owner.reg ? [o.owner.reg] : [])),
     ]);
-    const kept = this.regs.filter((r) => !removed.has(r));
-    this.checkWriters([...regs, ...ownerRegs], kept);
-    this.rank([...kept, ...regs, ...ownerRegs]); // throws on cycles, before any state change
+    this.checkWriters([...regs, ...ownerRegs], removed);
+    const ranked = this.order.plan(
+      [...regs.map((reg) => ({ id: reg, decl: reg })), ...live.map(({ owner }, i) => ({ id: owner.reg ?? ownerRegs[i], decl: ownerRegs[i] }))],
+      removed
+    ); // throws on cycles, before any state change
 
     this.store._batch(() => {
+      ranked();
       for (const reg of removing) this.unregister(reg, true);
       for (const reg of regs) this.register(reg, host);
       for (const delta of owners) {
@@ -701,7 +703,8 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   /**
    * In-place update of an owner: `reg` keeps its state (`root`, its binding
-   * tree with each instance's ctx.state; `disposed`) and takes everything
+   * tree with each instance's ctx.state; `disposed`; `rank`, set by the run
+   * order) and takes everything
    * else from `fresh`, prepared with the same `seq` and origin, then rewires its
    * trigger subscriptions and reruns the instances inside `hosts`, where
    * contributions were added or removed. A run in flight there is cancelled
@@ -709,7 +712,7 @@ export class BehaviorRuntime implements RuntimeHooks {
    * references stay in the target's scope chain.
    */
   private update(reg: Registration, fresh: Registration, hosts: readonly BaseStore<any>[]): void {
-    Object.assign(reg, { ...fresh, root: reg.root, disposed: reg.disposed });
+    Object.assign(reg, { ...fresh, root: reg.root, disposed: reg.disposed, rank: reg.rank });
     const seen = new Set<Binding>();
     for (const host of hosts) {
       const path = this.pathTo(reg, host);
@@ -914,56 +917,36 @@ export class BehaviorRuntime implements RuntimeHooks {
     };
   }
 
-  /** One writer per target among registrations whose regions overlap. */
-  private checkWriters(added: Registration[], current: Registration[]): void {
-    const existing = [...current];
+  /**
+   * One writer per target among registrations whose regions overlap: `added`
+   * against each other and against the registrations other than `removed`.
+   */
+  private checkWriters(added: Registration[], removed: ReadonlySet<Registration>): void {
+    const batch = added.length > 1 ? new NodeIndex<Write<Registration>>() : undefined;
     for (const reg of added) {
-      for (const other of existing) {
-        if (!(storeWithin(reg.host, other.host) || storeWithin(other.host, reg.host))) continue;
-        if (exclusiveBranches(reg, other)) continue;
-        reg.writes.forEach((w, i) => {
-          const at = other.targets.findIndex((o) => overlaps(reg.targets[i], o));
-          if (at === -1) return;
-          const hit = other.writes[at];
-          throw new Error(
-            `Behavior "${reg.name}": "${refLabel(w)}" is already written by "${other.name}"` +
-              (hit === w ? "" : ` (via "${refLabel(hit)}")`) + " – one writer per target"
-          );
-        });
+      const conflicts: { other: Write<Registration>; at: number }[] = [];
+      reg.targets.forEach((target, at) => {
+        const check = (other: Write<Registration>) => {
+          const o = other.reg;
+          if (removed.has(o) || !overlaps(target, other.target)) return;
+          if (!(storeWithin(reg.host, o.host) || storeWithin(o.host, reg.host)) || exclusiveBranches(reg, o)) return;
+          conflicts.push({ other, at });
+        };
+        this.order.writesNear(target.node, check);
+        batch?.near(target.node, check);
+      });
+      if (conflicts.length) {
+        // The earliest registration, then the first write of each.
+        const { other, at } = conflicts.sort((x, y) => x.other.reg.seq - y.other.reg.seq || x.at - y.at || x.other.at - y.other.at)[0];
+        const w = reg.writes[at];
+        const hit = other.reg.writes[other.at];
+        throw new Error(
+          `Behavior "${reg.name}": "${refLabel(w)}" is already written by "${other.reg.name}"` +
+            (hit === w ? "" : ` (via "${refLabel(hit)}")`) + " – one writer per target"
+        );
       }
-      existing.push(reg);
+      if (batch) reg.targets.forEach((target, at) => batch.add(target.node, { reg, target, at }));
     }
-  }
-
-  /** Longest-path ranks over the dependency graph; throws on cycles. */
-  private rank(regs: Registration[]): void {
-    const edges = new Map<Registration, Registration[]>(regs.map((r) => [r, []]));
-    const indegree = new Map<Registration, number>(regs.map((r) => [r, 0]));
-    for (const a of regs) {
-      for (const b of regs) {
-        if (a === b) continue;
-        if (a.targets.some((w) => b.inputs.some((r) => affects(w, r)))) {
-          edges.get(a)!.push(b);
-          indegree.set(b, indegree.get(b)! + 1);
-        }
-      }
-    }
-    const ranks = new Map<Registration, number>();
-    const queue = regs.filter((r) => indegree.get(r) === 0);
-    for (const r of queue) ranks.set(r, 0);
-    for (let i = 0; i < queue.length; i++) {
-      const a = queue[i];
-      for (const b of edges.get(a)!) {
-        ranks.set(b, Math.max(ranks.get(b) ?? 0, ranks.get(a)! + 1));
-        indegree.set(b, indegree.get(b)! - 1);
-        if (indegree.get(b) === 0) queue.push(b);
-      }
-    }
-    if (queue.length !== regs.length) {
-      const cycle = regs.filter((r) => indegree.get(r)! > 0).map((r) => `"${r.name}"`);
-      throw new Error(`Behaviors form a cycle: ${cycle.join(", ")} – merge them into one behavior (see link())`);
-    }
-    for (const r of regs) r.rank = ranks.get(r)!;
   }
 
   // ---- binding tree ----
@@ -1274,6 +1257,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private dispose(regs: Registration[]): void {
     const live = regs.filter((r) => !r.disposed);
     if (!live.length) return;
+    this.order.plan([], new Set(live))();
     this.store._batch(() => {
       for (const reg of live) this.unregister(reg, true);
     });
@@ -1286,7 +1270,6 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const leaf of this.pending.keys()) if (leaf.reg === reg) this.pending.delete(leaf);
     for (const leaf of this.busy(reg)) this.drop(leaf);
     if (reg.root) this.unbind(reg, reg.root, resetMeta);
-    this.rank(this.regs);
   }
 
   private unbind(reg: Registration, binding: Binding, resetMeta: boolean): void {
