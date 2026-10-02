@@ -26,8 +26,8 @@
 //               feature can only be written by that feature's behaviors; a
 //               combined key (`combine`) only by its owner.
 //   • Access  – ctx.get / ctx.set only accept declared references.
-//   • Defaults– key definitions with `behavior` (touched, dirty) register a
-//               feature behavior per node, limited to that node.
+//   • Defaults– a key definition's .behavior() registers a feature behavior
+//               per node that declares the key, limited to that node.
 //   • Runtime registration – store.addBehavior(...) runs every check above and
 //               returns a dispose function; disposing resets the meta keys
 //               the behavior wrote to their defaults.
@@ -66,9 +66,10 @@
 
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
-  refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
+  refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
   FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween,
 } from "./internal";
+import { isAncestorOrSelf } from "./tree";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
   type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks,
@@ -1143,7 +1144,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private run(leaf: Binding, p: Pending): void {
     const reg = leaf.reg;
     if (reg.disposed || !leaf.host.isAttached()) return;
-    const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concreteScopePath(leaf.host) });
+    const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concretePath(leaf.host, leaf.host.node) });
 
     const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
     const state = { ...leaf.state }; // saved only if the run completes
