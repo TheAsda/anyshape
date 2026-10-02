@@ -2,7 +2,7 @@
 // the DevTools performance tracks. Time comes from a stubbed performance.now
 // that the test's reactions, listeners and behaviors advance.
 
-import { form, object, array, field, createStore, defineBehavior, type InferValue, type RootStore } from "./index";
+import { form, object, array, field, createStore, defineBehavior, type InferValue, type RootStore, type AnyRef, type AnyNode } from "./index";
 import type { ProbedInstance } from "./store";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { concretePath } from "./internal";
@@ -179,3 +179,85 @@ describe("T · Probe", () => {
     });
   });
 });
+
+describe("T · Flush budget", () => {
+  const order = form({
+    lines: array(object({ qty: field<number>(), total: field<number>() })),
+    sum: field<number>(),
+    note: field<string>(),
+    profile: object({ size: field<number>() }),
+  });
+  const O = order.lines.item;
+  const orderValues = () => ({ lines: [{ qty: 1, total: 0 }, { qty: 2, total: 0 }, { qty: 3, total: 0 }], sum: 0, note: "", profile: { size: 0 } });
+  /** A behavior that takes `ms` per run and changes `write`, if any. */
+  const slow = (name: string, ms: number, triggers: AnyRef[], write?: AnyNode) =>
+    defineBehavior({
+      name, triggers, writes: write ? [write] : [],
+      run: (ctx) => {
+        t += ms;
+        if (write) ctx.set(write, ctx.get(write) + 1);
+      },
+    });
+
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  test("a flush over budget warns once: its total, reactions and UI listeners, and the three slowest behaviors over their instances", () => {
+    const s = createStore(order, orderValues(), {
+      behaviors: [
+        slow("total", 10, [O.qty], O.total),
+        slow("sum", 5, [order.lines], order.sum),
+        slow("note", 1, [order.sum], order.note),
+        slow("tiny", 0.5, [order.note]),
+      ],
+    });
+    s.react(order.sum, () => void (t += 2));
+    s.subscribe(order.lines, () => void (t += 4));
+    warn.mockClear();
+    s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toBe(
+      "[form] A flush took 42.5 ms, over the 33.3 ms budget: 38.5 ms in reactions, 4.0 ms in UI listeners. " +
+        'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run), "note" 1.0 ms (1 run).'
+    );
+  });
+
+  test("a flush within budget doesn't warn", () => {
+    const s = createStore(order, orderValues(), { behaviors: [slow("total", 10, [O.qty], O.total)] });
+    warn.mockClear();
+    s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("an async run counts its synchronous part and applying its writes, not its time in flight", async () => {
+    const s = createStore(order, orderValues());
+    const reply = deferred<void>();
+    s.addBehavior(
+      defineBehavior({
+        name: "load", triggers: [order.note], writes: [order.profile], runOn: { init: false },
+        run: async (ctx) => {
+          t += 40;
+          await reply.promise;
+          let first = true;
+          // Applying the write validates the object: a slow read stands for a big value.
+          ctx.set(order.profile, { get size() { if (first) { first = false; t += 40; } return 1; } });
+        },
+      })
+    );
+    s.set(order.note, "go");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toBe(
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in reactions, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms (1 run).'
+    );
+    t += 1000;
+    reply.resolve();
+    await flush();
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[1][0]).toBe(
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in reactions, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms.'
+    );
+  });
+});
+
