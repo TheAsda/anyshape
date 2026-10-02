@@ -33,6 +33,8 @@ jobs:
         with:
           name: vitest-failure-screenshots
           path: .vitest/
+          # .vitest/ is a dot-directory: skipped unless hidden files are on.
+          include-hidden-files: true
           if-no-files-found: ignore
 
   typecheck:
