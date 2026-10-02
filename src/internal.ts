@@ -8,6 +8,12 @@ import type { MetaKeyDef } from "./meta";
 import { BaseStore, ItemStore, type AnyRef } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 
+/**
+ * Dev build? Read as `process.env.NODE_ENV`, which bundlers replace: an app's
+ * production build then drops every dev-only branch. Node reads it at runtime.
+ */
+export const isDev = (): boolean => process.env.NODE_ENV !== "production";
+
 // ============================================================
 // Node internals, keyed by symbols so that every string name stays free for
 // fields and meta keys. Classes only `declare` these members and assign them

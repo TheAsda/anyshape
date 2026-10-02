@@ -71,7 +71,7 @@
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
-  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween,
+  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, isDev,
 } from "./internal";
 import { isAncestorOrSelf } from "./tree";
 import {
@@ -233,8 +233,6 @@ export class Behavior {
     this._trace = internals.trace;
   }
 }
-
-const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
 
 /**
  * What onError receives for an error thrown by a run: in dev, for behaviors
