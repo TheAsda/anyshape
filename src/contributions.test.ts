@@ -220,6 +220,18 @@ describe("In-place update", () => {
     expect(log.runs.map((r) => r.runs), "one counter across every change").toEqual([1, 2, 3, 4]);
   });
 
+  test("the owner keeps its place in the run order: a behavior registered after it still runs after it", ({ log }) => {
+    const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "base") });
+    const ownerRunsBefore: number[] = [];
+    s.addBehavior(
+      defineBehavior({ name: "after", triggers: [shape.a], writes: [shape.other], run: () => void ownerRunsBefore.push(log.runs.length) })
+    );
+    s.addBehavior(contribute(shape.a.tags, "late"));
+    log.runs.length = 0;
+    s.set(shape.a, "x");
+    expect(ownerRunsBefore.at(-1), "the owner ran first in the flush").toBe(1);
+  });
+
   test("merged declarations are rewired: a removed contribution's trigger no longer runs the owner", ({ log }) => {
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "base") });
     const h = s.addBehavior(contribute(shape.a.tags, "late", { triggers: [shape.mode] }));
