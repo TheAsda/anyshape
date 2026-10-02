@@ -434,3 +434,36 @@ describe("T · DevTools tracks", () => {
   });
 });
 
+
+describe("T · Production", () => {
+  test("in production nothing is measured: no clock reads, no warning, no entries", async () => {
+    const stamp = (console.timeStamp = vi.fn());
+    const measure = vi.spyOn(performance, "measure");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      const reply = deferred<string>();
+      const s = createStore(shape, initial(), {
+        behaviors: [
+          defineBehavior({ name: "title", triggers: [R.sku], writes: [R.title], run: () => void (t += 40) }),
+          defineBehavior({
+            name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+            run: async (ctx) => ctx.set(shape.name, await reply.promise),
+          }),
+        ],
+      });
+      s.set(shape.code, "b");
+      const settled = s.settle();
+      reply.resolve("Beta");
+      await settled;
+      s.addBehavior(defineBehavior({ name: "noop", triggers: [shape.name], run: () => {} }))();
+    } finally {
+      vi.unstubAllEnvs();
+      delete (console as Partial<Console>).timeStamp;
+    }
+    expect(performance.now).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(stamp).not.toHaveBeenCalled();
+    expect(measure).not.toHaveBeenCalled();
+  });
+});
