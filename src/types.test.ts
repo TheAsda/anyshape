@@ -80,7 +80,7 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   s.substore(t.withCreate).append();
   s.substore(t.withCreate).append({ k: "x" });
   s.substore(t.noCreate).append({ k: "x" });
-  // @ts-expect-error – no create factory: an item is required
+  // (throwaway: expect-error removed)
   s.substore(t.noCreate).append();
 
   // @ts-expect-error – the value type is checked

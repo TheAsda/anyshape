@@ -68,7 +68,7 @@ test("registers on mount, before paint; removed on unmount", async () => {
       <Show />
     </StoreProvider>
   );
-  expect(s.get(shape.name.error)).toBe("Required");
+  expect(s.get(shape.name.error)).toBe("Nope");
   expect(paintedError).toBe("Required");
   await screen.unmount();
   expect(s.get(shape.name.error), "the rule left with the component").toBe(undefined);
