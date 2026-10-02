@@ -26,8 +26,6 @@ export interface MetaKeyOptions<V> {
    * runtime) may write it among behaviors. Application code may still write it.
    */
   owner?: "feature";
-  /** Counted per subtree: nodes for which this returns true (countIn). */
-  aggregate?: (value: V) => boolean;
   /** Kept by reset(): for keys fed from outside the form (e.g. useSync), not user input. */
   keepOnReset?: boolean;
   /** false: stored and readable, but writing it never notifies, triggers or counts. */
@@ -48,11 +46,13 @@ export type UsedRefs<U extends readonly AnyMetaKeyDef[]> = {
 };
 
 /**
- * @internal What a definition's steps (.uses(), .behavior(), .combine())
- * declared, read by the core. Method syntax on purpose: the parameters are
- * then bivariant, so a definition stays assignable to MetaKeyDef<V>.
+ * @internal What a definition's steps (.aggregate(), .uses(), .behavior(),
+ * .combine()) declared, read by the core. Method syntax on purpose: the
+ * parameters are then bivariant, so a definition stays assignable to
+ * MetaKeyDef<V>.
  */
 export interface MetaKeySteps<V, P, U extends readonly AnyMetaKeyDef[]> {
+  aggregate?(value: V): boolean;
   uses?: U;
   behavior?(self: any, key: MetaRef<V, P>, uses: UsedRefs<U>): BehaviorConfig;
   combine?(self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>): OwnerConfig<P>;
@@ -82,7 +82,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
     if (options.inherit !== undefined && typeof defaultValue !== "boolean") {
       throw new Error("`inherit` is only supported for boolean meta keys");
     }
-    if (options.aggregate && options.aggregate(defaultValue)) {
+    if (steps.aggregate && steps.aggregate(defaultValue)) {
       // Subtree counts start at zero, so untouched nodes never need to be visited.
       throw new Error("`aggregate` must return false for the key's default value");
     }
@@ -93,15 +93,26 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
   }
 
   /**
+   * Counted per subtree: countIn(node, def) counts the nodes in the subtree
+   * where `isCounted` returns true for the key's value. It must return false
+   * for the default value.
+   */
+  aggregate(isCounted: (value: V) => boolean): MetaKeyDef<V, P, U> {
+    if (this._steps.aggregate) throw new Error(".aggregate() is declared once");
+    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, aggregate: isCounted });
+  }
+
+  /**
    * Keys of the same node that `behavior` or `combine` gets refs to, matched
    * by definition: `uses` receives the node's ref to each, in this order,
    * whatever name the node declares it under. It grants no access: declare
    * the refs in triggers, reads or writes.
    */
   uses<const U2 extends readonly AnyMetaKeyDef[]>(...defs: U2): MetaKeyDef<V, P, U2> {
-    if (this._steps.combine || this._steps.behavior) throw new Error("call .uses() before .combine() or .behavior()");
-    if (this._steps.uses) throw new Error(".uses() is declared once – list every used key in one call");
-    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { uses: defs });
+    const { behavior, combine, ...before } = this._steps;
+    if (combine || behavior) throw new Error("call .uses() before .combine() or .behavior()");
+    if (before.uses) throw new Error(".uses() is declared once – list every used key in one call");
+    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { ...before, uses: defs });
   }
 
   /**
@@ -127,7 +138,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
   }
 }
 
-/** Declare a meta key with capabilities. Add a default behavior or an owner with .behavior() / .combine(). */
+/** Declare a meta key with capabilities. Count it with .aggregate(); add a default behavior or an owner with .behavior() / .combine(). */
 export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V>): MetaKeyDef<V, P, []> {
   return new MetaKeyDef(defaultValue, options);
 }

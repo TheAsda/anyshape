@@ -113,7 +113,8 @@ const same = (a: readonly unknown[], b: readonly unknown[]) => a.length === b.le
 export const forced = metaKey(false);
 
 /** The field's first error: written by the queue, the owner of its rules. Counted per subtree. */
-export const error = metaKey<string | undefined, RulePart>(undefined, { aggregate: (e) => e !== undefined })
+export const error = metaKey<string | undefined, RulePart>(undefined)
+  .aggregate((e) => e !== undefined)
   .uses(forced)
   .combine((self, key, [force]) => ({
     name: `${self.path || "<root>"}#validation`,

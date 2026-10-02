@@ -1,5 +1,5 @@
 // countIn(node, def): nodes in a subtree whose key declared with `def` counts
-// (metaKey `aggregate`), under whatever name. Read-only, on the tally channel.
+// (MetaKeyDef.aggregate), under whatever name. Read-only, on the tally channel.
 
 import { ObjectNode, ArrayNode, type AnyNode } from "../shape";
 import type { MetaKeyDef } from "../meta";
@@ -7,7 +7,7 @@ import { FIELDS, META_DEFS, countSlotOf } from "../internal";
 import { isAncestorOrSelf } from "../tree";
 import { KIND, type RefKind } from "./kind";
 
-/** Number of nodes in a subtree (the node itself included) whose key declared with `def` counts (see metaKey `aggregate`). */
+/** Number of nodes in a subtree (the node itself included) whose key declared with `def` counts (see MetaKeyDef.aggregate). */
 export class CountRef {
   /** Nominal brand: a MetaRef has the same public shape and must not match. */
   private readonly _countRef = true;
@@ -64,13 +64,13 @@ export function countIn(node: AnyNode, def: MetaKeyDef<any, any>): CountRef {
   let ref = byDef.get(def);
   if (!ref) {
     byDef.set(def, (ref = new CountRef(node, def, `c:${countIds++}`)));
-    const problem = !def.options.aggregate
+    const problem = !def._steps.aggregate
       ? "the key has no aggregate"
       : !isDeclared(node, def)
         ? `no node under "${node.path || "<root>"}" declares it`
         : undefined;
     if (problem) {
-      console.warn(`countIn: ${problem} – the count is always 0. Counted keys are declared with metaKey(value, { aggregate }).`);
+      console.warn(`countIn: ${problem} – the count is always 0. Counted keys are declared with metaKey(value).aggregate(…).`);
     }
   }
   return ref;

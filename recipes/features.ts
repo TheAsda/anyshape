@@ -12,7 +12,7 @@ import { reveal } from "./submit";
 import { validation } from "./validation";
 
 /** true once the user changed the value (origin "user"); stays true. Counted per subtree. */
-export const touched = metaKey(false, { owner: "feature", aggregate: (t) => t }).behavior((self, key) => ({
+export const touched = metaKey(false, { owner: "feature" }).aggregate((t) => t).behavior((self, key) => ({
   triggers: [self],
   writes: [key],
   origins: ["user"],
@@ -21,7 +21,7 @@ export const touched = metaKey(false, { owner: "feature", aggregate: (t) => t })
 }));
 
 /** true while the value differs (Object.is) from its initial value. Counted per subtree. */
-export const dirty = metaKey(false, { owner: "feature", aggregate: (d) => d }).behavior((self, key) => ({
+export const dirty = metaKey(false, { owner: "feature" }).aggregate((d) => d).behavior((self, key) => ({
   triggers: [self, initialOf(self)],
   writes: [key],
   run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),

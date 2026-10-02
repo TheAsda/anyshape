@@ -80,7 +80,7 @@ describe("H · Counts and collect", () => {
 
   test("countIn warns when nothing in the subtree can aggregate the key", () => {
     const flag = metaKey(false);
-    const elsewhere = metaKey(false, { aggregate: (v) => v });
+    const elsewhere = metaKey(false).aggregate((v) => v);
     const local = form(
       object({
         a: field<string>().meta(control()),
@@ -106,7 +106,11 @@ describe("H · Counts and collect", () => {
 
   test("aggregate must be false for the default", async () => {
     const { metaKey } = await import("./meta");
-    expect(() => metaKey(true, { aggregate: (v) => v })).toThrow(/default value/);
+    expect(() => metaKey(true).aggregate((v) => v)).toThrow(/default value/);
+  });
+
+  test(".aggregate() is declared once: a second call throws instead of replacing the first", () => {
+    expect(() => metaKey(0).aggregate((v) => v > 0).aggregate((v) => v < 0)).toThrow(/\.aggregate\(\) is declared once/);
   });
 
   test("collect on a row store: paths from the root, only that row; nested rows", ({ store: s }) => {
@@ -120,7 +124,7 @@ describe("H · Counts and collect", () => {
   });
 
   test("a custom counted key written by application code counts like the built-in ones", () => {
-    const flaggedKey = metaKey<boolean>(false, { aggregate: (v) => v });
+    const flaggedKey = metaKey(false).aggregate((v) => v);
     const f = form({
       a: field<string>().meta({ flagged: flaggedKey }),
       rows: array(object({ b: field<string>().meta({ flagged: flaggedKey }) })),
@@ -140,8 +144,8 @@ describe("H · Counts and collect", () => {
 
 describe("H · Counts by definition", () => {
   test("countIn counts a key definition, whatever name a node declares it under", () => {
-    const flagged = metaKey(false, { aggregate: (v) => v });
-    const other = metaKey(false, { aggregate: (v) => v });
+    const flagged = metaKey(false).aggregate((v) => v);
+    const other = metaKey(false).aggregate((v) => v);
     const f = form({
       a: field<string>().meta({ flagged }),
       b: field<string>().meta({ marked: flagged, flagged: other }),
