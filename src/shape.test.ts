@@ -1,7 +1,7 @@
 // A · Shape: node instantiation, identity, parents, templates and structural checks.
 
 import {
-  form, object, array, field, meta, createStore,
+  form, object, array, field, createStore,
 } from "./index";
 import { test, describe, expect } from "vitest";
 import { userShape, initial } from "./test/fixtures/user";

@@ -1,6 +1,6 @@
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
-import { form, object, array, field, meta, createStore, countIn, type InferValue, type Origin } from "./index";
+import { form, object, array, field, createStore, countIn, type InferValue, type Origin } from "./index";
 import { error } from "./test/features";
 
 import { address, userShape, initial, type User } from "./test/fixtures/user";
