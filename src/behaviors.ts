@@ -67,7 +67,7 @@
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
-  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs,
+  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween,
 } from "./internal";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
@@ -772,10 +772,8 @@ export class BehaviorRuntime implements RuntimeHooks {
    */
   private pathTo(reg: Registration, host: BaseStore<any>): Binding[] | undefined {
     if (!host.isAttached() || !reg.chain.includes(host.node)) return;
-    const stores: BaseStore<any>[] = [];
-    for (let h = host; h !== reg.root!.host; h = (h as ItemStore<any>).arrayStore._host) stores.unshift(h);
     const path = [reg.root!];
-    for (const row of stores) path.push(this.child(path[path.length - 1], row as ItemStore<any>));
+    for (const row of rowsBetween(reg.root!.host, host)) path.push(this.child(path[path.length - 1], row));
     return path;
   }
 

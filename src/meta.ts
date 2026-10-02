@@ -102,6 +102,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    */
   uses<const U2 extends readonly AnyMetaKeyDef[]>(...defs: U2): MetaKeyDef<V, P, U2> {
     if (this._steps.combine || this._steps.behavior) throw new Error("call .uses() before .combine() or .behavior()");
+    if (this._steps.uses) throw new Error(".uses() is declared once – list every used key in one call");
     return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { uses: defs });
   }
 
