@@ -18,7 +18,7 @@
 import { type Lens, identityLens, propLens, composeLens } from "./lens";
 import {
   MetaBuilder, MetaKeyDef,
-  type Meta, type MetaInput, type MergeMetaInputs,
+  type Meta, type MetaInput, type MergeMetaRefs,
 } from "./meta";
 import { FIELDS, META_DEFS, META, CREATE, PLAIN } from "./internal";
 import { KIND, type RefKind } from "./refs/kind";
@@ -31,14 +31,14 @@ export type FieldId = string & { readonly [FieldIdBrand]: true };
 export type AnyNode = ShapeNode<any>;
 export type ContainerNode = ObjectNode<any> | ArrayNode<any, any>;
 
-export type InferValue<N> = N extends ShapeNode<infer V> ? V : N extends MetaRef<infer V> ? V : never;
+export type InferValue<N> = N extends ShapeNode<infer V> ? V : N extends MetaRef<infer V, any> ? V : never;
 /**
  * The node's declared meta keys and their value types, read from its meta
  * references. Properties typed `any` (every property of a loose AnyNode) are
  * not keys.
  */
 export type InferMeta<N> = {
-  [K in keyof N as 0 extends 1 & N[K] ? never : N[K] extends MetaRef<any> ? K : never]: N[K] extends MetaRef<infer V> ? V : never;
+  [K in keyof N as 0 extends 1 & N[K] ? never : N[K] extends MetaRef<any, any> ? K : never]: N[K] extends MetaRef<infer V, any> ? V : never;
 };
 
 /** Meta references for declared keys. */
@@ -60,9 +60,11 @@ interface InstantiateContext {
 // ============================================================
 // Meta reference – points at one meta key of one node
 // ============================================================
-export class MetaRef<V = unknown> {
+export class MetaRef<V = unknown, P = unknown> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
+  /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
+  declare readonly _payload: P;
 
   private constructor(readonly node: AnyNode, readonly key: string) {}
 
@@ -125,7 +127,7 @@ export abstract class ShapeNode<T = unknown> {
    */
   meta<Is extends readonly MetaInput[]>(
     ...inputs: Is
-  ): this & MetaRefs<MergeMetaInputs<Is>> {
+  ): this & MergeMetaRefs<Is> {
     if (this.id !== undefined) {
       throw new Error(
         `.meta() must be called before form() (node "${this.path || "<root>"}"). ` +

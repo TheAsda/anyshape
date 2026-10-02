@@ -5,8 +5,8 @@
 // ============================================================
 
 import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, rule,
-  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef,
+  form, object, array, field, metaKey, createStore, countIn, initialOf, rule, contribute,
+  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef,
 } from "./index";
 import { control, visible, disabled, submission } from "./test/features";
 import { test, expect, expectTypeOf } from "vitest";
@@ -95,6 +95,52 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   rule(t.plain, () => undefined);
 
   return [n, e, c];
+}
+
+// ---------------------------------------------------------------------------
+// Key contributions: the payload type flows from the key to contribute() and ctx.parts.
+const total = metaKey<number, { weight: number }>(0, {
+  combine: (self, key) => ({
+    name: `${self.path}#total`,
+    writes: [key],
+    run(ctx) {
+      ctx.set(key, ctx.parts.reduce((sum, p) => sum + p.payload.weight, 0));
+      // @ts-expect-error – the key's value type is number
+      ctx.set(key, "many");
+      // @ts-expect-error – the payload type comes from the key
+      void ctx.parts[0].payload.w;
+      type _self = Expect<Equal<RefValue<typeof self>, unknown>>; // the node's value type is unknowable here
+    },
+  }),
+});
+const reasons = metaKey<readonly string[], string>([], {
+  combine: (_self, key) => ({ writes: [key], run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)) }),
+});
+const ok = metaKey(false);
+const c = form(object({ n: field<number>().meta({ total, reasons, ok, plain: 0 }) }));
+
+type _c1 = Expect<Equal<RefValue<typeof c.n.total>, number>>;
+type _c2 = Expect<Equal<typeof c.n.total extends MetaRef<any, infer P> ? P : never, { weight: number }>>;
+type CM = InferMeta<typeof c.n>;
+type _c3 = Expect<Equal<[CM["total"], CM["reasons"], CM["ok"], CM["plain"]], [number, readonly string[], boolean, number]>>;
+
+// @ts-expect-error – `combine` must return a config whose run takes this key's parts
+metaKey<number, { weight: number }>(0, { combine: (_s, k) => ({ writes: [k], run: (ctx: { parts: readonly { payload: string }[] }) => {} }) });
+
+export function contributionChecks() {
+  contribute(c.n.total, { weight: 2 });
+  contribute(c.n.reasons, "because");
+  // @ts-expect-error – a reason on `total`
+  contribute(c.n.total, "because");
+  // @ts-expect-error – a weight on `reasons`
+  contribute(c.n.reasons, { weight: 1 });
+  // @ts-expect-error – keys without `combine` are not combinable
+  contribute(c.n.ok, false);
+  // @ts-expect-error – plain keys are not combinable
+  contribute(c.n.plain, 0);
+  // A definition with a payload still fits where MetaKeyDef<V> is expected.
+  const def: MetaKeyDef<number> = total;
+  return def;
 }
 
 test("a loose node declares no known meta keys", () => {
