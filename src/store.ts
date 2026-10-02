@@ -16,21 +16,21 @@
 //     keyed by item reference; writes through an item store transfer the
 //     store to the new reference. Each item store keeps its own initial value.
 //
-// References (stage 2):
+// References:
 //   • get / set / subscribe / react accept any reference: a node (value), a
 //     MetaRef (one meta key), and the read-only countIn, initialOf, pendingIn
 //     and pendingOf. Each kind is one module in src/refs/ and answers through
 //     RefKind (src/refs/kind.ts); the store keeps only the change channels.
-//   • Inherited keys (visible / disabled): get(ref) returns the effective
-//     value; getOwn(ref) the value written on the node itself.
-//   • Non-reactive keys (focusTarget) are stored in place: no flush, no
+//   • Inherited keys (declared with `inherit`): get(ref) returns the
+//     effective value; getOwn(ref) the value written on the node itself.
+//   • Non-reactive keys (`reactive: false`) are stored in place: no flush, no
 //     notification, allowed on detached stores, kept by reset().
 //
 // Writes carry an origin: "user" | "program" (default) | "initial" |
 // "behavior:<id>". { as: "initial" } writes the value and its baseline.
 // Reactions receive the origins of the writes that changed their target.
 //
-// Notification rules (unchanged):
+// Notification rules:
 //   1. A value subscription fires when its value is no longer Object.is-equal
 //      to the value at its last notification.
 //   2. Values and meta are separate channels; meta does not bubble.
@@ -54,7 +54,8 @@ import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
 } from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf, concretePath } from "./internal";
+import { isAncestorOrSelf } from "./tree";
 import { kindOf } from "./refs/kind";
 import type { CountRef } from "./refs/count";
 import type { InitialRef } from "./refs/initial";
@@ -167,11 +168,6 @@ interface ScopeHost {
   isAttached(): boolean;
 }
 
-function isAncestorOrSelf(ancestor: AnyNode, node: AnyNode): boolean {
-  for (let n: AnyNode | undefined = node; n; n = n.parent) if (n === ancestor) return true;
-  return false;
-}
-
 /** Do two locations overlap (one contains the other)? */
 function related(a: Loc, b: Loc): boolean {
   for (let i = 0; i < a.length && i < b.length; i++) {
@@ -217,15 +213,6 @@ function locOf(host: BaseStore<any>, node: AnyNode): Loc {
     h = parentHost;
   }
   return out;
-}
-
-/** Concrete path with row indexes, e.g. "lines[2].notes[0].text". */
-function concretePath(host: BaseStore<any>, node: AnyNode): string {
-  if (!(host instanceof ItemStore)) return node.path;
-  const arr = host.arrayStore;
-  const index = (arr.current() as readonly unknown[]).indexOf(host._currentRef);
-  const relative = node.path.slice(host.node.path.length);
-  return `${concretePath(arr._host, arr.node)}[${index}]${relative}`;
 }
 
 function register(map: Map<AnyNode, Set<Sub>>, node: AnyNode, sub: Sub): Unsubscribe {

@@ -1,6 +1,6 @@
 // O · Paths: resolvePath, and setting server errors through it.
 
-import { createStore, countIn } from "./index";
+import { createStore, countIn, defineBehavior } from "./index";
 import { error } from "./test/features";
 import { test as base, describe, expect } from "vitest";
 import * as limits from "./test/fixtures/limits";
@@ -49,5 +49,29 @@ describe("O · Paths", () => {
     }
     expect(s.substore(shape.lines).itemAt(1).get(L.qty.error)).toBe("Out of stock");
     expect(s.get(countIn(shape, error))).toBe(2);
+  });
+
+  test("a behavior error's scope and collect's path agree on the row prefix", () => {
+    const N = L.notes.item;
+    const scopes: string[] = [];
+    const s = createStore(shape, initial(), {
+      onError: (_, info) => void scopes.push(info.scope),
+      behaviors: defineBehavior({
+        name: "noteBoom", triggers: [N.text], runOn: { init: false },
+        run: () => { throw new Error("x"); },
+      }),
+    });
+    const lines = s.substore(shape.lines);
+    const note = () => lines.itemAt(lines.items().length - 1).substore(L.notes).itemAt(0);
+    const notePaths = () => s.collect(shape, error).filter((e) => e.ref.node === N.text).map((e) => e.path);
+
+    note().set(N.text, "y");
+    expect(scopes.at(-1)).toBe("lines[1].notes[0]");
+    expect(notePaths()).toEqual(["lines[1].notes[0].text"]);
+
+    lines.remove(lines.itemAt(0));
+    note().set(N.text, "z");
+    expect(scopes.at(-1), "after removing a row above").toBe("lines[0].notes[0]");
+    expect(notePaths(), "after removing a row above").toEqual(["lines[0].notes[0].text"]);
   });
 });

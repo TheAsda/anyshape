@@ -3,7 +3,8 @@
 
 import { ObjectNode, ArrayNode, type AnyNode } from "../shape";
 import type { MetaKeyDef } from "../meta";
-import { FIELDS, META_DEFS, isAncestorOrSelf, countSlotOf } from "../internal";
+import { FIELDS, META_DEFS, countSlotOf } from "../internal";
+import { isAncestorOrSelf } from "../tree";
 import { KIND, type RefKind } from "./kind";
 
 /** Number of nodes in a subtree (the node itself included) whose key declared with `def` counts (see metaKey `aggregate`). */

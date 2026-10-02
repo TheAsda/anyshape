@@ -6,7 +6,8 @@
 
 import type { AnyNode, MetaRef } from "../shape";
 import type { MetaKeyDef } from "../meta";
-import { isAncestorOrSelf, refNode, refKey, refLabel, targetOf } from "../internal";
+import { refNode, refKey, refLabel, targetOf } from "../internal";
+import { isAncestorOrSelf } from "../tree";
 import type { AnyRef, BaseStore } from "../store";
 import { KIND, type RefKind } from "./kind";
 
