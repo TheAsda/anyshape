@@ -135,3 +135,29 @@ describe("row-by-row contribution mounts", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Row-by-row behavior mounts: each row adds its own plain behavior (a per-row
+// calculation), as a row component's useBehaviors does. One registration per
+// row, so ranking cost per mount shows here. Few samples: before #6 an 800-row
+// mount took seconds.
+const sheet = form({ rows: array(object({ a: field<number>(), b: field<number>() })) });
+const S = sheet.rows.item;
+const double = () =>
+  defineBehavior({ name: "double", triggers: [S.a], writes: [S.b], run: (c) => c.set(S.b, c.get(S.a) * 2) });
+
+function calculateRowByRow(rows: number): void {
+  const s = createStore(sheet, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: 0 })) });
+  s.substore(sheet.rows).items().forEach((row) => row.addBehavior(double()));
+}
+
+describe("row-by-row behavior mounts", () => {
+  test("behaviors", async ({ bench }) => {
+    await bench.compare(
+      bench("200 rows", () => calculateRowByRow(200)),
+      bench("400 rows", () => calculateRowByRow(400)),
+      bench("800 rows", () => calculateRowByRow(800)),
+      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
+    );
+  });
+});
