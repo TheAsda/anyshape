@@ -20,31 +20,12 @@ declare const NoPayloadBrand: unique symbol;
  */
 export type NoPayload = { readonly [NoPayloadBrand]: true };
 
-export interface MetaKeyOptions<V, P = NoPayload> {
+export interface MetaKeyOptions<V> {
   /**
    * "feature": only the feature that declares the key (its default behavior or
    * runtime) may write it among behaviors. Application code may still write it.
    */
   owner?: "feature";
-  /**
-   * Default behavior, registered once per node (per row for row templates)
-   * and per name the node declares the key under, limited to that node:
-   * `self` (its value), its meta keys and initialOf(self). `key` is the
-   * node's ref under that name. The node is typed loosely because the key is
-   * declared before the node exists.
-   */
-  behavior?(self: any, key: MetaRef<V, P>): BehaviorConfig;
-  /**
-   * Key contributions: the key is written by one owner behavior per node
-   * instance, configured by `combine` and fed by contribute(ref, payload)
-   * declarations, which its run reads as ctx.parts. Called once per node and
-   * key, like `behavior`; `key` is the node's ref under the name it declares
-   * the key with. Mutually exclusive with `behavior`.
-   *
-   * `behavior` and `combine` use method syntax on purpose: their parameters
-   * are then bivariant, so a definition stays assignable to MetaKeyDef<V>.
-   */
-  combine?(self: ShapeNode<unknown>, key: MetaRef<V, P>): OwnerConfig<P>;
   /** Counted per subtree: nodes for which this returns true (countIn). */
   aggregate?: (value: V) => boolean;
   /** Feature-specific settings (e.g. validation options), read by the feature's runtime. */
@@ -61,23 +42,45 @@ export interface MetaKeyOptions<V, P = NoPayload> {
   inherit?: [V] extends [boolean] ? "all" | "any" : never;
 }
 
+type AnyMetaKeyDef = MetaKeyDef<any, any, any>;
+
+/** The node's refs to the keys a definition uses, in the order of .uses(). */
+export type UsedRefs<U extends readonly AnyMetaKeyDef[]> = {
+  readonly [K in keyof U]: U[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : never;
+};
+
+/**
+ * @internal What a definition's steps (.uses(), .behavior(), .combine())
+ * declared, read by the core. Method syntax on purpose: the parameters are
+ * then bivariant, so a definition stays assignable to MetaKeyDef<V>.
+ */
+export interface MetaKeySteps<V, P, U extends readonly AnyMetaKeyDef[]> {
+  uses?: U;
+  behavior?(self: any, key: MetaRef<V, P>, uses: UsedRefs<U>): BehaviorConfig;
+  combine?(self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>): OwnerConfig<P>;
+}
+
 /**
  * `P` defaults to `unknown` here, so MetaKeyDef<V> accepts any definition
  * (combined or not); metaKey() defaults it to NoPayload, so a key declared
  * without `combine` takes no contributions.
+ *
+ * A definition is immutable: each step returns a new one.
  */
-export class MetaKeyDef<V = unknown, P = unknown> {
+export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyDef[] = readonly AnyMetaKeyDef[]> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
   /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
   declare readonly _payload: P;
   readonly defaultValue: V;
-  readonly options: Readonly<MetaKeyOptions<V, P>>;
+  readonly options: Readonly<MetaKeyOptions<V>>;
+  /** @internal */
+  readonly _steps: Readonly<MetaKeySteps<V, P, U>>;
   /** @internal true when created from a plain value in .meta({...}) */
   declare readonly [PLAIN]: boolean;
 
-  constructor(defaultValue: V, options: MetaKeyOptions<V, P> = {}, plain = false) {
-    if (options.combine && options.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
+  constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, plain = false, steps: MetaKeySteps<V, P, U> = {}) {
+    if (steps.combine && steps.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
     if (options.inherit !== undefined && typeof defaultValue !== "boolean") {
       throw new Error("`inherit` is only supported for boolean meta keys");
     }
@@ -87,12 +90,46 @@ export class MetaKeyDef<V = unknown, P = unknown> {
     }
     this.defaultValue = defaultValue;
     this.options = Object.freeze({ ...options });
+    this._steps = Object.freeze({ ...steps });
     (this as any)[PLAIN] = plain;
+  }
+
+  /**
+   * Keys of the same node that `behavior` or `combine` gets refs to, matched
+   * by definition: `uses` receives the node's ref to each, in this order,
+   * whatever name the node declares it under. It grants no access: declare
+   * the refs in triggers, reads or writes.
+   */
+  uses<const U2 extends readonly AnyMetaKeyDef[]>(...defs: U2): MetaKeyDef<V, P, U2> {
+    if (this._steps.combine || this._steps.behavior) throw new Error("call .uses() before .combine() or .behavior()");
+    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { uses: defs });
+  }
+
+  /**
+   * Default behavior, registered once per node (per row for row templates)
+   * and per name the node declares the key under, limited to that node:
+   * `self` (its value), its meta keys and initialOf(self). `key` is the
+   * node's ref under that name. The node is typed loosely because the key is
+   * declared before the node exists.
+   */
+  behavior(factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig): MetaKeyDef<V, P, U> {
+    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, behavior: factory });
+  }
+
+  /**
+   * Key contributions: the key is written by one owner behavior per node
+   * instance, configured by `combine` and fed by contribute(ref, payload)
+   * declarations, which its run reads as ctx.parts. Called once per node and
+   * key, like `behavior`; `key` is the node's ref under the name it declares
+   * the key with. Mutually exclusive with `behavior`.
+   */
+  combine(factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>): MetaKeyDef<V, P, U> {
+    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, combine: factory });
   }
 }
 
-/** Declare a meta key with capabilities. */
-export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V, P>): MetaKeyDef<V, P> {
+/** Declare a meta key with capabilities. Add a default behavior or an owner with .behavior() / .combine(). */
+export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V>): MetaKeyDef<V, P, []> {
   return new MetaKeyDef(defaultValue, options);
 }
 
@@ -148,7 +185,7 @@ export function meta(): MetaBuilder {
 export type MetaInput = Meta | MetaBuilder<any>;
 
 type RefsOfEntries<T> = {
-  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;
+  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;
 };
 type RefsOf<I> = I extends MetaBuilder<infer T> ? RefsOfEntries<T> : RefsOfEntries<I>;
 

@@ -99,23 +99,22 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
 
 // ---------------------------------------------------------------------------
 // Key contributions: the payload type flows from the key to contribute() and ctx.parts.
-const total = metaKey<number, { weight: number }>(0, {
-  combine: (self, key) => ({
-    name: `${self.path}#total`,
-    writes: [key],
-    run(ctx) {
-      ctx.set(key, ctx.parts.reduce((sum, p) => sum + p.payload.weight, 0));
-      // @ts-expect-error – the key's value type is number
-      ctx.set(key, "many");
-      // @ts-expect-error – the payload type comes from the key
-      void ctx.parts[0].payload.w;
-      type _self = Expect<Equal<RefValue<typeof self>, unknown>>; // the node's value type is unknowable here
-    },
-  }),
-});
-const reasons = metaKey<readonly string[], string>([], {
-  combine: (_self, key) => ({ writes: [key], run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)) }),
-});
+const total = metaKey<number, { weight: number }>(0).combine((self, key) => ({
+  name: `${self.path}#total`,
+  writes: [key],
+  run(ctx) {
+    ctx.set(key, ctx.parts.reduce((sum, p) => sum + p.payload.weight, 0));
+    // @ts-expect-error – the key's value type is number
+    ctx.set(key, "many");
+    // @ts-expect-error – the payload type comes from the key
+    void ctx.parts[0].payload.w;
+    type _self = Expect<Equal<RefValue<typeof self>, unknown>>; // the node's value type is unknowable here
+  },
+}));
+const reasons = metaKey<readonly string[], string>([]).combine((_self, key) => ({
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
+}));
 const ok = metaKey(false);
 const c = form(object({ n: field<number>().meta({ total, reasons, ok, plain: 0 }) }));
 
@@ -125,7 +124,35 @@ type CM = InferMeta<typeof c.n>;
 type _c3 = Expect<Equal<[CM["total"], CM["reasons"], CM["ok"], CM["plain"]], [number, readonly string[], boolean, number]>>;
 
 // @ts-expect-error – `combine` must return a config whose run takes this key's parts
-metaKey<number, { weight: number }>(0, { combine: (_s, k) => ({ writes: [k], run: (ctx: { parts: readonly { payload: string }[] }) => {} }) });
+metaKey<number, { weight: number }>(0).combine((_s, k) => ({ writes: [k], run: (ctx: { parts: readonly { payload: string }[] }) => {} }));
+
+// `uses`: the node's refs to other keys arrive typed and in order, with <V, P> spelled out.
+const forcedFlag = metaKey(false);
+const hintText = metaKey("");
+metaKey<number, { weight: number }>(0)
+  .uses(forcedFlag, hintText)
+  .combine((_self, key, [force, hint]) => {
+    type _u = Expect<Equal<[RefValue<typeof force>, RefValue<typeof hint>], [boolean, string]>>;
+    return {
+      triggers: [force, hint],
+      writes: [key, force],
+      run(ctx) {
+        // @ts-expect-error – `force` is a boolean key
+        ctx.set(force, "yes");
+      },
+    };
+  });
+metaKey(false)
+  .uses(forcedFlag)
+  .behavior((_self, _key, [force]) => {
+    // @ts-expect-error – a boolean key's ref, not a string key's
+    const wrong: MetaRef<string> = force;
+    return { run: () => void wrong };
+  });
+metaKey(0).combine((_self, _key, uses) => {
+  type _none = Expect<Equal<typeof uses, readonly []>>;
+  return { run() {} };
+});
 
 export function contributionChecks() {
   contribute(c.n.total, { weight: 2 });
