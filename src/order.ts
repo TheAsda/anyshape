@@ -67,7 +67,11 @@ function unset<T>(map: Map<AnyNode, Set<T>>, node: AnyNode, item: T): void {
   if (set?.delete(item) && !set.size) map.delete(node);
 }
 
-/** One write of a registration: `reg.targets[at]`. */
+/**
+ * One write of a registration: `reg.targets[at]`, kept apart because an
+ * owner refreshed in place is indexed from its fresh declarations before
+ * `reg` takes them over.
+ */
 export interface Write<R> {
   readonly reg: R;
   readonly target: Target;
@@ -109,7 +113,28 @@ export interface Addition<R> {
   readonly declaredBy: Ranked;
 }
 
-type Edges<R extends Ranked> = Map<Vertex<R>, Set<Vertex<R>>>;
+/** The graph a plan leads to: the committed edges between the vertices that stay, plus the new ones. */
+class Planned<R extends Ranked> {
+  /** New edges, each starting or ending at a fresh vertex. */
+  readonly out = new Map<Vertex<R>, Set<Vertex<R>>>();
+  readonly into = new Map<Vertex<R>, Set<Vertex<R>>>();
+
+  constructor(readonly gone: ReadonlySet<Vertex<R>>) {}
+
+  link(a: Vertex<R>, b: Vertex<R>): void {
+    if (a === b) return;
+    setOf(this.out, a).add(b);
+    setOf(this.into, b).add(a);
+  }
+
+  succ(v: Vertex<R>): Vertex<R>[] {
+    return [...v.succ, ...(this.out.get(v) ?? [])].filter((s) => !this.gone.has(s));
+  }
+
+  pred(v: Vertex<R>): Vertex<R>[] {
+    return [...v.pred, ...(this.into.get(v) ?? [])].filter((p) => !this.gone.has(p));
+  }
+}
 
 export class RunOrder<R extends Ranked> {
   private readonly vertices = new Map<R, Vertex<R>>();
@@ -140,21 +165,14 @@ export class RunOrder<R extends Ranked> {
       else fresh.push(new Vertex(a.reg, a.declaredBy));
     }
 
-    // New edges: each starts or ends at a fresh vertex.
-    const out: Edges<R> = new Map();
-    const into: Edges<R> = new Map();
-    const link = (a: Vertex<R>, b: Vertex<R>) => {
-      if (a === b) return;
-      setOf(out, a).add(b);
-      setOf(into, b).add(a);
-    };
+    const graph = new Planned(gone);
     // Edges between fresh vertices: only with more than one.
     const batch = fresh.length > 1 ? new NodeIndex<Input<R>>() : undefined;
     if (batch) for (const v of fresh) for (const input of v.inputs) batch.add(refNode(input.ref), input);
     for (const v of fresh) {
       for (const { target } of v.writes) {
         const reach = (input: Input<R>) => {
-          if (!gone.has(input.vertex) && affects(target, input.ref)) link(v, input.vertex);
+          if (!gone.has(input.vertex) && affects(target, input.ref)) graph.link(v, input.vertex);
         };
         this.inputs.near(target.node, reach);
         batch?.near(target.node, reach);
@@ -163,7 +181,7 @@ export class RunOrder<R extends Ranked> {
       for (const { ref } of v.inputs) {
         this.writes.near(refNode(ref), (w) => {
           const writer = this.vertices.get(w.reg)!;
-          if (!gone.has(writer) && affects(w.target, ref)) link(writer, v);
+          if (!gone.has(writer) && affects(w.target, ref)) graph.link(writer, v);
         });
       }
     }
@@ -173,7 +191,8 @@ export class RunOrder<R extends Ranked> {
     const rankOf = (v: Vertex<R>) => ranks.get(v) ?? v.reg.rank;
 
     // Removals: a rank can only fall, after a removed vertex that ended a
-    // longest path to it. Walked by old rank, a topological order.
+    // longest path to it. Walked by old rank, a topological order, over the
+    // committed edges: the new ones only raise ranks, below.
     const byRank: Vertex<R>[][] = [];
     const queued = new Set<Vertex<R>>();
     const lower = (from: Vertex<R>) => {
@@ -206,15 +225,14 @@ export class RunOrder<R extends Ranked> {
     const raise = (a: Vertex<R>, b: Vertex<R>) => {
       const rank = rankOf(a) + 1;
       if (rank <= rankOf(b)) return;
-      if (rank >= size) throw this.cycle(fresh, gone, out, into);
+      if (rank >= size) throw this.cycle(fresh, graph);
       ranks.set(b, rank);
       raised.push(b);
     };
-    for (const [a, bs] of out) for (const b of bs) raise(a, b);
+    for (const [a, bs] of graph.out) for (const b of bs) raise(a, b);
     while (raised.length) {
       const v = raised.pop()!;
-      for (const s of v.succ) if (!gone.has(s)) raise(v, s);
-      for (const s of out.get(v) ?? []) raise(v, s);
+      for (const s of graph.succ(v)) raise(v, s);
     }
 
     return () => {
@@ -230,7 +248,7 @@ export class RunOrder<R extends Ranked> {
         for (const input of v.inputs) this.inputs.add(refNode(input.ref), input);
         this.vertices.set(v.reg, v);
       }
-      for (const [a, bs] of out) {
+      for (const [a, bs] of graph.out) {
         for (const b of bs) {
           a.succ.add(b);
           b.pred.add(a);
@@ -245,23 +263,22 @@ export class RunOrder<R extends Ranked> {
    * topological sort of what the fresh ones reach cannot place: the cycle and
    * what follows it.
    */
-  private cycle(fresh: readonly Vertex<R>[], gone: ReadonlySet<Vertex<R>>, out: Edges<R>, into: Edges<R>): Error {
-    const succ = (v: Vertex<R>) => [...v.succ, ...(out.get(v) ?? [])].filter((s) => !gone.has(s));
+  private cycle(fresh: readonly Vertex<R>[], graph: Planned<R>): Error {
     const region = new Set<Vertex<R>>();
     const stack = [...fresh];
     while (stack.length) {
       const v = stack.pop()!;
       if (region.has(v)) continue;
       region.add(v);
-      stack.push(...succ(v));
+      stack.push(...graph.succ(v));
     }
     const waiting = new Map<Vertex<R>, number>();
     for (const v of region) {
-      waiting.set(v, [...v.pred, ...(into.get(v) ?? [])].filter((p) => region.has(p) && !gone.has(p)).length);
+      waiting.set(v, graph.pred(v).filter((p) => region.has(p)).length);
     }
     const queue = [...region].filter((v) => waiting.get(v) === 0);
     for (let i = 0; i < queue.length; i++) {
-      for (const s of succ(queue[i])) {
+      for (const s of graph.succ(queue[i])) {
         const n = waiting.get(s)! - 1;
         waiting.set(s, n);
         if (n === 0) queue.push(s);

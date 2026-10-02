@@ -587,7 +587,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       ...owners.flatMap((o) => (o.owner.reg ? [o.owner.reg] : [])),
     ]);
     this.checkWriters([...regs, ...ownerRegs], removed);
-    const ranked = this.order.plan(
+    const commitOrder = this.order.plan(
       [
         ...regs.map((reg) => ({ reg, declaredBy: reg })),
         ...live.map(({ owner }, i) => ({ reg: owner.reg ?? ownerRegs[i], declaredBy: ownerRegs[i] })),
@@ -596,7 +596,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     ); // throws on cycles, before any state change
 
     this.store._batch(() => {
-      ranked();
+      commitOrder();
       for (const reg of removing) this.unregister(reg, true);
       for (const reg of regs) this.register(reg, host);
       for (const delta of owners) {
@@ -1259,7 +1259,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   private dispose(regs: Registration[]): void {
     const live = regs.filter((r) => !r.disposed);
     if (!live.length) return;
-    this.order.plan([], new Set(live))();
+    const commitOrder = this.order.plan([], new Set(live)); // a removal never forms a cycle
+    commitOrder();
     this.store._batch(() => {
       for (const reg of live) this.unregister(reg, true);
     });
