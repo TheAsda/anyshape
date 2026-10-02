@@ -36,9 +36,9 @@ import {
 // A per-field "lookup in flight" tag. metaKey (not a plain value)
 // so the key is countable: countIn(shape, lookingUp) counts every
 // field currently carrying a tag, across the whole form.
-export const lookingUp = metaKey<string | undefined>(undefined, {
-  aggregate: (v) => v !== undefined,
-});
+export const lookingUp = metaKey<string | undefined>(undefined).aggregate(
+  (v) => v !== undefined,
+);
 
 // ------------------------------------------------------------
 // Shape

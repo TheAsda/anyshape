@@ -17,7 +17,7 @@ export type Check = (value: any, ctx: Pick<BehaviorContext, "get">) => string | 
  * A test-local combined key: its owner writes the first failing check of the
  * node's contributions (test/rules.ts), in order. Counted per subtree.
  */
-export const error = metaKey<string | undefined, Check>(undefined, { aggregate: (e) => e !== undefined }).combine((self, key) => ({
+export const error = metaKey<string | undefined, Check>(undefined).aggregate((e) => e !== undefined).combine((self, key) => ({
   name: `${self.path || "<root>"}#error`,
   triggers: [self],
   writes: [key],
@@ -34,7 +34,7 @@ export const error = metaKey<string | undefined, Check>(undefined, { aggregate: 
 export const validation = () => ({ error });
 
 /** true once the user changed the value; stays true. */
-export const touched = metaKey(false, { owner: "feature", aggregate: (t) => t }).behavior((self, key) => ({
+export const touched = metaKey(false, { owner: "feature" }).aggregate((t) => t).behavior((self, key) => ({
   triggers: [self],
   writes: [key],
   origins: ["user"],
@@ -43,7 +43,7 @@ export const touched = metaKey(false, { owner: "feature", aggregate: (t) => t })
 }));
 
 /** true while the value differs (Object.is) from its initial value. */
-export const dirty = metaKey(false, { owner: "feature", aggregate: (d) => d }).behavior((self, key) => ({
+export const dirty = metaKey(false, { owner: "feature" }).aggregate((d) => d).behavior((self, key) => ({
   triggers: [self, initialOf(self)],
   writes: [key],
   run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),
