@@ -66,6 +66,7 @@ export type AsyncStart = "user" | "any" | "always";
 
 const starts = {
   user: (origins: ReadonlySet<Origin>) => origins.has("user"),
+  // The initial run has no origins, so "any" excludes it.
   any: (origins: ReadonlySet<Origin>) => origins.size > 0,
   always: () => true,
 } satisfies Record<AsyncStart, (origins: ReadonlySet<Origin>) => boolean>;
