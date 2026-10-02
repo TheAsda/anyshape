@@ -7,13 +7,20 @@
 // Features are plain objects of key definitions (see recipes/features.ts).
 // ============================================================
 
-import type { BehaviorConfig } from "./behaviors";
-import type { MetaRef } from "./shape";
+import type { BehaviorConfig, OwnerConfig } from "./behaviors";
+import type { MetaRef, ShapeNode } from "./shape";
 import { PLAIN } from "./internal";
 
 export type Meta = Record<string, unknown>;
 
-export interface MetaKeyOptions<V> {
+declare const NoPayloadBrand: unique symbol;
+/**
+ * The payload type of keys without `combine`: nothing can be contributed to
+ * them. A brand, not `never`, because `never` satisfies every constraint.
+ */
+export type NoPayload = { readonly [NoPayloadBrand]: true };
+
+export interface MetaKeyOptions<V, P = NoPayload> {
   /**
    * "feature": only the feature that declares the key (its default behavior or
    * runtime) may write it among behaviors. Application code may still write it.
@@ -26,7 +33,18 @@ export interface MetaKeyOptions<V> {
    * node's ref under that name. The node is typed loosely because the key is
    * declared before the node exists.
    */
-  behavior?: (self: any, key: MetaRef<V>) => BehaviorConfig;
+  behavior?(self: any, key: MetaRef<V, P>): BehaviorConfig;
+  /**
+   * Key contributions: the key is written by one owner behavior per node
+   * instance, configured by `combine` and fed by contribute(ref, payload)
+   * declarations, which its run reads as ctx.parts. Called once per node and
+   * key, like `behavior`; `key` is the node's ref under the name it declares
+   * the key with. Mutually exclusive with `behavior`.
+   *
+   * `behavior` and `combine` use method syntax on purpose: their parameters
+   * are then bivariant, so a definition stays assignable to MetaKeyDef<V>.
+   */
+  combine?(self: ShapeNode<unknown>, key: MetaRef<V, P>): OwnerConfig<P>;
   /** Counted per subtree: nodes for which this returns true (countIn). */
   aggregate?: (value: V) => boolean;
   /** Feature-specific settings (e.g. validation options), read by the feature's runtime. */
@@ -43,15 +61,23 @@ export interface MetaKeyOptions<V> {
   inherit?: [V] extends [boolean] ? "all" | "any" : never;
 }
 
-export class MetaKeyDef<V = unknown> {
+/**
+ * `P` defaults to `unknown` here, so MetaKeyDef<V> accepts any definition
+ * (combined or not); metaKey() defaults it to NoPayload, so a key declared
+ * without `combine` takes no contributions.
+ */
+export class MetaKeyDef<V = unknown, P = unknown> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
+  /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
+  declare readonly _payload: P;
   readonly defaultValue: V;
-  readonly options: Readonly<MetaKeyOptions<V>>;
+  readonly options: Readonly<MetaKeyOptions<V, P>>;
   /** @internal true when created from a plain value in .meta({...}) */
   declare readonly [PLAIN]: boolean;
 
-  constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, plain = false) {
+  constructor(defaultValue: V, options: MetaKeyOptions<V, P> = {}, plain = false) {
+    if (options.combine && options.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
     if (options.inherit !== undefined && typeof defaultValue !== "boolean") {
       throw new Error("`inherit` is only supported for boolean meta keys");
     }
@@ -66,7 +92,7 @@ export class MetaKeyDef<V = unknown> {
 }
 
 /** Declare a meta key with capabilities. */
-export function metaKey<V>(defaultValue: V, options?: MetaKeyOptions<V>): MetaKeyDef<V> {
+export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V, P>): MetaKeyDef<V, P> {
   return new MetaKeyDef(defaultValue, options);
 }
 
@@ -117,15 +143,15 @@ export function meta(): MetaBuilder {
 }
 
 // ============================================================
-// Type mapping: declarations → value types
+// Type mapping: declarations → meta references
 // ============================================================
 export type MetaInput = Meta | MetaBuilder<any>;
 
-type ValuesOfEntries<T> = { [K in keyof T]: T[K] extends MetaKeyDef<infer V> ? V : T[K] };
+type RefsOfEntries<T> = {
+  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;
+};
+type RefsOf<I> = I extends MetaBuilder<infer T> ? RefsOfEntries<T> : RefsOfEntries<I>;
 
-/** Value types declared by one .meta() input. */
-export type MetaValuesOf<I> = I extends MetaBuilder<infer T> ? ValuesOfEntries<T> : ValuesOfEntries<I>;
-
-/** Value types declared by all inputs of one .meta(a, b, c) call. */
-export type MergeMetaInputs<Is extends readonly unknown[]> =
-  Is extends readonly [infer H, ...infer R] ? MetaValuesOf<H> & MergeMetaInputs<R> : {};
+/** Meta references declared by all inputs of one .meta(a, b, c) call, typed with their payloads. */
+export type MergeMetaRefs<Is extends readonly unknown[]> =
+  Is extends readonly [infer H, ...infer R] ? RefsOf<H> & MergeMetaRefs<R> : {};

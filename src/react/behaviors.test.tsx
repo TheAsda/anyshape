@@ -2,7 +2,7 @@ import { useState, StrictMode, Component, type ReactNode } from "react";
 import { test, expect } from "vitest";
 import { cleanup } from "vitest-browser-react";
 import {
-  form, object, array, field, rule, defineBehavior, countIn, createStore, type InferValue,
+  form, object, array, field, rule, defineBehavior, countIn, createStore, contribute, metaKey, type InferValue,
   type RootStore, type BaseStore,
 } from "../index";
 import { control, disabled } from "../test/features";
@@ -10,7 +10,13 @@ import { required, pattern, max } from "../test/rules";
 import { StoreProvider, useBehaviors, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 
+/** A combined key: the payloads of its active contributions. */
+const tags = metaKey<readonly string[], string>([], {
+  combine: (self, key) => ({ triggers: [self], writes: [key], run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)) }),
+});
+
 const shape = form({
+  tagged: field<string>().meta({ tags }),
   type: field<"person" | "company">(),
   name: field<string>().meta(control(), { hint: "" }),
   phone: field<string>().meta(control()),
@@ -21,7 +27,7 @@ const shape = form({
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 const initial = (): Values => ({
-  type: "person", name: "", phone: "12-34", vat: "", note: "",
+  tagged: "", type: "person", name: "", phone: "12-34", vat: "", note: "",
   lines: [{ qty: 5 }, { qty: 1 }],
 });
 
@@ -240,7 +246,7 @@ test("StrictMode: registered once, removed on unmount", async () => {
   expect(s.get(shape.note.disabled)).toBe(false);
 });
 
-test("the same component twice: conflict with a hint; { key } shares one registration", async () => {
+test("the same component twice: a writer conflict with a hint to declare it once", async () => {
   const s = createStore(shape, initial());
   const lock = () =>
     defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) });
@@ -261,32 +267,9 @@ test("the same component twice: conflict with a hint; { key } shares one registr
   }
   const error = (thrown ?? uncaught[0]) as Error;
   expect(/already written by/.test(error.message)).toBe(true);
-  expect(/pass \{ key \}/.test(error.message), "the message carries the hint").toBe(true);
+  expect(error.message, "the message carries the hint").toMatch(/declare it once, in createStore or a common parent/);
   await cleanup();
   expect(s.get(shape.note.disabled), "nothing left registered").toBe(false);
-
-  let show!: (n: number) => void;
-  function Keyed() {
-    useBehaviors((b) => b.add(lock()), [], { key: "note-lock" });
-    return null;
-  }
-  function App() {
-    const [n, set] = useState(2);
-    show = set;
-    return (
-      <StoreProvider store={s}>
-        {n >= 1 ? <Keyed /> : null}
-        {n >= 2 ? <Keyed /> : null}
-      </StoreProvider>
-    );
-  }
-  await mount(<App />);
-  expect(uncaught).toEqual([]);
-  expect(s.get(shape.note.disabled)).toBe(true);
-  await settle(() => show(1));
-  expect(s.get(shape.note.disabled), "still held by the other instance").toBe(true);
-  await settle(() => show(0));
-  expect(s.get(shape.note.disabled), "removed with the last holder").toBe(false);
 });
 
 test("changing the provided store moves the registration", async () => {
@@ -323,39 +306,6 @@ test("explicit { store } option", async () => {
 });
 
 // ---------------------------------------------------------------------------
-test("{ key } is shared per store: the same key on different stores registers twice", async () => {
-  const s1 = createStore(shape, initial());
-  const s2 = createStore(shape, initial());
-  const calls = [spyRegistrations(s1), spyRegistrations(s2)];
-  function Keyed() {
-    useBehaviors((b) => b.add(required(shape.name)), [], { key: "name-required" });
-    return null;
-  }
-  let show!: (n: number) => void;
-  function App() {
-    const [n, set] = useState(2);
-    show = set;
-    return (
-      <div>
-        <StoreProvider store={s1}>
-          <Keyed />
-        </StoreProvider>
-        {n >= 2 ? (
-          <StoreProvider store={s2}>
-            <Keyed />
-          </StoreProvider>
-        ) : null}
-      </div>
-    );
-  }
-  await mount(<App />);
-  expect(calls.map((c) => c.add)).toEqual([1, 1]);
-  expect([s1.get(shape.name.error), s2.get(shape.name.error)]).toEqual(["Required", "Required"]);
-  await settle(() => show(1));
-  expect(s1.get(shape.name.error), "s2's holder leaving does not release s1's").toBe("Required");
-  expect(s2.get(shape.name.error)).toBe(undefined);
-});
-
 test("a deps change whose new registration fails keeps the old one and surfaces the error with the hint", async () => {
   const s = createStore(shape, initial());
   const lock = () =>
@@ -392,8 +342,38 @@ test("a deps change whose new registration fails keeps the old one and surfaces 
   expect(s.get(shape.vat.error)).toBe("Required");
   await screen.rerender(app("lock"));
   expect(atError.message).toMatch(/already written by/);
-  expect(atError.message).toMatch(/pass \{ key \}/);
+  expect(atError.message).toMatch(/declare it once/);
   expect(atError.vatError, "the old registration was still active").toBe("Required");
   expect(s.get(shape.vat.error), "removed once its component left").toBe(undefined);
   expect(s.get(shape.note.disabled), "the other component's registration is untouched").toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+test("contributions: a deps change keeps their place among later ones; the latest payload is used without re-registering", async () => {
+  const s = createStore(shape, initial());
+  const calls = spyRegistrations(s);
+  function First({ mode, label }: { mode: string; label: string }) {
+    useBehaviors((b) => b.add(contribute(shape.tagged.tags, `${mode} ${label}`)), [mode]);
+    return null;
+  }
+  function Second() {
+    useBehaviors((b) => b.add(contribute(shape.tagged.tags, "second")), []);
+    return null;
+  }
+  const app = (mode: string, label: string) => (
+    <StoreProvider store={s}>
+      <First mode={mode} label={label} />
+      <Second />
+    </StoreProvider>
+  );
+  const screen = await mount(app("a", "one"));
+  expect(s.get(shape.tagged.tags)).toEqual(["a one", "second"]);
+  await screen.rerender(app("b", "one"));
+  expect(s.get(shape.tagged.tags), "replaced in place, not moved behind Second").toEqual(["b one", "second"]);
+  await screen.rerender(app("b", "two"));
+  expect(calls).toEqual({ add: 2, replace: 1 });
+  await settle(() => s.set(shape.tagged, "x"));
+  expect(s.get(shape.tagged.tags), "the next run reads the latest payload").toEqual(["b two", "second"]);
+  await screen.unmount();
+  expect(s.get(shape.tagged.tags)).toEqual([]);
 });

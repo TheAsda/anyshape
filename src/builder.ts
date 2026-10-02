@@ -13,16 +13,16 @@
 //
 // An authoring layer only: it returns the plain list of behaviors and rules
 // that createStore / addBehavior accept.
-//   • when blocks add their guard to every behavior and rule inside them
-//     (guard refs become triggers; a skipped behavior keeps its writes, a
-//     skipped rule no longer contributes to the field's error).
+//   • when blocks add their guard to every behavior, contribution and rule
+//     inside them (guard refs become triggers; a skipped behavior keeps its
+//     writes, a contribution or rule whose guard fails is absent).
 //   • otherwise gets the negated guard. Behaviors in opposite branches of the
 //     same split may write the same target: they never run together.
 //   • Blocks nest; guards accumulate.
 //   • Reusable fragments are plain functions taking the builder.
 // ============================================================
 
-import { Behavior, when as guardOf, type AnyBehavior, type Branch, type Guard } from "./behaviors";
+import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Branch, type Guard } from "./behaviors";
 import { Rule } from "./validation";
 import type { ArrayNode, ObjectNode } from "./shape";
 import type { AnyRef, RefValue } from "./store";
@@ -42,7 +42,7 @@ export class BehaviorBuilder {
     private readonly branches: readonly Branch[]
   ) {}
 
-  /** Add behaviors and rules (arrays, e.g. from exclusive(), are flattened). */
+  /** Add behaviors, contributions and rules (arrays, e.g. from exclusive(), are flattened). */
   add(...items: Item[]): this {
     for (const item of items) {
       if (Array.isArray(item)) this.add(...(item as Item[]));
@@ -79,6 +79,10 @@ export class BehaviorBuilder {
     if (item instanceof Rule) {
       return new Rule(item.target, item.kind, item.check, { ...item.options, when: [...asArray(item.options.when), ...this.guards] });
     }
+    if (item instanceof Contribution) {
+      // Contributions never conflict, so their branches don't matter.
+      return new Contribution(item.target, item.payload, { ...item.decl, when: [...asArray(item.decl.when), ...this.guards] });
+    }
     if (item instanceof Behavior) {
       if (item._self) throw new Error("Default behaviors cannot be added through the builder");
       return new Behavior(
@@ -86,7 +90,7 @@ export class BehaviorBuilder {
         { branches: [...item._branches, ...this.branches], trace: item._trace }
       );
     }
-    throw new Error("Expected a behavior or a rule");
+    throw new Error("Expected a behavior, a contribution or a rule");
   }
 }
 
