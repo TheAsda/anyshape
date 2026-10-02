@@ -183,6 +183,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **L3 · P2** `ctx.initial(node)` without `initialOf(node)` declared throws the undeclared-read error. → `behaviors.test.ts`
 - [x] **L4 · P3** The default `onError` logs `[form] "<name>" failed at "<scope>"` via `console.error` (spy). → `behaviors.test.ts`
 
+### L′. Key contributions (`combine`, `contribute`)
+**Covered** in `contributions.test.ts` on test-local keys: registration checks (no `combine`, `combine`/`behavior` exclusive, owner-only writes even before an owner exists, refs in the target's scope chain, same form, target inside the store), `combine` once per node, parts (order, absent when the guard fails, triggers vs reads, `inputs`), in-place update (keeps `ctx.state`, rewires triggers, the last removal resets the key), atomic calls (a failing check changes nothing, one flush, `replaceBehavior` in one update), rows (row-local contributions, the default without running the owner, new rows get merged declarations), order by call and position (#25), dedup in both orders, builder guards, and async (rerun with the cancelled run's cause, kept work survives the update). Types in `types.test.ts`; `useBehaviors` in `react/behaviors.test.tsx` (R1).
+
 ### M. Validation
 **Covered:** queue order, feature required, guards, cross-field, rows, whole-array reads, runs after computing behaviors, hidden/disabled, row-scoped rules, removing the last rule, async (user start, unchecked, not while sync fails, debounce, abort, removed row, hidden abort, `origins: "any"`, throwing, result reuse), `validate()` errors.
 
@@ -232,9 +235,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.tsx`
 
 ### R. Behaviors in components (`react/behaviors.ts`)
-**Covered:** mount/unmount timing, row scoping, deps-driven atomic swap, latest props in `run`/checks/guards, declarations changing without deps (warning), builder features, StrictMode, duplicates with the `{ key }` hint and sharing, store change moves the registration, explicit `{ store }`.
+**Covered:** mount/unmount timing, row scoping, deps-driven atomic swap, latest props in `run`/checks/guards/contribution payloads, declarations changing without deps (warning), builder features, StrictMode, duplicates with the "declare it once" hint, store change moves the registration, explicit `{ store }`.
 
-- [x] **R1 · P2** A `{ key }`-shared registration is removed only when the **last** holder unmounts; holders on *different* stores with the same key don't share. → `react/behaviors.test.tsx`
+- [x] **R1 · P2** Contributions from a component keep their place in `ctx.parts` across a deps change, and the latest payload is used without re-registering. → `react/behaviors.test.tsx`
 - [x] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.tsx`
 
 ### S. Type-level tests
