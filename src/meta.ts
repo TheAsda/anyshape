@@ -93,12 +93,13 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
   }
 
   /**
-   * Counted per subtree: countIn(node, def) is the number of nodes whose value
-   * of the key `counts` returns true for. It must return false for the default.
+   * Counted per subtree: countIn(node, def) counts the nodes in the subtree
+   * where `isCounted` returns true for the key's value. It must return false
+   * for the default value.
    */
-  aggregate(counts: (value: V) => boolean): MetaKeyDef<V, P, U> {
+  aggregate(isCounted: (value: V) => boolean): MetaKeyDef<V, P, U> {
     if (this._steps.aggregate) throw new Error(".aggregate() is declared once");
-    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, aggregate: counts });
+    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, aggregate: isCounted });
   }
 
   /**
@@ -108,9 +109,10 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * the refs in triggers, reads or writes.
    */
   uses<const U2 extends readonly AnyMetaKeyDef[]>(...defs: U2): MetaKeyDef<V, P, U2> {
-    if (this._steps.combine || this._steps.behavior) throw new Error("call .uses() before .combine() or .behavior()");
-    if (this._steps.uses) throw new Error(".uses() is declared once – list every used key in one call");
-    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { aggregate: this._steps.aggregate, uses: defs });
+    const { behavior, combine, ...before } = this._steps;
+    if (combine || behavior) throw new Error("call .uses() before .combine() or .behavior()");
+    if (before.uses) throw new Error(".uses() is declared once – list every used key in one call");
+    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { ...before, uses: defs });
   }
 
   /**
