@@ -26,8 +26,8 @@
 //               feature can only be written by that feature's behaviors; a
 //               combined key (`combine`) only by its owner.
 //   • Access  – ctx.get / ctx.set only accept declared references.
-//   • Defaults– key definitions with `behavior` (touched, dirty) register a
-//               feature behavior per node, limited to that node.
+//   • Defaults– a key definition's .behavior() registers a feature behavior
+//               per node that declares the key, limited to that node.
 //   • Runtime registration – store.addBehavior(...) runs every check above and
 //               returns a dispose function; disposing resets the meta keys
 //               the behavior wrote to their defaults.

@@ -16,21 +16,21 @@
 //     keyed by item reference; writes through an item store transfer the
 //     store to the new reference. Each item store keeps its own initial value.
 //
-// References (stage 2):
+// References:
 //   • get / set / subscribe / react accept any reference: a node (value), a
 //     MetaRef (one meta key), and the read-only countIn, initialOf, pendingIn
 //     and pendingOf. Each kind is one module in src/refs/ and answers through
 //     RefKind (src/refs/kind.ts); the store keeps only the change channels.
-//   • Inherited keys (visible / disabled): get(ref) returns the effective
-//     value; getOwn(ref) the value written on the node itself.
-//   • Non-reactive keys (focusTarget) are stored in place: no flush, no
+//   • Inherited keys (declared with `inherit`): get(ref) returns the
+//     effective value; getOwn(ref) the value written on the node itself.
+//   • Non-reactive keys (`reactive: false`) are stored in place: no flush, no
 //     notification, allowed on detached stores, kept by reset().
 //
 // Writes carry an origin: "user" | "program" (default) | "initial" |
 // "behavior:<id>". { as: "initial" } writes the value and its baseline.
 // Reactions receive the origins of the writes that changed their target.
 //
-// Notification rules (unchanged):
+// Notification rules:
 //   1. A value subscription fires when its value is no longer Object.is-equal
 //      to the value at its last notification.
 //   2. Values and meta are separate channels; meta does not bubble.
