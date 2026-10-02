@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, meta, metaKey, MetaRef, createStore, type InferValue, type InferMeta,
+  form, object, array, field, metaKey, MetaRef, createStore, type InferValue, type InferMeta,
 } from "./index";
 import { control, validation, touched, visible, disabled, submission } from "./test/features";
 import { META, META_DEFS, CREATE, PLAIN, defOf } from "./internal";
@@ -81,11 +81,6 @@ describe("C · Declarations", () => {
   test("variadic and chained .meta() merge", () => {
     const a = field<string>().meta(validation(), { hint: "x" }).meta({ touched });
     expect(Object.keys(a[META_DEFS]).sort()).toEqual(["error", "hint", "touched"]);
-  });
-
-  test("MetaBuilder still works", () => {
-    const f = field<string>().meta(meta().required().label("A"));
-    expect(f[META]).toEqual({ required: true, label: "A" });
   });
 
   test("plain values can be overridden by plain values", () => {
@@ -178,6 +173,15 @@ describe("C · Arrays", () => {
   test("array create must be a function", () => {
     expect(() => array(object({ a: field<string>() }), { create: {} as any })).toThrow(/must be a function/);
   });
+
+  test("paths through nested arrays, for nodes and meta refs", () => {
+    const f = form({
+      outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
+    });
+    expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
+    expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
+    expect(f.outer.item.inner.path).toBe("outer[].inner");
+  });
 });
 
 const NODE_INTERNALS = ["id", "lens", "path", "parent", "meta", "constructor", "_type", "_hasCreate"];
@@ -210,29 +214,5 @@ describe("C · Reserved names, table-driven", () => {
     s.set(f.group._meta, "n");
     expect(s.getMeta(f.group)).toEqual({ _fields: 1, _meta: "n", _metaDefs: false });
     expect(s.get(f.group.x), "the node's own children still work").toBe("a");
-  });
-});
-
-describe("C · MetaBuilder", () => {
-  test("MetaBuilder: chained helpers and custom keys build a typed plain object", () => {
-    const built = meta().required().label("Name").custom("hint", "Use your legal name").custom("max", 3);
-    expect(built.build()).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
-    const f = form({ name: field<string>().meta(built) });
-    type M = InferMeta<typeof f.name>;
-    type _c1 = Expect<Equal<M["hint"], string>>;
-    type _c2 = Expect<Equal<M["max"], number>>;
-    type _c3 = Expect<Equal<M["required"], boolean>>;
-    expect(f.name[META]).toEqual({ required: true, label: "Name", hint: "Use your legal name", max: 3 });
-    expect(f.name.hint instanceof MetaRef).toBe(true);
-    expect(meta().disabled(false).visible().placeholder("x").build()).toEqual({ disabled: false, visible: true, placeholder: "x" });
-  });
-
-  test("paths through nested arrays, for nodes and meta refs", () => {
-    const f = form({
-      outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
-    });
-    expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
-    expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
-    expect(f.outer.item.inner.path).toBe("outer[].inner");
   });
 });
