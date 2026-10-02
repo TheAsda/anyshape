@@ -35,6 +35,21 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
   return (node as any)[key];
 }
 
+/**
+ * The node's refs to the keys `def` uses, matched by definition, in the order
+ * of .uses(). The node declares `def` as `name`.
+ */
+export function usedRefs(node: AnyNode, name: string, def: MetaKeyDef<any, any>): MetaRef<any, any>[] {
+  return (def._steps.uses ?? []).map((used, i) => {
+    const names = Object.keys(node[META_DEFS]).filter((n) => node[META_DEFS][n] === used);
+    const at = `Key "${name}" on "${node.path || "<root>"}" uses a key the node`;
+    const which = `(uses[${i}], default ${String(used.defaultValue)})`;
+    if (!names.length) throw new Error(`${at} doesn't declare ${which} – declare it in .meta()`);
+    if (names.length > 1) throw new Error(`${at} declares twice (${names.map((n) => `"${n}"`).join(", ")}) ${which} – declare it once`);
+    return metaRefOf(node, names[0]);
+  });
+}
+
 // ============================================================
 // References: every kind answers through its RefKind (src/refs/kind.ts).
 // ============================================================
@@ -93,6 +108,18 @@ export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
     h = h.arrayStore._host;
   }
   return h;
+}
+
+/** The row stores from `outer` (excluded) down to `host` (included): every scope host on the way is a row. */
+export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemStore<any>[] {
+  const rows: ItemStore<any>[] = [];
+  let h = host;
+  while (h !== outer) {
+    if (!(h instanceof ItemStore)) throw new Error(`"${host.node.path || "<root>"}" is not inside "${outer.node.path || "<root>"}"`);
+    rows.unshift(h);
+    h = h.arrayStore._host;
+  }
+  return rows;
 }
 
 export function concreteScopePath(host: BaseStore<any>): string {

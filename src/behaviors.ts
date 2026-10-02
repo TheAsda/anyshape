@@ -67,7 +67,7 @@
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, isAncestorOrSelf, storeWithin, hostFor, concreteScopePath,
-  FIELDS, META_DEFS, metaRefOf, defOf,
+  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween,
 } from "./internal";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
@@ -368,17 +368,60 @@ interface Entry {
   readonly index: number;
 }
 
+const partOrder = (a: Entry, b: Entry): number => a.seq - b.seq || a.index - b.index;
+
+/** How many entries declare each ref, by refKey. */
+type RefCounts = Map<string, { ref: AnyRef; n: number }>;
+
 /** The owner of a combined key on one node, with the contributions registered for it. */
 interface Owner {
   /** The node's ref to the key. */
   readonly ref: MetaRef<any, any>;
   readonly config: OwnerConfig<unknown>;
-  entries: Entry[];
+  /** Entries by the store they were added on, each list in ctx.parts order. */
+  readonly byHost: Map<BaseStore<any>, Entry[]>;
+  /** Entries by contribution: two copies must not reach one instance. */
+  readonly byContribution: Map<Contribution, Entry[]>;
+  /** The entries' triggers (guard refs included) and reads: the merged lists without a pass over every entry. */
+  readonly triggers: RefCounts;
+  readonly reads: RefCounts;
+  size: number;
   reg: Registration | undefined;
 }
 
-/** The owners an addBehavior / replaceBehavior call changes, with their next contribution lists. */
-type OwnerChange = { owner: Owner; entries: Entry[] }[];
+/**
+ * One owner's change in an addBehavior / replaceBehavior call: its entries
+ * added and removed, their hosts, and its size after the change. Applied
+ * (commitOwner) only once every check passed.
+ */
+interface OwnerDelta {
+  readonly owner: Owner;
+  readonly added: Entry[];
+  readonly removed: Entry[];
+  readonly hosts: BaseStore<any>[];
+  size: number;
+}
+type OwnerChange = OwnerDelta[];
+
+const triggerRefs = (d: Declaration): AnyRef[] => [...(d.triggers ?? []), ...guardsOf(d).flatMap((g) => g.refs)];
+const readRefs = (d: Declaration): readonly AnyRef[] => d.reads ?? [];
+
+function tally(counts: RefCounts, refs: readonly AnyRef[], by: 1 | -1): void {
+  for (const ref of refs) {
+    const key = refKey(ref);
+    const count = counts.get(key);
+    if (!count) counts.set(key, { ref, n: by });
+    else if ((count.n += by) === 0) counts.delete(key);
+  }
+}
+
+/** The refs `counts` holds once `delta` is applied. */
+function mergedRefs(counts: RefCounts, delta: OwnerDelta, pick: (d: Declaration) => readonly AnyRef[]): AnyRef[] {
+  const next: RefCounts = new Map([...counts].map(([key, count]) => [key, { ...count }]));
+  for (const e of delta.added) tally(next, pick(e.contribution.decl), 1);
+  for (const e of delta.removed) tally(next, pick(e.contribution.decl), -1);
+  return [...next.values()].map((c) => c.ref);
+}
 
 interface Pending {
   init: boolean;
@@ -417,6 +460,8 @@ interface Flight {
 class Binding {
   /** Trigger subscriptions: rewired when an owner's declarations change in place. */
   triggerOffs: Unsubscribe[] = [];
+  /** refKeys of the subscribed triggers, in order. */
+  triggerKeys: string[] = [];
   /** The array watch (non-leaf levels). */
   readonly offs: Unsubscribe[] = [];
   // leaf
@@ -569,8 +614,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     const queueRegs = (change?.add ?? []).map((a) => this.prepare(this.store, a.behavior, true));
     // A fresh registration per changed owner, used for every check; an owner
     // already registered then takes over its declarations in place.
-    const live = owners.filter((o) => o.entries.length);
-    const ownerRegs = live.map(({ owner, entries }) => this.prepare(this.store, this.ownerBehavior(owner, entries), true, owner));
+    const live = owners.filter((o) => o.size);
+    const ownerRegs = live.map((delta) => this.prepare(this.store, this.ownerBehavior(delta), true, delta.owner));
     const removed = new Set([
       ...(change?.remove ?? []).map((r) => r.reg),
       ...removing,
@@ -589,16 +634,17 @@ export class BehaviorRuntime implements RuntimeHooks {
         this.register(reg, this.store);
         change!.add[i].registered(reg);
       });
-      for (const { owner, entries } of owners) {
-        owner.entries = entries;
-        if (entries.length || !owner.reg) continue;
+      for (const delta of owners) {
+        const owner = delta.owner;
+        this.commitOwner(delta);
+        if (owner.size || !owner.reg) continue;
         // The last contribution is gone: the key returns to its default.
         this.unregister(owner.reg, true);
         owner.reg = undefined;
         this.owners.delete(refKey(owner.ref));
       }
-      live.forEach(({ owner }, i) => {
-        if (owner.reg) return this.update(owner.reg, ownerRegs[i]);
+      live.forEach(({ owner, hosts }, i) => {
+        if (owner.reg) return this.update(owner.reg, ownerRegs[i], hosts);
         owner.reg = ownerRegs[i];
         this.owners.set(refKey(owner.ref), owner);
         this.register(ownerRegs[i], this.store);
@@ -619,50 +665,125 @@ export class BehaviorRuntime implements RuntimeHooks {
     removed: readonly Entry[],
     seq: number
   ): { change: OwnerChange; added: Entry[] } {
-    const byKey = new Map<string, OwnerChange[number]>();
-    const changeOf = (target: MetaRef<any, any>) => {
+    const byKey = new Map<string, OwnerDelta>();
+    const deltaOf = (target: MetaRef<any, any>) => {
       const key = refKey(target);
-      let change = byKey.get(key);
-      if (!change) {
+      let delta = byKey.get(key);
+      if (!delta) {
         const owner = this.owners.get(key) ?? this.newOwner(target);
-        byKey.set(key, (change = { owner, entries: [...owner.entries] }));
+        byKey.set(key, (delta = { owner, added: [], removed: [], hosts: [], size: owner.size }));
       }
-      return change;
+      return delta;
     };
     for (const entry of removed) {
-      const change = changeOf(entry.contribution.target);
-      change.entries = change.entries.filter((e) => e !== entry);
+      const delta = deltaOf(entry.contribution.target);
+      delta.removed.push(entry);
+      delta.hosts.push(entry.host);
+      delta.size--;
     }
     const entries = added.map((contribution, index) => {
       this.checkContribution(host, contribution);
-      const change = changeOf(contribution.target);
+      const delta = deltaOf(contribution.target);
       // Two copies reaching one instance: the same store, or an outer and an inner one.
-      if (change.entries.some((e) => e.contribution === contribution && (storeWithin(host, e.host) || storeWithin(e.host, host)))) {
+      const copies = [
+        ...(delta.owner.byContribution.get(contribution) ?? []).filter((e) => !delta.removed.includes(e)),
+        ...delta.added.filter((e) => e.contribution === contribution),
+      ];
+      if (copies.some((e) => storeWithin(host, e.host) || storeWithin(e.host, host))) {
         throw new Error(`Contribution "${contribution.decl.name ?? refLabel(contribution.target)}" is registered twice for the same instances`);
       }
       const entry: Entry = { contribution, host, id: entryCounter++, seq, index };
-      change.entries.push(entry);
+      delta.added.push(entry);
+      delta.hosts.push(host);
+      delta.size++;
       return entry;
     });
-    for (const change of byKey.values()) change.entries.sort((a, b) => a.seq - b.seq || a.index - b.index);
     return { change: [...byKey.values()], added: entries };
+  }
+
+  /** Applies a checked delta to its owner's indexes. */
+  private commitOwner({ owner, added, removed, size }: OwnerDelta): void {
+    for (const e of removed) {
+      const list = owner.byHost.get(e.host)!;
+      list.splice(list.indexOf(e), 1);
+      if (!list.length) owner.byHost.delete(e.host);
+      const copies = owner.byContribution.get(e.contribution)!;
+      copies.splice(copies.indexOf(e), 1);
+      if (!copies.length) owner.byContribution.delete(e.contribution);
+      tally(owner.triggers, triggerRefs(e.contribution.decl), -1);
+      tally(owner.reads, readRefs(e.contribution.decl), -1);
+    }
+    for (const e of added) {
+      // Usually appended: a new call comes last; replaceBehavior keeps an earlier call's place.
+      let list = owner.byHost.get(e.host);
+      if (!list) owner.byHost.set(e.host, (list = []));
+      let at = list.length;
+      while (at > 0 && partOrder(list[at - 1], e) > 0) at--;
+      list.splice(at, 0, e);
+      let copies = owner.byContribution.get(e.contribution);
+      if (!copies) owner.byContribution.set(e.contribution, (copies = []));
+      copies.push(e);
+      tally(owner.triggers, triggerRefs(e.contribution.decl), 1);
+      tally(owner.reads, readRefs(e.contribution.decl), 1);
+    }
+    owner.size = size;
+  }
+
+  /** The owner's entries that apply to an instance at `host`: added on it or an enclosing store, in ctx.parts order. */
+  private applicable(owner: Owner, host: BaseStore<any>): Entry[] {
+    const out: Entry[] = [];
+    for (let h: BaseStore<any> | undefined = host; h; h = h.parentStore) {
+      const list = owner.byHost.get(h);
+      if (list) out.push(...list);
+    }
+    return out.sort(partOrder);
   }
 
   /**
    * In-place update of an owner: `reg` keeps its identity (`seq`, which
    * orders runs; `root`, its binding tree with each instance's ctx.state;
    * `disposed`) and takes everything else from `fresh`, then rewires its
-   * trigger subscriptions and reruns every instance. A run in flight is
-   * cancelled and rerun with its cause. The scope never changes:
-   * contributions' references stay in the target's scope chain.
+   * trigger subscriptions and reruns the instances inside `hosts`, where
+   * contributions were added or removed. A run in flight there is cancelled
+   * and rerun with its cause. The scope never changes: contributions'
+   * references stay in the target's scope chain.
    */
-  private update(reg: Registration, fresh: Registration): void {
+  private update(reg: Registration, fresh: Registration, hosts: readonly BaseStore<any>[]): void {
     Object.assign(reg, { ...fresh, seq: reg.seq, root: reg.root, disposed: reg.disposed });
-    for (const binding of this.bindings(reg.root!)) {
-      for (const off of binding.triggerOffs) off();
-      binding.triggerOffs = this.subscribeTriggers(binding, binding === reg.root);
-      if (binding.isLeaf && !this.supersede(binding)) this.mark(binding, {});
+    const seen = new Set<Binding>();
+    for (const host of hosts) {
+      const path = this.pathTo(reg, host);
+      if (!path) continue;
+      const at = path.pop()!;
+      // Bindings above the host take triggers of enclosing scopes; bindings
+      // inside it are the instances the change applies to. Others keep theirs.
+      for (const binding of [...path, ...this.bindings(at)]) {
+        if (seen.has(binding)) continue;
+        seen.add(binding);
+        this.rewire(binding);
+        if (binding.isLeaf && binding.host.isAttached() && !this.supersede(binding)) this.mark(binding, {});
+      }
     }
+  }
+
+  /**
+   * Bindings of `reg` from its root down to `host`'s level; undefined when
+   * `host` is detached or below the registration's instances.
+   */
+  private pathTo(reg: Registration, host: BaseStore<any>): Binding[] | undefined {
+    if (!host.isAttached() || !reg.chain.includes(host.node)) return;
+    const path = [reg.root!];
+    for (const row of rowsBetween(reg.root!.host, host)) path.push(this.child(path[path.length - 1], row));
+    return path;
+  }
+
+  /** Resubscribes the binding's triggers if the registration's changed. */
+  private rewire(binding: Binding): void {
+    const refs = this.triggersOf(binding);
+    const keys = refs.map(refKey);
+    if (keys.length === binding.triggerKeys.length && keys.every((k, i) => k === binding.triggerKeys[i])) return;
+    for (const off of binding.triggerOffs) off();
+    this.subscribeTriggers(binding, refs);
   }
 
   /** Its target is a combined key of this form inside `host`; its references are in the target's scope chain. */
@@ -673,7 +794,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     };
     const inForm = (node: AnyNode) => node instanceof ShapeNode && node.id !== undefined && rootOf(node) === this.store.node;
     if (!inForm(target.node)) fail(`"${refLabel(target)}" is not part of this form`);
-    if (!defOf(target).options.combine) fail(`"${refLabel(target)}" has no \`combine\``);
+    if (!defOf(target)._steps.combine) fail(`"${refLabel(target)}" has no \`combine\``);
     const chain = chainTo(scopeOf(target.node));
     if (!chain.includes(host.node)) {
       fail(`"${refLabel(target)}" is outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`);
@@ -689,28 +810,30 @@ export class BehaviorRuntime implements RuntimeHooks {
     const ref = metaRefOf(target.node, target.key);
     let config = this.combined.get(refKey(ref));
     if (!config) {
-      config = defOf(ref).options.combine!(ref.node, ref) as OwnerConfig<unknown>;
+      const def = defOf(ref);
+      config = def._steps.combine!(ref.node, ref, usedRefs(ref.node, ref.key, def)) as OwnerConfig<unknown>;
       this.combined.set(refKey(ref), config);
     }
-    return { ref, config, entries: [], reg: undefined };
+    return { ref, config, byHost: new Map(), byContribution: new Map(), triggers: new Map(), reads: new Map(), size: 0, reg: undefined };
   }
 
-  /** The owner behavior: combine's config plus every contribution's triggers, reads and guard refs. */
-  private ownerBehavior(owner: Owner, entries: readonly Entry[]): Behavior {
+  /** The owner behavior once `delta` applies: combine's config plus every contribution's triggers, reads and guard refs, each once. */
+  private ownerBehavior(delta: OwnerDelta): Behavior {
+    const { owner } = delta;
     const config = owner.config;
-    const declared = entries.map((e) => e.contribution.decl);
+    const once = (refs: AnyRef[]) => [...new Map(refs.map((r) => [refKey(r), r])).values()];
     return new Behavior({
       ...config,
       name: config.name ?? `${owner.ref.node.path || "<root>"}#${owner.ref.key}`,
-      triggers: [...(config.triggers ?? []), ...declared.flatMap((d) => [...(d.triggers ?? []), ...guardsOf(d).flatMap((g) => g.refs)])],
-      reads: [...(config.reads ?? []), ...declared.flatMap((d) => d.reads ?? [])],
+      triggers: once([...(config.triggers ?? []), ...mergedRefs(owner.triggers, delta, triggerRefs)]),
+      reads: once([...(config.reads ?? []), ...mergedRefs(owner.reads, delta, readRefs)]),
       run: config.run as BehaviorConfig["run"],
     });
   }
 
   private register(reg: Registration, host: BaseStore<any>): void {
     this.regs.push(reg);
-    reg.root = this.bind(reg, host, reg.chain.indexOf(host.node), true);
+    this.bind(reg, host, reg.chain.indexOf(host.node), true);
   }
 
   /** End of a flush: kept work that no run holds any more (its holder was cancelled) is aborted. */
@@ -781,7 +904,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const targets = writes.map((w) => {
       const target = targetOf(w as AnyRef);
       if (!target) return fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
-      if (target.def?.options.combine && (!owner || refKey(owner.ref) !== refKey(w as AnyRef))) {
+      if (target.def?._steps.combine && (!owner || refKey(owner.ref) !== refKey(w as AnyRef))) {
         fail(`"${refLabel(w)}" is written only by the owner of its key – contribute() to it instead`);
       }
       if (target.def?.options.owner === "feature" && !feature) {
@@ -886,7 +1009,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   // ---- binding tree ----
   private bind(reg: Registration, host: BaseStore<any>, depth: number, isRoot: boolean): Binding {
     const binding = new Binding(reg, host, depth);
-    binding.triggerOffs = this.subscribeTriggers(binding, isRoot);
+    if (isRoot) reg.root = binding;
+    this.subscribeTriggers(binding, this.triggersOf(binding));
 
     if (binding.isLeaf) {
       if (reg.runInit) this.mark(binding, { init: true });
@@ -912,17 +1036,20 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   /** Triggers of the binding's scope; the root binding also takes every scope above it. */
-  private subscribeTriggers(binding: Binding, isRoot: boolean): Unsubscribe[] {
+  private triggersOf(binding: Binding): AnyRef[] {
     const reg = binding.reg;
-    const offs: Unsubscribe[] = [];
-    for (const ref of reg.triggers) {
-      const scope = scopeOf(refNode(ref));
-      const level = reg.chain.indexOf(scope);
-      if (level === binding.depth || (isRoot && level < binding.depth)) {
-        offs.push(hostFor(binding.host, scope).react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info)));
-      }
-    }
-    return offs;
+    const isRoot = binding === reg.root;
+    return reg.triggers.filter((ref) => {
+      const level = reg.chain.indexOf(scopeOf(refNode(ref)));
+      return level === binding.depth || (isRoot && level < binding.depth);
+    });
+  }
+
+  private subscribeTriggers(binding: Binding, refs: AnyRef[]): void {
+    binding.triggerKeys = refs.map(refKey);
+    binding.triggerOffs = refs.map((ref) =>
+      hostFor(binding.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info))
+    );
   }
 
   /** Bindings under `binding` whose rows are attached, `binding` first. */
@@ -1128,7 +1255,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     try {
       const owner = reg.owner;
-      const applicable = owner ? owner.entries.filter((e) => storeWithin(leaf.host, e.host)) : [];
+      const applicable = owner ? this.applicable(owner, leaf.host) : [];
       if (owner && !applicable.length) {
         // No contribution applies to this instance: the key keeps (or returns to) its default.
         ctx.set(owner.ref, defOf(owner.ref).defaultValue);
@@ -1224,14 +1351,19 @@ export class BehaviorRuntime implements RuntimeHooks {
 // ============================================================
 // Default behaviors from key definitions
 // ============================================================
-/** @internal Feature behaviors declared by key definitions, one per node. */
+/**
+ * @internal Feature behaviors declared by key definitions, one per node.
+ * Checks every key's uses on the way, combined keys included: their owners
+ * are created later, with the first contribution.
+ */
 export function defaultBehaviors(root: AnyNode): Behavior[] {
   const out: Behavior[] = [];
   const visit = (node: AnyNode) => {
     for (const [name, def] of Object.entries(node[META_DEFS])) {
-      const factory = def.options.behavior;
+      const uses = usedRefs(node, name, def);
+      const factory = def._steps.behavior;
       if (!factory) continue;
-      const config = factory(node, metaRefOf(node, name)) as BehaviorConfig;
+      const config = factory(node, metaRefOf(node, name), uses) as BehaviorConfig;
       out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, { self: node }));
     }
     if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);

@@ -11,9 +11,11 @@ import { StoreProvider, useBehaviors, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 
 /** A combined key: the payloads of its active contributions. */
-const tags = metaKey<readonly string[], string>([], {
-  combine: (self, key) => ({ triggers: [self], writes: [key], run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)) }),
-});
+const tags = metaKey<readonly string[], string>([]).combine((self, key) => ({
+  triggers: [self],
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
+}));
 
 const shape = form({
   tagged: field<string>().meta({ tags }),

@@ -29,28 +29,20 @@ export const validation = (options: ValidationOptions = {}) => ({
 });
 
 /** true once the user changed the value; stays true. */
-export const touched = metaKey(false, {
-  owner: "feature",
-  aggregate: (t) => t,
-  behavior: (self, key) => ({
-    triggers: [self],
-    writes: [key],
-    origins: ["user"],
-    runOn: { init: false },
-    run: (ctx) => ctx.set(key, true),
-  }),
-});
+export const touched = metaKey(false, { owner: "feature", aggregate: (t) => t }).behavior((self, key) => ({
+  triggers: [self],
+  writes: [key],
+  origins: ["user"],
+  runOn: { init: false },
+  run: (ctx) => ctx.set(key, true),
+}));
 
 /** true while the value differs (Object.is) from its initial value. */
-export const dirty = metaKey(false, {
-  owner: "feature",
-  aggregate: (d) => d,
-  behavior: (self, key) => ({
-    triggers: [self, initialOf(self)],
-    writes: [key],
-    run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),
-  }),
-});
+export const dirty = metaKey(false, { owner: "feature", aggregate: (d) => d }).behavior((self, key) => ({
+  triggers: [self, initialOf(self)],
+  writes: [key],
+  run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),
+}));
 
 export const visible = metaKey(true, { inherit: "all" });
 

@@ -1,10 +1,10 @@
 // ============================================================
 // Performance baselines (NF3). Run with `npm run bench`.
-// Numbers are tracked over time, not asserted: compare runs on the same machine.
+// Timings are tracked over time, not asserted: compare runs on the same machine.
 // ============================================================
 
-import { test, describe } from "vitest";
-import { form, object, array, field, createStore, defineBehavior, countIn, rule } from "../index";
+import { test, describe, expect } from "vitest";
+import { form, object, array, field, createStore, defineBehavior, countIn, rule, metaKey, contribute } from "../index";
 import { control, revealed } from "../test/features";
 
 // ---------------------------------------------------------------------------
@@ -97,6 +97,40 @@ describe("200 rows, one error", () => {
       bench("get(countIn(root, 'error'))", () => {
         s.get(errors);
       })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Row-by-row contribution mounts: each row adds its own contribution to a row
+// key, as a row component's useBehaviors does. Each mount reruns only its row.
+let ownerRuns = 0;
+const mounted = metaKey<readonly string[], string>([]).combine((self, key) => ({
+  triggers: [self],
+  writes: [key],
+  run: (ctx) => {
+    ownerRuns++;
+    ctx.set(key, ctx.parts.map((p) => p.payload));
+  },
+}));
+const grid = form({ rows: array(object({ v: field<string>().meta({ mounted }) })) });
+const G = grid.rows.item;
+
+function mountRowByRow(rows: number): void {
+  const s = createStore(grid, { rows: Array.from({ length: rows }, () => ({ v: "" })) });
+  s.substore(grid.rows).items().forEach((row, i) => row.addBehavior(contribute(G.v.mounted, `row ${i}`)));
+}
+
+describe("row-by-row contribution mounts", () => {
+  test("mounts", async ({ bench }) => {
+    for (const rows of [400, 800]) {
+      ownerRuns = 0;
+      mountRowByRow(rows);
+      expect(ownerRuns, `${rows} rows: one owner run per mount`).toBe(rows);
+    }
+    await bench.compare(
+      bench("400 rows", () => mountRowByRow(400)),
+      bench("800 rows", () => mountRowByRow(800))
     );
   });
 });

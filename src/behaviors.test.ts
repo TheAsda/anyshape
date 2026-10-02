@@ -496,14 +496,12 @@ describe("J · Feature default behaviors", () => {
   test("a feature's default behavior may only use its own node", () => {
     let other: unknown;
     const mirror = () => ({
-      mirror: metaKey("", {
-        behavior: (self, key) => ({
-          triggers: [self],
-          reads: [other as typeof self],
-          writes: [key],
-          run: () => {},
-        }),
-      }),
+      mirror: metaKey("").behavior((self, key) => ({
+        triggers: [self],
+        reads: [other as typeof self],
+        writes: [key],
+        run: () => {},
+      })),
     });
     const f = form({ a: field<string>(), b: field<string>().meta(mirror()) });
     other = f.a;
