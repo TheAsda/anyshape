@@ -34,7 +34,11 @@ export interface RefKind<R = any> {
   read(store: BaseStore<any>, ref: R): unknown;
   /** Calls `fn` on `store` when the value changes (phase: reactions or UI). */
   subscribe(store: BaseStore<any>, ref: R, phase: Phase, fn: SubFn): Unsubscribe;
-  /** Can writing `target` change the value? Orders behaviors. */
+  /**
+   * Can writing `target` change the value? Orders behaviors. Only when the
+   * target's node and the reference's node are on one line of the tree (the
+   * same node, or one an ancestor of the other): the runtime looks for edges there.
+   */
   affectedBy(ref: R, target: Target): boolean;
   /** Depends on its node only, not on a subtree. Default behaviors may use only local references. */
   readonly local: boolean;

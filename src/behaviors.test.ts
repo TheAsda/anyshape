@@ -633,6 +633,106 @@ describe("K · Ordering edges", () => {
   });
 });
 
+describe("K · Run order across registration changes", () => {
+  type NumberField = typeof shape.start;
+  // A behavior that logs its runs and writes `to` from its first trigger.
+  const step = (log: string[], name: string, triggers: NumberField[], to: NumberField) =>
+    defineBehavior({
+      name, triggers, writes: [to],
+      run: (c) => (log.push(name), c.set(to, c.get(triggers[0]) + 1)),
+    });
+
+  test("a behavior added upstream of a chain runs first, and the whole chain after it, each once", () => {
+    const log: string[] = [];
+    // `c` is registered before `b`, which it depends on.
+    const c = step(log, "c", [shape.end, shape.discount], shape.total);
+    const b = step(log, "b", [shape.start, shape.discount], shape.end);
+    const s = createStore(shape, initial(), { behaviors: [c, b] });
+    s.addBehavior(step(log, "a", [shape.discount], shape.start));
+    log.length = 0;
+    s.set(shape.discount, 1);
+    expect(log).toEqual(["a", "b", "c"]);
+  });
+
+  test("a disposed upstream behavior lets its dependent run in registration order again", () => {
+    const log: string[] = [];
+    const a = step(log, "a", [shape.end, shape.discount], shape.total);
+    const b = step(log, "b", [shape.discount], shape.subtotal);
+    const s = createStore(shape, initial(), { behaviors: [a, b] });
+    const dispose = s.addBehavior(step(log, "x", [shape.start], shape.end));
+    log.length = 0;
+    s.set(shape.discount, 1);
+    expect(log, "a depends on x: after b").toEqual(["b", "a"]);
+    dispose();
+    log.length = 0;
+    s.set(shape.discount, 2);
+    expect(log, "independent again: registration order").toEqual(["a", "b"]);
+  });
+
+  test("disposing a link of a dependent's longest chain leaves it after the next longest", () => {
+    const log: string[] = [];
+    // `a` is registered first: with too low a rank it would run before `s2`.
+    const s = createStore(shape, initial(), { behaviors: step(log, "a", [shape.discount, shape.subtotal, shape.tax], shape.total) });
+    s.addBehavior(step(log, "p0", [shape.start], shape.discount));
+    s.addBehavior(step(log, "s1", [shape.start], shape.end));
+    s.addBehavior(step(log, "s2", [shape.end], shape.subtotal));
+    const dispose = s.addBehavior(step(log, "g", [shape.subtotal], shape.tax));
+    dispose();
+    log.length = 0;
+    s.batch(() => {
+      s.set(shape.discount, 1);
+      s.set(shape.end, 1);
+    });
+    expect(log, "a still waits for s2").toEqual(["s2", "a"]);
+  });
+
+  test("replacing a behavior checks cycles without it: the reverse link replaces it", () => {
+    const log: string[] = [];
+    const s = createStore(shape, initial());
+    const h = s.addBehavior(step(log, "forward", [shape.start], shape.end));
+    s.replaceBehavior(h, step(log, "back", [shape.end], shape.start));
+    s.set(shape.end, 10);
+    expect(s.get(shape.start)).toBe(11);
+    s.set(shape.start, 0);
+    expect(s.get(shape.end), "forward is gone").toBe(10);
+  });
+
+  test("a replacement that forms a cycle is rejected; the previous one keeps its place", () => {
+    const log: string[] = [];
+    const s = createStore(shape, initial(), { behaviors: step(log, "after", [shape.end], shape.total) });
+    const h = s.addBehavior(step(log, "mine", [shape.start], shape.end));
+    expect(() => s.replaceBehavior(h, step(log, "loop", [shape.total], shape.end))).toThrow(/form a cycle/);
+    log.length = 0;
+    s.set(shape.start, 5);
+    expect(log).toEqual(["mine", "after"]);
+    expect(s.get(shape.total)).toBe(7);
+  });
+
+  test("a contribution's trigger moves its owner after the trigger's writer", () => {
+    const log: string[] = [];
+    const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => void log.push("owner")) });
+    s.addBehavior(
+      defineBehavior({ name: "w", triggers: [shape.title], writes: [shape.country], run: (c) => (log.push("w"), c.set(shape.country, c.get(shape.title))) })
+    );
+    const dispose = s.addBehavior(rule(shape.name, () => "Not x", { when: when([shape.country], (c) => c !== "x") }));
+    log.length = 0;
+    s.batch(() => {
+      s.set(shape.title, "x");
+      s.set(shape.name, "Bo");
+    });
+    expect(log, "the owner, registered before w, now runs after it, once").toEqual(["w", "owner"]);
+    expect(s.get(shape.name.error)).toBe(undefined);
+
+    dispose();
+    log.length = 0;
+    s.batch(() => {
+      s.set(shape.title, "y");
+      s.set(shape.name, "Al");
+    });
+    expect(log, "without the contribution: independent again, registration order").toEqual(["owner", "w"]);
+  });
+});
+
 describe("L · The run context", () => {
   test("ctx.changed is false on the init run and true only for triggers that changed", () => {
     const seen: string[] = [];

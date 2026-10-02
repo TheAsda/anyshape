@@ -135,3 +135,58 @@ describe("row-by-row contribution mounts", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Row-by-row behavior mounts: each row adds its own plain behavior (a per-row
+// calculation), as a row component's useBehaviors does. One registration per
+// row, so ranking cost per mount shows here. Few samples: before #6 an 800-row
+// mount took seconds.
+const sheet = form({ rows: array(object({ a: field<number>(), b: field<number>() })) });
+const S = sheet.rows.item;
+const double = () =>
+  defineBehavior({ name: "double", triggers: [S.a], writes: [S.b], run: (c) => c.set(S.b, c.get(S.a) * 2) });
+
+function calculateRowByRow(rows: number): void {
+  const s = createStore(sheet, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: 0 })) });
+  s.substore(sheet.rows).items().forEach((row) => row.addBehavior(double()));
+}
+
+describe("row-by-row behavior mounts", () => {
+  test("behaviors", async ({ bench }) => {
+    await bench.compare(
+      bench("200 rows", () => calculateRowByRow(200)),
+      bench("400 rows", () => calculateRowByRow(400)),
+      bench("800 rows", () => calculateRowByRow(800)),
+      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Row-by-row chained mounts: each row adds a → b and b → c, then every row
+// unmounts. The behaviors are per template node, so every row's a → b ranks
+// before every row's b → c. Values are already consistent: the init runs
+// write nothing, so only registration and disposal show.
+const chain = form({ rows: array(object({ a: field<number>(), b: field<number>(), c: field<number>() })) });
+const C = chain.rows.item;
+const chained = () => [
+  defineBehavior({ name: "b", triggers: [C.a], writes: [C.b], run: (c) => c.set(C.b, c.get(C.a) * 2) }),
+  defineBehavior({ name: "c", triggers: [C.b], writes: [C.c], run: (c) => c.set(C.c, c.get(C.b) + 1) }),
+];
+
+function chainRowByRow(rows: number): void {
+  const s = createStore(chain, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: i * 2, c: i * 2 + 1 })) });
+  const handles = s.substore(chain.rows).items().flatMap((row) => chained().map((b) => row.addBehavior(b)));
+  for (const dispose of handles) dispose();
+}
+
+describe("row-by-row chained mounts", () => {
+  test("chained", async ({ bench }) => {
+    await bench.compare(
+      bench("100 rows", () => chainRowByRow(100)),
+      bench("200 rows", () => chainRowByRow(200)),
+      bench("400 rows", () => chainRowByRow(400)),
+      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
+    );
+  });
+});
