@@ -147,6 +147,15 @@ describe("C · Meta references", () => {
     expect((base as any).error).toBe(undefined);
     expect(withMeta.error instanceof MetaRef).toBe(true);
   });
+
+  test("paths through nested arrays, for nodes and meta refs", () => {
+    const f = form({
+      outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
+    });
+    expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
+    expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
+    expect(f.outer.item.inner.path).toBe("outer[].inner");
+  });
 });
 
 describe("C · Closed meta in the store", () => {
@@ -172,15 +181,6 @@ describe("C · Arrays", () => {
 
   test("array create must be a function", () => {
     expect(() => array(object({ a: field<string>() }), { create: {} as any })).toThrow(/must be a function/);
-  });
-
-  test("paths through nested arrays, for nodes and meta refs", () => {
-    const f = form({
-      outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
-    });
-    expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
-    expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
-    expect(f.outer.item.inner.path).toBe("outer[].inner");
   });
 });
 
