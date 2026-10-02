@@ -12,22 +12,20 @@ interface Run { path: string; runs: number; tags: string[]; origins: string[]; i
 interface Log { runs: Run[]; combined: string[] }
 let log: Log = { runs: [], combined: [] };
 
-const tags = metaKey<readonly string[], string>([], {
-  combine: (self, key) => {
-    log.combined.push(self.path);
-    return {
-      name: `${self.path}#tags`,
-      triggers: [self],
-      writes: [key],
-      run(ctx) {
-        const n = ((ctx.state.runs as number | undefined) ?? 0) + 1;
-        ctx.state.runs = n;
-        const list = ctx.parts.map((p) => p.payload);
-        log.runs.push({ path: `${ctx.store.node.path}:${self.path}`, runs: n, tags: list, origins: [...ctx.origins], isInit: ctx.isInit });
-        ctx.set(key, list);
-      },
-    };
-  },
+const tags = metaKey<readonly string[], string>([]).combine((self, key) => {
+  log.combined.push(self.path);
+  return {
+    name: `${self.path}#tags`,
+    triggers: [self],
+    writes: [key],
+    run(ctx) {
+      const n = ((ctx.state.runs as number | undefined) ?? 0) + 1;
+      ctx.state.runs = n;
+      const list = ctx.parts.map((p) => p.payload);
+      log.runs.push({ path: `${ctx.store.node.path}:${self.path}`, runs: n, tags: list, origins: [...ctx.origins], isInit: ctx.isInit });
+      ctx.set(key, list);
+    },
+  };
 });
 
 const owned = metaKey(0, { owner: "feature" });
@@ -53,8 +51,18 @@ describe("Registration", () => {
     expect(() => s.addBehavior(contribute(shape.b.note as any, "x"))).toThrow(/has no `combine`/);
   });
 
-  test("`combine` and `behavior` are mutually exclusive", () => {
-    expect(() => metaKey(0, { behavior: () => ({ run() {} }), combine: () => ({ run() {} }) })).toThrow(/mutually exclusive/);
+  test("`combine` and `behavior` are mutually exclusive, in either order", () => {
+    expect(() => metaKey(0).behavior(() => ({ run() {} })).combine(() => ({ run() {} }))).toThrow(/mutually exclusive/);
+    expect(() => metaKey(0).combine(() => ({ run() {} })).behavior(() => ({ run() {} }))).toThrow(/mutually exclusive/);
+  });
+
+  test("each step returns a new definition: the one it was called on is unchanged", () => {
+    const plain = metaKey<number, string>(0);
+    const combined = plain.combine(() => ({ run() {} }));
+    const sh = form(object({ f: field<string>().meta({ plain, combined }) }));
+    const s = createStore(sh, { f: "" });
+    expect(() => s.addBehavior(contribute(sh.f.plain, "x"))).toThrow(/has no `combine`/);
+    expect(() => s.addBehavior(contribute(sh.f.combined, "x"))).not.toThrow();
   });
 
   test("no owner without a contribution: the key keeps its default and nothing runs", ({ log }) => {
@@ -80,6 +88,76 @@ describe("Registration", () => {
     expect(() => s.addBehavior(writer)).toThrow(/is written only by the owner of its key/);
     s.set(shape.a.tags, ["server"]);
     expect(s.get(shape.a.tags)).toEqual(["server"]);
+  });
+});
+
+describe("Uses", () => {
+  /** Set to force a recheck; the owner clears it. */
+  const forced = metaKey(false);
+  const checked = metaKey<string, string>("").uses(forced).combine((self, key, [force]) => ({
+    triggers: [self, force],
+    writes: [key, force],
+    run(ctx) {
+      const isForced = ctx.get(force);
+      ctx.set(key, `${ctx.parts.map((p) => p.payload)}${isForced ? " (forced)" : ""}`);
+      if (isForced) ctx.set(force, false);
+    },
+  }));
+
+  test("combine receives refs to the keys it uses, under whatever name the node declares them, in any .meta() call", () => {
+    const sh = form(object({ f: field<string>().meta({ problem: checked }).meta({ recheck: forced }) }));
+    const s = createStore(sh, { f: "" }, { behaviors: contribute(sh.f.problem, "base") });
+    expect(s.get(sh.f.problem)).toBe("base");
+    s.set(sh.f.recheck, true);
+    expect(s.get(sh.f.problem)).toBe("base (forced)");
+    expect(s.get(sh.f.recheck), "the owner cleared it").toBe(false);
+  });
+
+  test("a default behavior receives them too", () => {
+    const mirrored = metaKey(false).uses(forced).behavior((_self, key, [force]) => ({
+      triggers: [force],
+      writes: [key],
+      run: (ctx) => ctx.set(key, ctx.get(force)),
+    }));
+    const sh = form(object({ f: field<string>().meta({ shown: mirrored, recheck: forced }) }));
+    const s = createStore(sh, { f: "" });
+    s.set(sh.f.recheck, true);
+    expect(s.get(sh.f.shown)).toBe(true);
+  });
+
+  test("a used key the node doesn't declare throws in createStore, before anything contributes", () => {
+    const sh = form(object({ rows: array(object({ x: field<string>().meta({ problem: checked }) })) }));
+    expect(() => createStore(sh, { rows: [] })).toThrow(
+      `Key "problem" on "rows[].x" uses a key the node doesn't declare (uses[0], default false) – declare it in .meta()`
+    );
+  });
+
+  test("uses grants no access: the owner still declares the refs it reads or writes", () => {
+    const errors: unknown[] = [];
+    const undeclared = metaKey<string, string>("").uses(forced).combine((_self, key, [force]) => ({
+      writes: [key],
+      run: (ctx) => ctx.set(key, String(ctx.get(force))),
+    }));
+    const sh = form(object({ f: field<string>().meta({ problem: undeclared, recheck: forced }) }));
+    const s = createStore(sh, { f: "" }, { behaviors: contribute(sh.f.problem, "base"), onError: (e) => errors.push(e) });
+    expect(String(errors[0])).toMatch(/"f#recheck" is not declared in triggers, reads, writes or when/);
+    expect(s.get(sh.f.problem)).toBe("");
+  });
+
+  test(".uses() comes before .combine() and .behavior(): the refs they receive are fixed then", () => {
+    expect(() => metaKey(0).combine(() => ({ run() {} })).uses(forced)).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
+    expect(() => metaKey(0).behavior(() => ({ run() {} })).uses(forced)).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
+  });
+
+  test(".uses() is declared once: a second call throws instead of dropping the first one's keys", () => {
+    expect(() => metaKey(0).uses(forced).uses(metaKey(""))).toThrow(/\.uses\(\) is declared once – list every used key in one call/);
+  });
+
+  test("a used key the node declares twice is ambiguous and throws in createStore", () => {
+    const sh = form(object({ f: field<string>().meta({ problem: checked, recheck: forced }).meta({ again: forced }) }));
+    expect(() => createStore(sh, { f: "" })).toThrow(
+      `Key "problem" on "f" uses a key the node declares twice ("recheck", "again") (uses[0], default false) – declare it once`
+    );
   });
 });
 
@@ -115,12 +193,10 @@ describe("Parts", () => {
 
   test("a part carries the contribution's declared inputs (triggers, reads), never its guard refs; the owner may read them", () => {
     const seen: unknown[] = [];
-    const probe = metaKey<number, null>(0, {
-      combine: (_self, key) => ({
-        writes: [key],
-        run: (ctx) => void seen.push(...ctx.parts.flatMap((p) => p.inputs.map((r) => ctx.get(r)))),
-      }),
-    });
+    const probe = metaKey<number, null>(0).combine((_self, key) => ({
+      writes: [key],
+      run: (ctx) => void seen.push(...ctx.parts.flatMap((p) => p.inputs.map((r) => ctx.get(r)))),
+    }));
     const sh = form(object({ f: field<string>().meta({ probe }), t: field<string>(), r: field<string>(), g: field<string>() }));
     createStore(sh, { f: "", t: "T", r: "R", g: "G" }, {
       behaviors: contribute(sh.f.probe, null, { triggers: [sh.t], reads: [sh.r], when: when([sh.g], () => true) }),
@@ -272,6 +348,49 @@ describe("Rows", () => {
     expect(row1.get(R.x.tags)).toEqual([]);
   });
 
+  test("a contribution added on a row reruns only that row's instance", ({ log }) => {
+    const s = createStore(shape, { ...initial(), rows: [{ x: 0 }, { x: 0 }, { x: 0 }] });
+    const rows = s.substore(shape.rows).items();
+    rows[0].addBehavior(contribute(R.x.tags, "row 0"));
+    log.runs.length = 0;
+    rows[1].addBehavior(contribute(R.x.tags, "row 1"));
+    expect(log.runs.map((r) => r.tags)).toEqual([["row 1"]]);
+    expect(rows.map((r) => r.get(R.x.tags))).toEqual([["row 0"], ["row 1"], []]);
+  });
+
+  test("removing a row's contribution reruns only that row's instance", ({ log }) => {
+    const s = createStore(shape, initial());
+    const [row0, row1] = s.substore(shape.rows).items();
+    row0.addBehavior(contribute(R.x.tags, "row 0"));
+    row1.addBehavior(contribute(R.x.tags, "row 1"));
+    const h = row1.addBehavior(contribute(R.x.tags, "row 1 extra"));
+    log.runs.length = 0;
+    h();
+    expect(log.runs.map((r) => r.tags)).toEqual([["row 1"]]);
+  });
+
+  test("a contribution added on the root reruns every row's instance", ({ log }) => {
+    const s = createStore(shape, initial());
+    const [row0, row1] = s.substore(shape.rows).items();
+    row0.addBehavior(contribute(R.x.tags, "row 0"));
+    row1.addBehavior(contribute(R.x.tags, "row 1"));
+    log.runs.length = 0;
+    s.addBehavior(contribute(R.x.tags, "all rows"));
+    expect(log.runs.map((r) => r.tags), "parts in call order").toEqual([["row 0", "all rows"], ["row 1", "all rows"]]);
+  });
+
+  test("a row's contribution triggers its row even when another row's contribution declared the same trigger first", ({ log }) => {
+    const sh = form(object({ rows: array(object({ x: field<number>().meta({ tags }), y: field<number>() })) }));
+    const Y = sh.rows.item;
+    const s = createStore(sh, { rows: [{ x: 0, y: 0 }, { x: 0, y: 0 }] }, { behaviors: contribute(Y.x.tags, "base") });
+    const [row0, row1] = s.substore(sh.rows).items();
+    row0.addBehavior(contribute(Y.x.tags, "row 0", { triggers: [Y.y] }));
+    row1.addBehavior(contribute(Y.x.tags, "row 1", { triggers: [Y.y] }));
+    log.runs.length = 0;
+    row1.set(Y.y, 1);
+    expect(log.runs.map((r) => r.tags)).toEqual([["base", "row 1"]]);
+  });
+
   test("a row added after an in-place update gets the merged declarations", () => {
     const s = createStore(shape, initial(), { behaviors: contribute(R.x.tags, "all rows") });
     s.addBehavior(contribute(R.x.tags, "strict rows", { when: when([shape.mode], (m) => m === "strict") }));
@@ -306,20 +425,18 @@ describe("In-flight runs", () => {
   interface Call { signal: AbortSignal; d: ReturnType<typeof deferred<string>>; origins: string[]; changed: boolean; isInit: boolean }
   let calls: Call[] = [];
 
-  const answer = metaKey<string, string>("", {
-    combine: (self, key) => ({
-      triggers: [self],
-      writes: [key],
-      run(ctx) {
-        const started = ((ctx.state.started as number | undefined) ?? 0) + 1;
-        ctx.state.started = started;
-        if (!ctx.isInit && !ctx.origins.size) return ctx.set(key, `idle ${ctx.parts.length}`);
-        const d = deferred<string>();
-        calls.push({ signal: ctx.signal, d, origins: [...ctx.origins], changed: ctx.changed(self), isInit: ctx.isInit });
-        return d.promise.then((a) => ctx.set(key, `${a} ${ctx.parts.map((p) => p.payload)} (#${started})`));
-      },
-    }),
-  });
+  const answer = metaKey<string, string>("").combine((self, key) => ({
+    triggers: [self],
+    writes: [key],
+    run(ctx) {
+      const started = ((ctx.state.started as number | undefined) ?? 0) + 1;
+      ctx.state.started = started;
+      if (!ctx.isInit && !ctx.origins.size) return ctx.set(key, `idle ${ctx.parts.length}`);
+      const d = deferred<string>();
+      calls.push({ signal: ctx.signal, d, origins: [...ctx.origins], changed: ctx.changed(self), isInit: ctx.isInit });
+      return d.promise.then((a) => ctx.set(key, `${a} ${ctx.parts.map((p) => p.payload)} (#${started})`));
+    },
+  }));
   const sh = form(object({ f: field<string>().meta({ answer }) }));
 
   function setup() {
@@ -350,18 +467,16 @@ describe("In-flight runs", () => {
   test("kept work survives an in-place update: the rerun continues it instead of restarting", async () => {
     const starts: AbortSignal[] = [];
     const work = deferred<string>();
-    const kept = metaKey<string, string>("", {
-      combine: (self, key) => ({
-        triggers: [self],
-        writes: [key],
-        runOn: { init: false },
-        async run(ctx) {
-          const value = ctx.get(self) as string;
-          const result = await ctx.keep([value], (signal) => (starts.push(signal), work.promise));
-          ctx.set(key, `${result} ${ctx.parts.length}`);
-        },
-      }),
-    });
+    const kept = metaKey<string, string>("").combine((self, key) => ({
+      triggers: [self],
+      writes: [key],
+      runOn: { init: false },
+      async run(ctx) {
+        const value = ctx.get(self) as string;
+        const result = await ctx.keep([value], (signal) => (starts.push(signal), work.promise));
+        ctx.set(key, `${result} ${ctx.parts.length}`);
+      },
+    }));
     const k = form(object({ f: field<string>().meta({ kept }) }));
     const s = createStore(k, { f: "" }, { behaviors: contribute(k.f.kept, "base") });
     s.set(k.f, "x", { origin: "user" });
@@ -371,6 +486,20 @@ describe("In-flight runs", () => {
     work.resolve("checked");
     await s.settle();
     expect(s.get(k.f.kept)).toBe("checked 2");
+  });
+
+  test("a contribution added on one row leaves another row's run in flight running", async () => {
+    calls = [];
+    const rowsSh = form(object({ rows: array(object({ f: field<string>().meta({ answer }) })) }));
+    const F = rowsSh.rows.item.f;
+    const s = createStore(rowsSh, { rows: [{ f: "" }, { f: "" }] });
+    const [row0, row1] = s.substore(rowsSh.rows).items();
+    row0.addBehavior(contribute(F.answer, "row 0"));
+    row1.addBehavior(contribute(F.answer, "row 1"));
+    expect(calls[0].signal.aborted).toBe(false);
+    calls[0].d.resolve("init");
+    await s.settle();
+    expect(row0.get(F.answer)).toBe("init row 0 (#1)");
   });
 
   test("an initial run in flight is rerun as an initial run", async () => {
