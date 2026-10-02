@@ -649,20 +649,15 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   /**
-   * In-place update of an owner: `reg` keeps its identity, its binding tree
-   * and each instance's ctx.state, takes `fresh`'s declarations and rank,
-   * rewires its trigger subscriptions and reruns every instance. A run in
-   * flight is cancelled and rerun with its cause.
+   * In-place update of an owner: `reg` keeps its identity (`seq`, which
+   * orders runs; `root`, its binding tree with each instance's ctx.state;
+   * `disposed`) and takes everything else from `fresh`, then rewires its
+   * trigger subscriptions and reruns every instance. A run in flight is
+   * cancelled and rerun with its cause. The scope never changes:
+   * contributions' references stay in the target's scope chain.
    */
   private update(reg: Registration, fresh: Registration): void {
-    reg.behavior = fresh.behavior;
-    reg.config = fresh.config;
-    reg.triggers = fresh.triggers;
-    reg.reads = fresh.reads;
-    reg.inputs = fresh.inputs;
-    reg.inputKeys = fresh.inputKeys;
-    reg.declared = fresh.declared;
-    reg.rank = fresh.rank;
+    Object.assign(reg, { ...fresh, seq: reg.seq, root: reg.root, disposed: reg.disposed });
     for (const binding of this.bindings(reg.root!)) {
       for (const off of binding.triggerOffs) off();
       binding.triggerOffs = this.subscribeTriggers(binding, binding === reg.root);
@@ -1133,8 +1128,8 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     try {
       const owner = reg.owner;
-      const mine = owner?.entries.filter((e) => storeWithin(leaf.host, e.host));
-      if (owner && !mine!.length) {
+      const applicable = owner ? owner.entries.filter((e) => storeWithin(leaf.host, e.host)) : [];
+      if (owner && !applicable.length) {
         // No contribution applies to this instance: the key keeps (or returns to) its default.
         ctx.set(owner.ref, defOf(owner.ref).defaultValue);
         return commit();
@@ -1142,13 +1137,12 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const guard of reg.guards) {
         if (!guard.test(...guard.refs.map(read))) return;
       }
-      let parts: Part[] = [];
-      if (owner) {
-        parts = mine!.filter((e) => guardsOf(e.contribution.decl).every((g) => g.test(...g.refs.map(read)))).map((e) => {
+      const parts: Part[] = applicable
+        .filter((e) => guardsOf(e.contribution.decl).every((g) => g.test(...g.refs.map(read))))
+        .map((e) => {
           const d = e.contribution.decl;
           return { payload: e.contribution.payload, name: d.name ?? reg.name, id: e.id, inputs: [...(d.triggers ?? []), ...(d.reads ?? [])] };
         });
-      }
       const tally = beginRun(leaf.host, reg.writes);
       let result: unknown;
       try {

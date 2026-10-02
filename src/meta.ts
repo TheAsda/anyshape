@@ -61,6 +61,11 @@ export interface MetaKeyOptions<V, P = NoPayload> {
   inherit?: [V] extends [boolean] ? "all" | "any" : never;
 }
 
+/**
+ * `P` defaults to `unknown` here, so MetaKeyDef<V> accepts any definition
+ * (combined or not); metaKey() defaults it to NoPayload, so a key declared
+ * without `combine` takes no contributions.
+ */
 export class MetaKeyDef<V = unknown, P = unknown> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
@@ -138,18 +143,9 @@ export function meta(): MetaBuilder {
 }
 
 // ============================================================
-// Type mapping: declarations → value types
+// Type mapping: declarations → meta references
 // ============================================================
 export type MetaInput = Meta | MetaBuilder<any>;
-
-type ValuesOfEntries<T> = { [K in keyof T]: T[K] extends MetaKeyDef<infer V, any> ? V : T[K] };
-
-/** Value types declared by one .meta() input. */
-export type MetaValuesOf<I> = I extends MetaBuilder<infer T> ? ValuesOfEntries<T> : ValuesOfEntries<I>;
-
-/** Value types declared by all inputs of one .meta(a, b, c) call. */
-export type MergeMetaInputs<Is extends readonly unknown[]> =
-  Is extends readonly [infer H, ...infer R] ? MetaValuesOf<H> & MergeMetaInputs<R> : {};
 
 type RefsOfEntries<T> = {
   readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;

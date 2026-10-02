@@ -41,9 +41,6 @@ export type InferMeta<N> = {
   [K in keyof N as 0 extends 1 & N[K] ? never : N[K] extends MetaRef<any, any> ? K : never]: N[K] extends MetaRef<infer V, any> ? V : never;
 };
 
-/** Meta references for declared keys. */
-export type MetaRefs<M> = { readonly [K in keyof M]: MetaRef<M[K]> };
-
 // Names used by the node itself. Neither fields nor meta keys may use them.
 const NODE_INTERNALS = ["id", "lens", "path", "parent", "meta", "constructor", "_type", "_hasCreate"];
 const RESERVED_FIELD_NAMES = new Set(NODE_INTERNALS);
