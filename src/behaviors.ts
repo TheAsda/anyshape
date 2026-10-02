@@ -77,6 +77,7 @@ import { isAncestorOrSelf } from "./tree";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
   type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks, type RegistrationChange,
+  LISTED_PARTS,
 } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 import { initialOf } from "./refs/initial";
@@ -346,6 +347,21 @@ interface Entry {
 }
 
 const partOrder = (a: Entry, b: Entry): number => a.seq - b.seq || a.index - b.index;
+
+/** The owner's first `n` entries in ctx.parts order, without sorting them all: each host's list is in that order. */
+function firstParts(owner: Owner, n: number): Entry[] {
+  const out: Entry[] = [];
+  for (const list of owner.byHost.values()) {
+    for (const e of list) {
+      if (out.length === n && partOrder(e, out[n - 1]) > 0) break;
+      let at = out.length;
+      while (at > 0 && partOrder(out[at - 1], e) > 0) at--;
+      out.splice(at, 0, e);
+      if (out.length > n) out.pop();
+    }
+  }
+  return out;
+}
 
 /** How many entries declare each ref, by refKey. */
 type RefCounts = Map<string, { ref: AnyRef; n: number }>;
@@ -626,7 +642,8 @@ export class BehaviorRuntime implements RuntimeHooks {
       owners: owners.map(({ owner }) => ({
         key: refLabel(owner.ref),
         triggers: owner.reg?.triggers.map(refLabel) ?? [],
-        parts: [...owner.byHost.values()].flat().sort(partOrder).map((e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`),
+        parts: firstParts(owner, LISTED_PARTS).map((e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`),
+        more: Math.max(0, owner.size - LISTED_PARTS),
       })),
     };
   }
