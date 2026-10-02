@@ -1,10 +1,11 @@
 // ------------------------------------------------------------
 // Stage 6 — Disabled.
 // The employer covers the lodging: the nightly budget stays
-// visible but locked. Disabling mirrors hiding: a locked field
-// is skipped by validation and omitted from the submitted
-// values — but its VALUE stays in the store and keeps feeding
-// derived state (watch the budget).
+// visible but locked. Like visibility, `disabled` is plain
+// metadata: the locked rate is still submitted, and its VALUE
+// stays in the store and keeps feeding derived state (watch the
+// budget). A rule that should apply only while unlocked would be
+// guarded on it, as the car rules are on visibility.
 // ------------------------------------------------------------
 
 import { useState } from "react";
@@ -68,8 +69,11 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   ));
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
   b.add(clearWhen(s.car, [s.car.visible], (visible) => !visible));
-  b.add(required(s.car.license), minLength(s.car.license, 3));
-  b.add(required(s.car.licenseExpiry));
+  // The car rules apply only while the group is shown.
+  b.when([s.car.visible], (v) => v, (b) => {
+    b.add(required(s.car.license), minLength(s.car.license, 3));
+    b.add(required(s.car.licenseExpiry));
+  });
 });
 
 function Derived() {

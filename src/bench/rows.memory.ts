@@ -5,9 +5,10 @@
 
 import { it, expect } from "vitest";
 import {
-  form, object, array, field, createStore, defineBehavior, asyncRule, rule, type ItemStore,
+  form, object, array, field, createStore, defineBehavior, type ItemStore,
 } from "../index";
 import { control } from "../test/features";
+import { rule } from "../test/rules";
 
 const gc = (globalThis as { gc?: () => void }).gc;
 
@@ -17,8 +18,9 @@ const shape = form({
       sku: field<string>().meta(control()),
       qty: field<number>().meta(control()),
       lineTotal: field<number>(),
+      lookup: field<string>(),
     }),
-    { create: () => ({ sku: "", qty: 1, lineTotal: 0 }) }
+    { create: () => ({ sku: "", qty: 1, lineTotal: 0, lookup: "" }) }
   ),
 });
 const L = shape.lines.item;
@@ -35,7 +37,15 @@ it.skipIf(!gc)("removed rows are collectable: stores, values and per-row state",
     behaviors: [
       defineBehavior({ triggers: [L.qty], writes: [L.lineTotal], run: (c) => c.set(L.lineTotal, c.get(L.qty) * 2) }),
       rule(L.sku, (v) => (v ? undefined : "Required")),
-      asyncRule(L.sku, async (v) => (v === "taken" ? "Taken" : undefined)),
+      defineBehavior({
+        triggers: [L.sku],
+        writes: [L.lookup],
+        runOn: { init: false },
+        run: async (c) => {
+          const sku = c.get(L.sku);
+          c.set(L.lookup, await c.keep([sku], async () => (sku === "taken" ? "Taken" : "")));
+        },
+      }),
     ],
   });
   const lines = s.substore(shape.lines);
@@ -48,7 +58,7 @@ it.skipIf(!gc)("removed rows are collectable: stores, values and per-row state",
       const row = lines.append({ sku: `S${i}` });
       const unsubscribe = row.subscribe(L.qty, () => {});
       row.set(L.qty, 2, { origin: "user" });
-      row.set(L.sku, "taken", { origin: "user" }); // starts an async check
+      row.set(L.sku, "taken", { origin: "user" }); // starts an async run
       row.set(L.sku.focusTarget, { focus() {} });
       stores.push(new WeakRef(row));
       values.push(new WeakRef(row.get(L) as object));

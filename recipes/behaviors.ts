@@ -7,14 +7,17 @@
 // ============================================================
 
 import {
-  defineBehavior, rule, initialOf,
+  defineBehavior, contribute, when, initialOf,
   type AnyNode, type InferValue, type MetaRef, type AnyBehavior, type Behavior, type Guard,
-  type Rule, type Validatable, type AnyRef, type RefValue,
+  type AnyRef, type RefValue, type Contribution,
 } from "form-lib";
 import { isEmpty, labelOf } from "./rules";
+import { rule, type Validatable } from "./validation";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
-type WithKey<K extends string, V> = AnyNode & { readonly [P in K]: MetaRef<V> };
+type WithKey<K extends string, V, P = unknown> = AnyNode & { readonly [P2 in K]: MetaRef<V, P> };
+/** A node with the `disabled` feature: its reasons (contributions) are strings. */
+type Disableable = WithKey<"disabled", boolean, string>;
 
 export interface CalculateOptions {
   name?: string;
@@ -94,19 +97,15 @@ export function visibleWhen<const Rs extends readonly AnyRef[]>(
   });
 }
 
-/** target.disabled = test(...refs). */
+/** Disables the target while test(...refs) holds. Other reasons (exclusive, more disableWhen) still apply. */
 export function disableWhen<const Rs extends readonly AnyRef[]>(
-  target: WithKey<"disabled", boolean>,
+  target: Disableable,
   refs: Rs,
   test: (...values: Values<Rs>) => boolean,
   options: { name?: string } = {}
-): Behavior {
-  return defineBehavior({
-    name: options.name ?? `disableWhen(${target.path})`,
-    triggers: refs,
-    writes: [target.disabled],
-    run: (ctx) => ctx.set(target.disabled, test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))),
-  });
+): Contribution<string> {
+  const name = options.name ?? `disableWhen(${target.path})`;
+  return contribute(target.disabled, name, { name, when: when(refs, test) });
 }
 
 /**
@@ -144,7 +143,7 @@ export interface ExclusiveOptions {
   name?: string;
 }
 
-type ExclusiveField = Validatable & WithKey<"disabled", boolean>;
+type ExclusiveField = Validatable & Disableable;
 
 /**
  * At most (or exactly, with `required`) one of the fields may be filled.
@@ -152,7 +151,7 @@ type ExclusiveField = Validatable & WithKey<"disabled", boolean>;
  *   • none or several    → all enabled, so the user can fix it
  *   • several filled     → every filled field gets an error
  *   • none (required)    → every field gets an error
- * Returns a behavior (owns the fields' `disabled`) plus one rule per field.
+ * Returns a `disabled` reason plus a rule per field.
  */
 export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveOptions = {}): AnyBehavior[] {
   if (fields.length < 2) throw new Error("exclusive() needs at least two fields");
@@ -162,18 +161,17 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
   const tooMany = options.message?.tooMany ?? `Only one of ${labels} can be set`;
   const missing = options.message?.missing ?? `One of ${labels} is required`;
 
-  const disabler = defineBehavior({
-    name,
-    triggers: fields,
-    writes: fields.map((f) => f.disabled),
-    run(ctx) {
-      const isFilled = fields.map((f) => filled(f, ctx.get(f)));
-      const count = isFilled.filter(Boolean).length;
-      fields.forEach((f, i) => ctx.set(f.disabled, count === 1 && !isFilled[i]));
-    },
-  });
+  const disablers = fields.map((field, i) =>
+    contribute(field.disabled, name, {
+      name: `${name}:${field.path}`,
+      when: when(fields, (...values: unknown[]) => {
+        const isFilled = fields.map((f, j) => filled(f, values[j]));
+        return isFilled.filter(Boolean).length === 1 && !isFilled[i];
+      }),
+    })
+  );
 
-  const rules: Rule[] = fields.map((field) =>
+  const rules: AnyBehavior[] = fields.map((field) =>
     rule(
       field,
       (value, ctx) => {
@@ -185,5 +183,5 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
       { name: `${name}:${field.path}`, triggers: fields.filter((f) => f !== field) }
     )
   );
-  return [disabler, ...rules];
+  return [...disablers, ...rules];
 }

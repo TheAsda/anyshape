@@ -11,11 +11,11 @@
 //     b.each(shape.lines, (b, line) => lineRules(b, line));
 //   });
 //
-// An authoring layer only: it returns the plain list of behaviors and rules
-// that createStore / addBehavior accept.
-//   • when blocks add their guard to every behavior, contribution and rule
-//     inside them (guard refs become triggers; a skipped behavior keeps its
-//     writes, a contribution or rule whose guard fails is absent).
+// An authoring layer only: it returns the plain list of behaviors and
+// contributions (rules are contributions) that createStore / addBehavior accept.
+//   • when blocks add their guard to every behavior and contribution inside
+//     them (guard refs become triggers; a skipped behavior keeps its writes,
+//     a contribution whose guard fails is absent).
 //   • otherwise gets the negated guard. Behaviors in opposite branches of the
 //     same split may write the same target: they never run together.
 //   • Blocks nest; guards accumulate.
@@ -23,7 +23,6 @@
 // ============================================================
 
 import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Branch, type Guard } from "./behaviors";
-import { Rule } from "./validation";
 import type { ArrayNode, ObjectNode } from "./shape";
 import type { AnyRef, RefValue } from "./store";
 
@@ -42,7 +41,7 @@ export class BehaviorBuilder {
     private readonly branches: readonly Branch[]
   ) {}
 
-  /** Add behaviors, contributions and rules (arrays, e.g. from exclusive(), are flattened). */
+  /** Add behaviors and contributions (arrays, e.g. from exclusive(), are flattened). */
   add(...items: Item[]): this {
     for (const item of items) {
       if (Array.isArray(item)) this.add(...(item as Item[]));
@@ -68,7 +67,7 @@ export class BehaviorBuilder {
     };
   }
 
-  /** Rules for array items: `item` is the row template (behaviors on it run once per row). */
+  /** Behaviors for array items: `item` is the row template (behaviors on it run once per row). */
   each<I extends ObjectNode<any>>(array: ArrayNode<I, any>, fn: (b: BehaviorBuilder, item: I) => void): this {
     fn(this, array.item);
     return this;
@@ -76,9 +75,6 @@ export class BehaviorBuilder {
 
   private wrap(item: AnyBehavior): AnyBehavior {
     if (!this.guards.length) return item;
-    if (item instanceof Rule) {
-      return new Rule(item.target, item.kind, item.check, { ...item.options, when: [...asArray(item.options.when), ...this.guards] });
-    }
     if (item instanceof Contribution) {
       // Contributions never conflict, so their branches don't matter.
       return new Contribution(item.target, item.payload, { ...item.decl, when: [...asArray(item.decl.when), ...this.guards] });
@@ -90,11 +86,11 @@ export class BehaviorBuilder {
         { branches: [...item._branches, ...this.branches], trace: item._trace }
       );
     }
-    throw new Error("Expected a behavior, a contribution or a rule");
+    throw new Error("Expected a behavior or a contribution");
   }
 }
 
-/** Build a list of behaviors and rules for `shape` (pass it to createStore or addBehavior). */
+/** Build a list of behaviors and contributions for `shape` (pass it to createStore or addBehavior). */
 export function defineBehaviors<S extends ObjectNode<any>>(shape: S, fn: (b: BehaviorBuilder, shape: S) => void): AnyBehavior[] {
   const out: AnyBehavior[] = [];
   fn(new BehaviorBuilder(out, [], []), shape);

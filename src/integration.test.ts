@@ -3,30 +3,23 @@
 // The trip booking lives in ./test/trip.ts (shared with the React suite).
 // ============================================================
 
-import { createStore, countIn } from "./index";
+import { createStore, countIn, type AnyNode, type BaseStore } from "./index";
+import { dirty, error, touched } from "./test/features";
 import { trip, T, tripBehaviors, emptyTrip, savedBooking, quiet } from "./test/trip";
 import { test, expect } from "vitest";
 
 // ---------------------------------------------------------------------------
 // INT1
-test("INT1 loading a saved booking: clean, sync errors present, async checks deferred to validate()", async () => {
+test("INT1 loading a saved booking: clean, sync errors present", () => {
   const s = createStore(trip, emptyTrip(), { behaviors: tripBehaviors(), ...quiet });
   s.setValues(savedBooking(), { as: "initial" });
-  const [ada, tim] = s.substore(trip.travelers).items();
+  const [, tim] = s.substore(trip.travelers).items();
 
-  expect(s.get(countIn(trip, "dirty")), "loaded data is the baseline").toBe(0);
-  expect(s.get(countIn(trip, "touched"))).toBe(0);
+  expect(s.get(countIn(trip, dirty)), "loaded data is the baseline").toBe(0);
+  expect(s.get(countIn(trip, touched))).toBe(0);
   expect(s.get(trip.nights), "calculations ran on the loaded data").toBe(7);
-  expect(tim.get(T.passport.error), "sync rules ran on load").toBe("Required");
-  expect(ada.get(T.passport.error), "async rules don't run on load").toBe(undefined);
-  expect(ada.get(T.passport.validating)).toBe(false);
-
-  const result = await s.validate();
-  expect(result.valid).toBe(false);
-  expect(result.errors.map((e) => [e.path, e.error])).toEqual([
-    ["travelers[0].passport", "This passport is reported lost"],
-    ["travelers[1].passport", "Required"],
-  ]);
+  expect(tim.get(T.passport.error), "rules ran on load").toBe("Required");
+  expect(errorsIn(s, trip)).toEqual([["travelers[1].passport", "Required"]]);
 });
 
 // ---------------------------------------------------------------------------
@@ -56,7 +49,7 @@ test("INT2 one user edit runs the pricing chain once each, in order, and the bud
 test("INT3 the visa section: shown and required for some destinations, cleared when hidden", () => {
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
   expect(s.get(trip.visa.visible)).toBe(false);
-  expect(s.get(trip.visa.number.error), "hidden: not validated").toBe(undefined);
+  expect(s.get(trip.visa.number.error), "hidden: its rules are guarded off").toBe(undefined);
 
   s.set(trip.destination, "IN", { origin: "user" });
   expect(s.get(trip.visa.visible)).toBe(true);
@@ -102,7 +95,7 @@ test("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta
   expect(tim.get(T.passport.error)).toBe("8 letters or digits");
   expect(tim.get(T.passport.touched)).toBe(true);
   expect(ada.get(T.passport.touched), "other rows untouched").toBe(false);
-  const errorsBefore = s.get(countIn(trip, "error"));
+  const errorsBefore = s.get(countIn(trip, error));
 
   // Removing the first row detaches it and takes its errors out of the counts.
   const before = s.get(trip.travelers);
@@ -117,7 +110,7 @@ test("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta
   expect(travelers.items()).toEqual([ada, tim, zoe]);
   expect(travelers.items().map((r) => r.stableId).slice(0, 2)).toEqual(ids);
   expect(tim.get(T.passport.error), "meta survived").toBe("8 letters or digits");
-  expect(s.get(countIn(trip, "error"))).toBe(errorsBefore);
+  expect(s.get(countIn(trip, error))).toBe(errorsBefore);
 });
 
 // ---------------------------------------------------------------------------
@@ -162,44 +155,44 @@ test("INT6 loaded data with both promo and voucher: both enabled and in error un
 
 // ---------------------------------------------------------------------------
 // INT7
-test("INT7 validate() waits for passport checks; a server rejection is mapped onto its row", async () => {
+test("INT7 a server rejection is mapped onto its row through its value path", () => {
   const s = createStore(trip, savedBooking(), { behaviors: tripBehaviors(), ...quiet });
   const [ada, tim] = s.substore(trip.travelers).items();
   tim.set(T.passport, "AB123456", { origin: "user" });
-
-  const first = await s.validate();
-  expect(first.valid, "the async check ran and failed").toBe(false);
-  expect(first.errors.map((e) => [e.path, e.error])).toEqual([["travelers[0].passport", "This passport is reported lost"]]);
-  expect(first.errors[0].store).toBe(ada);
-
-  ada.set(T.passport, "CD123456", { origin: "user" });
-  expect((await s.validate()).valid).toBe(true);
+  expect(errorsIn(s, trip)).toEqual([]);
 
   const rejected = { "travelers[1].passport": "Already booked on this trip" };
   for (const [path, message] of Object.entries(rejected)) {
-    const target = s.resolvePath(`${path}#error`)!;
-    target.store.set(target.ref as never, message as never);
+    const t = s.resolvePath(path)!;
+    const e = t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref)!;
+    e.store.set(e.ref, message);
   }
   expect(tim.get(T.passport.error), "mapped onto the second traveler").toBe("Already booked on this trip");
   expect(ada.get(T.passport.error)).toBe(undefined);
-  expect(s.get(countIn(trip, "error"))).toBe(1);
+  expect(s.get(countIn(trip, error))).toBe(1);
 });
 
 // ---------------------------------------------------------------------------
 // INT8
-test("INT8 validating a step section: only its errors, each with the error's ref", async () => {
+test("INT8 a step section's errors: collected in the section only, each with the error's ref", () => {
   const s = createStore(trip, emptyTrip(), { behaviors: tripBehaviors(), ...quiet });
   const step = s.substore(trip.contact);
 
-  const r = await step.validate();
-  expect(r.valid).toBe(false);
-  expect(r.errors.map((e) => e.path)).toEqual(["contact.name", "contact.email"]);
-  expect(r.errors.map((e) => e.ref)).toEqual([trip.contact.name.error, trip.contact.email.error]);
-  expect(r.errors[0].store.get(r.errors[0].ref)).toBe("Required");
+  const errors = step.collect(trip.contact, error).filter((e) => e.store.get(e.ref) !== undefined);
+  expect(errors.map((e) => e.path)).toEqual(["contact.name", "contact.email"]);
+  expect(errors.map((e) => e.ref)).toEqual([trip.contact.name.error, trip.contact.email.error]);
+  expect(errors[0].store.get(errors[0].ref)).toBe("Required");
   expect(s.get(trip.destination.error), "errors elsewhere exist but are not the step's").toBe("Required");
-  expect("values" in r, "submitted values are the store's value, not part of the result").toBe(false);
 
   s.set(trip.contact.name, "Ada", { origin: "user" });
   s.set(trip.contact.email, "ada@example.com", { origin: "user" });
-  expect((await step.validate()).valid).toBe(true);
+  expect(errorsIn(step, trip.contact)).toEqual([]);
 });
+
+/** [path, error] for every error in `node`, in shape order. */
+function errorsIn(store: BaseStore<any>, node: AnyNode): [string, string][] {
+  return store.collect(node, error).flatMap((e) => {
+    const message = e.store.get(e.ref);
+    return message === undefined ? [] : [[e.path, message] as [string, string]];
+  });
+}

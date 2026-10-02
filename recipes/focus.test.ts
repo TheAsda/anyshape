@@ -1,7 +1,8 @@
 // Focus recipe: focus(store, node), focusFirst(entries, compare).
 
-import { form, object, field, createStore, rule } from "form-lib";
+import { form, object, field, createStore } from "form-lib";
 import { control } from "./features";
+import { rule, validate } from "./validation";
 import { test as base, describe, expect } from "vitest";
 import { focus, focusFirst, type FocusTarget } from "./focus";
 import * as limits from "./test/fixtures/limits";
@@ -42,7 +43,7 @@ describe("Focus", () => {
     const focused: string[] = [];
     a.set(L.qty.focusTarget, { focus: () => focused.push("a") });
     b.set(L.qty.focusTarget, { focus: () => focused.push("b") });
-    const { errors } = await s.validate();
+    const { errors } = await validate(s);
     lines.remove(a);
     expect(focusFirst(errors)?.store).toBe(b);
     expect(focused).toEqual(["b"]);

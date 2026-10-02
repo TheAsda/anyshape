@@ -1,10 +1,10 @@
 import { useState, StrictMode } from "react";
 import { test, expect } from "vitest";
 import {
-  form, object, array, field, metaKey, rule, countIn, createStore, type InferValue, type RootStore,
+  form, object, array, field, metaKey, countIn, createStore, type InferValue, type RootStore,
 } from "../index";
-import { control, submission } from "../test/features";
-import { max } from "../test/rules";
+import { control, submission, error } from "../test/features";
+import { rule, max } from "../test/rules";
 import { StoreProvider, useForm, useSync, useField, useValue } from "./index";
 import { render, settle, captureWarnings } from "./test-utils";
 
@@ -152,7 +152,7 @@ test("useSync feeds a limit from React; survives reset; writes only on change", 
 
   const row = () => f.substore(shape.lines).itemAt(0);
   let writes = 0;
-  f.subscribe(countIn(shape, "error"), () => writes++);
+  f.subscribe(countIn(shape, error), () => writes++);
   row().subscribe(L.qty.maxQty, () => writes++);
 
   await settle(() => setMax(3));

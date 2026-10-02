@@ -12,8 +12,6 @@ import {
   array,
   defineBehaviors,
   defineBehavior,
-  rule,
-  asyncRule,
   metaKey,
   type InferValue,
   type FieldNode,
@@ -22,6 +20,8 @@ import {
   control,
   submission,
   visible,
+  rule,
+  asyncRule,
   required,
   minLength,
   email,
@@ -34,12 +34,10 @@ import {
 } from 'form-lib/recipes';
 
 // A per-field "lookup in flight" tag. metaKey (not a plain value)
-// so the key is countable: countIn(shape, 'lookingUp') counts every
+// so the key is countable: countIn(shape, lookingUp) counts every
 // field currently carrying a tag, across the whole form.
-const lookingUp = () => ({
-  lookingUp: metaKey<string | undefined>(undefined, {
-    aggregate: (v) => v !== undefined,
-  }),
+export const lookingUp = metaKey<string | undefined>(undefined, {
+  aggregate: (v) => v !== undefined,
 });
 
 // ------------------------------------------------------------
@@ -47,18 +45,19 @@ const lookingUp = () => ({
 // ------------------------------------------------------------
 // control()    = validation + touched + dirty + a focus target:
 //                everything an input needs.
-// { visible }  = adds `visible` (inherited down the subtree);
-//                hidden nodes skip validation by default.
+// { visible }  = adds `visible` (inherited down the subtree). Hidden
+//                nodes are still validated: their rules are guarded
+//                on it (b.when below).
 // submission() = adds `submitting`: the node can be submitted with
 //                handleSubmit(store, fn).
 //
 // The wizard steps are sibling objects that each declare submission();
 // the App shows one at a time and Continue submits that step's store.
-// Steps are not hidden when another step shows: a hidden step would
-// skip validation, and the final submit still checks (and the server
-// still rejects) step-1 fields. The nested `address` and `approval`
-// groups DO use visibility + clearWhen – that contrast is
-// the point of the demo.
+// Steps are not hidden when another step shows: the final submit
+// still checks (and the server still rejects) step-1 fields. The
+// nested `address` and `approval` groups DO use visibility +
+// clearWhen, with their rules guarded on it – that contrast is the
+// point of the demo.
 export const shape = form(
   object({
     /** Which step is shown: 0 = requester, 1 = items, 2 = logistics. */
@@ -66,14 +65,14 @@ export const shape = form(
     requester: object({
       title: field<string>().meta(control()),
       email: field<string>().meta(control()),
-    department: field<string>().meta(control(), lookingUp()),
+    department: field<string>().meta(control(), { lookingUp }),
     /** Remaining budget of the department – filled by the app-side lookup. */
     budget: field<number | undefined>(),
     }).meta(submission()),
     order: object({
       items: array(
         object({
-          sku: field<string>().meta(control(), lookingUp()),
+          sku: field<string>().meta(control(), { lookingUp }),
           /** Filled from the catalog by the app-side lookup – read-only for the user. */
           name: field<string>(),
           qty: field<number | undefined>().meta(control()),
@@ -330,19 +329,22 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
     ),
   );
   // Shipping somewhere else reveals the address; hiding it clears
-  // the fields inside (hidden fields also skip validation).
+  // the fields inside, and its rules apply only while it is shown.
   b.add(visibleWhen(s.logistics.address, [s.logistics.shipToOffice], (v) => !v));
   b.add(clearWhen(s.logistics.address, [s.logistics.address.visible], (visible) => !visible));
-  b.add(
-    required(s.logistics.address.street),
-    required(s.logistics.address.city),
-    required(s.logistics.address.zip),
-  );
+  b.when([s.logistics.address.visible], (v) => v, (b) => {
+    b.add(
+      required(s.logistics.address.street),
+      required(s.logistics.address.city),
+      required(s.logistics.address.zip),
+    );
+  });
   // Big orders need an approval; small ones don't even see it.
   b.add(
     visibleWhen(s.logistics.approval, [s.order.total], (total) => total !== undefined && total > 10_000),
   );
   b.add(clearWhen(s.logistics.approval, [s.logistics.approval.visible], (visible) => !visible));
-  b.add(required(s.logistics.approval.approver));
-  b.add(required(s.logistics.approval.justification));
+  b.when([s.logistics.approval.visible], (v) => v, (b) => {
+    b.add(required(s.logistics.approval.approver), required(s.logistics.approval.justification));
+  });
 });

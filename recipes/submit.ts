@@ -13,6 +13,7 @@
 
 import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "form-lib";
 import { focusFirst } from "./focus";
+import { validate } from "./validation";
 
 /** true while a submit of the node is running. */
 export const submitting = metaKey(false, { owner: "feature" });
@@ -63,8 +64,7 @@ export function handleSubmit<N extends Submittable>(
       for (const e of store.collect(store.node, revealed)) e.store.set(e.ref, true);
     });
     try {
-      // The store's validate() until #26 replaces it with the validation recipe's validate(store).
-      const { valid, errors } = await store.validate();
+      const { valid, errors } = await validate(store);
       if (valid) await fn(store.get(store.node as AnyNode) as InferValue<N>);
       else focusFirst(errors);
     } finally {

@@ -5,7 +5,7 @@ export const meta: StageMeta = {
   title: "Control",
   story: "Inputs need error state, touched/dirty tracking and focusing — opt in per field.",
   bullets: [
-    ".meta(control()) on a field adds error/touched/dirty/validating + a focus target",
+    ".meta(control()) on a field adds error/touched/dirty + a focus target (useControl also reports a pending check)",
     "useControl(node) replaces the manual useValue + set binding",
     "onBlur marks the field touched; errors still need rules (next stage)",
     "The status line under each input is live: watch untouched → touched · dirty",

@@ -1,6 +1,7 @@
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import { form, object, array, field, meta, createStore, countIn, type InferValue, type Origin } from "./index";
+import { error } from "./test/features";
 
 import { address, userShape, initial, type User } from "./test/fixtures/user";
 
@@ -205,7 +206,7 @@ describe("D, E · Reference API and array helpers", () => {
     const s = createStore(shape, initial());
     const b: boolean = s.get(shape.name.touched);
     const e: string | undefined = s.get(shape.name.error);
-    const n: number = s.get(countIn(shape, "error"));
+    const n: number = s.get(countIn(shape, error));
     const v: string = s.get(shape.name);
     // @ts-expect-error – a meta ref is not a count
     const wrong: number = s.get(shape.name.touched);

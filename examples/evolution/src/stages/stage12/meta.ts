@@ -9,7 +9,7 @@ export const meta: StageMeta = {
     "asyncRule(destination, check, { debounce: 400 }) — async errors are just rules",
     "submit() awaits pending async checks before deciding",
     "save() rejects with field errors addressed by path, e.g. \"startDate\"",
-    "resolvePath(`${path}#error`) → target.store.set(target.ref, message) plants them",
+    "resolvePath(path) finds the field; its error key is found by definition (collect(field, error)) and set",
     "Submit reveals, so server errors show immediately; the next validation run clears them",
   ],
   notes:
