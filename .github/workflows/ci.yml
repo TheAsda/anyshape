@@ -10,7 +10,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only superseded PR runs: every push to master keeps its full run.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   BUN_VERSION: 1.3.14
@@ -48,7 +49,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
 
-  example:
+  examples:
     # The examples import the library's source through aliases, so their
     # build catches broken aliases and recipe imports as well as types.
     runs-on: ubuntu-latest
