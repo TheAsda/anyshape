@@ -423,7 +423,7 @@ export abstract class BaseStore<N extends ContainerNode> {
       if (Object.is(current[key], next[key])) continue;
       changed.push(key);
       const def = node[META_DEFS][key];
-      const aggregate = def?.options.aggregate;
+      const aggregate = def?._steps.aggregate;
       if (aggregate) {
         const delta = (aggregate(next[key]) ? 1 : 0) - (aggregate(current[key]) ? 1 : 0);
         if (delta) this.root._applyCountDelta(host, node, countSlotOf(def), delta);
