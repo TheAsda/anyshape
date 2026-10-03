@@ -8,6 +8,9 @@
 // A registration change is planned, then committed. The plan finds the new
 // edges through indexes by node and recomputes the ranks only of what the
 // change reaches; it throws on a cycle before anything changes.
+//
+// The writes are also kept by scope host, for the one-writer check
+// (behaviors.ts): committed with the edges, so both views stay in step.
 // ============================================================
 
 import type { AnyNode } from "./shape";
@@ -42,13 +45,14 @@ export class NodeIndex<T> {
   private readonly under = new Map<AnyNode, Set<T>>();
 
   add(node: AnyNode, item: T): void {
-    setOf(this.at, node).add(item);
-    for (let n: AnyNode | undefined = node; n; n = n.parent) setOf(this.under, n).add(item);
+    entry(this.at, node, newSet).add(item);
+    for (let n: AnyNode | undefined = node; n; n = n.parent) entry(this.under, n, newSet).add(item);
   }
 
   delete(node: AnyNode, item: T): void {
-    unset(this.at, node, item);
-    for (let n: AnyNode | undefined = node; n; n = n.parent) unset(this.under, n, item);
+    const remove = (set: Set<T>) => set.delete(item) && !set.size;
+    prune(this.at, node, remove);
+    for (let n: AnyNode | undefined = node; n; n = n.parent) prune(this.under, n, remove);
   }
 
   /** Calls `fn` for the items on `node`, below it, or on one of its ancestors. */
@@ -72,13 +76,17 @@ class HostIndex<T> {
   private readonly under = new Map<BaseStore<any>, NodeIndex<T>>();
 
   add(host: BaseStore<any>, node: AnyNode, item: T): void {
-    indexOf(this.at, host).add(node, item);
-    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) indexOf(this.under, h).add(node, item);
+    entry(this.at, host, newIndex).add(node, item);
+    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) entry(this.under, h, newIndex).add(node, item);
   }
 
   delete(host: BaseStore<any>, node: AnyNode, item: T): void {
-    unindex(this.at, host, node, item);
-    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) unindex(this.under, h, node, item);
+    const remove = (index: NodeIndex<T>) => {
+      index.delete(node, item);
+      return index.isEmpty();
+    };
+    prune(this.at, host, remove);
+    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) prune(this.under, h, remove);
   }
 
   /** NodeIndex.near among the items of `host`, of the hosts inside it, and of the hosts enclosing it. */
@@ -88,28 +96,20 @@ class HostIndex<T> {
   }
 }
 
-function indexOf<T>(map: Map<BaseStore<any>, NodeIndex<T>>, host: BaseStore<any>): NodeIndex<T> {
-  let index = map.get(host);
-  if (!index) map.set(host, (index = new NodeIndex()));
-  return index;
+const newSet = <T>() => new Set<T>();
+const newIndex = <T>() => new NodeIndex<T>();
+
+/** `map`'s entry for `key`, created when missing. */
+function entry<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+  let value = map.get(key);
+  if (value === undefined) map.set(key, (value = create()));
+  return value;
 }
 
-function unindex<T>(map: Map<BaseStore<any>, NodeIndex<T>>, host: BaseStore<any>, node: AnyNode, item: T): void {
-  const index = map.get(host);
-  if (!index) return;
-  index.delete(node, item);
-  if (index.isEmpty()) map.delete(host);
-}
-
-function setOf<K, T>(map: Map<K, Set<T>>, key: K): Set<T> {
-  let set = map.get(key);
-  if (!set) map.set(key, (set = new Set()));
-  return set;
-}
-
-function unset<T>(map: Map<AnyNode, Set<T>>, node: AnyNode, item: T): void {
-  const set = map.get(node);
-  if (set?.delete(item) && !set.size) map.delete(node);
+/** Removes from `map`'s entry for `key`; `remove` tells whether the entry is then empty, and it is dropped. */
+function prune<K, V>(map: Map<K, V>, key: K, remove: (value: V) => boolean): void {
+  const value = map.get(key);
+  if (value !== undefined && remove(value)) map.delete(key);
 }
 
 /**
@@ -168,8 +168,8 @@ class Planned<R extends Ranked> {
 
   link(a: Vertex<R>, b: Vertex<R>): void {
     if (a === b) return;
-    setOf(this.out, a).add(b);
-    setOf(this.into, b).add(a);
+    entry(this.out, a, newSet).add(b);
+    entry(this.into, b, newSet).add(a);
   }
 
   succ(v: Vertex<R>): Vertex<R>[] {
@@ -184,8 +184,8 @@ class Planned<R extends Ranked> {
 export class RunOrder<R extends Ranked> {
   private readonly vertices = new Map<R, Vertex<R>>();
   private readonly writes = new NodeIndex<Write<R>>();
-  /** The writes again, by host: the one-writer check never needs sibling rows. */
-  private readonly hostedWrites = new HostIndex<Write<R>>();
+  /** The writes again, by scope host: the one-writer check never lists sibling rows. */
+  private readonly writesByHost = new HostIndex<Write<R>>();
   private readonly inputs = new NodeIndex<Input<R>>();
 
   /**
@@ -193,7 +193,7 @@ export class RunOrder<R extends Ranked> {
    * from `host`: those whose hosts are `host`, inside it, or enclosing it.
    */
   writesNear(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.hostedWrites.near(host, node, fn);
+    this.writesByHost.near(host, node, fn);
   }
 
   /**
@@ -291,7 +291,7 @@ export class RunOrder<R extends Ranked> {
         for (const p of v.pred) p.succ.delete(v);
         for (const w of v.writes) {
           this.writes.delete(w.target.node, w);
-          this.hostedWrites.delete(w.reg.host, w.target.node, w);
+          this.writesByHost.delete(w.reg.host, w.target.node, w);
         }
         for (const input of v.inputs) this.inputs.delete(refNode(input.ref), input);
         this.vertices.delete(v.reg);
@@ -299,7 +299,7 @@ export class RunOrder<R extends Ranked> {
       for (const v of fresh) {
         for (const w of v.writes) {
           this.writes.add(w.target.node, w);
-          this.hostedWrites.add(w.reg.host, w.target.node, w);
+          this.writesByHost.add(w.reg.host, w.target.node, w);
         }
         for (const input of v.inputs) this.inputs.add(refNode(input.ref), input);
         this.vertices.set(v.reg, v);
