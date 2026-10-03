@@ -446,6 +446,9 @@ describe("L · Runtime registration", () => {
     const note = a.substore(L.notes).itemAt(0);
     const other = b.substore(L.notes).append({ text: "x", len: 0 });
     const len = (name: string) => defineBehavior({ name, triggers: [N.text], writes: [N.len], run: () => {} });
+    const offAll = s.addBehavior(len("all"));
+    expect(() => note.addBehavior(len("note"))).toThrow('Behavior "note": "lines[].notes[].len" is already written by "all" – one writer per target');
+    offAll();
     const off = a.addBehavior(len("line"));
     expect(() => note.addBehavior(len("note"))).toThrow('Behavior "note": "lines[].notes[].len" is already written by "line" – one writer per target');
     other.addBehavior(len("otherNote"));
