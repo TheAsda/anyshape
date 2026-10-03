@@ -331,9 +331,9 @@ describe("T · DevTools tracks", () => {
     s.set(shape.rows, [...s.get(shape.rows), { sku: "z", title: "" }]);
     expect(stamp.mock.calls).toEqual([
       ["title @rows[2]", 10, 14, "behaviors", "form-lib", "primary"],
-      ["flush", 10, 15, "flush", "form-lib", "tertiary"],
       ["reactions", 10, 14, "flush", "form-lib", "tertiary-light"],
       ["UI listeners", 14, 15, "flush", "form-lib", "tertiary-light"],
+      ["flush", 10, 15, "flush", "form-lib", "tertiary"],
     ]);
   });
 
