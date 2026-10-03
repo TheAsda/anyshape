@@ -29,6 +29,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 56 |
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
+| `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 34 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
@@ -261,6 +262,14 @@ Type assertions are spread across the files today. Collect the public-API type c
   - `handleSubmit` on a store whose node has no `submission()`;
   - `set` on a `CountRef`.
 
+### T. Diagnostics, dev only (`diagnostics.ts`, the probe in `store.ts`)
+Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`src/diagnostics.test.ts`**.
+
+- [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed; disposing a handle that registered nothing is none.
+- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, reactions vs UI listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
+- [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its reactions and UI listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
+- [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. Checked once by hand, not in CI: `cd examples/basic && bunx vite build`, then the bundle contains none of `diagnostics.ts` (no `track-entry`, `over budget` or `A flush took`), only the `_probe == null` call sites.
+
 ---
 
 ## 3. Integration scenarios
@@ -285,7 +294,7 @@ The unit suites test each mechanism in isolation. Add **`src/integration.test.ts
 |---|---|---|---|
 | **NF1** | P1 | **Packaging:** the build emits both entries (`form-lib`, `form-lib/react`) with `.d.ts`; `package.json` `exports` resolve both; the core bundle contains no `react` import. | After fixing `vite.config.ts` (it builds only `src/index.ts`) and adding `exports`/`types`: a script that runs `vite build`, then imports `dist/` from a temp project and type-checks a small consumer. |
 | **NF2** | P2 | **CI gates:** `npm test`, `npm run typecheck`, and `cd examples/basic && npm run typecheck`. | CI workflow. The type-level tests only run under `tsc`. |
-| **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal). | `vitest bench` in `src/bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`src/bench/store.bench.ts`); found #6. |
+| **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal); the dev diagnostics overhead on a keystroke and a row edit (#17). The benches run in dev, so they include the diagnostics. | `vitest bench` in `src/bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`src/bench/store.bench.ts`); found #6. |
 | **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable. | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`src/bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |
 | **NF5** | P3 | **Mutation testing:** automate the "break it on purpose" habit (§5). | Try Stryker on `src/` (excluding `react/`); start with `lens.ts`, `store.ts`, `behaviors.ts`. |
 
@@ -304,7 +313,7 @@ When touching any of these, break it deliberately and confirm that at least one 
 | Per-phase "last seen" | `_seen[phase]` | reactions-then-UI tests |
 | Own-origin filter | `BehaviorRuntime.onTrigger` | `link` tests |
 | Rank ordering | `RunOrder.plan` (`order.ts`) / `runNext` | dependency order, K1–K3, K6 |
-| Buffered writes dropped on error | `BehaviorRuntime.run` | throwing behavior test |
+| Buffered writes dropped on error | `BehaviorRuntime.execute` | throwing behavior test |
 | Row totals shifted on detach | `ArrayStore.shiftTotals` | count removal tests |
 | Inherited-key subscriptions on all sources | `_addKeySub` / `_metaSources` | ancestor-change subscription test |
 | Reset re-runs init | `BehaviorRuntime.reinit` | reset recompute tests |
