@@ -4,7 +4,8 @@
 // createStore installs a probe on the root in dev (isDev); a production build
 // installs none, so nothing is measured. The probe feeds two consumers:
 //   • the flush budget: a flush over FLUSH_BUDGET logs one console.warn with
-//     its time in reactions and in UI listeners, and the three behaviors that
+//     its time applying async writes (if any), in reactions and in UI
+//     listeners, and the three behaviors that
 //     took the most time across their instances;
 //   • the DevTools performance tracks (track group "form-lib"): frequent
 //     entries through the extended console.timeStamp, rare detailed ones
@@ -38,6 +39,8 @@ interface Tally extends Spent {
 
 interface FlushReport {
   readonly total: number;
+  /** Applying async runs' writes, in the batch that started the flush. */
+  readonly applying: number;
   readonly reactions: number;
   readonly ui: number;
   /** At most three, slowest first. */
@@ -88,7 +91,7 @@ class FlushBudget {
         } else byName.set(name, { name, time, runs, trace });
       }
       const slowest = [...byName.values()].sort((a, b) => b.time - a.time).slice(0, 3);
-      report = { total, reactions: reactionsAt - this.start + this.carry, ui: at - reactionsAt, slowest };
+      report = { total, applying: this.carry, reactions: reactionsAt - this.start, ui: at - reactionsAt, slowest };
     }
     for (const tally of this.listed) {
       tally.time = 0;
@@ -121,12 +124,13 @@ class FlushBudget {
 const ms = (n: number) => `${n.toFixed(1)} ms`;
 
 /** "40.0 ms (2 runs)"; the runs are left out for writes applied alone. */
-const spent = (t: Spent) => `${ms(t.time)}${t.runs ? ` (${t.runs} ${t.runs === 1 ? "run" : "runs"})` : ""}`;
+const spentLabel = (t: Spent) => `${ms(t.time)}${t.runs ? ` (${t.runs} ${t.runs === 1 ? "run" : "runs"})` : ""}`;
 
 function overBudget(report: FlushReport): string {
-  const slowest = report.slowest.map((t) => `"${t.name}" ${spent(t)}`).join(", ");
+  const slowest = report.slowest.map((t) => `"${t.name}" ${spentLabel(t)}`).join(", ");
   return (
     `[form] A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget: ` +
+    (report.applying ? `${ms(report.applying)} applying async writes, ` : "") +
     `${ms(report.reactions)} in reactions, ${ms(report.ui)} in UI listeners.` +
     (slowest ? ` Slowest behaviors: ${slowest}.` : "")
   );
@@ -142,7 +146,7 @@ type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "t
 /** console.timeStamp with the extended arguments (Chrome 136+). */
 type TimeStamp = (label: string, start: number, end: number, track: Track, group: string, color: Color) => void;
 
-const where = (instance: ProbedInstance) => `${instance.reg.name} @${pathLabel(instance.host, instance.host.node)}`;
+const labelOf = (instance: ProbedInstance) => `${instance.reg.name} @${pathLabel(instance.host, instance.host.node)}`;
 
 class Tracks {
   private flushAt = 0;
@@ -192,9 +196,10 @@ class Tracks {
     this.detail("flush over budget", this.flushAt, at, "flush", "error", {
       tooltipText: `A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget`,
       properties: [
+        ...(report.applying ? [["Applying async writes", ms(report.applying)] as [string, string]] : []),
         ["Reactions", ms(report.reactions)],
         ["UI listeners", ms(report.ui)],
-        ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.name}`, spent(t)]),
+        ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.name}`, spentLabel(t)]),
       ],
     });
   }
@@ -205,7 +210,7 @@ class Tracks {
 
   runEnd(instance: ProbedInstance, at: number, part: RunPart): void {
     if (!this.stamp) return;
-    const label = where(instance);
+    const label = labelOf(instance);
     this.stamp(part === "apply" ? `${label} (apply)` : label, this.runAt, at, "behaviors", GROUP, "primary");
     if (part === "async") this.flights.set(instance, { start: this.runAt, label });
   }

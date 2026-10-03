@@ -88,16 +88,20 @@ describe("200 rows", () => {
 
 // Dev diagnostics (#17): the same edits on a store created in production
 // (no probe) and in dev (budget check and DevTools tracks). Vitest's console
-// has no timeStamp: a no-op one stands in for Chrome's, so the dev store also
-// builds every entry's label.
+// has no timeStamp: a no-op one stands in for Chrome's while the dev stores
+// are created (they keep the function they found), so they also build every
+// entry's label.
 describe("dev diagnostics overhead", () => {
-  console.timeStamp ??= () => {};
   vi.stubEnv("NODE_ENV", "production");
   const prodFlat = createStore(flat, flatValues());
   const prodOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
   vi.unstubAllEnvs();
+  const timeStamp = Object.getOwnPropertyDescriptor(console, "timeStamp");
+  console.timeStamp ??= () => {};
   const devFlat = createStore(flat, flatValues());
   const devOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
+  if (timeStamp) Object.defineProperty(console, "timeStamp", timeStamp);
+  else delete (console as Partial<Console>).timeStamp;
   expect([prodFlat._probe, prodOrder._probe, devFlat._probe && devOrder._probe].map(Boolean)).toEqual([false, false, true]);
   const prodRow = prodOrder.substore(order.lines).itemAt(100);
   const devRow = devOrder.substore(order.lines).itemAt(100);
