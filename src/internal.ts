@@ -128,10 +128,17 @@ export function outerHost(host: BaseStore<any>): BaseStore<any> | undefined {
   return host instanceof ItemStore ? host.arrayStore._host : undefined;
 }
 
-/** The scope host (root or row store) at `scope`, walking up from `host`. */
-export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
+/** The scope host (root or row store) at `scope`, walking up from `host`; none when `scope` isn't `host`'s or an enclosing one. */
+export function hostAt(host: BaseStore<any>, scope: AnyNode): BaseStore<any> | undefined {
   for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) if (h.node === scope) return h;
-  throw new Error(`No store for scope "${scope.path || "<root>"}"`);
+  return undefined;
+}
+
+/** hostAt, for a scope that must be `host`'s or an enclosing one. */
+export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
+  const found = hostAt(host, scope);
+  if (!found) throw new Error(`No store for scope "${scope.path || "<root>"}"`);
+  return found;
 }
 
 /** The row stores from `outer` (excluded) down to `host` (included): every scope host on the way is a row. */

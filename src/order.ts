@@ -17,7 +17,7 @@
 // ============================================================
 
 import type { AnyNode } from "./shape";
-import { refNode, refKey, outerHost, scopeOf } from "./internal";
+import { refNode, refKey, outerHost, scopeOf, hostAt } from "./internal";
 import type { AnyRef, BaseStore } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 
@@ -142,9 +142,7 @@ interface Input<R extends Ranked> {
  * or inside it (read in each of its rows).
  */
 function readerOf(host: BaseStore<any>, node: AnyNode): BaseStore<any> {
-  const scope = scopeOf(node);
-  for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) if (h.node === scope) return h;
-  return host;
+  return hostAt(host, scopeOf(node)) ?? host;
 }
 
 class Vertex<R extends Ranked> {
@@ -236,18 +234,17 @@ export class RunOrder<R extends Ranked> {
     }
 
     const graph = new Planned(gone);
-    // Edges between fresh vertices: only with more than one. A change adds them
-    // on one host, plus the root for owners, so the host filter skips none
-    // today; it keeps the plan from depending on that.
-    const batch = fresh.length > 1 ? new HostIndex<Input<R>>() : undefined;
-    if (batch) for (const v of fresh) for (const input of v.inputs) batch.add(input.host, input.node, input);
+    // Edges between fresh vertices: only with more than one. They need no host
+    // filter: a change adds them on one host, plus the root for owners.
+    const batch = fresh.length > 1 ? new NodeIndex<Input<R>>() : undefined;
+    if (batch) for (const v of fresh) for (const input of v.inputs) batch.add(input.node, input);
     for (const v of fresh) {
       for (const { target } of v.writes) {
         const reach = (input: Input<R>) => {
           if (!gone.has(input.vertex) && affects(target, input.ref)) graph.link(v, input.vertex);
         };
         this.inputs.near(v.reg.host, target.node, reach);
-        batch?.near(v.reg.host, target.node, reach);
+        batch?.near(target.node, reach);
       }
       // Edges between fresh vertices were found above, from the writer's side.
       for (const { ref, node, host } of v.inputs) {
