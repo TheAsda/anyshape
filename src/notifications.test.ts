@@ -236,6 +236,24 @@ describe("F · Row writes", () => {
     expect(lines.items()).toEqual([a, b]);
   });
 
+  test("every write inside a row gives the row a new object, so its subscribers see it", ({ lines }) => {
+    const [a, b] = lines.items();
+    b.setValue(L.price, 21);                // a flush that walks the rows first
+    const note = a.substore(L.notes).itemAt(0);
+    const r = recorder();
+    a.subscribe(r.on("a"));
+    b.subscribe(r.on("b"));
+    note.setValue(L.notes.item.text, "x");  // through a nested row
+    expect(r.take()).toEqual(["a"]);
+    a.setValue(L.qty, 5, { as: "initial" });
+    expect(r.take()).toEqual(["a"]);
+    a.setValue(L.qty, 8);
+    expect(r.take()).toEqual(["a"]);
+    a.reset();
+    expect(r.take()).toEqual(["a"]);
+    expect(a.getValue(L.qty)).toBe(5);
+  });
+
   test("a row written again in a later flush notifies again", ({ lines }) => {
     const row = lines.itemAt(1);
     const r = recorder();
