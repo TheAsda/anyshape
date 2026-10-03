@@ -17,7 +17,7 @@
 
 import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store";
 import type { AnyNode } from "./shape";
-import { concretePath } from "./internal";
+import { concretePath, locatedAt } from "./internal";
 
 /** One frame at 30 fps, in ms. */
 export const FLUSH_BUDGET = 1000 / 30;
@@ -27,6 +27,8 @@ interface Spent {
   readonly name: string;
   time: number;
   runs: number;
+  /** Where it was defined (dev, defineBehavior); the first registration's, under a shared name. */
+  trace: Error | undefined;
 }
 
 /** One registration's time, over all its instances. */
@@ -77,12 +79,13 @@ class FlushBudget {
     if (total > FLUSH_BUDGET) {
       const reactionsAt = this.reactionsDone ? this.reactionsAt : at;
       const byName = new Map<string, Spent>();
-      for (const { name, time, runs } of this.listed) {
+      for (const { name, time, runs, trace } of this.listed) {
         const spent = byName.get(name);
         if (spent) {
           spent.time += time;
           spent.runs += runs;
-        } else byName.set(name, { name, time, runs });
+          spent.trace ??= trace;
+        } else byName.set(name, { name, time, runs, trace });
       }
       const slowest = [...byName.values()].sort((a, b) => b.time - a.time).slice(0, 3);
       report = { total, reactions: reactionsAt - this.start + this.carry, ui: at - reactionsAt, slowest };
@@ -104,7 +107,7 @@ class FlushBudget {
   runEnd(instance: ProbedInstance, at: number, part: RunPart): void {
     const time = at - this.runAt;
     let tally = this.tallies.get(instance.reg);
-    if (!tally) this.tallies.set(instance.reg, (tally = { name: instance.reg.name, time: 0, runs: 0, listed: false }));
+    if (!tally) this.tallies.set(instance.reg, (tally = { name: instance.reg.name, time: 0, runs: 0, trace: instance.reg.behavior._trace, listed: false }));
     if (!tally.listed) {
       tally.listed = true;
       this.listed.push(tally);
@@ -229,6 +232,10 @@ class Tracks {
   }
 }
 
+/** For each listed behavior with a trace: an error located where it was defined, for DevTools to link. */
+const definedAt = (report: FlushReport): Error[] =>
+  report.slowest.flatMap((t) => (t.trace?.stack ? [locatedAt(t.trace, `"${t.name}" is defined here`)] : []));
+
 /** The probe createStore installs in dev. */
 export class Diagnostics implements Probe {
   private readonly budget = new FlushBudget();
@@ -243,7 +250,7 @@ export class Diagnostics implements Probe {
   }
   flushEnd(at: number): void {
     const report = this.budget.flushEnd(at);
-    if (report) console.warn(overBudget(report));
+    if (report) console.warn(overBudget(report), ...definedAt(report));
     this.tracks?.flushEnd(at, report);
   }
   runStart(_instance: ProbedInstance, at: number): void {

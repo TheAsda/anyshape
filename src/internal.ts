@@ -14,6 +14,16 @@ import { kindOf, type Target } from "./refs/kind";
  */
 export const isDev = (): boolean => process.env.NODE_ENV !== "production";
 
+/**
+ * An error with `message` whose stack is `trace`'s: a behavior's trace is
+ * captured in dev where defineBehavior was called (Behavior._trace).
+ */
+export function locatedAt(trace: Error, message: string, options?: ErrorOptions): Error {
+  const error = new Error(message, options);
+  error.stack = `Error: ${message}\n${(trace.stack ?? "").split("\n").slice(1).join("\n")}`;
+  return error;
+}
+
 // ============================================================
 // Node internals, keyed by symbols so that every string name stays free for
 // fields and meta keys. Classes only `declare` these members and assign them

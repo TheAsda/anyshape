@@ -29,7 +29,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 56 |
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
-| `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 16 |
+| `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 18 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 34 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
@@ -266,7 +266,7 @@ Type assertions are spread across the files today. Collect the public-API type c
 Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`src/diagnostics.test.ts`**.
 
 - [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed.
-- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, reactions vs UI listeners, the three slowest behaviors over their instances. An async run counts its synchronous part and applying its writes, not its time in flight.
+- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, reactions vs UI listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
 - [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush`, `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
 - [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. (A production build of `examples/basic` also contains none of `diagnostics.ts`.)
 
