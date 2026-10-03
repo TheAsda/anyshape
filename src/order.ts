@@ -6,11 +6,11 @@
 // A flush runs the lowest pending rank first, equal ranks by seq.
 //
 // A registration change is planned, then committed. The plan finds the new
-// edges through indexes by node and recomputes the ranks only of what the
-// change reaches; it throws on a cycle before anything changes.
-//
-// The writes are also kept by scope host, for the one-writer check
-// (behaviors.ts): one Writes index holds both views.
+// edges through indexes by scope host and node, and recomputes the ranks only
+// of what the change reaches; it throws on a cycle before anything changes.
+// Two registrations are linked only when their hosts are on one line of the
+// host tree: a row never reaches a sibling row. The one-writer check
+// (behaviors.ts) lists the writes through the same index.
 // ============================================================
 
 import type { AnyNode } from "./shape";
@@ -124,32 +124,6 @@ export interface Write<R> {
   readonly at: number;
 }
 
-/** The registered writes, by node for ranking and by scope host for the one-writer check. */
-class Writes<R extends Ranked> {
-  private readonly byNode = new NodeIndex<Write<R>>();
-  private readonly byHost = new HostIndex<Write<R>>();
-
-  add(w: Write<R>): void {
-    this.byNode.add(w.target.node, w);
-    this.byHost.add(w.reg.host, w.target.node, w);
-  }
-
-  delete(w: Write<R>): void {
-    this.byNode.delete(w.target.node, w);
-    this.byHost.delete(w.reg.host, w.target.node, w);
-  }
-
-  /** NodeIndex.near: the writes of every host. */
-  near(node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.byNode.near(node, fn);
-  }
-
-  /** HostIndex.near: the writes of `host`, of the hosts inside it and of those enclosing it. */
-  nearFrom(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.byHost.near(host, node, fn);
-  }
-}
-
 interface Input<R extends Ranked> {
   readonly vertex: Vertex<R>;
   readonly ref: AnyRef;
@@ -210,15 +184,15 @@ class Planned<R extends Ranked> {
 
 export class RunOrder<R extends Ranked> {
   private readonly vertices = new Map<R, Vertex<R>>();
-  private readonly writes = new Writes<R>();
-  private readonly inputs = new NodeIndex<Input<R>>();
+  private readonly writes = new HostIndex<Write<R>>();
+  private readonly inputs = new HostIndex<Input<R>>();
 
   /**
    * Calls `fn` for the registered writes that may overlap a write to `node`
    * from `host`: those whose hosts are `host`, inside it, or enclosing it.
    */
   writesNear(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.writes.nearFrom(host, node, fn);
+    this.writes.near(host, node, fn);
   }
 
   /**
@@ -241,20 +215,22 @@ export class RunOrder<R extends Ranked> {
     }
 
     const graph = new Planned(gone);
-    // Edges between fresh vertices: only with more than one.
-    const batch = fresh.length > 1 ? new NodeIndex<Input<R>>() : undefined;
-    if (batch) for (const v of fresh) for (const input of v.inputs) batch.add(refNode(input.ref), input);
+    // Edges between fresh vertices: only with more than one. They are on one
+    // host, plus the root for owners, but are linked through the same host filter.
+    const batch = fresh.length > 1 ? new HostIndex<Input<R>>() : undefined;
+    if (batch) for (const v of fresh) for (const input of v.inputs) batch.add(v.reg.host, refNode(input.ref), input);
     for (const v of fresh) {
+      const host = v.reg.host;
       for (const { target } of v.writes) {
         const reach = (input: Input<R>) => {
           if (!gone.has(input.vertex) && affects(target, input.ref)) graph.link(v, input.vertex);
         };
-        this.inputs.near(target.node, reach);
-        batch?.near(target.node, reach);
+        this.inputs.near(host, target.node, reach);
+        batch?.near(host, target.node, reach);
       }
       // Edges between fresh vertices were found above, from the writer's side.
       for (const { ref } of v.inputs) {
-        this.writes.near(refNode(ref), (w) => {
+        this.writes.near(host, refNode(ref), (w) => {
           const writer = this.vertices.get(w.reg)!;
           if (!gone.has(writer) && affects(w.target, ref)) graph.link(writer, v);
         });
@@ -314,13 +290,13 @@ export class RunOrder<R extends Ranked> {
       for (const v of gone) {
         for (const s of v.succ) s.pred.delete(v);
         for (const p of v.pred) p.succ.delete(v);
-        for (const w of v.writes) this.writes.delete(w);
-        for (const input of v.inputs) this.inputs.delete(refNode(input.ref), input);
+        for (const w of v.writes) this.writes.delete(v.reg.host, w.target.node, w);
+        for (const input of v.inputs) this.inputs.delete(v.reg.host, refNode(input.ref), input);
         this.vertices.delete(v.reg);
       }
       for (const v of fresh) {
-        for (const w of v.writes) this.writes.add(w);
-        for (const input of v.inputs) this.inputs.add(refNode(input.ref), input);
+        for (const w of v.writes) this.writes.add(v.reg.host, w.target.node, w);
+        for (const input of v.inputs) this.inputs.add(v.reg.host, refNode(input.ref), input);
         this.vertices.set(v.reg, v);
       }
       for (const [a, bs] of graph.out) {

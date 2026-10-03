@@ -840,6 +840,20 @@ describe("K · Run order between scope hosts", () => {
     expect(b.get(L.sku)).toBe("5");
   });
 
+  test("sibling rows don't order each other: each runs in registration order", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const [a, b] = lines.items();
+    b.addBehavior(logged(log, "reader", [L.lineTotal], L.sku.hint, (c) => String(c.get(L.lineTotal))));
+    a.addBehavior(logged(log, "writer", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
+    log.length = 0;
+    s.batch(() => {
+      a.set(L.qty, 4);
+      b.set(L.lineTotal, 7);
+    });
+    expect(log, "the writer's lineTotal is another row's").toEqual(["reader", "writer"]);
+    expect(b.get(L.sku.hint)).toBe("7");
+  });
+
   test("a cycle through a row and the root is reported with what follows it; nothing is registered", ({ store: s, lines }) => {
     const [a, b] = lines.items();
     s.addBehavior(defineBehavior({ name: "sum", triggers: [shape.lines], writes: [shape.discount], run: () => {} }));
@@ -909,12 +923,14 @@ describe("L · The run context", () => {
 });
 
 describe("K · Pinned constraints", () => {
-  test("constraint: behaviors on different rows that form a cycle only across rows are rejected", ({ store: s }) => {
+  test("behaviors on sibling rows that would form a cycle only across rows are no cycle: each row runs its own", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
     a.addBehavior(defineBehavior({ name: "qtyFromPrice", triggers: [L.price], writes: [L.qty], run: (c) => c.set(L.qty, c.get(L.price)) }));
-    const priceFromQty = defineBehavior({ name: "priceFromQty", triggers: [L.qty], writes: [L.price], run: (c) => c.set(L.price, c.get(L.qty)) });
-    expect(() => b.addBehavior(priceFromQty)).toThrow(/form a cycle: .*qtyFromPrice.*priceFromQty|form a cycle: .*priceFromQty.*qtyFromPrice/);
-    expect(b.get(L.price), "nothing registered").toBe(20);
+    b.addBehavior(defineBehavior({ name: "priceFromQty", triggers: [L.qty], writes: [L.price], run: (c) => c.set(L.price, c.get(L.qty)) }));
+    expect([a.get(L.qty), b.get(L.price)], "init runs").toEqual([10, 2]);
+    a.set(L.price, 7);
+    b.set(L.qty, 3);
+    expect([a.get(L.qty), a.get(L.price), b.get(L.qty), b.get(L.price)]).toEqual([7, 7, 3, 3]);
   });
 });
 
