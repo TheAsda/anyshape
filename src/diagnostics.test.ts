@@ -5,7 +5,7 @@
 import { form, object, array, field, createStore, defineBehavior, type InferValue, type RootStore, type AnyRef, type AnyNode } from "./index";
 import type { ProbedInstance } from "./store";
 import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from "vitest";
-import { concretePath } from "./internal";
+import { pathLabel } from "./internal";
 import { deferred, flush } from "./test/harness";
 import { validation } from "./test/features";
 import { required, rule } from "./test/rules";
@@ -44,7 +44,7 @@ function record(s: RootStore<any>): unknown[][] {
   const show = (arg: unknown) => {
     if (arg && typeof arg === "object" && "reg" in arg && "host" in arg) {
       const { reg, host } = arg as ProbedInstance;
-      return `${reg.name}@${concretePath(host, host.node) || "<root>"}`;
+      return `${reg.name}@${pathLabel(host, host.node)}`;
     }
     return typeof arg === "function" ? arg() : arg;
   };
@@ -164,7 +164,7 @@ describe("T · Probe", () => {
         store: "<root>",
         added: ["copy"],
         removed: [],
-        owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]", "required(lines[].email) @<root>"], more: 0 }],
+        owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], contributions: ["unique @lines[1]", "required(lines[].email) @<root>"], more: 0 }],
       },
     ]);
 
@@ -175,7 +175,7 @@ describe("T · Probe", () => {
       store: "<root>",
       added: [],
       removed: ["copy"],
-      owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]"], more: 0 }],
+      owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], contributions: ["unique @lines[1]"], more: 0 }],
     });
   });
   test("disposing a handle that registered nothing is no registration change", () => {

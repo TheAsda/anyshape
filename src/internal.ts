@@ -154,3 +154,8 @@ export function concretePath(host: BaseStore<any>, node: AnyNode): string {
   return `${concretePath(arr._host, arr.node)}[${index}]${relative}`;
 }
 
+/** concretePath for labels and messages: "<root>" for the form root. */
+export function pathLabel(host: BaseStore<any>, node: AnyNode): string {
+  return concretePath(host, node) || "<root>";
+}
+

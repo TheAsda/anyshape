@@ -71,13 +71,13 @@
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
-  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, isDev, locatedAt,
+  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, isDev, locatedAt, pathLabel,
 } from "./internal";
 import { isAncestorOrSelf } from "./tree";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
   type AnyRef, type RefValue, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks, type RegistrationChange,
-  LISTED_PARTS,
+  type Probe, type ProbedInstance, type RunPart, LISTED_CONTRIBUTIONS,
 } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 import { initialOf } from "./refs/initial";
@@ -347,7 +347,7 @@ interface Entry {
 const partOrder = (a: Entry, b: Entry): number => a.seq - b.seq || a.index - b.index;
 
 /** The owner's first `n` entries in ctx.parts order, without sorting them all: each host's list is in that order. */
-function firstParts(owner: Owner, n: number): Entry[] {
+function firstContributions(owner: Owner, n: number): Entry[] {
   const out: Entry[] = [];
   for (const list of owner.byHost.values()) {
     for (const e of list) {
@@ -359,6 +359,16 @@ function firstParts(owner: Owner, n: number): Entry[] {
     }
   }
   return out;
+}
+
+/** Dev: `fn` as one synchronous part of a run on `leaf`, timed by the probe. `part` is read when it ends. */
+function timed(probe: Probe, leaf: ProbedInstance, fn: () => void, part: () => RunPart): void {
+  probe.runStart(leaf, performance.now());
+  try {
+    fn();
+  } finally {
+    probe.runEnd(leaf, performance.now(), part());
+  }
 }
 
 /** How many entries declare each ref, by refKey. */
@@ -633,7 +643,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   /** A committed registration change, for the probe. */
   private describe(host: BaseStore<any>, added: readonly Registration[], removed: readonly Registration[], owners: OwnerChange): RegistrationChange {
-    const at = (store: BaseStore<any>) => concretePath(store, store.node) || "<root>";
+    const at = (store: BaseStore<any>) => pathLabel(store, store.node);
     return {
       store: at(host),
       added: added.map((r) => r.name),
@@ -641,8 +651,8 @@ export class BehaviorRuntime implements RuntimeHooks {
       owners: owners.map(({ owner }) => ({
         key: refLabel(owner.ref),
         triggers: owner.reg?.triggers.map(refLabel) ?? [],
-        parts: firstParts(owner, LISTED_PARTS).map((e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`),
-        more: Math.max(0, owner.size - LISTED_PARTS),
+        contributions: firstContributions(owner, LISTED_CONTRIBUTIONS).map((e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`),
+        more: Math.max(0, owner.size - LISTED_CONTRIBUTIONS),
       })),
     };
   }
@@ -1166,12 +1176,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (leaf.reg.disposed || !leaf.host.isAttached()) return;
     const probe = this.store._probe;
     if (!probe) return this.execute(leaf, p);
-    probe.runStart(leaf, performance.now());
-    try {
-      this.execute(leaf, p);
-    } finally {
-      probe.runEnd(leaf, performance.now(), this.flights.has(leaf) ? "async" : "sync");
-    }
+    timed(probe, leaf, () => this.execute(leaf, p), () => (this.flights.has(leaf) ? "async" : "sync"));
   }
 
   private execute(leaf: Binding, p: Pending): void {
@@ -1285,12 +1290,7 @@ export class BehaviorRuntime implements RuntimeHooks {
               this.end(leaf, flight, false);
               const probe = this.store._probe;
               if (!probe) return commit();
-              probe.runStart(leaf, performance.now());
-              try {
-                commit();
-              } finally {
-                probe.runEnd(leaf, performance.now(), "apply");
-              }
+              timed(probe, leaf, commit, () => "apply");
             });
           } catch (error) {
             this.onError(located(reg.behavior, error), info());
