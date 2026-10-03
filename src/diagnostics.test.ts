@@ -224,6 +224,21 @@ describe("T · Flush budget", () => {
     );
   });
 
+  test("a behavior registered row by row counts as one: its time adds up over the rows", () => {
+    const lineTotal = () => slow("total", 10, [O.qty], O.total);
+    const s = createStore(order, orderValues(), { behaviors: [slow("sum", 5, [order.lines], order.sum)] });
+    for (const row of s.substore(order.lines).items()) row.addBehavior(lineTotal());
+    warn.mockClear();
+    s.batch(() => {
+      for (const row of s.substore(order.lines).items()) row.set(O.qty, row.get(O.qty) + 1);
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toBe(
+      "[form] A flush took 35.0 ms, over the 33.3 ms budget: 35.0 ms in reactions, 0.0 ms in UI listeners. " +
+        'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run).'
+    );
+  });
+
   test("a flush within budget doesn't warn", () => {
     const s = createStore(order, orderValues(), { behaviors: [slow("total", 10, [O.qty], O.total)] });
     warn.mockClear();
