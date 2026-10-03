@@ -174,7 +174,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **K2 · P2** **Inherited-meta edge:** a behavior writing an ancestor's `visible` runs before a field's validation queue that triggers on its effective visibility. → `behaviors.test.ts`
 - [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
 - [x] **K4 · P3** A row behavior triggered by its whole array runs once per row: siblings' writes don't re-trigger it (sync) or cancel its runs in flight (async, one `settle()` round), and a change that mixes them with another origin still runs it (#3). → `behaviors.test.ts`, `async.test.ts`
-- [x] **K5 · P3** Pin the constraint: two component behaviors on different rows that would only form a cycle across rows are rejected at registration. → `behaviors.test.ts`
+- [x] **K5 · P3** Sibling rows don't order each other (#63): two component behaviors on different rows that would form a cycle only across rows both register, each row running its own; a row and the hosts enclosing or inside it are still ordered both ways, through nested rows, and a cycle through them is rejected. → `behaviors.test.ts`
 - [x] **K6 · P2** Ranks follow each registration change, reranking only what it reaches (#6): a behavior added upstream raises the whole chain; disposing one lowers its dependents, to their next longest chain; a replacement is checked for cycles without the registration it replaces, and a rejected one keeps the previous place; a contribution's trigger moves its owner after the trigger's writer, and its removal moves it back. → `behaviors.test.ts`
 
 ### L. Runtime lifecycle
