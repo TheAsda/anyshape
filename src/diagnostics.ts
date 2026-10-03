@@ -17,7 +17,7 @@
 
 import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store";
 import type { AnyNode } from "./shape";
-import { concretePath, locatedAt } from "./internal";
+import { locatedAt, pathLabel } from "./internal";
 
 /** One frame at 30 fps, in ms. */
 export const FLUSH_BUDGET = 1000 / 30;
@@ -142,7 +142,7 @@ type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "t
 /** console.timeStamp with the extended arguments (Chrome 136+). */
 type TimeStamp = (label: string, start: number, end: number, track: Track, group: string, color: Color) => void;
 
-const where = (instance: ProbedInstance) => `${instance.reg.name} @${concretePath(instance.host, instance.host.node) || "<root>"}`;
+const where = (instance: ProbedInstance) => `${instance.reg.name} @${pathLabel(instance.host, instance.host.node)}`;
 
 class Tracks {
   private flushAt = 0;
@@ -215,7 +215,7 @@ class Tracks {
     if (!flight) return;
     this.flights.delete(instance);
     const [label, color]: [string, Color] = cancelled ? [`${flight.label} (cancelled)`, "secondary-light"] : [flight.label, "secondary"];
-    this.stamp!(label, flight.start, at, "async", GROUP, color);
+    this.stamp?.(label, flight.start, at, "async", GROUP, color);
   }
 
   registrationStart(at: number): void {
@@ -233,14 +233,14 @@ class Tracks {
         ...(removed.length ? [["Removed", removed.join(", ")] as [string, string]] : []),
         ...owners.flatMap((o): [string, string][] => [
           [`${o.key} triggers`, o.triggers.join(", ")],
-          [`${o.key} contributions`, [...o.parts, ...(o.more ? [`… and ${o.more} more`] : [])].join(", ") || "none: the key is back to its default"],
+          [`${o.key} contributions`, [...o.contributions, ...(o.more ? [`… and ${o.more} more`] : [])].join(", ") || "none: the key is back to its default"],
         ]),
       ],
     });
   }
 
   settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void {
-    const at = concretePath(store._host, node) || "<root>";
+    const at = pathLabel(store._host, node);
     this.detail(`settle @${at}`, start, end, "async", "secondary-dark", {
       tooltipText: `settle() waited ${ms(end - start)} for the runs in flight inside ${at}`,
       properties: [],

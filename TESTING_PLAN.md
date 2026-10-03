@@ -268,7 +268,7 @@ Time comes from a stubbed `performance.now` that the test's reactions, listeners
 - [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed; disposing a handle that registered nothing is none.
 - [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, reactions vs UI listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
 - [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its reactions and UI listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
-- [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. (A production build of `examples/basic` also contains none of `diagnostics.ts`.)
+- [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. Checked once by hand, not in CI: `cd examples/basic && bunx vite build`, then the bundle contains none of `diagnostics.ts` (no `track-entry`, `over budget` or `A flush took`), only the `_probe == null` call sites.
 
 ---
 
