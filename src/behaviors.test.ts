@@ -784,6 +784,78 @@ describe("K · Run order across registration changes", () => {
   });
 });
 
+describe("K · Run order between scope hosts", () => {
+  // Each reader is registered before its writer: without an edge it would run first.
+  const logged = (log: string[], name: string, triggers: any[], to: any, value: (c: BehaviorContext) => unknown) =>
+    defineBehavior({ name, triggers, writes: [to], run: (c) => (log.push(name), c.set(to, value(c))) });
+
+  test("a root writer runs before a row reader", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const a = lines.itemAt(0);
+    a.addBehavior(logged(log, "row", [L.qty, shape.discount], L.lineTotal, (c) => c.get(L.qty) * (1 - c.get(shape.discount))));
+    s.addBehavior(logged(log, "root", [shape.start], shape.discount, (c) => c.get(shape.start) / 10));
+    log.length = 0;
+    s.batch(() => {
+      a.set(L.qty, 4);
+      s.set(shape.start, 5);
+    });
+    expect(log).toEqual(["root", "row"]);
+    expect(a.get(L.lineTotal)).toBe(2);
+  });
+
+  test("a row writer runs before a root reader that reads every row", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const a = lines.itemAt(0);
+    s.addBehavior(logged(log, "sum", [shape.lines], shape.subtotal, (c) => c.get(shape.lines).reduce((t: number, l: Values["lines"][number]) => t + l.lineTotal, 0)));
+    a.addBehavior(logged(log, "row", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
+    log.length = 0;
+    a.set(L.qty, 3);
+    expect(log).toEqual(["row", "sum"]);
+    expect(s.get(shape.subtotal)).toBe(30 + 0);
+  });
+
+  test("through nested rows: an enclosing writer runs before a nested reader, a nested writer before an enclosing reader", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const a = lines.itemAt(0);
+    const note = a.substore(L.notes).itemAt(0);
+    note.addBehavior(logged(log, "note", [N.text, L.lineTotal, shape.discount], N.len, (c) => c.get(N.text).length + c.get(L.lineTotal) + c.get(shape.discount)));
+    a.addBehavior(logged(log, "line", [L.qty], L.lineTotal, (c) => c.get(L.qty)));
+    s.addBehavior(logged(log, "root", [shape.start], shape.discount, (c) => c.get(shape.start)));
+    log.length = 0;
+    s.batch(() => {
+      note.set(N.text, "abc");
+      a.set(L.qty, 4);
+      s.set(shape.start, 5);
+    });
+    expect(log, "the line and the root, two hosts up, in registration order, then the note").toEqual(["line", "root", "note"]);
+    expect(note.get(N.len)).toBe(3 + 4 + 5);
+
+    const b = lines.itemAt(1);
+    const other = b.substore(L.notes).append({ text: "x", len: 0 });
+    b.addBehavior(logged(log, "lens", [L.notes], L.sku, (c) => c.get(L.notes).map((n) => n.len).join(",")));
+    other.addBehavior(logged(log, "len", [N.text], N.len, (c) => c.get(N.text).length));
+    log.length = 0;
+    other.set(N.text, "hello");
+    expect(log).toEqual(["len", "lens"]);
+    expect(b.get(L.sku)).toBe("5");
+  });
+
+  test("a cycle through a row and the root is reported with what follows it; nothing is registered", ({ store: s, lines }) => {
+    const [a, b] = lines.items();
+    s.addBehavior(defineBehavior({ name: "sum", triggers: [shape.lines], writes: [shape.discount], run: () => {} }));
+    s.addBehavior(defineBehavior({ name: "after", triggers: [shape.discount], writes: [shape.total], run: () => {} }));
+    // Meta writes: not part of the list's value, so not read by "sum".
+    b.addBehavior(defineBehavior({ name: "hint", triggers: [shape.discount], writes: [L.sku.hint], run: () => {} }));
+    b.addBehavior(defineBehavior({ name: "unrelated", triggers: [L.price], writes: [L.sku.disabled], run: () => {} }));
+    const qty = defineBehavior({ name: "qty", triggers: [shape.discount], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.discount)) });
+    expect(() => a.addBehavior(qty)).toThrow(
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "sum", "after", "hint", "qty" – merge them into one behavior (see link())'
+    );
+    s.set(shape.discount, 9);
+    expect(a.get(L.qty), "not registered").toBe(1);
+  });
+});
+
 describe("L · The run context", () => {
   test("ctx.changed is false on the init run and true only for triggers that changed", () => {
     const seen: string[] = [];
