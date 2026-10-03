@@ -10,7 +10,7 @@
 // change reaches; it throws on a cycle before anything changes.
 //
 // The writes are also kept by scope host, for the one-writer check
-// (behaviors.ts): committed with the edges, so both views stay in step.
+// (behaviors.ts): one Writes index holds both views.
 // ============================================================
 
 import type { AnyNode } from "./shape";
@@ -61,14 +61,15 @@ export class NodeIndex<T> {
     for (let n = node.parent; n; n = n.parent) this.at.get(n)?.forEach((item) => fn(item));
   }
 
+  /** `under` holds the same items as `at`, so it empties with it. */
   isEmpty(): boolean {
     return !this.at.size;
   }
 }
 
 /**
- * Items by scope host, then by node. Items of sibling rows are on no line of
- * the host tree with each other: `near` from one row never lists the others.
+ * Items by scope host, then by node. `near` lists the items of a host, of the
+ * hosts inside it and of those enclosing it: never those of a sibling row.
  */
 class HostIndex<T> {
   private readonly at = new Map<BaseStore<any>, NodeIndex<T>>();
@@ -121,6 +122,32 @@ export interface Write<R> {
   readonly reg: R;
   readonly target: Target;
   readonly at: number;
+}
+
+/** The registered writes, by node for ranking and by scope host for the one-writer check. */
+class Writes<R extends Ranked> {
+  private readonly byNode = new NodeIndex<Write<R>>();
+  private readonly byHost = new HostIndex<Write<R>>();
+
+  add(w: Write<R>): void {
+    this.byNode.add(w.target.node, w);
+    this.byHost.add(w.reg.host, w.target.node, w);
+  }
+
+  delete(w: Write<R>): void {
+    this.byNode.delete(w.target.node, w);
+    this.byHost.delete(w.reg.host, w.target.node, w);
+  }
+
+  /** NodeIndex.near: the writes of every host. */
+  near(node: AnyNode, fn: (write: Write<R>) => void): void {
+    this.byNode.near(node, fn);
+  }
+
+  /** HostIndex.near: the writes of `host`, of the hosts inside it and of those enclosing it. */
+  nearFrom(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
+    this.byHost.near(host, node, fn);
+  }
 }
 
 interface Input<R extends Ranked> {
@@ -183,9 +210,7 @@ class Planned<R extends Ranked> {
 
 export class RunOrder<R extends Ranked> {
   private readonly vertices = new Map<R, Vertex<R>>();
-  private readonly writes = new NodeIndex<Write<R>>();
-  /** The writes again, by scope host: the one-writer check never lists sibling rows. */
-  private readonly writesByHost = new HostIndex<Write<R>>();
+  private readonly writes = new Writes<R>();
   private readonly inputs = new NodeIndex<Input<R>>();
 
   /**
@@ -193,7 +218,7 @@ export class RunOrder<R extends Ranked> {
    * from `host`: those whose hosts are `host`, inside it, or enclosing it.
    */
   writesNear(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.writesByHost.near(host, node, fn);
+    this.writes.nearFrom(host, node, fn);
   }
 
   /**
@@ -289,18 +314,12 @@ export class RunOrder<R extends Ranked> {
       for (const v of gone) {
         for (const s of v.succ) s.pred.delete(v);
         for (const p of v.pred) p.succ.delete(v);
-        for (const w of v.writes) {
-          this.writes.delete(w.target.node, w);
-          this.writesByHost.delete(w.reg.host, w.target.node, w);
-        }
+        for (const w of v.writes) this.writes.delete(w);
         for (const input of v.inputs) this.inputs.delete(refNode(input.ref), input);
         this.vertices.delete(v.reg);
       }
       for (const v of fresh) {
-        for (const w of v.writes) {
-          this.writes.add(w.target.node, w);
-          this.writesByHost.add(w.reg.host, w.target.node, w);
-        }
+        for (const w of v.writes) this.writes.add(w);
         for (const input of v.inputs) this.inputs.add(refNode(input.ref), input);
         this.vertices.set(v.reg, v);
       }
