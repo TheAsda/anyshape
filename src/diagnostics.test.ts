@@ -239,6 +239,20 @@ describe("T · Flush budget", () => {
     );
   });
 
+  test("each listed behavior comes with where it was defined, as an error whose stack starts at its defineBehavior call", () => {
+    const s = createStore(order, orderValues(), {
+      behaviors: [slow("total", 10, [O.qty], O.total), slow("sum", 5, [order.lines], order.sum)],
+    });
+    warn.mockClear();
+    s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
+    const [, ...definedAt] = warn.mock.calls[0] as [string, ...Error[]];
+    expect(definedAt.map((e) => e.message)).toEqual(['"total" is defined here', '"sum" is defined here']);
+    for (const e of definedAt) {
+      const frames = e.stack!.split("\n").filter((l) => l.trim().startsWith("at "));
+      expect(frames[0]).toMatch(/diagnostics\.test\.ts/); // the call to defineBehavior in `slow`
+    }
+  });
+
   test("a flush within budget doesn't warn", () => {
     const s = createStore(order, orderValues(), { behaviors: [slow("total", 10, [O.qty], O.total)] });
     warn.mockClear();

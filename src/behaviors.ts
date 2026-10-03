@@ -71,7 +71,7 @@
 import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode, type InferValue } from "./shape";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
-  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, isDev,
+  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, isDev, locatedAt,
 } from "./internal";
 import { isAncestorOrSelf } from "./tree";
 import {
@@ -243,9 +243,7 @@ export class Behavior {
 function located(behavior: Behavior, error: unknown): unknown {
   const trace = behavior._trace;
   if (!trace?.stack) return error;
-  const located = new Error(error instanceof Error ? error.message : String(error), { cause: error });
-  located.stack = `Error: ${located.message}\n${trace.stack.split("\n").slice(1).join("\n")}`;
-  return located;
+  return locatedAt(trace, error instanceof Error ? error.message : String(error), { cause: error });
 }
 
 function guardsOf(decl: Declaration): Guard[] {

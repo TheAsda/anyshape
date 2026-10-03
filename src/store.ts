@@ -49,7 +49,7 @@
 // ============================================================
 
 import type { Meta, MetaKeyDef } from "./meta";
-import type { AnyBehavior, BehaviorHandle } from "./behaviors";
+import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors";
 import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
@@ -169,7 +169,7 @@ export const LISTED_PARTS = 20;
 
 /** @internal A behavior instance as a probe sees it: instances of one registration share `reg`. */
 export interface ProbedInstance {
-  readonly reg: { readonly name: string };
+  readonly reg: { readonly name: string; readonly behavior: Behavior };
   readonly host: BaseStore<any>;
 }
 
