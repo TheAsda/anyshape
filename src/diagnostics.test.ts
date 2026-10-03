@@ -292,7 +292,7 @@ describe("T · Flush budget", () => {
     await flush();
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[1][0]).toBe(
-      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in reactions, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms.'
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms applying async writes, 0.0 ms in reactions, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms.'
     );
   });
 });
