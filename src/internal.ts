@@ -123,6 +123,11 @@ export function storeWithin(inner: BaseStore<any>, outer: BaseStore<any>): boole
   return false;
 }
 
+/** The scope host enclosing a scope host: a row's, none for the root. */
+export function outerHost(host: BaseStore<any>): BaseStore<any> | undefined {
+  return host instanceof ItemStore ? host.arrayStore._host : undefined;
+}
+
 /** The scope host (root or row store) at `scope`, walking up from `host`. */
 export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
   let h = host;
