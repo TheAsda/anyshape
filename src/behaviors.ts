@@ -965,6 +965,8 @@ export class BehaviorRuntime implements RuntimeHooks {
   /**
    * One writer per target among registrations whose regions overlap: `added`
    * against each other and against the registrations other than `removed`.
+   * Regions overlap when the hosts are on one line of the host tree; within
+   * `added` they always are: `host` and the root, for owners.
    */
   private checkWriters(added: Registration[], removed: ReadonlySet<Registration>): void {
     const batch = added.length > 1 ? new NodeIndex<Write<Registration>>() : undefined;
@@ -973,11 +975,10 @@ export class BehaviorRuntime implements RuntimeHooks {
       reg.targets.forEach((target, at) => {
         const check = (other: Write<Registration>) => {
           const o = other.reg;
-          if (removed.has(o) || !overlaps(target, other.target)) return;
-          if (!(storeWithin(reg.host, o.host) || storeWithin(o.host, reg.host)) || exclusiveBranches(reg, o)) return;
+          if (removed.has(o) || !overlaps(target, other.target) || exclusiveBranches(reg, o)) return;
           conflicts.push({ other, at });
         };
-        this.order.writesNear(target.node, check);
+        this.order.writesNear(reg.host, target.node, check);
         batch?.near(target.node, check);
       });
       if (conflicts.length) {

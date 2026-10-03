@@ -11,14 +11,16 @@
 // ============================================================
 
 import type { AnyNode } from "./shape";
-import { refNode, refKey } from "./internal";
-import type { AnyRef } from "./store";
+import { refNode, refKey, outerHost } from "./internal";
+import type { AnyRef, BaseStore } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 
 /** What the run order needs from a registration. */
 export interface Ranked {
   readonly seq: number;
   readonly name: string;
+  /** The scope host it was registered on. */
+  readonly host: BaseStore<any>;
   readonly targets: readonly Target[];
   readonly inputs: readonly AnyRef[];
   rank: number;
@@ -54,6 +56,49 @@ export class NodeIndex<T> {
     this.under.get(node)?.forEach((item) => fn(item));
     for (let n = node.parent; n; n = n.parent) this.at.get(n)?.forEach((item) => fn(item));
   }
+
+  isEmpty(): boolean {
+    return !this.at.size;
+  }
+}
+
+/**
+ * Items by scope host, then by node. Items of sibling rows are on no line of
+ * the host tree with each other: `near` from one row never lists the others.
+ */
+class HostIndex<T> {
+  private readonly at = new Map<BaseStore<any>, NodeIndex<T>>();
+  /** Items of the host or of a host inside it. */
+  private readonly under = new Map<BaseStore<any>, NodeIndex<T>>();
+
+  add(host: BaseStore<any>, node: AnyNode, item: T): void {
+    indexOf(this.at, host).add(node, item);
+    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) indexOf(this.under, h).add(node, item);
+  }
+
+  delete(host: BaseStore<any>, node: AnyNode, item: T): void {
+    unindex(this.at, host, node, item);
+    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) unindex(this.under, h, node, item);
+  }
+
+  /** NodeIndex.near among the items of `host`, of the hosts inside it, and of the hosts enclosing it. */
+  near(host: BaseStore<any>, node: AnyNode, fn: (item: T) => void): void {
+    this.under.get(host)?.near(node, fn);
+    for (let h = outerHost(host); h; h = outerHost(h)) this.at.get(h)?.near(node, fn);
+  }
+}
+
+function indexOf<T>(map: Map<BaseStore<any>, NodeIndex<T>>, host: BaseStore<any>): NodeIndex<T> {
+  let index = map.get(host);
+  if (!index) map.set(host, (index = new NodeIndex()));
+  return index;
+}
+
+function unindex<T>(map: Map<BaseStore<any>, NodeIndex<T>>, host: BaseStore<any>, node: AnyNode, item: T): void {
+  const index = map.get(host);
+  if (!index) return;
+  index.delete(node, item);
+  if (index.isEmpty()) map.delete(host);
 }
 
 function setOf<K, T>(map: Map<K, Set<T>>, key: K): Set<T> {
@@ -139,11 +184,16 @@ class Planned<R extends Ranked> {
 export class RunOrder<R extends Ranked> {
   private readonly vertices = new Map<R, Vertex<R>>();
   private readonly writes = new NodeIndex<Write<R>>();
+  /** The writes again, by host: the one-writer check never needs sibling rows. */
+  private readonly hostedWrites = new HostIndex<Write<R>>();
   private readonly inputs = new NodeIndex<Input<R>>();
 
-  /** Calls `fn` for the registered writes that may overlap a write to `node`. */
-  writesNear(node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.writes.near(node, fn);
+  /**
+   * Calls `fn` for the registered writes that may overlap a write to `node`
+   * from `host`: those whose hosts are `host`, inside it, or enclosing it.
+   */
+  writesNear(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
+    this.hostedWrites.near(host, node, fn);
   }
 
   /**
@@ -239,12 +289,18 @@ export class RunOrder<R extends Ranked> {
       for (const v of gone) {
         for (const s of v.succ) s.pred.delete(v);
         for (const p of v.pred) p.succ.delete(v);
-        for (const w of v.writes) this.writes.delete(w.target.node, w);
+        for (const w of v.writes) {
+          this.writes.delete(w.target.node, w);
+          this.hostedWrites.delete(w.reg.host, w.target.node, w);
+        }
         for (const input of v.inputs) this.inputs.delete(refNode(input.ref), input);
         this.vertices.delete(v.reg);
       }
       for (const v of fresh) {
-        for (const w of v.writes) this.writes.add(w.target.node, w);
+        for (const w of v.writes) {
+          this.writes.add(w.target.node, w);
+          this.hostedWrites.add(w.reg.host, w.target.node, w);
+        }
         for (const input of v.inputs) this.inputs.add(refNode(input.ref), input);
         this.vertices.set(v.reg, v);
       }
