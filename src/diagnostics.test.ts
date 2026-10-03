@@ -307,7 +307,7 @@ describe("T · DevTools tracks", () => {
   const measured = () =>
     measure.mock.calls.map(([name, options]: any) => ({ name, start: options.start, end: options.end, ...options.detail.devtools }));
 
-  test("each flush and each run is an entry in the form-lib group: label, start, end, track, color", () => {
+  test("each flush, its two phases and each run are entries in the form-lib group: label, start, end, track, color", () => {
     const s = createStore(shape, initial());
     s.addBehavior(
       defineBehavior({
@@ -318,12 +318,15 @@ describe("T · DevTools tracks", () => {
         },
       })
     );
+    s.subscribe(shape.rows, () => void (t += 1));
     stamp.mockClear();
     t = 10;
     s.set(shape.rows, [...s.get(shape.rows), { sku: "z", title: "" }]);
     expect(stamp.mock.calls).toEqual([
       ["title @rows[2]", 10, 14, "behaviors", "form-lib", "primary"],
-      ["flush", 10, 14, "flush", "form-lib", "tertiary"],
+      ["flush", 10, 15, "flush", "form-lib", "tertiary"],
+      ["reactions", 10, 14, "flush", "form-lib", "tertiary-light"],
+      ["UI listeners", 14, 15, "flush", "form-lib", "tertiary-light"],
     ]);
   });
 
@@ -336,7 +339,7 @@ describe("T · DevTools tracks", () => {
     measure.mockClear();
     t = 10;
     s.set(shape.rows, s.get(shape.rows).map((r) => ({ ...r, sku: r.sku + "!" })));
-    expect(stamp.mock.calls.filter((c) => c[3] === "flush")).toEqual([]);
+    expect(stamp.mock.calls.filter((c) => c[3] === "flush").map((c) => c[0])).toEqual(["reactions", "UI listeners"]);
     expect(measured()).toEqual([
       {
         name: "flush over budget", start: 10, end: 51,

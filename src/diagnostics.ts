@@ -137,7 +137,7 @@ function overBudget(report: FlushReport): string {
 // ============================================================
 const GROUP = "form-lib";
 type Track = "flush" | "behaviors" | "async" | "registration";
-type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "tertiary" | "tertiary-dark" | "error";
+type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "tertiary" | "tertiary-light" | "tertiary-dark" | "error";
 
 /** console.timeStamp with the extended arguments (Chrome 136+). */
 type TimeStamp = (label: string, start: number, end: number, track: Track, group: string, color: Color) => void;
@@ -146,6 +146,8 @@ const where = (instance: ProbedInstance) => `${instance.reg.name} @${concretePat
 
 class Tracks {
   private flushAt = 0;
+  /** End of the flush's reactions; undefined when they threw. */
+  private reactionsAt: number | undefined;
   private runAt = 0;
   private registrationAt = 0;
   /** Runs in flight: their start and label. */
@@ -165,10 +167,23 @@ class Tracks {
 
   flushStart(at: number): void {
     this.flushAt = at;
+    this.reactionsAt = undefined;
   }
 
+  reactionsEnd(at: number): void {
+    this.reactionsAt = at;
+  }
+
+  /** The flush, then its phases nested in it. Over budget, the flush is a detailed entry. */
   flushEnd(at: number, report: FlushReport | undefined): void {
-    if (!report) return this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
+    if (!report) this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
+    else this.overBudget(at, report);
+    const reactionsAt = this.reactionsAt ?? at;
+    this.stamp?.("reactions", this.flushAt, reactionsAt, "flush", GROUP, "tertiary-light");
+    if (this.reactionsAt !== undefined) this.stamp?.("UI listeners", reactionsAt, at, "flush", GROUP, "tertiary-light");
+  }
+
+  private overBudget(at: number, report: FlushReport): void {
     this.detail("flush over budget", this.flushAt, at, "flush", "error", {
       tooltipText: `A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget`,
       properties: [
@@ -247,6 +262,7 @@ export class Diagnostics implements Probe {
   }
   reactionsEnd(at: number): void {
     this.budget.reactionsEnd(at);
+    this.tracks?.reactionsEnd(at);
   }
   flushEnd(at: number): void {
     const report = this.budget.flushEnd(at);
