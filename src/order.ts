@@ -73,12 +73,12 @@ export class NodeIndex<T> {
  */
 class HostIndex<T> {
   private readonly at = new Map<BaseStore<any>, NodeIndex<T>>();
-  /** Items of the host or of a host inside it. */
-  private readonly under = new Map<BaseStore<any>, NodeIndex<T>>();
+  /** Items of the hosts inside the host: a row without nested rows has none. */
+  private readonly inner = new Map<BaseStore<any>, NodeIndex<T>>();
 
   add(host: BaseStore<any>, node: AnyNode, item: T): void {
     entry(this.at, host, newIndex).add(node, item);
-    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) entry(this.under, h, newIndex).add(node, item);
+    for (let h = outerHost(host); h; h = outerHost(h)) entry(this.inner, h, newIndex).add(node, item);
   }
 
   delete(host: BaseStore<any>, node: AnyNode, item: T): void {
@@ -87,12 +87,13 @@ class HostIndex<T> {
       return index.isEmpty();
     };
     prune(this.at, host, remove);
-    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) prune(this.under, h, remove);
+    for (let h = outerHost(host); h; h = outerHost(h)) prune(this.inner, h, remove);
   }
 
   /** NodeIndex.near among the items of `host`, of the hosts inside it, and of the hosts enclosing it. */
   near(host: BaseStore<any>, node: AnyNode, fn: (item: T) => void): void {
-    this.under.get(host)?.near(node, fn);
+    this.at.get(host)?.near(node, fn);
+    this.inner.get(host)?.near(node, fn);
     for (let h = outerHost(host); h; h = outerHost(h)) this.at.get(h)?.near(node, fn);
   }
 }
