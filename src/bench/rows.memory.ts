@@ -90,3 +90,22 @@ it.skipIf(!gc)("a row removed while its subscription is still active is collecta
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
 });
+
+it.skipIf(!gc)("a removed row whose own behaviors were disposed is collectable", async () => {
+  const s = createStore(shape, { lines: [] });
+  const lines = s.substore(shape.lines);
+  const refs: WeakRef<object>[] = [];
+  (() => {
+    for (let i = 0; i < 50; i++) {
+      const row = lines.append();
+      const dispose = row.addBehavior(
+        defineBehavior({ triggers: [L.qty], writes: [L.lineTotal], run: (c) => c.set(L.lineTotal, c.get(L.qty) * 2) })
+      );
+      refs.push(new WeakRef(row));
+      dispose();
+    }
+    for (const row of [...lines.items()]) lines.remove(row);
+  })();
+  await collectGarbage();
+  expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
+});
