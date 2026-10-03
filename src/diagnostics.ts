@@ -22,11 +22,15 @@ import { concretePath } from "./internal";
 /** One frame at 30 fps, in ms. */
 export const FLUSH_BUDGET = 1000 / 30;
 
-/** One behavior's time in the current flush, over all its instances. */
-interface Tally {
-  readonly reg: ProbedInstance["reg"];
+/** A behavior's time in the current flush. */
+interface Spent {
+  readonly name: string;
   time: number;
   runs: number;
+}
+
+/** One registration's time, over all its instances. */
+interface Tally extends Spent {
   listed: boolean;
 }
 
@@ -35,12 +39,13 @@ interface FlushReport {
   readonly reactions: number;
   readonly ui: number;
   /** At most three, slowest first. */
-  readonly slowest: readonly Tally[];
+  readonly slowest: readonly Spent[];
 }
 
 /**
  * Times each flush. Allocation-free while a flush is within budget: tallies
- * are kept per registration and reset in place.
+ * are kept per registration and reset in place. A report adds them up by
+ * behavior name: a behavior registered row by row is one registration per row.
  */
 class FlushBudget {
   private start = 0;
@@ -71,7 +76,15 @@ class FlushBudget {
     let report: FlushReport | undefined;
     if (total > FLUSH_BUDGET) {
       const reactionsAt = this.reactionsDone ? this.reactionsAt : at;
-      const slowest = [...this.listed].sort((a, b) => b.time - a.time).slice(0, 3).map((t) => ({ ...t }));
+      const byName = new Map<string, Spent>();
+      for (const { name, time, runs } of this.listed) {
+        const spent = byName.get(name);
+        if (spent) {
+          spent.time += time;
+          spent.runs += runs;
+        } else byName.set(name, { name, time, runs });
+      }
+      const slowest = [...byName.values()].sort((a, b) => b.time - a.time).slice(0, 3);
       report = { total, reactions: reactionsAt - this.start + this.carry, ui: at - reactionsAt, slowest };
     }
     for (const tally of this.listed) {
@@ -91,7 +104,7 @@ class FlushBudget {
   runEnd(instance: ProbedInstance, at: number, part: RunPart): void {
     const time = at - this.runAt;
     let tally = this.tallies.get(instance.reg);
-    if (!tally) this.tallies.set(instance.reg, (tally = { reg: instance.reg, time: 0, runs: 0, listed: false }));
+    if (!tally) this.tallies.set(instance.reg, (tally = { name: instance.reg.name, time: 0, runs: 0, listed: false }));
     if (!tally.listed) {
       tally.listed = true;
       this.listed.push(tally);
@@ -105,10 +118,10 @@ class FlushBudget {
 const ms = (n: number) => `${n.toFixed(1)} ms`;
 
 /** "40.0 ms (2 runs)"; the runs are left out for writes applied alone. */
-const spent = (t: Tally) => `${ms(t.time)}${t.runs ? ` (${t.runs} ${t.runs === 1 ? "run" : "runs"})` : ""}`;
+const spent = (t: Spent) => `${ms(t.time)}${t.runs ? ` (${t.runs} ${t.runs === 1 ? "run" : "runs"})` : ""}`;
 
 function overBudget(report: FlushReport): string {
-  const slowest = report.slowest.map((t) => `"${t.reg.name}" ${spent(t)}`).join(", ");
+  const slowest = report.slowest.map((t) => `"${t.name}" ${spent(t)}`).join(", ");
   return (
     `[form] A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget: ` +
     `${ms(report.reactions)} in reactions, ${ms(report.ui)} in UI listeners.` +
@@ -158,7 +171,7 @@ class Tracks {
       properties: [
         ["Reactions", ms(report.reactions)],
         ["UI listeners", ms(report.ui)],
-        ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.reg.name}`, spent(t)]),
+        ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.name}`, spent(t)]),
       ],
     });
   }
