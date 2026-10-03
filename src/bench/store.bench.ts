@@ -4,9 +4,21 @@
 // ============================================================
 
 import { test, describe, expect, vi } from "vitest";
-import { form, object, array, field, createStore, defineBehavior, countIn, metaKey, contribute } from "../index";
+import { form, object, array, field, createStore as createDevStore, defineBehavior, countIn, metaKey, contribute } from "../index";
 import { control, revealed, error } from "../test/features";
 import { rule } from "../test/rules";
+
+// Vitest runs with NODE_ENV=test, where createStore installs the dev
+// diagnostics probe. The benches measure the library: their stores are
+// created in production, except in "dev diagnostics overhead".
+const createStore: typeof createDevStore = (...args) => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    return createDevStore(...args);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+};
 
 // ---------------------------------------------------------------------------
 // A flat form: 500 fields on the root, each with a UI listener
@@ -92,14 +104,12 @@ describe("200 rows", () => {
 // are created (they keep the function they found), so they also build every
 // entry's label.
 describe("dev diagnostics overhead", () => {
-  vi.stubEnv("NODE_ENV", "production");
   const prodFlat = createStore(flat, flatValues());
   const prodOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
-  vi.unstubAllEnvs();
   const timeStamp = Object.getOwnPropertyDescriptor(console, "timeStamp");
   console.timeStamp ??= () => {};
-  const devFlat = createStore(flat, flatValues());
-  const devOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
+  const devFlat = createDevStore(flat, flatValues());
+  const devOrder = createDevStore(order, orderValues(), { behaviors: orderBehaviors });
   if (timeStamp) Object.defineProperty(console, "timeStamp", timeStamp);
   else delete (console as Partial<Console>).timeStamp;
   expect([prodFlat._probe, prodOrder._probe, devFlat._probe && devOrder._probe].map(Boolean)).toEqual([false, false, true]);
@@ -191,6 +201,7 @@ describe("row-by-row behavior mounts", () => {
       bench("200 rows", () => calculateRowByRow(200)),
       bench("400 rows", () => calculateRowByRow(400)),
       bench("800 rows", () => calculateRowByRow(800)),
+      bench("1600 rows", () => calculateRowByRow(1600)),
       { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
     );
   });
