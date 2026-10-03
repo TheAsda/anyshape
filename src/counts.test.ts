@@ -48,6 +48,21 @@ describe("H · Counts and collect", () => {
     expect(s.get(countIn(shape, error)), "restored row counts again").toBe(2);
   });
 
+  test("a row write that drops its nested rows moves their counts before the reactions run", () => {
+    // No behaviors: the count is the only thing that changes for the reactions.
+    const flaggedKey = metaKey(false).aggregate((v) => v);
+    const f = form({ rows: array(object({ notes: array(object({ text: field<string>().meta({ flagged: flaggedKey }) })) })) });
+    const s = createStore(f, { rows: [{ notes: [{ text: "" }] }, { notes: [] }] });
+    const row = s.substore(f.rows).itemAt(0);
+    const note = row.substore(f.rows.item.notes).itemAt(0);
+    note.set(f.rows.item.notes.item.text.flagged, true);
+    note.setValue(f.rows.item.notes.item.text, "n");   // a flush that walks the rows first
+    const seen: number[] = [];
+    s.react(countIn(f, flaggedKey), (next) => seen.push(next));
+    row.setValue(f.rows.item.notes, []);
+    expect(seen).toEqual([0]);
+  });
+
   test("count subscriptions fire on changes and row removal", ({ store: s }) => {
     const seen: number[] = [];
     s.subscribe(countIn(shape, error), () => seen.push(s.get(countIn(shape, error))));

@@ -1184,6 +1184,10 @@ export type NewItemArgs<N extends ArrayNode<any, any>> = N["_hasCreate"] extends
 const EMPTY: readonly never[] = Object.freeze([]);
 let stableIdCounter = 0;
 
+/** A walk over the rows: the sync walk, or a phase's visit. */
+type Walk = "sync" | Phase;
+const WALKS: readonly Walk[] = ["sync", ...PHASES];
+
 export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   private readonly itemStores = new WeakMap<object, ItemStore<ItemOf<N>>>();
   private sequence: readonly ItemStore<ItemOf<N>>[] = EMPTY;
@@ -1191,8 +1195,10 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   private members = new Set<object>();
   private baseline: { array: readonly object[]; set: Set<object> } | undefined;
   private readonly itemsSubs = new Set<Sub<readonly ItemStore<ItemOf<N>>[]>>();
-  private lastVisited: Record<Phase, readonly ItemStore<any>[]> = { reaction: EMPTY, ui: EMPTY };
   private createdSince: Record<Phase, ItemStore<any>[]> = { reaction: [], ui: [] };
+  /** Per walk: the sequence it last walked, and the rows whose object changed since. */
+  private walked: Record<Walk, readonly ItemStore<any>[]> = { sync: EMPTY, reaction: EMPTY, ui: EMPTY };
+  private readonly rewritten: Record<Walk, Set<ItemStore<any>>> = { sync: new Set(), reaction: new Set(), ui: new Set() };
 
   /** @internal – use store.substore(node) */
   constructor(node: N, parent: BaseStore<any>) {
@@ -1326,7 +1332,10 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
       let store = this.itemStores.get(ref);
       if (store && store._currentRef !== ref) {
         if (members.has(store._currentRef as object)) store = undefined;
-        else store._currentRef = ref;
+        else {
+          store._currentRef = ref;
+          this.markRewritten(store);
+        }
       }
       if (!store) {
         store = new ItemStore<ItemOf<N>>(this, ref, `i${stableIdCounter++}`, this._baselineHas(ref) ? ref : {});
@@ -1350,6 +1359,18 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     return this.sequence;
   }
 
+  /**
+   * The synced array `row` was in now holds `row` as `arr`, the row's new
+   * object instead of `prev`: the same rows in the same order. Brings the
+   * sync up to date in place rather than rebuilding it from `arr`.
+   */
+  private syncReplaced(row: ItemStore<any>, prev: object, arr: readonly object[]): void {
+    this.members.delete(prev);
+    this.members.add(row._currentRef as object);
+    this.syncedArray = arr;
+    this.markRewritten(row);
+  }
+
   /** Add or remove a row's subtree counts from the enclosing scopes. */
   private shiftTotals(row: ItemStore<any>, attach: boolean): void {
     row._counted = attach;
@@ -1360,8 +1381,41 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     }
   }
 
+  /** A row now has another object: every walk looks at it, even when the sequence is the same. */
+  private markRewritten(row: ItemStore<any>): void {
+    for (const walk of WALKS) this.rewritten[walk].add(row);
+  }
+
+  /**
+   * The rows `walk` goes through now, in array order; `seq` is the current
+   * sequence. Records this pass: the next one starts from here.
+   * - `seq` is the sequence of the walk's last pass: no row attached or
+   *   detached since, so only the rewritten rows can have changed. A row
+   *   write costs its row, not every row.
+   * - Otherwise every row in `seq`; a visit also takes the rows of its last
+   *   pass and the rows created since, which may have just detached (rule 4).
+   */
+  private rowsToWalk(walk: Walk, seq: readonly ItemStore<any>[]): readonly ItemStore<any>[] {
+    const rewritten = this.rewritten[walk];
+    const previous = this.walked[walk];
+    let rows: readonly ItemStore<any>[];
+    if (seq === previous) {
+      // No rewritten row, or one (the usual row write): no scan of the sequence.
+      rows = rewritten.size < 2 ? [...rewritten] : seq.filter((row) => rewritten.has(row));
+    } else if (walk === "sync") {
+      rows = seq;
+    } else {
+      // Each store created since the last pass changed the sequence: it is taken here.
+      rows = [...new Set([...seq, ...previous, ...this.createdSince[walk]])];
+      this.createdSince[walk] = [];
+    }
+    rewritten.clear();
+    this.walked[walk] = seq;
+    return rows;
+  }
+
   protected override _syncChildren(): void {
-    for (const row of this._sync()) row._syncVisit();
+    for (const row of this.rowsToWalk("sync", this._sync())) row._syncVisit();
   }
 
   override _refreshInitials(): void {
@@ -1379,18 +1433,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   }
 
   protected override _visitChildren(phase: Phase, calls: Calls, changed: StoreSet | undefined, log: readonly WriteEntry[] | undefined): void {
-    const seq = this._sync();
-    const visited = new Set<ItemStore<any>>();
-    // Current items, plus items that may have just detached (rule 4).
-    for (const list of [seq, this.lastVisited[phase], this.createdSince[phase]]) {
-      for (const store of list) {
-        if (visited.has(store)) continue;
-        visited.add(store);
-        store._visit(phase, calls, changed, log);
-      }
-    }
-    this.lastVisited[phase] = seq;
-    this.createdSince[phase] = [];
+    for (const store of this.rowsToWalk(phase, this._sync())) store._visit(phase, calls, changed, log);
 
     if (phase === "ui") {
       for (const sub of this.itemsSubs) check(sub, calls, undefined);
@@ -1426,6 +1469,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     this.itemStores.set(next, store);
     store._currentRef = next;
     this._write(this.node, nextArr);
+    this.syncReplaced(store, prev as object, nextArr);
   }
 }
 

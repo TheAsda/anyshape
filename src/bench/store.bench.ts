@@ -8,6 +8,18 @@ import { form, object, array, field, createStore, defineBehavior, countIn, metaK
 import { control, revealed, error } from "../test/features";
 import { rule } from "../test/rules";
 
+// Vitest runs with NODE_ENV=test, where createStore installs the dev
+// diagnostics probe. The benches measure the library: their stores are
+// created in production, except in "dev diagnostics overhead".
+const createProductionStore: typeof createStore = (...args) => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    return createStore(...args);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+};
+
 // ---------------------------------------------------------------------------
 // A flat form: 500 fields on the root, each with a UI listener
 const FLAT = 500;
@@ -16,7 +28,7 @@ const flatNodes = flat as unknown as Record<string, any>;
 const flatValues = () => Object.fromEntries(Array.from({ length: FLAT }, (_, i) => [`f${i}`, ""])) as never;
 
 describe("flat form, 500 fields", () => {
-  const s = createStore(flat, flatValues());
+  const s = createProductionStore(flat, flatValues());
   for (let i = 0; i < FLAT; i++) s.subscribe(flatNodes[`f${i}`], () => {});
   let n = 0;
   test("flat form", async ({ bench }) => {
@@ -25,7 +37,7 @@ describe("flat form, 500 fields", () => {
         s.set(flatNodes.f250, `v${n++}`, { origin: "user" });
       }),
       bench("createStore", () => {
-        createStore(flat, flatValues());
+        createProductionStore(flat, flatValues());
       })
     );
   });
@@ -64,7 +76,7 @@ const orderValues = () => ({
 });
 
 describe("200 rows", () => {
-  const s = createStore(order, orderValues(), { behaviors: orderBehaviors });
+  const s = createProductionStore(order, orderValues(), { behaviors: orderBehaviors });
   const lines = s.substore(order.lines);
   for (const row of lines.items()) row.subscribe(O.qty, () => {});
   lines.subscribeItems(() => {});
@@ -80,7 +92,7 @@ describe("200 rows", () => {
         lines.remove(row);
       }),
       bench("createStore with behaviors", () => {
-        createStore(order, orderValues(), { behaviors: orderBehaviors });
+        createProductionStore(order, orderValues(), { behaviors: orderBehaviors });
       })
     );
   });
@@ -92,10 +104,8 @@ describe("200 rows", () => {
 // are created (they keep the function they found), so they also build every
 // entry's label.
 describe("dev diagnostics overhead", () => {
-  vi.stubEnv("NODE_ENV", "production");
-  const prodFlat = createStore(flat, flatValues());
-  const prodOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
-  vi.unstubAllEnvs();
+  const prodFlat = createProductionStore(flat, flatValues());
+  const prodOrder = createProductionStore(order, orderValues(), { behaviors: orderBehaviors });
   const timeStamp = Object.getOwnPropertyDescriptor(console, "timeStamp");
   console.timeStamp ??= () => {};
   const devFlat = createStore(flat, flatValues());
@@ -121,7 +131,7 @@ describe("dev diagnostics overhead", () => {
 });
 
 describe("200 rows, one error", () => {
-  const s = createStore(order, orderValues(), { behaviors: orderBehaviors });
+  const s = createProductionStore(order, orderValues(), { behaviors: orderBehaviors });
   s.substore(order.lines).itemAt(150).set(O.qty, 0);
   const errors = countIn(order, error);
   test("errors", async ({ bench }) => {
@@ -152,7 +162,7 @@ const grid = form({ rows: array(object({ v: field<string>().meta({ mounted }) })
 const G = grid.rows.item;
 
 function mountRowByRow(rows: number): void {
-  const s = createStore(grid, { rows: Array.from({ length: rows }, () => ({ v: "" })) });
+  const s = createProductionStore(grid, { rows: Array.from({ length: rows }, () => ({ v: "" })) });
   s.substore(grid.rows).items().forEach((row, i) => row.addBehavior(contribute(G.v.mounted, `row ${i}`)));
 }
 
@@ -181,7 +191,7 @@ const double = () =>
   defineBehavior({ name: "double", triggers: [S.a], writes: [S.b], run: (c) => c.set(S.b, c.get(S.a) * 2) });
 
 function calculateRowByRow(rows: number): void {
-  const s = createStore(sheet, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: 0 })) });
+  const s = createProductionStore(sheet, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: 0 })) });
   s.substore(sheet.rows).items().forEach((row) => row.addBehavior(double()));
 }
 
@@ -191,6 +201,7 @@ describe("row-by-row behavior mounts", () => {
       bench("200 rows", () => calculateRowByRow(200)),
       bench("400 rows", () => calculateRowByRow(400)),
       bench("800 rows", () => calculateRowByRow(800)),
+      bench("1600 rows", () => calculateRowByRow(1600)),
       { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
     );
   });
@@ -209,7 +220,7 @@ const chained = () => [
 ];
 
 function chainRowByRow(rows: number): void {
-  const s = createStore(chain, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: i * 2, c: i * 2 + 1 })) });
+  const s = createProductionStore(chain, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: i * 2, c: i * 2 + 1 })) });
   const handles = s.substore(chain.rows).items().flatMap((row) => chained().map((b) => row.addBehavior(b)));
   for (const dispose of handles) dispose();
 }

@@ -196,6 +196,72 @@ describe("F · Rule 4 – attachment changes", () => {
     expect(lines.itemAt(0)).toBe(row);
     expect(lines.itemAt(1) === row).toBe(false);
   });
+
+  test("a row write that drops its nested rows detaches them", ({ lines }) => {
+    const row = lines.itemAt(0);
+    const note = row.substore(L.notes).itemAt(0);
+    const r = recorder();
+    note.subscribeValue(L.notes.item.text, r.on("noteText"));
+    row.setValue(L.notes, []);
+    expect(r.take()).toEqual(["noteText"]);
+    expect(note.isAttached()).toBe(false);
+  });
+});
+
+// Row writes leave the sequence of rows as it is: these pin what the flush
+// must still find among the rows.
+describe("F · Row writes", () => {
+  test("rows written in one batch notify in array order", ({ store: s, lines }) => {
+    const [a, b] = lines.items();
+    a.setValue(L.price, 11);                // a flush that walks the rows first
+    const r = recorder();
+    a.subscribeValue(L.qty, r.on("a"));
+    b.subscribeValue(L.qty, r.on("b"));
+    s.batch(() => {
+      b.setValue(L.qty, 5);
+      a.setValue(L.qty, 6);
+    });
+    expect(r.log).toEqual(["a", "b"]);
+  });
+
+  test("a row set back to an older version of its object notifies its subscribers", ({ store: s, lines }) => {
+    const [a, b] = lines.items();
+    const older = s.getValues().lines;
+    a.setValue(L.qty, 9);
+    const r = recorder();
+    a.subscribeValue(L.qty, r.on("a"));
+    b.subscribeValue(L.qty, r.on("b"));
+    s.setValue(shape.lines, older);
+    expect(r.take()).toEqual(["a"]);
+    expect(lines.items()).toEqual([a, b]);
+  });
+
+  test("every write inside a row gives the row a new object, so its subscribers see it", ({ lines }) => {
+    const [a, b] = lines.items();
+    b.setValue(L.price, 21);                // a flush that walks the rows first
+    const note = a.substore(L.notes).itemAt(0);
+    const r = recorder();
+    a.subscribe(r.on("a"));
+    b.subscribe(r.on("b"));
+    note.setValue(L.notes.item.text, "x");  // through a nested row
+    expect(r.take()).toEqual(["a"]);
+    a.setValue(L.qty, 5, { as: "initial" });
+    expect(r.take()).toEqual(["a"]);
+    a.setValue(L.qty, 8);
+    expect(r.take()).toEqual(["a"]);
+    a.reset();
+    expect(r.take()).toEqual(["a"]);
+    expect(a.getValue(L.qty)).toBe(5);
+  });
+
+  test("a row written again in a later flush notifies again", ({ lines }) => {
+    const row = lines.itemAt(1);
+    const r = recorder();
+    row.subscribeValue(L.qty, r.on("qty"));
+    row.setValue(L.qty, 3);
+    row.setValue(L.qty, 4);
+    expect(r.take()).toEqual(["qty", "qty"]);
+  });
 });
 
 describe("F · Rule 5 – store-wide", () => {
