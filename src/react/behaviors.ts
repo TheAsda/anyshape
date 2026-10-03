@@ -27,11 +27,9 @@
 import { useLayoutEffect, useRef } from "react";
 import { Behavior, Contribution, type AnyBehavior, type BehaviorHandle, type Guard } from "../behaviors";
 import { defineBehaviors, type BehaviorBuilder } from "../builder";
-import { refKey } from "../internal";
+import { refKey, isDev } from "../internal";
 import type { BaseStore } from "../store";
 import { useStore, type HookOptions } from "./hooks";
-
-const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
 
 export type UseBehaviorsOptions = HookOptions;
 

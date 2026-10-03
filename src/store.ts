@@ -49,7 +49,7 @@
 // ============================================================
 
 import type { Meta, MetaKeyDef } from "./meta";
-import type { AnyBehavior, BehaviorHandle } from "./behaviors";
+import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors";
 import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue, type InferMeta,
@@ -112,6 +112,69 @@ export interface RuntimeHooks {
   /** See BaseStore.settle. */
   settle(store: BaseStore<any>, node: AnyNode): Promise<void>;
 }
+
+/**
+ * @internal Where a form's time goes. Dev only: createStore installs one on
+ * the root (diagnostics.ts); in production the root has none and nothing is
+ * measured. Every point carries `at`, a performance.now() time.
+ */
+export interface Probe {
+  flushStart(at: number): void;
+  /** The reactions settled: the UI listeners are next. */
+  reactionsEnd(at: number): void;
+  flushEnd(at: number): void;
+  /** A synchronous part of a run on `instance` starts. Parts never nest. */
+  runStart(instance: ProbedInstance, at: number): void;
+  /**
+   * The part ends. "sync": the run completed. "async": run() returned a
+   * promise; the run is in flight from runStart until flightEnd. "apply": an
+   * async run's writes were applied.
+   */
+  runEnd(instance: ProbedInstance, at: number, part: RunPart): void;
+  /** The instance's run in flight completed (its promise settled) or was cancelled. */
+  flightEnd(instance: ProbedInstance, at: number, cancelled: boolean): void;
+  /** A registration change starts: addBehavior, replaceBehavior, a handle's dispose, createStore's behaviors. */
+  registrationStart(at: number): void;
+  /** It is committed; its flush is next. `describe` reads the committed state: call it now or never. */
+  registrationEnd(at: number, describe: () => RegistrationChange): void;
+  /** store.settle(node) waited from `start` to `end` (a settle that doesn't wait isn't reported). */
+  settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void;
+}
+
+/** @internal A registration change, for the registration track. */
+export interface RegistrationChange {
+  /** Concrete path of the store it was made on ("<root>" for the root). */
+  readonly store: string;
+  /** Names of the behaviors registered and removed. */
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+  /**
+   * Each combined key whose contributions changed: its owner's merged triggers
+   * and its first LISTED_CONTRIBUTIONS contributions in ctx.parts order, as
+   * "name @store", with the number of the others.
+   */
+  readonly owners: readonly {
+    readonly key: string;
+    readonly triggers: readonly string[];
+    readonly contributions: readonly string[];
+    readonly more: number;
+  }[];
+}
+
+/**
+ * @internal An owner's contributions listed per registration entry. Rows that
+ * each contribute on mount would otherwise list every row on every mount.
+ */
+export const LISTED_CONTRIBUTIONS = 20;
+
+/** @internal A behavior instance as a probe sees it: instances of one registration share `reg`. */
+export interface ProbedInstance {
+  readonly reg: { readonly name: string; readonly behavior: Behavior };
+  readonly host: BaseStore<any>;
+}
+
+/** @internal */
+export type RunPart = "sync" | "async" | "apply";
 
 // ============================================================
 // Internals: phases, subscriptions, write log
@@ -893,6 +956,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   private phase: "idle" | Phase = "idle";
   private writeLog: WriteEntry[] = [];
   /** @internal */ _runtime: RuntimeHooks | undefined;
+  /** @internal */ _probe: Probe | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { reaction: new Set(), ui: new Set() };
   private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { reaction: new Map(), ui: new Map() };
   private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { reaction: new Map(), ui: new Map() };
@@ -1039,6 +1103,8 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   // ---- flush (rules 6–8) ----
   private flush(): void {
     this.flushing = true;
+    const probe = this._probe;
+    probe?.flushStart(performance.now());
     try {
       this.depth++; // writes made by reactions must not start a nested flush
       try {
@@ -1062,6 +1128,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
       } finally {
         this.depth--;
       }
+      probe?.reactionsEnd(performance.now());
 
       this._syncWalk();
       this.phase = "ui";
@@ -1088,6 +1155,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
       this.phase = "idle";
       this.flushing = false;
       this.writeLog = [];
+      probe?.flushEnd(performance.now());
     }
   }
 }

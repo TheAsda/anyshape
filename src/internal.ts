@@ -8,6 +8,22 @@ import type { MetaKeyDef } from "./meta";
 import { BaseStore, ItemStore, type AnyRef } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 
+/**
+ * Dev build? Read as `process.env.NODE_ENV`, which bundlers replace: an app's
+ * production build then drops every dev-only branch. Node reads it at runtime.
+ */
+export const isDev = (): boolean => process.env.NODE_ENV !== "production";
+
+/**
+ * An error with `message` whose stack is `trace`'s: a behavior's trace is
+ * captured in dev where defineBehavior was called (Behavior._trace).
+ */
+export function locatedAt(trace: Error, message: string, options?: ErrorOptions): Error {
+  const error = new Error(message, options);
+  error.stack = `Error: ${message}\n${(trace.stack ?? "").split("\n").slice(1).join("\n")}`;
+  return error;
+}
+
 // ============================================================
 // Node internals, keyed by symbols so that every string name stays free for
 // fields and meta keys. Classes only `declare` these members and assign them
@@ -136,5 +152,10 @@ export function concretePath(host: BaseStore<any>, node: AnyNode): string {
   const index = (arr.current() as readonly unknown[]).indexOf(host._currentRef);
   const relative = node.path.slice(host.node.path.length);
   return `${concretePath(arr._host, arr.node)}[${index}]${relative}`;
+}
+
+/** concretePath for labels and messages: "<root>" for the form root. */
+export function pathLabel(host: BaseStore<any>, node: AnyNode): string {
+  return concretePath(host, node) || "<root>";
 }
 

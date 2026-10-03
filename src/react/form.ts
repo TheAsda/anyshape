@@ -17,9 +17,7 @@ import { createStore } from "../create";
 import type { StoreOptions } from "../behaviors";
 import type { RootStore, WriteOptions } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
-import { refLabel, targetOf } from "../internal";
-
-const isDev = () => (globalThis as any).process?.env?.NODE_ENV !== "production";
+import { refLabel, targetOf, isDev } from "../internal";
 
 // ============================================================
 // useForm
