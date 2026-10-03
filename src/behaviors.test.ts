@@ -784,6 +784,136 @@ describe("K · Run order across registration changes", () => {
   });
 });
 
+describe("K · Run order between scope hosts", () => {
+  // Each reader is registered before its writer: without an edge it would run first.
+  const logged = (log: string[], name: string, triggers: any[], to: any, value: (c: BehaviorContext) => unknown) =>
+    defineBehavior({ name, triggers, writes: [to], run: (c) => (log.push(name), c.set(to, value(c))) });
+
+  test("a root writer runs before a row reader", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const a = lines.itemAt(0);
+    a.addBehavior(logged(log, "row", [L.qty, shape.discount], L.lineTotal, (c) => c.get(L.qty) * (1 - c.get(shape.discount))));
+    s.addBehavior(logged(log, "root", [shape.start], shape.discount, (c) => c.get(shape.start) / 10));
+    log.length = 0;
+    s.batch(() => {
+      a.set(L.qty, 4);
+      s.set(shape.start, 5);
+    });
+    expect(log).toEqual(["root", "row"]);
+    expect(a.get(L.lineTotal)).toBe(2);
+  });
+
+  test("a row writer runs before a root reader that reads every row", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const a = lines.itemAt(0);
+    s.addBehavior(logged(log, "sum", [shape.lines], shape.subtotal, (c) => c.get(shape.lines).reduce((t: number, l: Values["lines"][number]) => t + l.lineTotal, 0)));
+    a.addBehavior(logged(log, "row", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
+    log.length = 0;
+    a.set(L.qty, 3);
+    expect(log).toEqual(["row", "sum"]);
+    expect(s.get(shape.subtotal), "row 1's lineTotal is 0").toBe(30 + 0);
+  });
+
+  test("through nested rows: an enclosing writer runs before a nested reader, a nested writer before an enclosing reader", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const a = lines.itemAt(0);
+    const note = a.substore(L.notes).itemAt(0);
+    note.addBehavior(logged(log, "note", [N.text, L.lineTotal, shape.discount], N.len, (c) => c.get(N.text).length + c.get(L.lineTotal) + c.get(shape.discount)));
+    a.addBehavior(logged(log, "line", [L.qty], L.lineTotal, (c) => c.get(L.qty)));
+    s.addBehavior(logged(log, "root", [shape.start], shape.discount, (c) => c.get(shape.start)));
+    log.length = 0;
+    s.batch(() => {
+      note.set(N.text, "abc");
+      a.set(L.qty, 4);
+      s.set(shape.start, 5);
+    });
+    expect(log, "the line, one host up, and the root, two up, in registration order, then the note").toEqual(["line", "root", "note"]);
+    expect(note.get(N.len)).toBe(3 + 4 + 5);
+
+    const b = lines.itemAt(1);
+    const other = b.substore(L.notes).append({ text: "x", len: 0 });
+    b.addBehavior(logged(log, "lens", [L.notes], L.sku, (c) => c.get(L.notes).map((n) => n.len).join(",")));
+    other.addBehavior(logged(log, "len", [N.text], N.len, (c) => c.get(N.text).length));
+    log.length = 0;
+    other.set(N.text, "hello");
+    expect(log).toEqual(["len", "lens"]);
+    expect(b.get(L.sku)).toBe("5");
+  });
+
+  test("sibling rows don't order each other: each runs in registration order", ({ store: s, lines }) => {
+    const log: string[] = [];
+    const [a, b] = lines.items();
+    b.addBehavior(logged(log, "reader", [L.lineTotal], L.sku.hint, (c) => String(c.get(L.lineTotal))));
+    a.addBehavior(logged(log, "writer", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
+    log.length = 0;
+    s.batch(() => {
+      a.set(L.qty, 4);
+      b.set(L.lineTotal, 7);
+    });
+    expect(log, "the writer's lineTotal is another row's").toEqual(["reader", "writer"]);
+    expect(b.get(L.sku.hint)).toBe("7");
+
+    // A row's behavior on its nested rows, against a sibling row's nested row.
+    const note = a.substore(L.notes).itemAt(0);
+    const other = b.substore(L.notes).append({ text: "x", len: 0 });
+    a.addBehavior(logged(log, "notes", [N.len], N.text, (c) => `#${c.get(N.len)}`));
+    other.addBehavior(logged(log, "len", [N.text], N.len, (c) => c.get(N.text).length));
+    log.length = 0;
+    s.batch(() => {
+      note.set(N.len, 4);
+      other.set(N.text, "hello");
+    });
+    expect(log, "the len is another row's note's").toEqual(["notes", "len"]);
+    expect(note.get(N.text)).toBe("#4");
+  });
+
+  test("a row reader of the whole list runs after a sibling row's writer", ({ lines }) => {
+    const log: string[] = [];
+    const [a, b] = lines.items();
+    a.addBehavior(logged(log, "reader", [shape.lines], L.sku, (c) => c.get(shape.lines).map((l) => l.lineTotal).join(",")));
+    b.addBehavior(logged(log, "writer", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
+    log.length = 0;
+    b.set(L.qty, 5);
+    expect(log, "the list holds the writer's row").toEqual(["writer", "reader"]);
+    expect(a.get(L.sku)).toBe("0,50");
+  });
+
+  test("sibling rows that each write from the whole list form a cycle", ({ lines }) => {
+    const [a, b] = lines.items();
+    const fromList = (name: string) =>
+      defineBehavior({ name, triggers: [shape.lines], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.lines).length) });
+    a.addBehavior(fromList("a"));
+    expect(() => b.addBehavior(fromList("b"))).toThrow(
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "a", "b" – merge them into one behavior (see link())'
+    );
+  });
+
+  test("behaviors on sibling rows that would form a cycle only through their own fields are no cycle: each row runs its own", ({ store: s }) => {
+    const [a, b] = s.substore(shape.lines).items();
+    a.addBehavior(defineBehavior({ name: "qtyFromPrice", triggers: [L.price], writes: [L.qty], run: (c) => c.set(L.qty, c.get(L.price)) }));
+    b.addBehavior(defineBehavior({ name: "priceFromQty", triggers: [L.qty], writes: [L.price], run: (c) => c.set(L.price, c.get(L.qty)) }));
+    expect([a.get(L.qty), b.get(L.price)], "init runs").toEqual([10, 2]);
+    a.set(L.price, 7);
+    b.set(L.qty, 3);
+    expect([a.get(L.qty), a.get(L.price), b.get(L.qty), b.get(L.price)]).toEqual([7, 7, 3, 3]);
+  });
+
+  test("a cycle through a row and the root is reported with what follows it; nothing is registered", ({ store: s, lines }) => {
+    const [a, b] = lines.items();
+    s.addBehavior(defineBehavior({ name: "sum", triggers: [shape.lines], writes: [shape.discount], run: () => {} }));
+    s.addBehavior(defineBehavior({ name: "after", triggers: [shape.discount], writes: [shape.total], run: () => {} }));
+    // Meta writes: not part of the list's value, so not read by "sum".
+    b.addBehavior(defineBehavior({ name: "hint", triggers: [shape.discount], writes: [L.sku.hint], run: () => {} }));
+    b.addBehavior(defineBehavior({ name: "unrelated", triggers: [L.price], writes: [L.sku.disabled], run: () => {} }));
+    const qty = defineBehavior({ name: "qty", triggers: [shape.discount], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.discount)) });
+    expect(() => a.addBehavior(qty)).toThrow(
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "sum", "after", "hint", "qty" – merge them into one behavior (see link())'
+    );
+    s.set(shape.discount, 9);
+    expect(a.get(L.qty), "not registered").toBe(1);
+  });
+});
+
 describe("L · The run context", () => {
   test("ctx.changed is false on the init run and true only for triggers that changed", () => {
     const seen: string[] = [];
@@ -833,16 +963,6 @@ describe("L · The run context", () => {
     });
     const s = createStore(shape, initial(), { behaviors: declared });
     expect(s.get(shape.slug)).toBe("Hello!");
-  });
-});
-
-describe("K · Pinned constraints", () => {
-  test("constraint: behaviors on different rows that form a cycle only across rows are rejected", ({ store: s }) => {
-    const [a, b] = s.substore(shape.lines).items();
-    a.addBehavior(defineBehavior({ name: "qtyFromPrice", triggers: [L.price], writes: [L.qty], run: (c) => c.set(L.qty, c.get(L.price)) }));
-    const priceFromQty = defineBehavior({ name: "priceFromQty", triggers: [L.qty], writes: [L.price], run: (c) => c.set(L.price, c.get(L.qty)) });
-    expect(() => b.addBehavior(priceFromQty)).toThrow(/form a cycle: .*qtyFromPrice.*priceFromQty|form a cycle: .*priceFromQty.*qtyFromPrice/);
-    expect(b.get(L.price), "nothing registered").toBe(20);
   });
 });
 

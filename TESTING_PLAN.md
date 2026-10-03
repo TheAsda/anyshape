@@ -26,7 +26,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
 | `src/inheritance.test.ts` | I | inherited `visible` / `disabled`, `get` vs `getOwn` | 4 |
-| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 56 |
+| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 67 |
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
@@ -174,7 +174,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **K2 · P2** **Inherited-meta edge:** a behavior writing an ancestor's `visible` runs before a field's validation queue that triggers on its effective visibility. → `behaviors.test.ts`
 - [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
 - [x] **K4 · P3** A row behavior triggered by its whole array runs once per row: siblings' writes don't re-trigger it (sync) or cancel its runs in flight (async, one `settle()` round), and a change that mixes them with another origin still runs it (#3). → `behaviors.test.ts`, `async.test.ts`
-- [x] **K5 · P3** Pin the constraint: two component behaviors on different rows that would only form a cycle across rows are rejected at registration. → `behaviors.test.ts`
+- [x] **K5 · P3** Sibling rows don't order each other through their own scopes (#63): two component behaviors on different rows that would form a cycle only through each row's own fields both register, each row running its own, and the same for nested rows. A row's read of an enclosing scope (the whole list) is still ordered after a sibling row's writer, and sibling rows that each write from the whole list form a cycle; a row and the hosts enclosing or inside it are ordered both ways, through nested rows, and a cycle through them is rejected with the same message. → `behaviors.test.ts`
 - [x] **K6 · P2** Ranks follow each registration change, reranking only what it reaches (#6): a behavior added upstream raises the whole chain; disposing one lowers its dependents, to their next longest chain; a replacement is checked for cycles without the registration it replaces, and a rejected one keeps the previous place; a contribution's trigger moves its owner after the trigger's writer, and its removal moves it back. → `behaviors.test.ts`
 
 ### L. Runtime lifecycle
@@ -295,14 +295,14 @@ The unit suites test each mechanism in isolation. Add **`src/integration.test.ts
 | **NF1** | P1 | **Packaging:** the build emits both entries (`form-lib`, `form-lib/react`) with `.d.ts`; `package.json` `exports` resolve both; the core bundle contains no `react` import. | After fixing `vite.config.ts` (it builds only `src/index.ts`) and adding `exports`/`types`: a script that runs `vite build`, then imports `dist/` from a temp project and type-checks a small consumer. |
 | **NF2** | P2 | **CI gates:** `npm test`, `npm run typecheck`, and `cd examples/basic && npm run typecheck`. | CI workflow. The type-level tests only run under `tsc`. |
 | **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal); the dev diagnostics overhead on a keystroke and a row edit (#17). The benches run in dev, so they include the diagnostics. | `vitest bench` in `src/bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`src/bench/store.bench.ts`); found #6. |
-| **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable. | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`src/bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |
+| **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable; so do removed nested rows, a row whose disposed behavior read the whole list, rows whose disposed behaviors were linked to a root behavior that stays, and a dropped store with its rows and behaviors (#63). The heap a store keeps per row with row-by-row chained behaviors is recorded, not asserted: it should stay flat as the rows double (before #63 it grew 27 → 37 → 58 KB per row at 200/400/800 rows). | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`src/bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |
 | **NF5** | P3 | **Mutation testing:** automate the "break it on purpose" habit (§5). | Try Stryker on `src/` (excluding `react/`); start with `lens.ts`, `store.ts`, `behaviors.ts`. |
 
 ---
 
 ## 5. Mechanisms to mutation-check
 
-When touching any of these, break it deliberately and confirm that at least one test fails:
+When touching any of these, break it deliberately and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), registration and disposal (`behaviors.ts`) or the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows only as a leak.
 
 | Mechanism | Where | Expected to fail |
 |---|---|---|
@@ -313,6 +313,8 @@ When touching any of these, break it deliberately and confirm that at least one 
 | Per-phase "last seen" | `_seen[phase]` | reactions-then-UI tests |
 | Own-origin filter | `BehaviorRuntime.onTrigger` | `link` tests |
 | Rank ordering | `RunOrder.plan` (`order.ts`) / `runNext` | dependency order, K1–K3, K6 |
+| Host filter of the run order | `HostIndex.near` / `readerOf` (`order.ts`) | K5, "Run order between scope hosts", one writer between rows |
+| Index and edge removal on dispose | `HostIndex.delete`, `RunOrder.plan`'s commit (`order.ts`) | NF4 collectability (`test:memory`) |
 | Buffered writes dropped on error | `BehaviorRuntime.execute` | throwing behavior test |
 | Row totals shifted on detach | `ArrayStore.shiftTotals` | count removal tests |
 | Inherited-key subscriptions on all sources | `_addKeySub` / `_metaSources` | ancestor-change subscription test |

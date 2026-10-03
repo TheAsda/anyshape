@@ -209,9 +209,9 @@ describe("row-by-row behavior mounts", () => {
 
 // ---------------------------------------------------------------------------
 // Row-by-row chained mounts: each row adds a → b and b → c, then every row
-// unmounts. The behaviors are per template node, so every row's a → b ranks
-// before every row's b → c. Values are already consistent: the init runs
-// write nothing, so only registration and disposal show.
+// unmounts. Each row's a → b ranks before its own b → c, and sibling rows
+// don't link (#63). Values are already consistent: the init runs write
+// nothing, so only registration and disposal show.
 const chain = form({ rows: array(object({ a: field<number>(), b: field<number>(), c: field<number>() })) });
 const C = chain.rows.item;
 const chained = () => [
@@ -231,6 +231,7 @@ describe("row-by-row chained mounts", () => {
       bench("100 rows", () => chainRowByRow(100)),
       bench("200 rows", () => chainRowByRow(200)),
       bench("400 rows", () => chainRowByRow(400)),
+      bench("800 rows", () => chainRowByRow(800)),
       { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
     );
   });
