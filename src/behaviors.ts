@@ -965,8 +965,9 @@ export class BehaviorRuntime implements RuntimeHooks {
   /**
    * One writer per target among registrations whose regions overlap: `added`
    * against each other and against the registrations other than `removed`.
-   * Regions overlap when the hosts are on one line of the host tree; within
-   * `added` they always are: `host` and the root, for owners.
+   * Regions overlap only when the hosts are on one line of the host tree, so
+   * only those writes are listed. `batch` needs no such filter: `added` is on
+   * one host, plus the root for owners.
    */
   private checkWriters(added: Registration[], removed: ReadonlySet<Registration>): void {
     const batch = added.length > 1 ? new NodeIndex<Write<Registration>>() : undefined;
