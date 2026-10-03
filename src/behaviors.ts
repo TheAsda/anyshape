@@ -570,6 +570,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const handle = (() => {
       if (entry.disposed) return;
       entry.disposed = true;
+      if (!regs.length && !entries.length) return; // registered nothing
       this.apply(host, [], regs, entries.length ? this.ownerChange(host, [], entries, seq).change : []);
     }) as BehaviorHandle;
     handles.set(handle, entry);

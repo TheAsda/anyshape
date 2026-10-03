@@ -178,6 +178,13 @@ describe("T · Probe", () => {
       owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], parts: ["unique @lines[1]"], more: 0 }],
     });
   });
+  test("disposing a handle that registered nothing is no registration change", () => {
+    const s = createStore(shape, initial());
+    const handle = s.addBehavior([]);
+    const events = record(s);
+    handle();
+    expect(events).toEqual([]);
+  });
 });
 
 describe("T · Flush budget", () => {
