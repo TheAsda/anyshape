@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext, type WritableRef,
 } from "./index";
 import { control, visible, disabled, touched, dirty } from "./test/features";
 import { rule, max } from "./test/rules";
@@ -460,14 +460,19 @@ describe("L · Runtime registration", () => {
 
   test("among conflicts in rows, the earliest registration is reported, then its first write", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
-    const w = (name: string, writes: any[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
+    const w = (name: string, writes: WritableRef[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
     b.addBehavior(w("disB", [L.sku.disabled]));
     a.addBehavior(w("hintA", [L.sku.hint]));
     a.addBehavior(w("disA", [L.sku.disabled]));
     expect(() => s.addBehavior(w("all", [L.sku.hint, L.sku.disabled]))).toThrow(
       'Behavior "all": "lines[].sku#disabled" is already written by "disB" – one writer per target'
     );
-    // A value write to the list overlaps every value write in its rows, not meta writes.
+  });
+
+  test("a value write to the list conflicts with value writes in its rows, not with meta writes", ({ store: s }) => {
+    const [a, b] = s.substore(shape.lines).items();
+    const w = (name: string, writes: WritableRef[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
+    a.addBehavior(w("disA", [L.sku.disabled]));
     const row = s.substore(shape.lines).append({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] });
     row.addBehavior(w("qty", [L.qty]));
     b.addBehavior(w("totals", [L.lineTotal, L.qty]));
