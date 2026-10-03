@@ -231,6 +231,7 @@ describe("row-by-row chained mounts", () => {
       bench("100 rows", () => chainRowByRow(100)),
       bench("200 rows", () => chainRowByRow(200)),
       bench("400 rows", () => chainRowByRow(400)),
+      bench("800 rows", () => chainRowByRow(800)),
       { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
     );
   });
