@@ -174,13 +174,18 @@ class Tracks {
     this.reactionsAt = at;
   }
 
-  /** The flush, then its phases nested in it. Over budget, the flush is a detailed entry. */
+  /**
+   * The flush, with its phases nested in it. Over budget, the flush is a
+   * detailed entry. The phases come first: Chrome coarsens times (100 µs
+   * without cross-origin isolation), so a flush and its reactions often span
+   * the same times, and DevTools then puts the entry made last on top.
+   */
   flushEnd(at: number, report: FlushReport | undefined): void {
-    if (!report) this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
-    else this.overBudget(at, report);
     const reactionsAt = this.reactionsAt ?? at;
     this.stamp?.("reactions", this.flushAt, reactionsAt, "flush", GROUP, "tertiary-light");
     if (this.reactionsAt !== undefined) this.stamp?.("UI listeners", reactionsAt, at, "flush", GROUP, "tertiary-light");
+    if (!report) this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
+    else this.overBudget(at, report);
   }
 
   private overBudget(at: number, report: FlushReport): void {
