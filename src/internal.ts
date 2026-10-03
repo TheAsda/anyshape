@@ -123,14 +123,15 @@ export function storeWithin(inner: BaseStore<any>, outer: BaseStore<any>): boole
   return false;
 }
 
+/** The scope host enclosing a scope host: a row's, none for the root. */
+export function outerHost(host: BaseStore<any>): BaseStore<any> | undefined {
+  return host instanceof ItemStore ? host.arrayStore._host : undefined;
+}
+
 /** The scope host (root or row store) at `scope`, walking up from `host`. */
 export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
-  let h = host;
-  while (h.node !== scope) {
-    if (!(h instanceof ItemStore)) throw new Error(`No store for scope "${scope.path || "<root>"}"`);
-    h = h.arrayStore._host;
-  }
-  return h;
+  for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) if (h.node === scope) return h;
+  throw new Error(`No store for scope "${scope.path || "<root>"}"`);
 }
 
 /** The row stores from `outer` (excluded) down to `host` (included): every scope host on the way is a row. */

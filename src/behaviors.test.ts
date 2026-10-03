@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext, type WritableRef,
 } from "./index";
 import { control, visible, disabled, touched, dirty } from "./test/features";
 import { rule, max } from "./test/rules";
@@ -428,6 +428,57 @@ describe("L · Runtime registration", () => {
     b.addBehavior(hint("rowB"));
     expect(() => s.addBehavior(hint("all"))).toThrow(/already written by "rowA"/);
     expect(() => a.addBehavior(hint("rowA2"))).toThrow(/already written by "rowA"/);
+  });
+
+  test("one writer between the root and a row, either registered first", ({ store: s }) => {
+    const [a, b] = s.substore(shape.lines).items();
+    const hint = (name: string) => defineBehavior({ name, triggers: [L.qty], writes: [L.sku.hint], run: () => {} });
+    const off = s.addBehavior(hint("all"));
+    expect(() => b.addBehavior(hint("rowB"))).toThrow('Behavior "rowB": "lines[].sku#hint" is already written by "all" – one writer per target');
+    off();
+    b.addBehavior(hint("rowB"));
+    expect(() => s.addBehavior(hint("all"))).toThrow('Behavior "all": "lines[].sku#hint" is already written by "rowB" – one writer per target');
+    a.addBehavior(hint("rowA"));
+  });
+
+  test("one writer between a row and the rows nested in it, not across sibling rows", ({ store: s }) => {
+    const [a, b] = s.substore(shape.lines).items();
+    const note = a.substore(L.notes).itemAt(0);
+    const other = b.substore(L.notes).append({ text: "x", len: 0 });
+    const len = (name: string) => defineBehavior({ name, triggers: [N.text], writes: [N.len], run: () => {} });
+    const offAll = s.addBehavior(len("all"));
+    expect(() => note.addBehavior(len("note"))).toThrow('Behavior "note": "lines[].notes[].len" is already written by "all" – one writer per target');
+    offAll();
+    const off = a.addBehavior(len("line"));
+    expect(() => note.addBehavior(len("note"))).toThrow('Behavior "note": "lines[].notes[].len" is already written by "line" – one writer per target');
+    other.addBehavior(len("otherNote"));
+    off();
+    note.addBehavior(len("note"));
+    expect(() => a.addBehavior(len("line"))).toThrow('Behavior "line": "lines[].notes[].len" is already written by "note" – one writer per target');
+    expect(() => s.addBehavior(len("all"))).toThrow('Behavior "all": "lines[].notes[].len" is already written by "otherNote" – one writer per target');
+  });
+
+  test("among conflicts in rows, the earliest registration is reported, then its first write", ({ store: s }) => {
+    const [a, b] = s.substore(shape.lines).items();
+    const w = (name: string, writes: WritableRef[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
+    b.addBehavior(w("disB", [L.sku.disabled]));
+    a.addBehavior(w("hintA", [L.sku.hint]));
+    a.addBehavior(w("disA", [L.sku.disabled]));
+    expect(() => s.addBehavior(w("all", [L.sku.hint, L.sku.disabled]))).toThrow(
+      'Behavior "all": "lines[].sku#disabled" is already written by "disB" – one writer per target'
+    );
+  });
+
+  test("a value write to the list conflicts with value writes in its rows, not with meta writes", ({ store: s }) => {
+    const [a, b] = s.substore(shape.lines).items();
+    const w = (name: string, writes: WritableRef[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
+    a.addBehavior(w("disA", [L.sku.disabled]));
+    const row = s.substore(shape.lines).append({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] });
+    row.addBehavior(w("qty", [L.qty]));
+    b.addBehavior(w("totals", [L.lineTotal, L.qty]));
+    expect(() => s.addBehavior(defineBehavior({ name: "list", triggers: [shape.title], writes: [shape.lines], run: () => {} }))).toThrow(
+      'Behavior "list": "lines" is already written by "qty" (via "lines[].qty") – one writer per target'
+    );
   });
 
   test("root registration later: rows present and future", ({ store: s }) => {

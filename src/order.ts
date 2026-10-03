@@ -8,17 +8,22 @@
 // A registration change is planned, then committed. The plan finds the new
 // edges through indexes by node and recomputes the ranks only of what the
 // change reaches; it throws on a cycle before anything changes.
+//
+// The writes are also kept by scope host, for the one-writer check
+// (behaviors.ts): one Writes index holds both views.
 // ============================================================
 
 import type { AnyNode } from "./shape";
-import { refNode, refKey } from "./internal";
-import type { AnyRef } from "./store";
+import { refNode, refKey, outerHost } from "./internal";
+import type { AnyRef, BaseStore } from "./store";
 import { kindOf, type Target } from "./refs/kind";
 
 /** What the run order needs from a registration. */
 export interface Ranked {
   readonly seq: number;
   readonly name: string;
+  /** The scope host it was registered on. */
+  readonly host: BaseStore<any>;
   readonly targets: readonly Target[];
   readonly inputs: readonly AnyRef[];
   rank: number;
@@ -40,13 +45,14 @@ export class NodeIndex<T> {
   private readonly under = new Map<AnyNode, Set<T>>();
 
   add(node: AnyNode, item: T): void {
-    setOf(this.at, node).add(item);
-    for (let n: AnyNode | undefined = node; n; n = n.parent) setOf(this.under, n).add(item);
+    entry(this.at, node, newSet).add(item);
+    for (let n: AnyNode | undefined = node; n; n = n.parent) entry(this.under, n, newSet).add(item);
   }
 
   delete(node: AnyNode, item: T): void {
-    unset(this.at, node, item);
-    for (let n: AnyNode | undefined = node; n; n = n.parent) unset(this.under, n, item);
+    const remove = (set: Set<T>) => set.delete(item) && !set.size;
+    prune(this.at, node, remove);
+    for (let n: AnyNode | undefined = node; n; n = n.parent) prune(this.under, n, remove);
   }
 
   /** Calls `fn` for the items on `node`, below it, or on one of its ancestors. */
@@ -54,17 +60,57 @@ export class NodeIndex<T> {
     this.under.get(node)?.forEach((item) => fn(item));
     for (let n = node.parent; n; n = n.parent) this.at.get(n)?.forEach((item) => fn(item));
   }
+
+  /** `under` holds the same items as `at`, so it empties with it. */
+  isEmpty(): boolean {
+    return !this.at.size;
+  }
 }
 
-function setOf<K, T>(map: Map<K, Set<T>>, key: K): Set<T> {
-  let set = map.get(key);
-  if (!set) map.set(key, (set = new Set()));
-  return set;
+/**
+ * Items by scope host, then by node. `near` lists the items of a host, of the
+ * hosts inside it and of those enclosing it: never those of a sibling row.
+ */
+class HostIndex<T> {
+  private readonly at = new Map<BaseStore<any>, NodeIndex<T>>();
+  /** Items of the host or of a host inside it. */
+  private readonly under = new Map<BaseStore<any>, NodeIndex<T>>();
+
+  add(host: BaseStore<any>, node: AnyNode, item: T): void {
+    entry(this.at, host, newIndex).add(node, item);
+    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) entry(this.under, h, newIndex).add(node, item);
+  }
+
+  delete(host: BaseStore<any>, node: AnyNode, item: T): void {
+    const remove = (index: NodeIndex<T>) => {
+      index.delete(node, item);
+      return index.isEmpty();
+    };
+    prune(this.at, host, remove);
+    for (let h: BaseStore<any> | undefined = host; h; h = outerHost(h)) prune(this.under, h, remove);
+  }
+
+  /** NodeIndex.near among the items of `host`, of the hosts inside it, and of the hosts enclosing it. */
+  near(host: BaseStore<any>, node: AnyNode, fn: (item: T) => void): void {
+    this.under.get(host)?.near(node, fn);
+    for (let h = outerHost(host); h; h = outerHost(h)) this.at.get(h)?.near(node, fn);
+  }
 }
 
-function unset<T>(map: Map<AnyNode, Set<T>>, node: AnyNode, item: T): void {
-  const set = map.get(node);
-  if (set?.delete(item) && !set.size) map.delete(node);
+const newSet = <T>() => new Set<T>();
+const newIndex = <T>() => new NodeIndex<T>();
+
+/** `map`'s entry for `key`, created when missing. */
+function entry<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+  let value = map.get(key);
+  if (value === undefined) map.set(key, (value = create()));
+  return value;
+}
+
+/** Removes from `map`'s entry for `key`; `remove` tells whether the entry is then empty, and it is dropped. */
+function prune<K, V>(map: Map<K, V>, key: K, remove: (value: V) => boolean): void {
+  const value = map.get(key);
+  if (value !== undefined && remove(value)) map.delete(key);
 }
 
 /**
@@ -76,6 +122,32 @@ export interface Write<R> {
   readonly reg: R;
   readonly target: Target;
   readonly at: number;
+}
+
+/** The registered writes, by node for ranking and by scope host for the one-writer check. */
+class Writes<R extends Ranked> {
+  private readonly byNode = new NodeIndex<Write<R>>();
+  private readonly byHost = new HostIndex<Write<R>>();
+
+  add(w: Write<R>): void {
+    this.byNode.add(w.target.node, w);
+    this.byHost.add(w.reg.host, w.target.node, w);
+  }
+
+  delete(w: Write<R>): void {
+    this.byNode.delete(w.target.node, w);
+    this.byHost.delete(w.reg.host, w.target.node, w);
+  }
+
+  /** NodeIndex.near: the writes of every host. */
+  near(node: AnyNode, fn: (write: Write<R>) => void): void {
+    this.byNode.near(node, fn);
+  }
+
+  /** HostIndex.near: the writes of `host`, of the hosts inside it and of those enclosing it. */
+  nearFrom(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
+    this.byHost.near(host, node, fn);
+  }
 }
 
 interface Input<R extends Ranked> {
@@ -123,8 +195,8 @@ class Planned<R extends Ranked> {
 
   link(a: Vertex<R>, b: Vertex<R>): void {
     if (a === b) return;
-    setOf(this.out, a).add(b);
-    setOf(this.into, b).add(a);
+    entry(this.out, a, newSet).add(b);
+    entry(this.into, b, newSet).add(a);
   }
 
   succ(v: Vertex<R>): Vertex<R>[] {
@@ -138,12 +210,15 @@ class Planned<R extends Ranked> {
 
 export class RunOrder<R extends Ranked> {
   private readonly vertices = new Map<R, Vertex<R>>();
-  private readonly writes = new NodeIndex<Write<R>>();
+  private readonly writes = new Writes<R>();
   private readonly inputs = new NodeIndex<Input<R>>();
 
-  /** Calls `fn` for the registered writes that may overlap a write to `node`. */
-  writesNear(node: AnyNode, fn: (write: Write<R>) => void): void {
-    this.writes.near(node, fn);
+  /**
+   * Calls `fn` for the registered writes that may overlap a write to `node`
+   * from `host`: those whose hosts are `host`, inside it, or enclosing it.
+   */
+  writesNear(host: BaseStore<any>, node: AnyNode, fn: (write: Write<R>) => void): void {
+    this.writes.nearFrom(host, node, fn);
   }
 
   /**
@@ -239,12 +314,12 @@ export class RunOrder<R extends Ranked> {
       for (const v of gone) {
         for (const s of v.succ) s.pred.delete(v);
         for (const p of v.pred) p.succ.delete(v);
-        for (const w of v.writes) this.writes.delete(w.target.node, w);
+        for (const w of v.writes) this.writes.delete(w);
         for (const input of v.inputs) this.inputs.delete(refNode(input.ref), input);
         this.vertices.delete(v.reg);
       }
       for (const v of fresh) {
-        for (const w of v.writes) this.writes.add(w.target.node, w);
+        for (const w of v.writes) this.writes.add(w);
         for (const input of v.inputs) this.inputs.add(refNode(input.ref), input);
         this.vertices.set(v.reg, v);
       }
