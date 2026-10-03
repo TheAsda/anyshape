@@ -441,7 +441,7 @@ describe("L · Runtime registration", () => {
     a.addBehavior(hint("rowA"));
   });
 
-  test("one writer between nested rows on one line, not across lines", ({ store: s }) => {
+  test("one writer between a row and the rows nested in it, not across sibling rows", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
     const note = a.substore(L.notes).itemAt(0);
     const other = b.substore(L.notes).append({ text: "x", len: 0 });
