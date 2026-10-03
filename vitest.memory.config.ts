@@ -9,5 +9,7 @@ export default defineConfig({
     execArgv: ['--expose-gc'],
     environment: 'node',
     testTimeout: 30_000,
+    // Prints the recorded heap figures even when a test is filtered with -t.
+    disableConsoleIntercept: true,
   },
 });
