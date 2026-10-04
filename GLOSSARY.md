@@ -33,7 +33,7 @@ A named piece of state a node declares beside its value (such as `error`, `visib
 _Avoid_: flag, attribute, status
 
 **Feature**:
-A reusable bundle of meta key definitions declared together. Only the feature's own behaviors write the keys it owns.
+A reusable bundle of meta key definitions declared together.
 _Avoid_: plugin, mixin
 
 **Behavior**:
