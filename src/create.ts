@@ -22,7 +22,7 @@ export function createStore<N extends ObjectNode<any>>(
   store._runtime = runtime;
   store._batch(() => {
     const defaults = defaultBehaviors(shape);
-    if (defaults.length) runtime.add(store, defaults, true);
+    if (defaults.length) runtime.add(store, defaults);
     if (options.behaviors) runtime.add(store, options.behaviors);
   });
   return store;

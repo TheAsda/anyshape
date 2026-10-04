@@ -336,12 +336,12 @@ describe("J · Registration checks", () => {
     createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.disabled)] });
   });
 
-  test("feature-owned keys cannot be written by behaviors", () => {
-    expect(() =>
-      createStore(shape, initial(), {
-        behaviors: defineBehavior({ triggers: [shape.title], writes: [shape.name.touched], run: () => {} }),
-      })
-    ).toThrow(/owned by its feature/);
+  test("a key's default behavior is its one writer; a key without one is free for a behavior", () => {
+    const w = (target: any) => defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
+    expect(() => createStore(shape, initial(), { behaviors: w(shape.name.touched) })).toThrow(/"name#touched" is already written by "name#touched"/);
+    const s = createStore(shape, initial(), { behaviors: w(shape.name.revealed) });
+    s.set(shape.title, "changed");
+    expect(s.get(shape.name.revealed)).toBe(true);
   });
 
   test("cycles are rejected at registration, nothing is registered", ({ store: s }) => {
