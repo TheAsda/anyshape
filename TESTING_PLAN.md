@@ -160,7 +160,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `inheritance.test.ts`
 
 ### J. Behavior registration checks
-**Covered:** undeclared reads and writes, async reported, one writer, feature-owned keys, cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
+**Covered:** undeclared reads and writes, async reported, one writer (a default behavior included; a key without one is free for a behavior), cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
 
 - [x] **J1 · P1** A custom feature whose default `behavior` references another node is rejected: "default behaviors may only use their own node". → `behaviors.test.ts`
 - [x] **J2 · P2** Writing a `CountRef` or `InitialRef` is rejected: "only values and meta keys are writable". → `behaviors.test.ts`

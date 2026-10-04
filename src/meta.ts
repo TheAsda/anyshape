@@ -21,11 +21,6 @@ declare const NoPayloadBrand: unique symbol;
 export type NoPayload = { readonly [NoPayloadBrand]: true };
 
 export interface MetaKeyOptions<V> {
-  /**
-   * "feature": only the feature that declares the key (its default behavior or
-   * runtime) may write it among behaviors. Application code may still write it.
-   */
-  owner?: "feature";
   /** Kept by reset(): for keys fed from outside the form (e.g. useSync), not user input. */
   keepOnReset?: boolean;
   /** false: stored and readable, but writing it never notifies, triggers or counts. */
