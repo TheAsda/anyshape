@@ -5,8 +5,9 @@
 //     and no source, tests or recipes;
 //   • the core internals are defined once in dist/, and the core entry
 //     reaches no `react` import;
-//   • the declarations export the same names as the source entries
-//     (stripInternal drops a whole statement after a stray tag);
+//   • every shipped declaration file typechecks, and the declarations
+//     export the same names as the source entries (stripInternal drops a
+//     whole statement after a stray tag);
 //   • a consumer without react imports and typechecks the core entry;
 //   • a consumer with react typechecks both entries, passes a node created
 //     through `anyshape` to an `anyshape/react` hook, and renders it;
@@ -58,13 +59,13 @@ function passes(cmd: string, args: string[], cwd: string): boolean {
   }
 }
 
-const work = mkdtempSync(join(tmpdir(), "anyshape-package-"));
+const tmp = mkdtempSync(join(tmpdir(), "anyshape-package-"));
 try {
   // ---- The tarball ----
-  const [packed] = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", work], root)) as [
+  const [packed] = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", tmp], root)) as [
     { filename: string; files: { path: string }[] },
   ];
-  const tarball = join(work, packed.filename);
+  const tarball = join(tmp, packed.filename);
   const files = packed.files.map((f) => f.path);
   for (const path of REQUIRED) check(files.includes(path), `the tarball holds ${path}`);
   for (const prefix of FORBIDDEN) {
@@ -73,7 +74,7 @@ try {
   check(!files.some((f) => f.endsWith(".map")), "the tarball holds no sourcemaps");
 
   // ---- A consumer without react ----
-  const core = join(work, "core");
+  const core = join(tmp, "core");
   writeConsumer(core, {
     "index.ts": `
       import { form, object, field, createStore, type InferValue } from "anyshape";
@@ -88,8 +89,8 @@ try {
   run("npm", ["install", "--no-audit", "--no-fund", tarball], core);
   const dist = join(core, "node_modules", "anyshape", "dist");
 
-  const js = readdirSync(dist, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".js"));
-  const symbols = js.flatMap((f) => [...readFileSync(join(dist, f), "utf8").matchAll(/Symbol\("(anyshape\.\w+)"\)/g)].map((m) => m[1]));
+  const distJs = readdirSync(dist, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".js"));
+  const symbols = distJs.flatMap((f) => [...readFileSync(join(dist, f), "utf8").matchAll(/Symbol\("(anyshape\.\w+)"\)/g)].map((m) => m[1]));
   check(symbols.includes("anyshape.fields"), "the core internals are in dist/");
   check(new Set(symbols).size === symbols.length, `each core internal is defined once in dist/ (${symbols.join(", ")})`);
 
@@ -103,7 +104,7 @@ try {
   }
 
   // ---- A consumer with react ----
-  const withReact = join(work, "react");
+  const withReact = join(tmp, "react");
   writeConsumer(withReact, {
     "index.tsx": `
       import { form, object, field, createStore } from "anyshape";
@@ -124,6 +125,12 @@ try {
     `,
   });
   run("npm", ["install", "--no-audit", "--no-fund", tarball, "react@19", "react-dom@19", "@types/react@19", "@types/react-dom@19"], withReact);
+  // Every shipped declaration file, not only those the entries reach: a
+  // module's .d.ts must not import a declaration stripInternal dropped.
+  writeFileSync(join(withReact, "tsconfig.dist.json"), JSON.stringify({
+    extends: "./tsconfig.json", include: ["node_modules/anyshape/dist/**/*.d.ts"], exclude: [],
+  }));
+  check(passes(bin("tsc"), ["-p", "tsconfig.dist.json"], withReact), "every shipped declaration file typechecks");
   if (check(passes(bin("tsc"), ["-p", "."], withReact), "a consumer with react typechecks both entries")) {
     run(bin("tsc"), ["-p", ".", "--noEmit", "false", "--outDir", "out"], withReact);
     check(passes("node", ["out/index.js"], withReact), "a consumer with react renders a hook on a node from the core entry");
@@ -143,7 +150,7 @@ try {
   check(passes(bin("publint"), ["run", "--pack", "npm", "--strict"], root), "publint passes");
   check(passes(bin("attw"), [tarball, "--profile", "esm-only"], root), "@arethetypeswrong/cli passes (ESM only)");
 } finally {
-  rmSync(work, { recursive: true, force: true });
+  rmSync(tmp, { recursive: true, force: true });
 }
 
 if (failures.length) {
