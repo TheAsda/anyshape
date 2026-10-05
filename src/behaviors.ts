@@ -42,7 +42,7 @@
 // apply in one batch. The latest run wins. A run is cancelled (ctx.signal is
 // aborted; ctx.get / ctx.set throw its reason, which is never reported) when:
 //   • a trigger or a reads ref changes, whatever the origin: it is rerun with
-//     the cancelled run's cause (origins, changed, isInit) plus the change's,
+//     the cancelled run's cause (origins, changed inputs) plus the change's,
 //     unless the origins filter ignores the change;
 //   • another origin writes one of its targets: no rerun;
 //   • a guard turns false: no rerun, earlier writes stay;
@@ -54,9 +54,8 @@
 // reading the outside world (fetch) is fine.
 //
 // The cause of an async run covers everything since the last completed run:
-// an init run replaced in flight has isInit together with the user's origins.
-// Behaviors that respond to a change, and server checks, should use
-// runOn.init: false rather than an isInit check.
+// an init run replaced in flight is rerun with the user's origins. Behaviors
+// that respond to a change, and server checks, use runOn.init: false.
 //
 // Kept work (ctx.keep(key, start)): async work a rerun can continue instead of
 // restarting, one slot per instance. It must depend only on its key; it gets
@@ -79,7 +78,6 @@ import {
   type Probe, type ProbedInstance, type RunPart, LISTED_CONTRIBUTIONS,
 } from "./store";
 import { kindOf, type Target } from "./refs/kind";
-import { initialOf } from "./refs/initial";
 import { beginRun, pendingIn, type PendingRun } from "./refs/pending";
 import { RunOrder, NodeIndex, type Write } from "./order";
 
@@ -107,18 +105,12 @@ export interface BehaviorContext {
   get<R extends AnyRef>(ref: R): RefValue<R>;
   /** Write a declared target. Applied when the run completes. */
   set<R extends WritableRef>(ref: R, value: InferValue<R>): void;
-  /** Initial value of a declared node (declare `initialOf(node)`). */
-  initial<N extends AnyNode>(node: N): InferValue<N>;
   /** Did this trigger change since the last run? Always false on the initial run. */
   changed(ref: AnyRef): boolean;
-  /** true for the run made when the instance is created. */
-  readonly isInit: boolean;
   /** Origins of the changes that caused this run (writes of this behavior, from any of its instances, excluded). */
   readonly origins: ReadonlySet<Origin>;
   /** Per-instance state, kept between runs (e.g. "the user overrode this"). A copy: saved only if the run completes. */
   readonly state: Record<string, unknown>;
-  /** The store of the instance's scope (root or row). */
-  readonly store: BaseStore<any>;
   /** Aborted when the run is cancelled (pass it to fetch). After that, get and set throw its reason. */
   readonly signal: AbortSignal;
   /**
@@ -149,8 +141,8 @@ export interface Declaration {
 export interface BehaviorConfig extends Declaration {
   /** The only targets ctx.set accepts. One writer per target. */
   writes?: readonly WritableRef[];
-  /** Default: both true. */
-  runOn?: { init?: boolean; change?: boolean };
+  /** Run when the instance is created. Default: true. */
+  runOn?: { init?: boolean };
   /**
    * Run on changes only when at least one origin is of these kinds. Default:
    * any. Tallies (countIn, pendingIn, pendingOf) carry no origins: registration
@@ -206,34 +198,21 @@ export function contribute<P>(target: MetaRef<any, P>, payload: NoInfer<P>, decl
   return new Contribution(target, payload, decl);
 }
 
-/**
- * @internal A side of a when / otherwise split. Behaviors in opposite sides of
- * the same split never run together, so they may write the same target.
- */
-export interface Branch {
-  readonly group: object;
-  readonly side: 0 | 1;
-}
-
 /** @internal What the core attaches to a behavior besides its config. */
 export interface BehaviorInternals {
   /** Set for default behaviors: the node the behavior is limited to. */
   self?: AnyNode;
-  /** When / otherwise splits the behavior is inside of (builder). */
-  branches?: readonly Branch[];
   /** Dev only: where defineBehavior was called. */
   trace?: Error;
 }
 
 export class Behavior {
   /** @internal */ readonly _self: AnyNode | undefined;
-  /** @internal */ readonly _branches: readonly Branch[];
   /** @internal */ readonly _trace: Error | undefined;
 
   /** @internal */
   constructor(readonly config: BehaviorConfig, internals: BehaviorInternals = {}) {
     this._self = internals.self;
-    this._branches = internals.branches ?? [];
     this._trace = internals.trace;
   }
 }
@@ -251,10 +230,6 @@ function located(behavior: Behavior, error: unknown): unknown {
 
 function guardsOf(decl: Declaration): Guard[] {
   return decl.when === undefined ? [] : Array.isArray(decl.when) ? [...decl.when] : [decl.when as Guard];
-}
-
-function exclusiveBranches(a: Registration, b: Registration): boolean {
-  return a.behavior._branches.some((x) => b.behavior._branches.some((y) => x.group === y.group && x.side !== y.side));
 }
 
 /** Anything addBehavior / createStore accept: behaviors and contributions. */
@@ -326,7 +301,6 @@ export interface Registration {
   writable: Set<string>;
   kinds: Set<OriginKind> | undefined;
   runInit: boolean;
-  runChange: boolean;
   rank: number;
   disposed: boolean;
   root: Binding | undefined;
@@ -427,7 +401,6 @@ function mergedRefs(counts: RefCounts, delta: OwnerDelta, pick: (d: Declaration)
 }
 
 interface Pending {
-  init: boolean;
   changed: Set<string>;
   origins: Set<Origin>;
 }
@@ -762,7 +735,7 @@ export class BehaviorRuntime implements RuntimeHooks {
         if (seen.has(binding)) continue;
         seen.add(binding);
         this.rewire(binding);
-        if (binding.isLeaf && binding.host.isAttached() && !this.supersede(binding)) this.mark(binding, {});
+        if (binding.isLeaf && binding.host.isAttached() && !this.supersede(binding)) this.mark(binding);
       }
     }
   }
@@ -876,7 +849,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const leaf of this.leaves(reg.root)) {
         if (!inside(leaf.host)) continue;
         this.drop(leaf); // its cause is not passed on
-        if (reg.runInit) this.mark(leaf, { init: true });
+        if (reg.runInit) this.mark(leaf);
       }
     }
   }
@@ -958,7 +931,6 @@ export class BehaviorRuntime implements RuntimeHooks {
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
       runInit: config.runOn?.init !== false,
-      runChange: config.runOn?.change !== false,
       rank: 0, disposed: false, root: undefined, owner,
     };
   }
@@ -977,7 +949,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       reg.targets.forEach((target, at) => {
         const check = (other: Write<Registration>) => {
           const o = other.reg;
-          if (removed.has(o) || !overlaps(target, other.target) || exclusiveBranches(reg, o)) return;
+          if (removed.has(o) || !overlaps(target, other.target)) return;
           conflicts.push({ other, at });
         };
         this.order.writesNear(reg.host, target.node, check);
@@ -1004,7 +976,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     this.subscribeTriggers(binding, this.triggersOf(binding));
 
     if (binding.isLeaf) {
-      if (reg.runInit) this.mark(binding, { init: true });
+      if (reg.runInit) this.mark(binding);
     } else {
       const next = reg.chain[depth + 1];
       const arrStore = host.substore(next.parent as ArrayNode<any, any>) as ArrayStore<any>;
@@ -1072,22 +1044,21 @@ export class BehaviorRuntime implements RuntimeHooks {
     const reg = binding.reg;
     if (reg.disposed) return;
     const key = refKey(ref);
-    for (const leaf of this.leaves(binding)) this.onInput(leaf, key, info, reg.runChange);
+    for (const leaf of this.leaves(binding)) this.onInput(leaf, key, info);
   }
 
   /**
-   * An input of `leaf` changed. A run in flight read the old value: it is
-   * cancelled and rerun with its cause, whatever the change's origin. The
-   * change adds to the cause unless the origins filter ignores it. Only a
-   * trigger change, with runOn.change, starts a run.
+   * An input of `leaf` changed: a trigger, or a read while its run is in
+   * flight (see watch). A run in flight read the old value: it is cancelled
+   * and rerun with its cause, whatever the change's origin. The change adds to
+   * the cause unless the origins filter ignores it.
    */
-  private onInput(leaf: Binding, key: string, info: ChangeInfo, starts: boolean): void {
+  private onInput(leaf: Binding, key: string, info: ChangeInfo): void {
     const reg = leaf.reg;
     const origins = new Set(info.origins);
     origins.delete(reg.origin);
     if (info.origins.size > 0 && origins.size === 0) return; // only its own writes, from any instance
-    const rerun = this.supersede(leaf);
-    if (!starts && !rerun) return;
+    this.supersede(leaf);
     if (reg.kinds && ![...origins].some((o) => reg.kinds!.has(originKind(o)))) return;
     this.mark(leaf, { changed: [key], origins });
   }
@@ -1110,7 +1081,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       const key = refKey(ref);
       flight.offs.push(
         hostFor(leaf.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => {
-          if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info, false);
+          if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info);
         })
       );
     }
@@ -1166,10 +1137,9 @@ export class BehaviorRuntime implements RuntimeHooks {
     gate?.resolve();
   }
 
-  private mark(leaf: Binding, change: { init?: boolean; changed?: Iterable<string>; origins?: Iterable<Origin> }): void {
+  private mark(leaf: Binding, change: { changed?: Iterable<string>; origins?: Iterable<Origin> } = {}): void {
     let p = this.pending.get(leaf);
-    if (!p) this.pending.set(leaf, (p = { init: false, changed: new Set(), origins: new Set() }));
-    if (change.init) p.init = true;
+    if (!p) this.pending.set(leaf, (p = { changed: new Set(), origins: new Set() }));
     if (change.changed) for (const k of change.changed) p.changed.add(k);
     if (change.origins) for (const o of change.origins) p.origins.add(o);
   }
@@ -1209,7 +1179,6 @@ export class BehaviorRuntime implements RuntimeHooks {
         buffer.delete(key); // keep insertion order = last write
         buffer.set(key, { ref, value });
       },
-      initial: (node) => read(initialOf(node)),
       keep: <T>(key: readonly unknown[], start: (signal: AbortSignal) => Promise<T>): Promise<T> => {
         if (signal.aborted) throw signal.reason;
         const slot = leaf.kept;
@@ -1237,10 +1206,8 @@ export class BehaviorRuntime implements RuntimeHooks {
         return promise;
       },
       changed: (ref) => p.changed.has(refKey(ref)),
-      isInit: p.init,
       origins: p.origins,
       state,
-      store: leaf.host,
       signal,
     };
 
