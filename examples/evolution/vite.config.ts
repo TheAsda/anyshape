@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 // The library source, consumed directly (no build step): examples/evolution -> <repo>/src
 const lib = resolve(here, "../../src");
-const recipes = resolve(here, "../../recipes");
 
 export default defineConfig({
   plugins: [react()],
@@ -14,8 +13,6 @@ export default defineConfig({
     alias: [
       // More specific entry first.
       { find: "form-lib/react", replacement: resolve(lib, "react/index.ts") },
-      { find: "form-lib/recipes/react", replacement: resolve(recipes, "react/index.ts") },
-      { find: "form-lib/recipes", replacement: resolve(recipes, "index.ts") },
       { find: "form-lib", replacement: resolve(lib, "index.ts") },
     ],
   },
