@@ -1,10 +1,48 @@
 {
-  "name": "form-lib",
-  "version": "0.1.0",
+  "name": "anyshape",
+  "version": "0.0.0",
+  "description": "Form state for TypeScript: a typed shape, a store that holds values and metadata, and behaviors that keep them consistent.",
+  "keywords": [
+    "form",
+    "forms",
+    "react",
+    "typescript",
+    "form-state",
+    "validation"
+  ],
+  "homepage": "https://github.com/TheAsda/anyshape#readme",
+  "bugs": "https://github.com/TheAsda/anyshape/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheAsda/anyshape.git"
+  },
+  "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "docs/guide",
+    "docs/principles.md",
+    "GLOSSARY.md"
+  ],
   "packageManager": "bun@1.3.14",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "check:package": "bun scripts/check-package.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "bun run build && bun run check:package && changeset publish",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:react": "vitest run --project react",
@@ -16,21 +54,28 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p recipes",
     "dev": "vite"
   },
-  "dependencies": {},
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/cli": "^3.0.3",
     "@types/node": "^25.6.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitest/browser-playwright": "5.0.2",
     "playwright": "^1.63.0",
+    "publint": "^0.3.25",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "ts-expect": "^1.3.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
-    "vite-plugin-dts": "^4.0.0",
     "vitest": "^5.0.2",
     "vitest-browser-react": "^2.3.0"
   }

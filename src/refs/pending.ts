@@ -4,13 +4,13 @@
 //     only meta targets declared with it, whatever their name.
 //   • pendingOf – whether that exact target is pending (one writer per target).
 
-import type { AnyNode } from "../shape";
-import type { MetaRef } from "./meta";
-import type { MetaKeyDef } from "../meta";
-import { refNode, refKey, refLabel, targetOf } from "../internal";
-import { isAncestorOrSelf } from "../tree";
-import type { AnyRef, BaseStore } from "../store";
-import { KIND, type RefKind } from "./kind";
+import type { AnyNode } from "../shape.js";
+import type { MetaRef } from "./meta.js";
+import type { MetaKeyDef } from "../meta.js";
+import { refNode, refKey, refLabel, targetOf } from "../internal.js";
+import { isAncestorOrSelf } from "../tree.js";
+import type { AnyRef, BaseStore } from "../store.js";
+import { KIND, type RefKind } from "./kind.js";
 
 /** The slot of pendingIn(node) without a definition: every target. */
 const ANY: object = Object.freeze({});

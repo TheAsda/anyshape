@@ -3,8 +3,8 @@
   "compilerOptions": {
     "types": ["node", "vitest-browser-react", "@vitest/browser-playwright"],
     "paths": {
-      "form-lib": ["../src/index.ts"],
-      "form-lib/react": ["../src/react/index.ts"]
+      "anyshape": ["../src/index.ts"],
+      "anyshape/react": ["../src/react/index.ts"]
     }
   },
   "include": ["./**/*"]

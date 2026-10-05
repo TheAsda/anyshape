@@ -3,7 +3,7 @@
 // These assertions are checked by `npm run typecheck` (tsc), not by vitest.
 // ============================================================
 
-import { form, object, field } from "form-lib";
+import { form, object, field } from "anyshape";
 import {
   control, visible, disabled, required, min, pattern, visibleWhen, disableWhen, exclusive,
 } from "./index";

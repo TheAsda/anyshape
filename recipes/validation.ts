@@ -35,7 +35,7 @@ import {
   metaKey, contribute, pendingOf, MetaRef,
   type AnyNode, type AnyRef, type RefValue, type Contribution, type Origin, type Part,
   type BaseStore, type CollectEntry,
-} from "form-lib";
+} from "anyshape";
 
 export interface RuleContext {
   /** Read a declared reference (the target, triggers, reads, guard refs). */

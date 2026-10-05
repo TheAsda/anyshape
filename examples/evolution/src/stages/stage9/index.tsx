@@ -7,12 +7,12 @@
 // ------------------------------------------------------------
 
 import { useState } from "react";
-import { form, object, field, type InferValue, array, defineBehaviors } from "form-lib";
+import { form, object, field, type InferValue, array, defineBehaviors } from "anyshape";
 import {
   control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen,
 } from "../../../../../recipes";
-import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
+import { StoreProvider, useForm, useArray, useValue } from "anyshape/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;

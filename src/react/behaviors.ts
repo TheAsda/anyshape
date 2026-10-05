@@ -26,11 +26,11 @@
 // ============================================================
 
 import { useLayoutEffect, useRef } from "react";
-import { Behavior, Contribution, type AnyBehavior, type BehaviorHandle, type Guard } from "../behaviors";
-import { defineBehaviors, type BehaviorBuilder } from "../builder";
-import { refKey, isDev } from "../internal";
-import type { BaseStore } from "../store";
-import { useStore, type HookOptions } from "./hooks";
+import { Behavior, Contribution, type AnyBehavior, type BehaviorHandle, type Guard } from "../behaviors.js";
+import { defineBehaviors, type BehaviorBuilder } from "../builder.js";
+import { refKey, isDev } from "../internal.js";
+import type { BaseStore } from "../store.js";
+import { useStore, type HookOptions } from "./hooks.js";
 
 export type UseBehaviorsOptions = HookOptions;
 

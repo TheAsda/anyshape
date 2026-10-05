@@ -15,9 +15,9 @@
 // ============================================================
 
 import { useId } from "react";
-import { useValue } from "form-lib/react";
+import { useValue } from "anyshape/react";
 import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
-import type { AnyNode } from "form-lib";
+import type { AnyNode } from "anyshape";
 
 // Node types accepted by each component: a ControlNode whose value type
 // matches the input. Passing e.g. a number field to TextField is a type

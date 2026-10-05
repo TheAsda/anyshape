@@ -6,8 +6,8 @@
 // ------------------------------------------------------------
 
 import { useState } from "react";
-import { form, object, field, type InferValue } from "form-lib";
-import { StoreProvider, useForm, useValue } from "form-lib/react";
+import { form, object, field, type InferValue } from "anyshape";
+import { StoreProvider, useForm, useValue } from "anyshape/react";
 import { ValueField, ResultCard, SubmitButton } from "../../ui";
 
 const shape = form(

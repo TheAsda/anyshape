@@ -9,11 +9,11 @@
 // computed member name while the other modules are still being evaluated.
 // ============================================================
 
-import type { AnyNode } from "../shape";
-import type { MetaKeyDef } from "../meta";
-import type { BaseStore, Phase, SubFn, Unsubscribe, WriteOptions } from "../store";
+import type { AnyNode } from "../shape.js";
+import type { MetaKeyDef } from "../meta.js";
+import type { BaseStore, Phase, SubFn, Unsubscribe, WriteOptions } from "../store.js";
 
-export const KIND: unique symbol = Symbol("form-lib.refKind");
+export const KIND: unique symbol = Symbol("anyshape.refKind");
 
 /** What a write to a writable reference changes: a node's value, or one meta key of a node. */
 export interface Target {

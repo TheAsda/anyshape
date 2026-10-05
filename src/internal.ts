@@ -3,17 +3,27 @@
 // Not exported from the package index.
 // ============================================================
 
-import { ArrayNode, type AnyNode } from "./shape";
-import type { MetaRef } from "./refs/meta";
-import type { MetaKeyDef } from "./meta";
-import { BaseStore, ItemStore, type AnyRef } from "./store";
-import { kindOf, type Target } from "./refs/kind";
+import { ArrayNode, type AnyNode } from "./shape.js";
+import type { MetaRef } from "./refs/meta.js";
+import type { MetaKeyDef } from "./meta.js";
+import { BaseStore, ItemStore, type AnyRef } from "./store.js";
+import { kindOf, type Target } from "./refs/kind.js";
 
 /**
  * Dev build? Read as `process.env.NODE_ENV`, which bundlers replace: an app's
  * production build then drops every dev-only branch. Node reads it at runtime.
+ * Where nothing defines `process` (an unbundled load in a browser), the read
+ * throws and this is false: the form runs without dev diagnostics. Not a
+ * `typeof process` guard: bundlers replace the read but leave `process`
+ * undefined, so the guard would turn dev diagnostics off in every bundled app.
  */
-export const isDev = (): boolean => process.env.NODE_ENV !== "production";
+export function isDev(): boolean {
+  try {
+    return process.env.NODE_ENV !== "production";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * An error with `message` whose stack is `trace`'s: a behavior's trace is
@@ -32,13 +42,13 @@ export function locatedAt(trace: Error, message: string, options?: ErrorOptions)
 // ============================================================
 
 /** ObjectNode: its children (also exposed as direct properties). */
-export const FIELDS: unique symbol = Symbol("form-lib.fields");
+export const FIELDS: unique symbol = Symbol("anyshape.fields");
 /** ShapeNode: normalized declarations, one per meta key. */
-export const META_DEFS: unique symbol = Symbol("form-lib.metaDefs");
+export const META_DEFS: unique symbol = Symbol("anyshape.metaDefs");
 /** ShapeNode: default values of all declared meta keys. */
-export const META: unique symbol = Symbol("form-lib.meta");
+export const META: unique symbol = Symbol("anyshape.meta");
 /** ArrayNode: factory for new rows, if declared. */
-export const CREATE: unique symbol = Symbol("form-lib.create");
+export const CREATE: unique symbol = Symbol("anyshape.create");
 
 /** The declaration of the key a meta reference points at. */
 export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {

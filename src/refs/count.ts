@@ -1,11 +1,11 @@
 // countIn(node, def): nodes in a subtree whose key declared with `def` counts
 // (MetaKeyDef.aggregate), under whatever name. Read-only, on the tally channel.
 
-import { ObjectNode, ArrayNode, type AnyNode } from "../shape";
-import type { MetaKeyDef } from "../meta";
-import { FIELDS, META_DEFS, countSlotOf } from "../internal";
-import { isAncestorOrSelf } from "../tree";
-import { KIND, type RefKind } from "./kind";
+import { ObjectNode, ArrayNode, type AnyNode } from "../shape.js";
+import type { MetaKeyDef } from "../meta.js";
+import { FIELDS, META_DEFS, countSlotOf } from "../internal.js";
+import { isAncestorOrSelf } from "../tree.js";
+import { KIND, type RefKind } from "./kind.js";
 
 /** Number of nodes in a subtree (the node itself included) whose key declared with `def` counts (see MetaKeyDef.aggregate). */
 export class CountRef {

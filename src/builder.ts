@@ -18,9 +18,9 @@
 //   • Reusable fragments are plain functions taking the builder.
 // ============================================================
 
-import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Guard } from "./behaviors";
-import type { ArrayNode, ObjectNode } from "./shape";
-import type { AnyRef, RefValue } from "./store";
+import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Guard } from "./behaviors.js";
+import type { ArrayNode, ObjectNode } from "./shape.js";
+import type { AnyRef, RefValue } from "./store.js";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
 type Item = AnyBehavior | readonly Item[];

@@ -1,7 +1,7 @@
 // The ready-made rules (recipes/rules.ts): messages, reference limits, guarded by a builder block.
 import {
   form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
-} from "form-lib";
+} from "anyshape";
 import {
   control, required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf, calculate,
   exclusive, error, dirty,
