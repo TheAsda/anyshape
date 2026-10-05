@@ -24,6 +24,15 @@ Confirmed by a prototype ([#23](https://github.com/TheAsda/anyshape/issues/23), 
 
   Both stop at the first error and rerun less than `combine`. But they lose the shared debounce, turn forcing into a token nobody resets, need incremental ranking, and add more core than they remove. Every version that keeps the policies spanning several rules (one debounce, one force flag, a start decision from the run's cause) needs one evaluator per instance with a `ctx`, which is the owner, so it turns back into `combine`. A fold suits order-free keys like `disabled`, but that isn't worth a second mechanism. Rejected.
 
+## Prior art
+
+Every form library we surveyed reserves errors in its core: TanStack Form, React Hook Form, Final Form, Formik and Angular's forms each have a built-in error slot that their validation writes. None of them keeps validation out of the core, so on this point anyshape departs from its peers on purpose. Those libraries have no core/recipe boundary to protect.
+
+The combining model has precedents outside form state, where a mechanism is kept separate from the policy built on it:
+
+- **CodeMirror 6 facets** ([reference](https://codemirror.net/docs/ref/#state.Facet)). A facet is an extension point: any number of extensions provide inputs, and the facet's `combine` function turns them into one output. The facet object is the typed identity that inputs are attached to. A key definition plays the facet's part here, and `contribute()` plays `facet.of()`. One difference is deliberate: CodeMirror orders inputs by precedence, while anyshape has no precedence between contributions and throws on ambiguity ([#25](https://github.com/TheAsda/anyshape/issues/25)).
+- **Angular Signal Forms' metadata keys.** Schema rules contribute values to a metadata key, and the key's reducer combines them. Constraint validators such as `required()` are built on this generic system. Errors themselves still travel on a dedicated channel there, so the precedent covers the mechanism, not the step of moving errors out of the core.
+
 ## Consequences
 
 - A guard means different things on a contribution and on a behavior, on purpose. On a contribution, a false guard makes it **absent**, and the owner recomputes without it. On a behavior, `when` skips the run and keeps its last writes.
