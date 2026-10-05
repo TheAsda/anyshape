@@ -4,7 +4,7 @@ import {
   form, object, array, field, metaKey, createStore, countIn, initialOf, when,
 } from "../src/index";
 import { control, revealed, dirty, error } from "./support/features";
-import { test, test as base, describe, expect } from "vitest";
+import { test, test as base, describe, expect, vi } from "vitest";
 import * as company from "./support/fixtures/company";
 import * as limits from "./support/fixtures/limits";
 
@@ -93,32 +93,6 @@ describe("H · Counts and collect", () => {
     expect(found.map((e) => e.store.get(e.ref))).toEqual([false, false, true, false]);
   });
 
-  test("countIn warns when nothing in the subtree can aggregate the key", () => {
-    const flag = metaKey(false);
-    const elsewhere = metaKey(false).aggregate((v) => v);
-    const local = form(
-      object({
-        a: field<string>().meta(control()),
-        b: field<boolean>().meta({ flag }),
-      })
-    );
-    const original = console.warn;
-    const seen: string[] = [];
-    console.warn = (...args: unknown[]) => void seen.push(args.join(" "));
-    try {
-      expect(countIn(local, error)).toBeDefined(); // aggregable: silent
-      countIn(local, flag); // declared, but without an aggregate: always 0
-      countIn(local, flag); // cached ref: still one warning
-      countIn(local, elsewhere); // not declared in the subtree (e.g. the wrong key)
-      expect(countIn(local, error)).toBe(countIn(local, error));
-    } finally {
-      console.warn = original;
-    }
-    expect(seen.length).toBe(2);
-    expect(seen[0]).toMatch(/has no aggregate/);
-    expect(seen[1]).toMatch(/no node under "<root>" declares it/);
-  });
-
   test("aggregate must be false for the default", async () => {
     const { metaKey } = await import("../src/meta");
     expect(() => metaKey(true).aggregate((v) => v)).toThrow(/default value/);
@@ -176,6 +150,53 @@ describe("H · Counts by definition", () => {
     expect(s.get(countIn(f, other)), "another definition under the same name").toBe(1);
     expect(countIn(f, flagged)).toBe(countIn(f, flagged));
     expect(countIn(f, flagged) === countIn(f, other)).toBe(false);
+  });
+});
+
+describe.each(["development", "production"])("H · countIn rejects a key it can't count (%s)", (mode) => {
+  const flag = metaKey(false);
+  const counted = metaKey(false).aggregate((v) => v);
+  const f = form(
+    object({
+      a: field<string>().meta({ counted }),
+      b: field<boolean>().meta({ flag }),
+      rows: array(object({ c: field<string>().meta({ inRow: counted }) })),
+      other: object({ d: field<string>() }),
+    })
+  );
+  const test = base.extend("warn", ({}, { onCleanup }) => {
+    vi.stubEnv("NODE_ENV", mode);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    onCleanup(() => {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    });
+    return warn;
+  });
+
+  test("a key without aggregate throws, naming the node and the key", ({ warn }) => {
+    expect(() => countIn(f, flag)).toThrow(
+      'countIn on "<root>": key "flag" on "b" has no aggregate – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).'
+    );
+    expect(() => countIn(f, flag), "a failed call caches nothing").toThrow(/has no aggregate/);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("a key no node in the subtree declares throws, naming the node", ({ warn }) => {
+    expect(() => countIn(f.other, counted)).toThrow(
+      'countIn on "other": no node in the subtree declares the key – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).'
+    );
+    expect(() => countIn(f.other, counted), "a failed call caches nothing").toThrow(/no node in the subtree declares the key/);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("a counted key declared in the subtree, by a field or a row template, does not throw", ({ warn }) => {
+    const s = createStore(f, { a: "", b: false, rows: [{ c: "" }], other: { d: "" } });
+    s.substore(f.rows).itemAt(0).set(f.rows.item.c.inRow, true);
+    expect(s.get(countIn(f, counted))).toBe(1);
+    expect(s.get(countIn(f.rows, counted)), "declared only by the row template").toBe(1);
+    expect(s.get(countIn(f.a, counted))).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
