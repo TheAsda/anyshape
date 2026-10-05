@@ -199,7 +199,7 @@ describe("D · Foreign nodes and duplicate rows", () => {
     expect(() => s.get(address.city)).toThrow(/is not part of the store/);
   });
 
-  test("assertInScope: the check get() and set() run, for code that keeps state beside the form", ({ store: s }) => {
+  test("assertInScope rejects a node the store does not address, with the messages get() uses", ({ store: s }) => {
     const other = form(object({ name: field<string>() }));
     const line = s.substore(userShape.items).itemAt(0);
     expect(() => s.assertInScope(other.name)).toThrow(/is not part of the store/);

@@ -818,8 +818,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   /**
    * Throw unless this store addresses `node`: the node is this store's node
    * or below it, and not inside an array item (a row node needs the row's
-   * store). The check get(), set() and subscribe() run, for code that keeps
-   * state beside the form.
+   * store). Every read, write and subscription through the store runs it;
+   * code that keeps state beside the form calls it directly.
    */
   assertInScope(node: AnyNode): void {
     for (let n: AnyNode | undefined = node; n !== this.node; n = n.parent) {
