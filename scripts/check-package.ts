@@ -30,9 +30,8 @@ const bin = (name: string) => join(root, "node_modules", ".bin", name);
 const REQUIRED = [
   "package.json", "LICENSE",
   "dist/index.js", "dist/index.d.ts", "dist/react/index.js", "dist/react/index.d.ts",
-  // The docs agents read at node_modules/anyshape/…: docs/principles.md
-  // joins this list when it's written (#84).
-  "GLOSSARY.md",
+  // The docs agents read at node_modules/anyshape/….
+  "GLOSSARY.md", "docs/principles.md",
   "docs/guide/README.md", "docs/guide/agents.md",
   ...["shape", "store", "meta-keys", "behaviors", "guards", "arrays", "contributions", "async", "react", "your-side", "writing-a-recipe"]
     .map((page) => `docs/guide/${page}.md`),
