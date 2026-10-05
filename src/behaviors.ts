@@ -55,8 +55,8 @@
 //
 // The cause of an async run covers everything since the last completed run:
 // an init run replaced in flight has isInit together with the user's origins.
-// Reactions and server checks should use runOn.init: false rather than an
-// isInit check.
+// Behaviors that respond to a change, and server checks, should use
+// runOn.init: false rather than an isInit check.
 //
 // Kept work (ctx.keep(key, start)): async work a rerun can continue instead of
 // restarting, one slot per instance. It must depend only on its key; it gets
@@ -513,7 +513,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly flights = new Map<Binding, Flight>();
   /** Instances whose kept-work slot holds work. */
   private readonly keeping = new Set<Binding>();
-  /** Instances whose run in flight was cancelled while holding kept work: see flushed(). */
+  /** Instances whose run in flight was cancelled while holding kept work: see behaviorsEnd(). */
   private readonly orphans = new Set<Binding>();
   /** Resolved when a run in flight ends or is cancelled; settle() awaits it. */
   private settledGate: { promise: Promise<void>; resolve: () => void } | undefined;
@@ -833,8 +833,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     this.bind(reg, host, reg.chain.indexOf(host.node), true);
   }
 
-  /** End of a flush: kept work that no run holds any more (its holder was cancelled) is aborted. */
-  flushed(): void {
+  /** End of the flush's behavior phase: kept work that no run holds any more (its holder was cancelled) is aborted. */
+  behaviorsEnd(): void {
     for (const leaf of this.orphans) if (leaf.kept?.holder.aborted) this.abortKept(leaf);
     this.orphans.clear();
   }
@@ -1001,7 +1001,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       let seq = arrStore.items();
       for (const row of seq) this.child(binding, row);
       binding.offs.push(
-        host.react(arrStore.node, () => {
+        host._react(arrStore.node, () => {
           if (reg.disposed) return;
           const now = arrStore.items();
           if (now === seq) return;
@@ -1028,7 +1028,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private subscribeTriggers(binding: Binding, refs: AnyRef[]): void {
     binding.triggerKeys = refs.map(refKey);
     binding.triggerOffs = refs.map((ref) =>
-      hostFor(binding.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info))
+      hostFor(binding.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info))
     );
   }
 
@@ -1090,7 +1090,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const ref of reg.writes) {
       if (reg.inputKeys.has(refKey(ref))) continue; // an input change reruns it
       flight.offs.push(
-        leaf.host.react(ref, () => {
+        leaf.host._react(ref, () => {
           if (this.flights.get(leaf) === flight) this.cancel(leaf);
         })
       );
@@ -1098,7 +1098,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const ref of reg.reads) {
       const key = refKey(ref);
       flight.offs.push(
-        hostFor(leaf.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => {
+        hostFor(leaf.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => {
           if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info, false);
         })
       );
