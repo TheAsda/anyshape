@@ -7,7 +7,7 @@ import { test as base, describe, expect } from "vitest";
 import { deferred, flush } from "./test/harness";
 
 /** Every owner run: the instance's run counter (ctx.state) and the parts it saw. */
-interface Run { path: string; runs: number; tags: string[]; origins: string[]; isInit: boolean }
+interface Run { path: string; runs: number; tags: string[]; origins: string[] }
 
 interface Log { runs: Run[]; combined: string[] }
 let log: Log = { runs: [], combined: [] };
@@ -22,7 +22,7 @@ const tags = metaKey<readonly string[], string>([]).combine((self, key) => {
       const n = ((ctx.state.runs as number | undefined) ?? 0) + 1;
       ctx.state.runs = n;
       const list = ctx.parts.map((p) => p.payload);
-      log.runs.push({ path: `${ctx.store.node.path}:${self.path}`, runs: n, tags: list, origins: [...ctx.origins], isInit: ctx.isInit });
+      log.runs.push({ path: self.path, runs: n, tags: list, origins: [...ctx.origins] });
       ctx.set(key, list);
     },
   };
@@ -366,7 +366,7 @@ describe("Rows", () => {
     const [row0, row1] = s.substore(shape.rows).items();
     const h = row1.addBehavior(contribute(R.x.tags, "row 1"));
     expect([row0.get(R.x.tags), row1.get(R.x.tags)]).toEqual([[], ["row 1"]]);
-    expect(log.runs.map((r) => r.path), "only row 1's instance ran").toEqual(["rows[]:rows[].x"]);
+    expect(log.runs.map((r) => r.path), "only row 1's instance ran").toEqual(["rows[].x"]);
     h();
     expect(row1.get(R.x.tags)).toEqual([]);
   });
@@ -426,13 +426,14 @@ describe("Rows", () => {
 });
 
 describe("Builder", () => {
-  test("when / otherwise add their guards to contributions; branches don't matter for them", () => {
+  test("when adds its guard to contributions; nested guards accumulate", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehaviors(shape, (b, s) => {
         b.when([s.mode], (m) => m !== "", (b) => {
           b.when([s.other], (o) => o === "x", (b) => b.add(contribute(s.a.tags, "both")));
           b.add(contribute(s.a.tags, "mode"));
-        }).otherwise((b) => b.add(contribute(s.a.tags, "no mode"), contribute(s.a.tags, "no mode either")));
+        });
+        b.when([s.mode], (m) => m === "", (b) => b.add(contribute(s.a.tags, "no mode"), contribute(s.a.tags, "no mode either")));
       }),
     });
     expect(s.get(shape.a.tags)).toEqual(["no mode", "no mode either"]);
@@ -444,19 +445,24 @@ describe("Builder", () => {
 });
 
 describe("In-flight runs", () => {
-  /** Owner calls: async unless the run has no origins and isn't the initial one (a contribution change at rest). */
-  interface Call { signal: AbortSignal; d: ReturnType<typeof deferred<string>>; origins: string[]; changed: boolean; isInit: boolean }
+  /**
+   * Owner calls: async unless the run has no origins and isn't the first (a
+   * contribution change at rest). "First" is kept in ctx.state: no run has
+   * completed yet.
+   */
+  interface Call { signal: AbortSignal; d: ReturnType<typeof deferred<string>>; origins: string[]; changed: boolean; first: boolean }
   let calls: Call[] = [];
 
   const answer = metaKey<string, string>("").combine((self, key) => ({
     triggers: [self],
     writes: [key],
     run(ctx) {
+      const first = ctx.state.started === undefined;
       const started = ((ctx.state.started as number | undefined) ?? 0) + 1;
       ctx.state.started = started;
-      if (!ctx.isInit && !ctx.origins.size) return ctx.set(key, `idle ${ctx.parts.length}`);
+      if (!first && !ctx.origins.size) return ctx.set(key, `idle ${ctx.parts.length}`);
       const d = deferred<string>();
-      calls.push({ signal: ctx.signal, d, origins: [...ctx.origins], changed: ctx.changed(self), isInit: ctx.isInit });
+      calls.push({ signal: ctx.signal, d, origins: [...ctx.origins], changed: ctx.changed(self), first });
       return d.promise.then((a) => ctx.set(key, `${a} ${ctx.parts.map((p) => p.payload)} (#${started})`));
     },
   }));
@@ -477,7 +483,7 @@ describe("In-flight runs", () => {
     s.set(sh.f, "x", { origin: "user" });
     s.addBehavior(contribute(sh.f.answer, "late"));
     expect(calls[1].signal.aborted).toBe(true);
-    expect(calls[2], "rerun with the cancelled run's origins and changed inputs").toMatchObject({ origins: ["user"], changed: true, isInit: false });
+    expect(calls[2], "rerun with the cancelled run's origins and changed inputs").toMatchObject({ origins: ["user"], changed: true, first: false });
     calls[1].d.resolve("stale");
     await flush();
     expect(s.get(sh.f.answer)).toBe("init base (#1)");
@@ -520,16 +526,16 @@ describe("In-flight runs", () => {
     row0.addBehavior(contribute(F.answer, "row 0"));
     row1.addBehavior(contribute(F.answer, "row 1"));
     expect(calls[0].signal.aborted).toBe(false);
-    calls[0].d.resolve("init");
+    for (const c of calls) c.d.resolve("init"); // row 1's run too: it is that instance's first
     await s.settle();
     expect(row0.get(F.answer)).toBe("init row 0 (#1)");
   });
 
-  test("an initial run in flight is rerun as an initial run", async () => {
+  test("an initial run in flight is rerun with no origins, still the first", async () => {
     const { s, errors } = setup();
     s.addBehavior(contribute(sh.f.answer, "late"));
     expect(calls[0].signal.aborted).toBe(true);
-    expect(calls[1]).toMatchObject({ origins: [], isInit: true });
+    expect(calls[1]).toMatchObject({ origins: [], first: true });
     calls[1].d.resolve("init");
     await s.settle();
     expect(s.get(sh.f.answer)).toBe("init base,late (#1)");

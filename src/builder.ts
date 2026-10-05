@@ -5,8 +5,6 @@
 //     b.add(required(shape.name), maxLength(shape.name, 50));
 //     b.when([shape.type], (t) => t === "company", (b) => {
 //       b.add(required(shape.taxId));
-//     }).otherwise((b) => {
-//       b.add(required(shape.personalId));
 //     });
 //     b.each(shape.lines, (b, line) => lineRules(b, line));
 //   });
@@ -16,13 +14,11 @@
 //   • when blocks add their guard to every behavior and contribution inside
 //     them (guard refs become triggers; a skipped behavior keeps its writes,
 //     a contribution whose guard fails is absent).
-//   • otherwise gets the negated guard. Behaviors in opposite branches of the
-//     same split may write the same target: they never run together.
 //   • Blocks nest; guards accumulate.
 //   • Reusable fragments are plain functions taking the builder.
 // ============================================================
 
-import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Branch, type Guard } from "./behaviors";
+import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Guard } from "./behaviors";
 import type { ArrayNode, ObjectNode } from "./shape";
 import type { AnyRef, RefValue } from "./store";
 
@@ -37,8 +33,7 @@ export class BehaviorBuilder {
   /** @internal */
   constructor(
     private readonly out: AnyBehavior[],
-    private readonly guards: readonly Guard[],
-    private readonly branches: readonly Branch[]
+    private readonly guards: readonly Guard[]
   ) {}
 
   /** Add behaviors and contributions (arrays, e.g. from exclusive(), are flattened). */
@@ -55,16 +50,9 @@ export class BehaviorBuilder {
     refs: Rs,
     test: (...values: Values<Rs>) => boolean,
     fn: (b: BehaviorBuilder) => void
-  ): { otherwise(fn: (b: BehaviorBuilder) => void): void } {
-    const guard = guardOf(refs, test);
-    const group = {};
-    fn(new BehaviorBuilder(this.out, [...this.guards, guard], [...this.branches, { group, side: 0 }]));
-    return {
-      otherwise: (other) => {
-        const negated = guardOf(refs, (...values) => !test(...(values as Values<Rs>)));
-        other(new BehaviorBuilder(this.out, [...this.guards, negated], [...this.branches, { group, side: 1 }]));
-      },
-    };
+  ): this {
+    fn(new BehaviorBuilder(this.out, [...this.guards, guardOf(refs, test)]));
+    return this;
   }
 
   /** Behaviors for array items: `item` is the row template (behaviors on it run once per row). */
@@ -76,14 +64,13 @@ export class BehaviorBuilder {
   private wrap(item: AnyBehavior): AnyBehavior {
     if (!this.guards.length) return item;
     if (item instanceof Contribution) {
-      // Contributions never conflict, so their branches don't matter.
       return new Contribution(item.target, item.payload, { ...item.decl, when: [...asArray(item.decl.when), ...this.guards] });
     }
     if (item instanceof Behavior) {
       if (item._self) throw new Error("Default behaviors cannot be added through the builder");
       return new Behavior(
         { ...item.config, when: [...asArray(item.config.when), ...this.guards] },
-        { branches: [...item._branches, ...this.branches], trace: item._trace }
+        { trace: item._trace }
       );
     }
     throw new Error("Expected a behavior or a contribution");
@@ -93,6 +80,6 @@ export class BehaviorBuilder {
 /** Build a list of behaviors and contributions for `shape` (pass it to createStore or addBehavior). */
 export function defineBehaviors<S extends ObjectNode<any>>(shape: S, fn: (b: BehaviorBuilder, shape: S) => void): AnyBehavior[] {
   const out: AnyBehavior[] = [];
-  fn(new BehaviorBuilder(out, [], []), shape);
+  fn(new BehaviorBuilder(out, []), shape);
   return out;
 }

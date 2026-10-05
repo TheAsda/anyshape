@@ -168,7 +168,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **J4 · P3** `replaceBehavior` with a handle from another store / runtime throws; with an already-disposed handle throws. → `behaviors.test.ts`
 
 ### K. Ordering & ownership
-**Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), nor do siblings' writes of the same behavior, one writer, opposite `when/otherwise` branches may share a target.
+**Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), nor do siblings' writes of the same behavior, one writer (opposite `when` guards don't exempt two writers: a target with a value under a condition and another otherwise is one behavior, #92).
 
 - [x] **K1 · P2** **Container edge:** a row behavior writing a row field runs before a root behavior that triggers on the whole array (assert run order with a log, not only final values). → `behaviors.test.ts`
 - [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
@@ -181,7 +181,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **L1 · P2** `ctx.changed(ref)` is `false` on the init run and `true` only for triggers that changed since the last run. → `behaviors.test.ts`
 - [x] **L2 · P2** Within one run: two `ctx.set` calls to the same target → the last one wins; `ctx.get` sees the pending write. → `behaviors.test.ts`
-- [x] **L3 · P2** `ctx.initial(node)` without `initialOf(node)` declared throws the undeclared-read error. → `behaviors.test.ts`
+- [x] **L3 · P2** A run reads an initial value with `ctx.get(initialOf(node))`; without `initialOf(node)` declared, that throws the undeclared-read error. → `behaviors.test.ts`
 - [x] **L4 · P3** The default `onError` logs `[form] "<name>" failed at "<scope>"` via `console.error` (spy). → `behaviors.test.ts`
 
 ### L′. Key contributions (`combine`, `contribute`)
