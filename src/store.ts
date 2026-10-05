@@ -189,7 +189,7 @@ interface Sub<V = any> {
   equals: (a: V, b: V) => boolean;
   fn: (next: V, prev: V, info: ChangeInfo) => void;
   /** Origins of the log entries relevant to this subscription. */
-  origins: (log: readonly WriteEntry[]) => Set<Origin>;
+  origins: (log: readonly WriteEntry[]) => ReadonlySet<Origin>;
 }
 
 /** @internal */
@@ -715,7 +715,7 @@ export abstract class BaseStore<N extends ContainerNode> {
       phase, fn, active: true, last: undefined,
       read: read ? () => read(host) : () => host._countOf(node, slot),
       equals: Object.is,
-      origins: () => new Set(),
+      origins: () => NO_ORIGINS,
     };
     sub.last = sub.read();
     let bySlot = host._countSubs.get(node);
@@ -1093,7 +1093,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
       read: () => this._sync(),
       equals: Object.is,
       fn: () => listener(),
-      origins: () => new Set(),
+      origins: () => NO_ORIGINS,
     };
     this.itemsSubs.add(sub);
     return () => {

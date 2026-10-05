@@ -2,7 +2,7 @@
 // owner behavior per node instance, fed by contribute(ref, payload, decl).
 // The keys here are test-local and unrelated to validation: `tags` lists the
 // payloads of its active contributions.
-import { form, object, array, field, createStore, contribute, defineBehavior, defineBehaviors, metaKey, when, type InferValue } from "./index";
+import { form, object, array, field, createStore, contribute, defineBehavior, defineBehaviors, metaKey, when, pendingOf, type InferValue } from "./index";
 import { test as base, describe, expect } from "vitest";
 import { deferred, flush } from "./test/harness";
 
@@ -43,6 +43,20 @@ const initial = (): InferValue<typeof shape> => ({ mode: "", other: "", a: "", b
 const test = base.extend("log", (): Log => (log = { runs: [], combined: [] }));
 
 describe("Registration", () => {
+  test("a tally trigger from a contribution throws when the owner filters origins, and adds nothing", () => {
+    const filtered = metaKey<readonly string[], string>([]).combine((self, key) => ({
+      triggers: [self], writes: [key], origins: ["user"], run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
+    }));
+    const sh = form(object({ f: field<string>().meta({ filtered }), g: field<string>() }));
+    const s = createStore(sh, { f: "", g: "" });
+    s.addBehavior(contribute(sh.f.filtered, "plain"));
+    expect(() => s.addBehavior(contribute(sh.f.filtered, "tally", { triggers: [pendingOf(sh.g)] }))).toThrow(
+      `"${pendingOf(sh.g).path}" carries no origins (it is a tally) – drop the origins filter or the reference`
+    );
+    s.set(sh.f, "x", { origin: "user" });
+    expect(s.get(sh.f.filtered), "the owner still runs, without the rejected part").toEqual(["plain"]);
+  });
+
   test("contributing to a key without `combine` throws at registration", () => {
     const s = createStore(shape, initial());
     expect(() => s.addBehavior(contribute(shape.b.note as any, "x"))).toThrow(/has no `combine`/);
