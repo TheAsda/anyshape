@@ -94,6 +94,7 @@ describe("N · Behaviors", () => {
     s.set(shape.company.phone, "555");
     expect(s.get(shape.company.phone), "an edit is reset too while hidden").toBe("123");
     s.set(shape.type, "company");
+    expect(s.get(shape.company.phone), "not restored when shown again").toBe("123");
     s.set(shape.company.phone, "777");
     expect(s.get(shape.company.phone), "shown: edits stay").toBe("777");
   });

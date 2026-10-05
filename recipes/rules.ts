@@ -64,7 +64,7 @@ function limitRule<N extends Validatable>(
     },
     {
       name: options.name ?? `${label}(${node.path}, ${ref === undefined ? limit : ref.path})`,
-        triggers: ref === undefined ? [] : [ref],
+      triggers: ref === undefined ? [] : [ref],
     }
   );
 }

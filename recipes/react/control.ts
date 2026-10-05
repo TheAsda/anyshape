@@ -5,8 +5,7 @@
 //   control() keys, read and written through the node's refs.
 //   • `pending` while a check of the field runs (pendingOf(node.error)).
 //   • showError: an error is shown once the field is revealed – on blur
-//     (onBlur) or by a submit – and no check is pending. One fixed
-//     expression: a team that wants another moment edits it in its copy.
+//     (onBlur) or by a submit – and no check is pending.
 // ============================================================
 
 import { useCallback, useRef } from "react";
