@@ -513,7 +513,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly flights = new Map<Binding, Flight>();
   /** Instances whose kept-work slot holds work. */
   private readonly keeping = new Set<Binding>();
-  /** Instances whose run in flight was cancelled while holding kept work: see flushed(). */
+  /** Instances whose run in flight was cancelled while holding kept work: see behaviorsEnd(). */
   private readonly orphans = new Set<Binding>();
   /** Resolved when a run in flight ends or is cancelled; settle() awaits it. */
   private settledGate: { promise: Promise<void>; resolve: () => void } | undefined;
@@ -833,8 +833,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     this.bind(reg, host, reg.chain.indexOf(host.node), true);
   }
 
-  /** End of a flush: kept work that no run holds any more (its holder was cancelled) is aborted. */
-  flushed(): void {
+  /** End of the flush's behavior phase: kept work that no run holds any more (its holder was cancelled) is aborted. */
+  behaviorsEnd(): void {
     for (const leaf of this.orphans) if (leaf.kept?.holder.aborted) this.abortKept(leaf);
     this.orphans.clear();
   }
