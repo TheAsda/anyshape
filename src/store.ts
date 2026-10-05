@@ -43,10 +43,8 @@
 //      form is not final; code that needs that awaits store.settle().
 //   7. Reactions run first (repeating until settled, max MAX_REACTION_ROUNDS),
 //      then UI listeners once; writing during the UI phase throws.
-//      Reactions are internal (_react): the behavior runtime is their only
-//      user, so derived writes are behaviors, which declare what they read and
-//      write, have one writer per target and run in order. Side effects are
-//      UI listeners (subscribe).
+//      Reactions are internal (_react), for the behavior runtime: derived
+//      writes are behaviors, side effects are UI listeners (subscribe).
 //   8. UI listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
@@ -75,6 +73,7 @@ export interface WriteOptions {
   as?: "initial";
 }
 
+/** @internal */
 export interface ChangeInfo {
   /** Origins of the writes that changed this reaction's target since its last run. */
   readonly origins: ReadonlySet<Origin>;

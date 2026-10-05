@@ -1,6 +1,7 @@
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
-import { form, object, array, field, createStore, countIn, type InferValue, type Origin } from "./index";
+import { form, object, array, field, createStore, countIn, type InferValue } from "./index";
+import { watchOrigins } from "./test/harness";
 import { error } from "./test/features";
 
 import { address, userShape, initial, type User } from "./test/fixtures/user";
@@ -250,8 +251,7 @@ describe("D, E · Reference API and array helpers", () => {
   });
 
   test("helpers pass the origin through", ({ store: s }) => {
-    const seen: Origin[][] = [];
-    s._react(shape.lines, (_n, _p, i) => seen.push([...i.origins]));
+    const seen = watchOrigins(s, shape.lines);
     s.substore(shape.lines).append(undefined, { origin: "user" });
     expect(seen).toEqual([["user"]]);
   });
