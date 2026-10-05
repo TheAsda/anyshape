@@ -89,11 +89,11 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   // @ts-expect-error – only declared meta keys have refs
   s.set(t.text.nope, 1);
   // @ts-expect-error – refs come from nodes (t.text.error) or collect, never constructed
-  new MetaRef(t.text, "error");
+  void new MetaRef(t.text, "error");
   // @ts-expect-error – counts are read-only
   s.set(countIn(t, error), 1);
   // @ts-expect-error – createStore is the one way to build a root store
-  new core.RootStore(t, {} as InferValue<typeof t>, () => ({}) as never);
+  void new core.RootStore(t, {} as InferValue<typeof t>, () => ({}) as never);
 
   // @ts-expect-error – `plain` has no validation()
   rule(t.plain, () => undefined);
@@ -128,7 +128,7 @@ type CM = InferMeta<typeof c.n>;
 type _c3 = Expect<Equal<[CM["total"], CM["reasons"], CM["ok"], CM["plain"]], [number, readonly string[], boolean, number]>>;
 
 // @ts-expect-error – `combine` must return a config whose run takes this key's parts
-metaKey<number, { weight: number }>(0).combine((_s, k) => ({ writes: [k], run: (ctx: { parts: readonly { payload: string }[] }) => {} }));
+metaKey<number, { weight: number }>(0).combine((_s, k) => ({ writes: [k], run: (_ctx: { parts: readonly { payload: string }[] }) => {} }));
 
 // `uses`: the node's refs to other keys arrive typed and in order, with <V, P> spelled out.
 const forcedFlag = metaKey(false);

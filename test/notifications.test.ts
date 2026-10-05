@@ -107,7 +107,7 @@ describe("F · Rule 2 – separate channels, no meta bubbling", () => {
 });
 
 describe("F · Rule 3 – array structure channel", () => {
-  test("rule 3: editing a row does not fire subscribeItems; items() is stable", ({ store: s, lines, recorder: r }) => {
+  test("rule 3: editing a row does not fire subscribeItems; items() is stable", ({ lines, recorder: r }) => {
     lines.subscribeItems(r.on("items"));
     lines.subscribe(shape.lines, r.on("arrayValue"));
     const before = lines.items();
@@ -458,7 +458,7 @@ describe("F · Array replacement and flat forms", () => {
 });
 
 describe("F · Meta-key subscriptions", () => {
-  const { shape, L, initial, originsOf } = company;
+  const { shape, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()));
 
