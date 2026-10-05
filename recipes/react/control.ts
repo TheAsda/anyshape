@@ -9,8 +9,8 @@
 // ============================================================
 
 import { useCallback, useRef } from "react";
-import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "form-lib";
-import { useField, useValue, type HookOptions } from "form-lib/react";
+import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "anyshape";
+import { useField, useValue, type HookOptions } from "anyshape/react";
 import { registerFocus, type FocusTarget } from "../focus";
 
 /** A node with the control() keys. */

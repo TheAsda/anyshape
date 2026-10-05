@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "form-lib",
+      "name": "anyshape",
       "devDependencies": {
         "@types/node": "^25.6.0",
         "@types/react": "^19.0.0",

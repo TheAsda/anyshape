@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "form-lib-example-basic",
+      "name": "anyshape-example-basic",
       "dependencies": {
         "react": "^19.0.0",
         "react-dom": "^19.0.0",

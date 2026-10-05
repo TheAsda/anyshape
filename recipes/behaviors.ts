@@ -10,7 +10,7 @@ import {
   defineBehavior, contribute, when, initialOf,
   type AnyNode, type InferValue, type MetaRef, type AnyBehavior, type Behavior,
   type AnyRef, type RefValue, type Contribution,
-} from "form-lib";
+} from "anyshape";
 import { isEmpty, labelOf } from "./rules";
 import { rule, type Validatable } from "./validation";
 

@@ -10,8 +10,8 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from "react";
-import { countIn, pendingIn, type RootStore } from "form-lib";
-import { StoreProvider, useForm, useStore, useValue } from "form-lib/react";
+import { countIn, pendingIn, type RootStore } from "anyshape";
+import { StoreProvider, useForm, useStore, useValue } from "anyshape/react";
 import { handleSubmit, error, dirty } from "../../../recipes";
 import { useControl } from "../../../recipes/react";
 import {
@@ -213,7 +213,7 @@ function RequesterSection() {
         label="Email"
         type="email"
         placeholder="you@company.example"
-        hint="ada@example.com is known; dev@form-lib.dev has an open requisition; anything else is unknown"
+        hint="ada@example.com is known; dev@anyshape.dev has an open requisition; anything else is unknown"
       />
       <DepartmentField />
     </section>
@@ -343,7 +343,7 @@ function LogisticsSection() {
 function FailureTour() {
   const rows: [step: string, input: string, effect: string][] = [
     ["1", "unknown email", "async rule: Unknown employee"],
-    ["1", "dev@form-lib.dev", "async rule: open requisition"],
+    ["1", "dev@anyshape.dev", "async rule: open requisition"],
     ["1", "unknown DEP code", "app lookup: Unknown department"],
     ["1", "Continue with empties", "required + focus jumps to the field"],
     ["2", "a SKU used in another row", "not selectable – each row is unique"],

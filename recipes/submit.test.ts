@@ -1,6 +1,6 @@
 // Submit recipe: handleSubmit(store, fn).
 
-import { form, object, array, field, metaKey, createStore } from "form-lib";
+import { form, object, array, field, metaKey, createStore } from "anyshape";
 import { test as base, describe, expect } from "vitest";
 import { handleSubmit, submission } from "./submit";
 import { registerFocus } from "./focus";

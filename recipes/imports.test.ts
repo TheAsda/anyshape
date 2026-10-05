@@ -1,8 +1,8 @@
 // ============================================================
 // Recipes build only on the core's public interface (AGENTS.md, "Core and
-// recipes"): a file under recipes/ imports the core entry (`form-lib`) or
+// recipes"): a file under recipes/ imports the core entry (`anyshape`) or
 // another file under recipes/, never a core module; a file under
-// recipes/react/ may also import the core React entry (`form-lib/react`).
+// recipes/react/ may also import the core React entry (`anyshape/react`).
 // The core, its tests and benches included, imports no recipe.
 // ============================================================
 
@@ -42,12 +42,12 @@ function violations(dir: string, allowed: (spec: string, file: string) => boolea
 }
 
 test("a recipe imports only the core entry or another recipe", () => {
-  // Packages (vitest, node:*) are not the core; `form-lib/<path>` reaches past
-  // the entry, except `form-lib/react` from a React recipe.
+  // Packages (vitest, node:*) are not the core; `anyshape/<path>` reaches past
+  // the entry, except `anyshape/react` from a React recipe.
   const allowed = (spec: string, file: string) => {
     if (isRelative(spec)) return isInside(recipes, resolve(dirname(file), spec));
-    if (spec === "form-lib/react") return isInside(reactRecipes, file);
-    return !spec.startsWith("form-lib/");
+    if (spec === "anyshape/react") return isInside(reactRecipes, file);
+    return !spec.startsWith("anyshape/");
   };
   expect(violations(recipes, allowed)).toEqual([]);
 });

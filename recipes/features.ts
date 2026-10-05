@@ -6,7 +6,7 @@
 // collect(node, touched). Bundles (validation(), control()) spread several.
 // ============================================================
 
-import { metaKey, initialOf } from "form-lib";
+import { metaKey, initialOf } from "anyshape";
 import { reveal } from "./submit";
 import { validation } from "./validation";
 

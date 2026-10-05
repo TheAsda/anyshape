@@ -2,7 +2,7 @@
 import {
   form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
   type BehaviorBuilder,
-} from "form-lib";
+} from "anyshape";
 import {
   required, maxLength, min, calculate, link, visibleWhen,
   disableWhen, clearWhen, exclusive, error,

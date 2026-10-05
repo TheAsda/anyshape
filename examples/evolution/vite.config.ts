@@ -12,8 +12,8 @@ export default defineConfig({
   resolve: {
     alias: [
       // More specific entry first.
-      { find: "form-lib/react", replacement: resolve(lib, "react/index.ts") },
-      { find: "form-lib", replacement: resolve(lib, "index.ts") },
+      { find: "anyshape/react", replacement: resolve(lib, "react/index.ts") },
+      { find: "anyshape", replacement: resolve(lib, "index.ts") },
     ],
   },
   server: {

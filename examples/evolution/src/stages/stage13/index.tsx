@@ -11,12 +11,12 @@ import { useState } from "react";
 import {
   form, object, field, type InferValue, array, defineBehaviors, defineBehavior, countIn, pendingIn,
   type FieldNode,
-} from "form-lib";
+} from "anyshape";
 import {
   control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen, rule, asyncRule, error,
 } from "../../../../../recipes";
-import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
+import { StoreProvider, useForm, useArray, useValue } from "anyshape/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard } from "../../ui";
 
 const DAY_MS = 86_400_000;

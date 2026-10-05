@@ -7,7 +7,7 @@
 //     its time applying async writes (if any), in behaviors and in
 //     listeners, and the three behaviors that took the most time across
 //     their instances;
-//   • the DevTools performance tracks (track group "form-lib"): frequent
+//   • the DevTools performance tracks (track group "anyshape"): frequent
 //     entries through the extended console.timeStamp, rare detailed ones
 //     through performance.measure with detail.devtools. Both are
 //     feature-detected; other tools ignore the extra arguments and detail.
@@ -139,7 +139,7 @@ function overBudget(report: FlushReport): string {
 // ============================================================
 // DevTools tracks (https://developer.chrome.com/docs/devtools/performance/extension)
 // ============================================================
-const GROUP = "form-lib";
+const GROUP = "anyshape";
 type Track = "flush" | "behaviors" | "async" | "registration";
 type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "tertiary" | "tertiary-light" | "tertiary-dark" | "error";
 

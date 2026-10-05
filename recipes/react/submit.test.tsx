@@ -1,8 +1,8 @@
 // Submit and focus in a real DOM: document order, and handleSubmit on a <form>.
 
 import { test, expect } from "vitest";
-import { form, object, field, createStore, type InferValue, type RootStore } from "form-lib";
-import { StoreProvider, useForm } from "form-lib/react";
+import { form, object, field, createStore, type InferValue, type RootStore } from "anyshape";
+import { StoreProvider, useForm } from "anyshape/react";
 import { control } from "../features";
 import { rule } from "../validation";
 import { focusFirst, registerFocus } from "../focus";

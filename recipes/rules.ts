@@ -9,7 +9,7 @@
 //       b.when([s.x.required], (r) => r, (b) => b.add(required(s.x)))
 // ============================================================
 
-import { type AnyNode, type InferValue, type Ref, type ShapeNode, type CountRef, type Contribution } from "form-lib";
+import { type AnyNode, type InferValue, type Ref, type ShapeNode, type CountRef, type Contribution } from "anyshape";
 import { rule, type RulePart, type Validatable } from "./validation";
 
 export type Message<V = any> = string | ((value: V) => string);

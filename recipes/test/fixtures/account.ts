@@ -1,7 +1,7 @@
 // An account form for validation: person/company type, password confirmation,
 // a hidden-able company section, a
 // disableable promo ({ disabled }), disableable rows and submission().
-import { form, object, array, field, type InferValue } from "form-lib";
+import { form, object, array, field, type InferValue } from "anyshape";
 import { control, validation, visible, disabled, submission, rule } from "../../index";
 import { deferred } from "../harness";
 
