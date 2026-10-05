@@ -173,14 +173,11 @@ describe("N · disabled: reasons OR together", () => {
 });
 
 describe("N · Builder", () => {
-  test("builder: when / otherwise with rules", () => {
+  test("builder: when with rules", () => {
     const behaviors = defineBehaviors(shape, (b) => {
       b.add(required(shape.name));
-      b.when([shape.type], (t) => t === "company", (b) => {
-        b.add(required(shape.taxId));
-      }).otherwise((b) => {
-        b.add(required(shape.personalId));
-      });
+      b.when([shape.type], (t) => t === "company", (b) => b.add(required(shape.taxId)));
+      b.when([shape.type], (t) => t !== "company", (b) => b.add(required(shape.personalId)));
     });
     expect(behaviors.length).toBe(3);
     const s = createStore(shape, initial(), { behaviors });
@@ -191,18 +188,22 @@ describe("N · Builder", () => {
     expect(s.get(shape.taxId.error)).toBe("Required");
   });
 
-  test("builder: opposite branches may write the same target", () => {
-    const hint = (text: string) => defineBehavior({ triggers: [shape.name], writes: [shape.note.hint], run: (c) => c.set(shape.note.hint, text) });
-    const behaviors = defineBehaviors(shape, (b) => {
-      b.when([shape.type], (t) => t === "company", (b) => b.add(hint("company"))).otherwise((b) => b.add(hint("person")));
+  test("builder: a target with a value under a condition and another otherwise is one behavior", () => {
+    const hint = defineBehavior({
+      triggers: [shape.type], writes: [shape.note.hint],
+      run: (c) => c.set(shape.note.hint, c.get(shape.type) === "company" ? "company" : "person"),
     });
-    const s = createStore(shape, initial(), { behaviors });
+    const s = createStore(shape, initial(), { behaviors: defineBehaviors(shape, (b) => b.add(hint)) });
     expect(s.get(shape.note.hint)).toBe("person");
     s.set(shape.type, "company");
     expect(s.get(shape.note.hint)).toBe("company");
-    expect(() => createStore(shape, initial(), { behaviors: [hint("a"), hint("b")] })).toThrow(/already written/);
-    const sameSide = defineBehaviors(shape, (b) => b.when([shape.type], () => true, (b) => b.add(hint("a"), hint("b"))));
-    expect(() => createStore(shape, initial(), { behaviors: sameSide })).toThrow(/already written/);
+
+    const fixed = (text: string) => defineBehavior({ triggers: [shape.name], writes: [shape.note.hint], run: (c) => c.set(shape.note.hint, text) });
+    const opposite = defineBehaviors(shape, (b) => {
+      b.when([shape.type], (t) => t === "company", (b) => b.add(fixed("company")));
+      b.when([shape.type], (t) => t !== "company", (b) => b.add(fixed("person")));
+    });
+    expect(() => createStore(shape, initial(), { behaviors: opposite }), "opposite guards don't exempt two writers").toThrow(/already written/);
   });
 
   test("builder: nested blocks accumulate guards", () => {

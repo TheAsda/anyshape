@@ -203,13 +203,16 @@ test("declarations changing without deps: kept, with a warning", async () => {
   expect(warnings.filter((w) => /without a deps change/.test(w)).length).toBe(1);
 });
 
-test("builder features: when / otherwise with a shared target", async () => {
+test("builder features: when, and one behavior for a target's two values", async () => {
   const s = createStore(shape, initial());
-  const lock = (value: boolean) =>
-    defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, value) });
+  const lock = defineBehavior({
+    triggers: [shape.type], writes: [shape.note.disabled],
+    run: (c) => c.set(shape.note.disabled, c.get(shape.type) === "company"),
+  });
   function Rules() {
     useBehaviors((b) => {
-      b.when([shape.type], (t) => t === "company", (b) => b.add(required(shape.vat), lock(true))).otherwise((b) => b.add(lock(false)));
+      b.add(lock);
+      b.when([shape.type], (t) => t === "company", (b) => b.add(required(shape.vat)));
     }, []);
     return null;
   }

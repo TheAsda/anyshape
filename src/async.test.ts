@@ -321,14 +321,14 @@ describe("J · Cancellation", () => {
 
   test("reset() covering a run cancels it; the init rerun has no cause from it", async () => {
     const s = createStore(shape, initial());
-    const runs: { isInit: boolean; origins: string[]; signal: AbortSignal }[] = [];
+    const runs: { origins: string[]; signal: AbortSignal }[] = [];
     const gate = deferred<void>();
     s.addBehavior(
       defineBehavior({
         triggers: [shape.code],
         writes: [shape.name],
         run: async (ctx) => {
-          runs.push({ isInit: ctx.isInit, origins: [...ctx.origins], signal: ctx.signal });
+          runs.push({ origins: [...ctx.origins], signal: ctx.signal });
           await gate.promise;
           ctx.set(shape.name, ctx.get(shape.code));
         },
@@ -338,10 +338,10 @@ describe("J · Cancellation", () => {
     s.reset(shape.name); // the name is still "": the reset writes nothing new
     gate.resolve();
     await flush();
-    expect(runs.map((r) => [r.isInit, r.origins, r.signal.aborted])).toEqual([
-      [true, [], true],
-      [true, ["user"], true], // replaced the init run in flight
-      [true, [], false],
+    expect(runs.map((r) => [r.origins, r.signal.aborted])).toEqual([
+      [[], true],
+      [["user"], true], // replaced the init run in flight
+      [[], false],
     ]);
     expect(s.get(shape.name)).toBe("b");
   });
@@ -349,15 +349,14 @@ describe("J · Cancellation", () => {
 
 describe("J · Reruns", () => {
   /** An async behavior that records each run's cause and waits for a gate. */
-  function recorder(config: { triggers: AnyRef[]; reads?: AnyRef[]; origins?: OriginKind[]; runOn?: { init?: boolean; change?: boolean } }) {
-    const runs: { isInit: boolean; origins: string[]; changed: string[]; signal: AbortSignal }[] = [];
+  function recorder(config: { triggers: AnyRef[]; reads?: AnyRef[]; origins?: OriginKind[]; runOn?: { init?: boolean } }) {
+    const runs: { origins: string[]; changed: string[]; signal: AbortSignal }[] = [];
     const gate = deferred<void>();
     const behavior = defineBehavior({
       ...config,
       writes: [shape.rows],
       run: async (ctx) => {
         runs.push({
-          isInit: ctx.isInit,
           origins: [...ctx.origins].map((o) => o.replace(/^behavior:.*/, "behavior")),
           changed: [...config.triggers, ...(config.reads ?? [])].filter((t) => ctx.changed(t)).map((t) => (t as AnyNode).path),
           signal: ctx.signal,
@@ -389,10 +388,10 @@ describe("J · Reruns", () => {
     s.addBehavior(behavior);
     s.set(shape.code, "b", { origin: "user" });
     s.set(shape.name, "n"); // "program": filtered out
-    expect(runs.map((r) => [r.isInit, r.origins, r.changed, r.signal.aborted])).toEqual([
-      [true, [], [], true],
-      [true, ["user"], ["code"], true],
-      [true, ["user"], ["code"], false],
+    expect(runs.map((r) => [r.origins, r.changed, r.signal.aborted])).toEqual([
+      [[], [], true],
+      [["user"], ["code"], true],
+      [["user"], ["code"], false],
     ]);
   });
 
@@ -412,14 +411,14 @@ describe("J · Reruns", () => {
     expect(runs).toHaveLength(4); // rerun, though the origins filter ignores the change
   });
 
-  test("an init run replaced in flight keeps isInit, even with runOn.change: false", async () => {
+  test("a reads change reruns a run in flight, and starts none when idle", async () => {
     const s = createStore(shape, initial());
-    const { runs, gate, behavior } = recorder({ triggers: [shape.code], runOn: { change: false } });
+    const { runs, gate, behavior } = recorder({ triggers: [], reads: [shape.code] });
     s.addBehavior(behavior);
     s.set(shape.code, "b", { origin: "user" });
-    expect(runs.map((r) => [r.isInit, r.origins, r.changed, r.signal.aborted])).toEqual([
-      [true, [], [], true],
-      [true, ["user"], ["code"], false],
+    expect(runs.map((r) => [r.origins, r.changed, r.signal.aborted])).toEqual([
+      [[], [], true],
+      [["user"], ["code"], false], // replaced the init run in flight
     ]);
     gate.resolve();
     await flush();

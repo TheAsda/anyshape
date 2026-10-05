@@ -355,6 +355,6 @@ export class RunOrder<R extends Ranked> {
     }
     const placed = new Set(queue);
     const names = [...region].filter((v) => !placed.has(v)).sort((a, b) => a.reg.seq - b.reg.seq).map((v) => `"${v.reg.name}"`);
-    return new Error(`Behaviors form a cycle: ${names.join(", ")} – merge them into one behavior (see link())`);
+    return new Error(`Behaviors form a cycle: ${names.join(", ")} – merge them into one behavior that writes all their targets`);
   }
 }

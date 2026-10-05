@@ -5,8 +5,8 @@
 // ============================================================
 
 import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, contribute,
-  type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef, type NoPayload,
+  form, object, array, field, metaKey, createStore, countIn, initialOf, contribute, defineBehavior, defineBehaviors,
+  type BehaviorContext, type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef, type NoPayload,
 } from "./index";
 import * as core from "./index";
 import { control, visible, disabled, submission, error } from "./test/features";
@@ -196,6 +196,20 @@ export function contributionChecks() {
   // A definition with a payload still fits where MetaKeyDef<V> is expected.
   const def: MetaKeyDef<number> = total;
   return def;
+}
+
+// One way to say each thing (#92).
+export function oneWayChecks() {
+  // A run reaches the form only through its declared refs: no store, no initial(), no isInit.
+  expectTypeOf<BehaviorContext>().not.toHaveProperty("store");
+  expectTypeOf<BehaviorContext>().not.toHaveProperty("initial");
+  expectTypeOf<BehaviorContext>().not.toHaveProperty("isInit");
+  // @ts-expect-error – a ref that never starts a run is declared in `reads`
+  defineBehavior({ triggers: [t.text], runOn: { change: false }, run() {} });
+  defineBehaviors(t, (b) => {
+    // @ts-expect-error – one behavior computes both values of a target
+    b.when([t.text], (v) => v === "", () => {}).otherwise(() => {});
+  });
 }
 
 test("a loose node declares no known meta keys", () => {

@@ -17,7 +17,7 @@ A declaration that supplies one input to the single behavior owning a meta key, 
 _Avoid_: provider, source, partial writer
 
 **Cause**:
-What a run exists to handle: the origins of the changes that started it, which inputs changed, and whether it is the initial run. A run cancelled by an input change passes its cause to the run that replaces it.
+What a run exists to handle: the origins of the changes that started it and which inputs changed. A run cancelled by an input change passes its cause to the run that replaces it.
 _Avoid_: trigger info, reason
 
 **Kept work**:
