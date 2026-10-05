@@ -92,6 +92,12 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   new MetaRef(t.text, "error");
   // @ts-expect-error – counts are read-only
   s.set(countIn(t, error), 1);
+  // @ts-expect-error – countIn takes only a key declared with .aggregate()
+  countIn(t, metaKey(false));
+  // @ts-expect-error – .behavior() and .combine() don't make a key countable
+  countIn(t, metaKey(false).behavior(() => ({ triggers: [], run: () => {} })));
+  // Countable whatever step follows .aggregate().
+  countIn(t, metaKey(false).aggregate((v) => v).uses(error).behavior(() => ({ triggers: [], run: () => {} })));
   // @ts-expect-error – createStore is the one way to build a root store
   new core.RootStore(t, {} as InferValue<typeof t>, () => ({}) as never);
 
@@ -163,14 +169,14 @@ const flaggedKey = metaKey(false).aggregate((v) => {
   type _v = Expect<Equal<typeof v, boolean>>;
   return v;
 });
-type _w1 = Expect<Equal<typeof flaggedKey, MetaKeyDef<boolean, NoPayload, []>>>;
+type _w1 = Expect<Equal<typeof flaggedKey, MetaKeyDef<boolean, NoPayload, [], true>>>;
 const countKey = metaKey(0).aggregate((v) => v > 0);
-type _w2 = Expect<Equal<typeof countKey, MetaKeyDef<number, NoPayload, []>>>;
+type _w2 = Expect<Equal<typeof countKey, MetaKeyDef<number, NoPayload, [], true>>>;
 const labelKey = metaKey("").aggregate((v) => v !== "");
-type _w3 = Expect<Equal<typeof labelKey, MetaKeyDef<string, NoPayload, []>>>;
+type _w3 = Expect<Equal<typeof labelKey, MetaKeyDef<string, NoPayload, [], true>>>;
 // Spelled-out type arguments are kept as written.
 const issueKey = metaKey<string | undefined, { reason: string }>(undefined).aggregate((v) => v !== undefined);
-type _w4 = Expect<Equal<typeof issueKey, MetaKeyDef<string | undefined, { reason: string }, []>>>;
+type _w4 = Expect<Equal<typeof issueKey, MetaKeyDef<string | undefined, { reason: string }, [], true>>>;
 // @ts-expect-error – `aggregate` is a step, not an option
 metaKey(false, { aggregate: (v: boolean) => v });
 // The steps after `aggregate` are typed by the widened value.

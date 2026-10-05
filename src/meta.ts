@@ -48,15 +48,19 @@ export interface MetaKeySteps<V, P, U extends readonly AnyMetaKeyDef[]> {
 /**
  * `P` defaults to `unknown` here, so MetaKeyDef<V> accepts any definition
  * (combined or not); metaKey() defaults it to NoPayload, so a key declared
- * without `combine` takes no contributions.
+ * without `combine` takes no contributions. `C` likewise defaults to
+ * `boolean`; metaKey() sets it to false and .aggregate() to true, so countIn
+ * takes only a countable key.
  *
  * A definition is immutable: each step returns a new one.
  */
-export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyDef[] = readonly AnyMetaKeyDef[]> {
+export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyDef[] = readonly AnyMetaKeyDef[], C extends boolean = boolean> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
   /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
   declare readonly _payload: P;
+  /** Phantom type: whether .aggregate() made the key countable. */
+  declare readonly _counted: C;
   readonly defaultValue: V;
   readonly options: Readonly<MetaKeyOptions<V>>;
   /** @internal */
@@ -78,9 +82,9 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * where `isCounted` returns true for the key's value. It must return false
    * for the default value.
    */
-  aggregate(isCounted: (value: V) => boolean): MetaKeyDef<V, P, U> {
+  aggregate(isCounted: (value: V) => boolean): MetaKeyDef<V, P, U, true> {
     if (this._steps.aggregate) throw new Error(".aggregate() is declared once");
-    return new MetaKeyDef(this.defaultValue, this.options, { ...this._steps, aggregate: isCounted });
+    return new MetaKeyDef<V, P, U, true>(this.defaultValue, this.options, { ...this._steps, aggregate: isCounted });
   }
 
   /**
@@ -89,11 +93,11 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * whatever name the node declares it under. It grants no access: declare
    * the refs in triggers, reads or writes.
    */
-  uses<const U2 extends readonly AnyMetaKeyDef[]>(...defs: U2): MetaKeyDef<V, P, U2> {
+  uses<const U2 extends readonly AnyMetaKeyDef[]>(...defs: U2): MetaKeyDef<V, P, U2, C> {
     const { behavior, combine, ...before } = this._steps;
     if (combine || behavior) throw new Error("call .uses() before .combine() or .behavior()");
     if (before.uses) throw new Error(".uses() is declared once – list every used key in one call");
-    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, { ...before, uses: defs });
+    return new MetaKeyDef<V, P, U2, C>(this.defaultValue, this.options, { ...before, uses: defs });
   }
 
   /**
@@ -103,8 +107,8 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * node's ref under that name. The node is typed loosely because the key is
    * declared before the node exists.
    */
-  behavior(factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig): MetaKeyDef<V, P, U> {
-    return new MetaKeyDef(this.defaultValue, this.options, { ...this._steps, behavior: factory });
+  behavior(factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig): MetaKeyDef<V, P, U, C> {
+    return new MetaKeyDef<V, P, U, C>(this.defaultValue, this.options, { ...this._steps, behavior: factory });
   }
 
   /**
@@ -114,14 +118,14 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * key, like `behavior`; `key` is the node's ref under the name it declares
    * the key with. Mutually exclusive with `behavior`.
    */
-  combine(factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>): MetaKeyDef<V, P, U> {
-    return new MetaKeyDef(this.defaultValue, this.options, { ...this._steps, combine: factory });
+  combine(factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>): MetaKeyDef<V, P, U, C> {
+    return new MetaKeyDef<V, P, U, C>(this.defaultValue, this.options, { ...this._steps, combine: factory });
   }
 }
 
 /** Declare a meta key with capabilities. Count it with .aggregate(); add a default behavior or an owner with .behavior() / .combine(). */
-export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V>): MetaKeyDef<V, P, []> {
-  return new MetaKeyDef(defaultValue, options);
+export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V>): MetaKeyDef<V, P, [], false> {
+  return new MetaKeyDef<V, P, [], false>(defaultValue, options);
 }
 
 // ============================================================
