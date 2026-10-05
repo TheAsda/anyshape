@@ -14,7 +14,7 @@
 import { createContext, createElement, useCallback, useContext, useRef, type ReactNode } from "react";
 import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "form-lib";
 import { useField, useValue, type HookOptions } from "form-lib/react";
-import type { FocusTarget } from "../focus";
+import { registerFocus, type FocusTarget } from "../focus";
 
 /** What an error display policy decides on: a control's current state. */
 export interface ErrorDisplayState {
@@ -54,7 +54,6 @@ export type ControlNode = AnyNode & {
   readonly touched: MetaRef<boolean>;
   readonly dirty: MetaRef<boolean>;
   readonly revealed: MetaRef<boolean>;
-  readonly focusTarget: MetaRef<FocusTarget | undefined>;
 };
 
 export interface ControlBinding<N extends ControlNode> {
@@ -91,19 +90,12 @@ export function useControl<N extends ControlNode>(node: N, options?: UseControlO
   const revealed = useValue(node.revealed, { store });
   const pending = useValue(pendingOf(node.error), { store });
 
-  const registered = useRef<FocusTarget | null>(null);
+  const unregister = useRef<(() => void) | null>(null);
   const focusRef = useCallback(
     (target: FocusTarget | null) => {
-      if (target) {
-        registered.current = target;
-        store.set(node.focusTarget, target);
-        return;
-      }
-      // Unmount: clear only what this ref registered (another element may have taken over).
-      if (registered.current && store.get(node.focusTarget) === registered.current) {
-        store.set(node.focusTarget, undefined);
-      }
-      registered.current = null;
+      // Clears only what this ref registered (another element may have taken over).
+      unregister.current?.();
+      unregister.current = target ? registerFocus(store, node, target) : null;
     },
     [store, node]
   );

@@ -22,7 +22,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/lens.test.ts` | B | lens unit tests | 8 |
 | `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 21 |
 | `src/store.test.ts` | D, E, I | stores, scopes, reference API, own-node meta keys, row identity, array helpers | 30 |
-| `src/notifications.test.ts` | F | the notification rules, flush, non-reactive keys | 34 |
+| `src/notifications.test.ts` | F | the notification rules, flush | 33 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 66 |
@@ -34,7 +34,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
 | `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
 | `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
-| `recipes/focus.test.ts` | O | the focus recipe: `focusFirst` order and skips, `focus(store, node)` | 5 |
+| `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), `focusFirst` order and skips, `focus(store, node)` | 7 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
@@ -209,7 +209,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
 
 ### O. Submit, focus, paths
-**Covered:** `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors. The recipes: `handleSubmit` (`preventDefault`, no event, `formData` is the store's value, `submitting` and its reset when `fn` throws, reveal scope, focus on invalid, the per-store guard, independent submittable nodes, a non-submittable store rejected), `focusFirst` order and `compare`, skipped entries, `focus(store, node)`, DOM order in a real browser.
+**Covered:** `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors. The recipes: `handleSubmit` (`preventDefault`, no event, `formData` is the store's value, `submitting` and its reset when `fn` throws, reveal scope, focus on invalid, the per-store guard, independent submittable nodes, a non-submittable store rejected), `registerFocus` (found from any store in the scope, kept by reset, per row, unregistering only its own target), `focusFirst` order and `compare`, skipped entries, `focus(store, node)`, DOM order in a real browser.
 
 - [x] **O1 · P2** `focus(store, node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `recipes/focus.test.ts`
 - [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `recipes/focus.test.ts`

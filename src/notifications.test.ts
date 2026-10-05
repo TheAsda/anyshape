@@ -1,7 +1,6 @@
 import { form, object, array, field, createStore, defineBehavior, type InferValue } from "./index";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
-import type { FocusTarget } from "./test/features";
 
 const address = object({
   street: field<string>(),
@@ -470,27 +469,5 @@ describe("F · Meta-key subscriptions", () => {
     expect(calls).toBe(0);
     s.set(shape.name.error, "x");
     expect(calls).toBe(1);
-  });
-});
-
-describe("F · Non-reactive keys", () => {
-  const { shape, L, initial } = company;
-  const test = base
-    .extend("store", () => createStore(shape, initial()))
-    .extend("lines", ({ store }) => store.substore(shape.lines));
-
-  test("focus targets never notify and work on detached rows", ({ store: s, lines }) => {
-    const row = lines.itemAt(0);
-    let calls = 0;
-    s.subscribe(shape, () => calls++);
-    row.subscribe(L.sku.focusTarget, () => calls++);
-    const target: FocusTarget = { focus() {} };
-    row.set(L.sku.focusTarget, target);
-    expect(calls).toBe(0);
-    expect(row.get(L.sku.focusTarget)).toBe(target);
-    lines.remove(row);
-    calls = 0;
-    row.set(L.sku.focusTarget, undefined);        // unmount after removal must not throw
-    expect(calls).toBe(0);
   });
 });

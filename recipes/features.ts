@@ -7,7 +7,6 @@
 // ============================================================
 
 import { metaKey, initialOf } from "form-lib";
-import { focusable } from "./focus";
 import { reveal } from "./submit";
 import { validation } from "./validation";
 
@@ -46,8 +45,8 @@ export const disabled = metaKey<boolean, string>(false).combine((self, key) => (
 }));
 
 /**
- * The usual set for an input: validation, touched, dirty, revealed and a
- * focus target, with their default behaviors.
+ * The usual set for an input: validation, touched, dirty and revealed, with
+ * their default behaviors.
  * Deliberately not configurable: control() exists to provide this default
  * functionality. For different logic, compose the features you need and
  * declare your own key, e.g. field().meta(validation(), { touched, dirty: false }).
@@ -57,5 +56,4 @@ export const control = () => ({
   touched,
   dirty,
   ...reveal(),
-  ...focusable(),
 });

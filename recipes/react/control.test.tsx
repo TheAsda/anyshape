@@ -9,6 +9,7 @@ import { StoreProvider } from "form-lib/react";
 import { control } from "../features";
 import { rule, asyncRule } from "../validation";
 import { handleSubmit, submission } from "../submit";
+import { focus } from "../focus";
 import { useControl, ErrorDisplayProvider, fromInput, fromCheckbox } from "./index";
 import { render, settle } from "./test-utils";
 
@@ -189,11 +190,13 @@ test("focusRef registers the element, focus() and submit use it, unmount clears 
     </StoreProvider>
   );
   const input = screen.getByTestId("in");
-  expect(s.get(shape.name.focusTarget)).toBe(input.element());
   await settle(() => handleSubmit(s, async () => {})());
   await expect.element(input, { message: "submit focused the first error" }).toHaveFocus();
+  (input.element() as HTMLElement).blur();
+  expect(focus(s, shape.name)).toBe(true);
+  await expect.element(input).toHaveFocus();
   await screen.unmount();
-  expect(s.get(shape.name.focusTarget), "cleared on unmount").toBe(undefined);
+  expect(focus(s, shape.name), "cleared on unmount").toBe(false);
 });
 
 test("focusRef: unmounting one of two inputs keeps the other's registration", async () => {
@@ -216,12 +219,15 @@ test("focusRef: unmounting one of two inputs keeps the other's registration", as
     </StoreProvider>
   );
   const screen = await render(app(true));
-  const b = screen.getByTestId("b").element();
-  expect(s.get(shape.name.focusTarget), "the last one mounted wins").toBe(b);
+  const b = screen.getByTestId("b");
+  expect(focus(s, shape.name)).toBe(true);
+  await expect.element(b, { message: "the last one mounted wins" }).toHaveFocus();
+  (b.element() as HTMLElement).blur();
   await screen.rerender(app(false));
-  expect(s.get(shape.name.focusTarget)).toBe(b);
+  expect(focus(s, shape.name)).toBe(true);
+  await expect.element(b).toHaveFocus();
   await screen.unmount();
-  expect(s.get(shape.name.focusTarget)).toBe(undefined);
+  expect(focus(s, shape.name)).toBe(false);
 });
 
 test("fromInput / fromCheckbox with real events; handlers are cached", async () => {
