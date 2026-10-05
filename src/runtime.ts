@@ -304,7 +304,8 @@ class Binding {
 }
 
 // ============================================================
-// Handles
+// Handles – what a BehaviorHandle (behaviors.ts) disposes
+// ============================================================
 interface HandleEntry {
   runtime: BehaviorRuntime;
   host: BaseStore<any>;
