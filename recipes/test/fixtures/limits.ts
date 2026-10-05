@@ -1,7 +1,7 @@
 // A form with limits kept across reset (minCode, maxQty), a `disabled` flag,
 // nested rows and submission(). Used by reset, submit, limit and replacement tests.
 import {
-  form, object, array, field, metaKey, createStore, type InferValue,
+  form, object, array, field, metaKey, type InferValue,
 } from "anyshape";
 import { control, submission, disabled } from "../../index";
 

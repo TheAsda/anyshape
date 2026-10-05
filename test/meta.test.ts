@@ -2,7 +2,7 @@ import {
   form, object, array, field, MetaRef, createStore, type InferValue, type InferMeta,
 } from "../src/index";
 import { control, validation, touched, visible, disabled, submission } from "./support/features";
-import { META, META_DEFS, CREATE, defOf } from "../src/internal";
+import { META_DEFS, CREATE, defOf } from "../src/internal";
 import { test, describe, expect } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -51,7 +51,7 @@ type _9 = Expect<Equal<InferMeta<typeof shape.note>, {}>>;
 // Compile-time only – never called.
 export function typeOnlyChecks() {
   // @ts-expect-error – `note` declares no meta
-  shape.note.error;
+  void shape.note.error;
   // @ts-expect-error – `create` must return a complete item
   array(object({ a: field<string>() }), { create: () => ({}) });
 }

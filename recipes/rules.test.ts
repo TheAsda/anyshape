@@ -4,7 +4,7 @@ import {
 } from "anyshape";
 import {
   control, required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf, calculate,
-  exclusive, error, dirty,
+  exclusive, dirty,
 } from "./index";
 import { test as base, describe, expect } from "vitest";
 import { shape, L, initial } from "./test/fixtures/profile";

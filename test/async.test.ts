@@ -61,7 +61,7 @@ describe("J · Async runs", () => {
         writes: [shape.name],
         run: async (ctx) => {
           ctx.set(shape.name, "first");
-          await null;
+          await Promise.resolve();
           seen.push(ctx.get(shape.name));
           ctx.set(shape.name, "last");
         },
@@ -83,7 +83,7 @@ describe("J · Async runs", () => {
         writes: [shape.name],
         run: async (ctx) => {
           ctx.set(shape.name, "partial");
-          await null;
+          await Promise.resolve();
           throw failure;
         },
       }),
@@ -93,7 +93,7 @@ describe("J · Async runs", () => {
         writes: [shape.rows],
         run: async (ctx) => {
           ctx.set(shape.rows, []);
-          await null;
+          await Promise.resolve();
           ctx.get(shape.name);
         },
       }),
@@ -113,7 +113,7 @@ describe("J · Async runs", () => {
         triggers: [shape.code],
         writes: [shape.rows],
         run: async (ctx) => {
-          await null;
+          await Promise.resolve();
           const row = { sku: "y", title: "" };
           ctx.set(shape.rows, [row, row]);
         },
@@ -439,7 +439,7 @@ describe("J · Transactional state", () => {
         run: async (ctx) => {
           seen.push(ctx.state.overridden);
           if (ctx.origins.has("user")) ctx.state.overridden = true; // in place, like calculate
-          await null;
+          await Promise.resolve();
         },
       })
     );
@@ -654,7 +654,7 @@ describe("J · Definition traces", () => {
       triggers: [shape.code],
       writes: [shape.name],
       run: async () => {
-        await null;
+        await Promise.resolve();
         throw new TypeError("lookup failed");
       },
     });
@@ -668,8 +668,8 @@ describe("J · Definition traces", () => {
     expect(error.message).toBe("lookup failed");
     expect((error.cause as Error).message).toBe("lookup failed");
     expect(error.cause).toBeInstanceOf(TypeError);
-    const frames = error.stack!.split("\n").filter((l) => l.trim().startsWith("at "));
-    expect(frames[0]).toMatch(/async\.test\.ts/); // the call to defineBehavior in `failing`
+    const frame = error.stack!.split("\n").find((l) => l.trim().startsWith("at "));
+    expect(frame).toMatch(/async\.test\.ts/); // the call to defineBehavior in `failing`
   });
 
   test("in production, onError gets the thrown value itself", async () => {

@@ -41,7 +41,7 @@
     "build": "vite build && tsc -p tsconfig.build.json",
     "check:package": "bun scripts/check-package.ts",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && oxfmt --write",
     "release": "bun run build && bun run check:package && changeset publish",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
@@ -52,6 +52,10 @@
     "bench": "vitest bench --run --project 'unit (bench)' --reporter=verbose",
     "test:memory": "vitest run --config vitest.memory.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p recipes && kiira check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt --write",
+    "format:check": "oxfmt --check",
     "dev": "vite"
   },
   "peerDependencies": {
@@ -70,6 +74,8 @@
     "@types/react-dom": "^19.0.0",
     "@vitest/browser-playwright": "5.0.2",
     "kiira": "^0.6.0",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
     "playwright": "^1.63.0",
     "publint": "^0.3.25",
     "react": "^19.0.0",

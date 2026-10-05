@@ -1,15 +1,15 @@
 // H · Counts: countIn, collect, aggregate keys, counts across rows.
 
 import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, when,
+  form, object, array, field, metaKey, createStore, countIn, initialOf,
 } from "../src/index";
-import { control, revealed, dirty, error } from "./support/features";
+import { revealed, dirty, error } from "./support/features";
 import { test, test as base, describe, expect, vi } from "vitest";
 import * as company from "./support/fixtures/company";
 import * as limits from "./support/fixtures/limits";
 
 describe("H · Counts and collect", () => {
-  const { shape, L, initial, originsOf } = company;
+  const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
     .extend("lines", ({ store }) => store.substore(shape.lines));
@@ -164,6 +164,7 @@ describe.each(["development", "production"])("H · countIn rejects a key it can'
       other: object({ d: field<string>() }),
     })
   );
+  // oxlint-disable-next-line no-empty-pattern -- Vitest needs a destructuring pattern as a fixture's first argument
   const test = base.extend("warn", ({}, { onCleanup }) => {
     vi.stubEnv("NODE_ENV", mode);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -203,7 +204,7 @@ describe.each(["development", "production"])("H · countIn rejects a key it can'
 });
 
 describe("H · Stable count references", () => {
-  const { shape, L, initial } = limits;
+  const { shape } = limits;
 
   // ---------------------------------------------------------------------------
   // Stable references

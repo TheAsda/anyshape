@@ -28,7 +28,7 @@ const item = shape.order.items.item;
  * stays listed – the select needs it to render the selection.
  */
 function SkuField() {
-  const c = useControl(item.sku);
+  const { focusRef, ...c } = useControl(item.sku);
   const rows = useValue(shape.order.items);
   const id = useId();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -61,7 +61,7 @@ function SkuField() {
       </label>
       <select
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         value={c.value}
         onBlur={c.onBlur}
