@@ -37,6 +37,7 @@ const countKind: RefKind<CountRef> = {
   affectedBy: (ref, t) =>
     t.key === undefined ? isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node) : t.def === ref.def && isAncestorOrSelf(ref.node, t.node),
   local: false,
+  tally: true,
   readOnly: "Counts are read-only",
 };
 
