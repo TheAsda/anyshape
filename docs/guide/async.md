@@ -90,12 +90,13 @@ The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/
 
 ## Pending
 
-The core derives which targets are pending; nothing declares or writes it. Three read-only references report it, and a fourth method waits for it:
+The core derives which targets are pending; nothing declares or writes it. Two read-only references report it, and a store method waits for it:
 
 - `pendingOf(target)` is `true` while a run that writes `target` is in flight.
 - `pendingIn(node)` counts the pending targets under `node`, rows included. `pendingIn(node, definition)` counts only the meta keys declared with that definition.
-- `countIn(node, definition)` counts the nodes whose counted key is set ([meta-keys.md](meta-keys.md)). Together with `pendingIn`, it answers "can this form be submitted now?".
-- `store.settle(node)` resolves once no run that writes under `node` is in flight.
+- `store.settle(node)` resolves once no run that writes under `node` is in flight. Without a node, it waits for the store's whole subtree.
+
+`pendingIn` pairs with `countIn(node, definition)`, which counts the nodes whose counted key is set ([meta-keys.md](meta-keys.md)): no errors and nothing pending answers "can this form be submitted now?".
 
 ```ts
 const store = createStore(shape, { destination: "", nights: 3 }, { behaviors: [checkDestinationDebounced] });
