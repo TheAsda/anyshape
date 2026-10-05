@@ -14,8 +14,7 @@ export function createStore<N extends ObjectNode<any>>(
   options: StoreOptions = {}
 ): RootStore<N> {
   const onError = options.onError ?? ((error, info) => console.error(`[form] "${info.behavior}" failed at "${info.scope}"`, error));
-  const runtime = (root: RootStore<N>) => new BehaviorRuntime(root, onError);
-  const store = new RootStore(shape, initialValues, runtime);
+  const store = new RootStore(shape, initialValues, (root) => new BehaviorRuntime(root, onError));
   if (isDev()) store._probe = new Diagnostics();
   store._batch(() => {
     const defaults = defaultBehaviors(shape);

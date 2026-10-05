@@ -93,7 +93,7 @@ export interface CollectEntry<V = unknown> {
 
 export const MAX_REACTION_ROUNDS = 100;
 
-/** @internal Installed on the root by the behavior runtime (behaviors.ts). */
+/** @internal The behavior runtime (behaviors.ts): built by the factory createStore passes to the root. */
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;
@@ -383,7 +383,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.assertInScope(node);
     this.root._batch(() => {
       this.assertAttached();
-      const initial = node.lens.get(this.scope.getScopeInitial());
+      const initial = this._readInitial(node);
       this.root._log({ loc: locOf(this._host, node), origin: "initial" });
       this._write(node, initial);
       this._resetMeta(node);
@@ -849,7 +849,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { reaction: new Map(), ui: new Map() };
 
   /** @internal – use createStore() */
-  constructor(shape: N, initialValues: InferValue<N>, runtime: (root: RootStore<N>) => RuntimeHooks) {
+  constructor(shape: N, initialValues: InferValue<N>, createRuntime: (root: RootStore<N>) => RuntimeHooks) {
     super(shape, undefined);
     if (shape.id === undefined || shape.parent !== undefined) {
       throw new Error("RootStore needs the root returned by form()");
@@ -858,7 +858,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     this.value = initialValues;
     this.initial = initialValues;
     this._initSeen();
-    this._runtime = runtime(this);
+    this._runtime = createRuntime(this);
   }
 
   protected override get scope(): ScopeHost {
