@@ -260,7 +260,8 @@ Type assertions are spread across the files today. Collect the public-API type c
   - `useControl` on a node without `control()`;
   - a ref to an undeclared key (`node.nope`), or `new MetaRef(…)`;
   - `handleSubmit` on a store whose node has no `submission()`;
-  - `set` on a `CountRef`.
+  - `set` on a `CountRef`;
+  - `form()` on a record of fields instead of an `object()` node (#101).
 
 ### T. Diagnostics, dev only (`diagnostics.ts`, the probe in `store.ts`)
 Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`src/diagnostics.test.ts`**.

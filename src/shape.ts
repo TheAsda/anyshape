@@ -307,7 +307,7 @@ export function array(item: any, options?: ArrayOptions<any>): any {
 
 /** Root entry point: instantiates the form's object node (ids, paths, lenses). */
 export function form<N extends ObjectNode<any>>(root: N): N {
-  if (!(root instanceof ObjectNode)) throw new Error("form() takes an object node, e.g. form(object({ ... }))");
+  if (!(root instanceof ObjectNode)) throw new Error("form() takes an object node – wrap the fields, e.g. form(object({ ... }))");
   let counter = 0;
   return instantiate(root, {
     path: "",
