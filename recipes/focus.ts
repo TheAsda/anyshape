@@ -13,7 +13,7 @@
 //     result's errors) whose node has a target, in document order by default.
 // ============================================================
 
-import { ArrayStore, ObjectStore, type AnyNode, type BaseStore, type CollectEntry } from "form-lib";
+import type { AnyNode, BaseStore, CollectEntry } from "form-lib";
 
 /** Anything that can receive focus – an input, or a custom component's handle. */
 export interface FocusTarget {
@@ -24,21 +24,14 @@ export interface FocusTarget {
 /** Registered targets by scope store, then node. A removed row's store takes its targets with it. */
 const targets = new WeakMap<BaseStore<any>, Map<AnyNode, FocusTarget>>();
 
-/** The scope store (root or row) that `store` addresses its nodes through: past section and array views. */
-function scopeOf(store: BaseStore<any>): BaseStore<any> {
-  while (store instanceof ObjectStore || store instanceof ArrayStore) store = store.parentStore!;
-  return store;
-}
-
 /**
  * Register where focus() and focusFirst() move the cursor for `node`; a
  * later registration for the node replaces it. The returned function
  * unregisters the target, unless another one has replaced it since.
  */
 export function registerFocus(store: BaseStore<any>, node: AnyNode, target: FocusTarget): () => void {
-  const scope = scopeOf(store);
-  let byNode = targets.get(scope);
-  if (!byNode) targets.set(scope, (byNode = new Map()));
+  let byNode = targets.get(store.scopeStore);
+  if (!byNode) targets.set(store.scopeStore, (byNode = new Map()));
   byNode.set(node, target);
   return () => {
     if (byNode.get(node) === target) byNode.delete(node);
@@ -64,7 +57,7 @@ export function domOrder(a: FocusTarget, b: FocusTarget): number {
 /** The target registered for the node; none for a removed row. */
 function targetOf(store: BaseStore<any>, node: AnyNode): FocusTarget | undefined {
   if (!store.isAttached()) return undefined;
-  return targets.get(scopeOf(store))?.get(node);
+  return targets.get(store.scopeStore)?.get(node);
 }
 
 function moveTo(target: FocusTarget): void {

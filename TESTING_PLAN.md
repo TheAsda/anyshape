@@ -21,7 +21,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
 | `src/lens.test.ts` | B | lens unit tests | 8 |
 | `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 21 |
-| `src/store.test.ts` | D, E, I | stores, scopes, reference API, own-node meta keys, row identity, array helpers | 30 |
+| `src/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, reference API, own-node meta keys, row identity, array helpers | 31 |
 | `src/notifications.test.ts` | F | the notification rules, flush | 33 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
