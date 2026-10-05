@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 322 tests in 25 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 449 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -21,20 +21,22 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
 | `src/lens.test.ts` | B | lens unit tests | 8 |
 | `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 21 |
-| `src/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, reference API, own-node meta keys, row identity, array helpers | 31 |
+| `src/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers | 32 |
 | `src/notifications.test.ts` | F | the notification rules, flush | 33 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 66 |
+| `src/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 42 |
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 34 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
+| `recipes/features.test.ts` | N | the default behaviors of `touched` and `dirty` | 1 |
 | `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
 | `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
-| `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), `focusFirst` order and skips, `focus(store, node)` | 7 |
+| `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips, `focus(store, node)` | 8 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
@@ -112,6 +114,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **D1 · P2** Meta delegation: a deep node's key read through `root` and through `root.substore(section)` is one value; a write through one is visible through the other. → `store.test.ts`
 - [x] **D2 · P2** `substore(fieldNode)` throws "needs an object or array node". → `store.test.ts`
 - [x] **D3 · P3** A node from another form, or an uninstantiated description, is rejected by `get`/`set`/`substore` with "is not part of the store". → `store.test.ts`
+- [x] **D4 · P2** `assertInScope(node)` is public, with the messages `get` uses: another form's node, a row node through the root store, a node outside a substore throw; in-scope nodes and a node inside a row, through the row's store, pass. → `store.test.ts`
 
 ### E. Row identity & array helpers (`ArrayStore`, `ItemStore`)
 **Covered:** stable ids, identity preserved through row writes, isolated per-row meta, reorder, outside replace = new store, detached reads/writes, nested arrays, `append`/`insert`/`remove`/`move`, complete items without `create`, origins passed through, undo re-attach, both versions present.
@@ -215,6 +218,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `recipes/focus.test.ts`
 - [x] **O3 · P2** `handleSubmit` rejects a store whose own node doesn't declare `submission()`, at compile time and at run time. → `recipes/submit.test.ts`
 - [x] **O4 · P3** `handleSubmit(store, fn)()` called without an event. → `recipes/submit.test.ts`
+- [x] **O5 · P2** `registerFocus` and `focus` throw for a node the store does not address: a row node through the root store, a node of another form. → `recipes/focus.test.ts`
 
 ### P. React bindings (`react/hooks.ts`, `recipes/react/`)
 **Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useArray` (re-render on structure only, nested arrays). In the recipes: `useControl` (state, user writes, `onBlur` reveal, default policy and `ErrorDisplayProvider`), `focusRef`, adapters (real events, caching).
