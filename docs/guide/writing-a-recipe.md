@@ -39,6 +39,7 @@ export const disabled = metaKey<boolean, string>(false).combine((self, key) => (
 ```
 
 `.combine` adds the owner to the definition from step 1: the one [behavior](../../GLOSSARY.md) per node that writes the key. Its run sees the reasons that currently apply as `ctx.parts`, and the field is disabled while there is at least one. A reason whose [guard](../../GLOSSARY.md) fails is absent, so the key turns back to `false` on its own when the last reason goes away. The name built from the node's path makes the owner easy to find in error messages and DevTools.
+
 ## Step 3: a contribution function
 
 ```ts
