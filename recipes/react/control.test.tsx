@@ -4,8 +4,8 @@
 // ============================================================
 
 import { test, expect } from "vitest";
-import { form, object, array, field, createStore, type BaseStore, type InferValue } from "form-lib";
-import { StoreProvider } from "form-lib/react";
+import { form, object, array, field, createStore, type BaseStore, type InferValue } from "anyshape";
+import { StoreProvider } from "anyshape/react";
 import { control } from "../features";
 import { rule, asyncRule } from "../validation";
 import { handleSubmit, submission } from "../submit";

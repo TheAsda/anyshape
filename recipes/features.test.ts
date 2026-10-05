@@ -1,6 +1,6 @@
 // Features: the default behaviors of touched and dirty.
 
-import { form, object, field, createStore } from "form-lib";
+import { form, object, field, createStore } from "anyshape";
 import { describe, expect, test } from "vitest";
 import { touched, dirty } from "./features";
 

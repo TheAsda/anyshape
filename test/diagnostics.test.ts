@@ -314,7 +314,7 @@ describe("T · DevTools tracks", () => {
   const measured = () =>
     measure.mock.calls.map(([name, options]: any) => ({ name, start: options.start, end: options.end, ...options.detail.devtools }));
 
-  test("each flush, its two phases and each run are entries in the form-lib group: label, start, end, track, color", () => {
+  test("each flush, its two phases and each run are entries in the anyshape group: label, start, end, track, color", () => {
     const s = createStore(shape, initial());
     s.addBehavior(
       defineBehavior({
@@ -330,10 +330,10 @@ describe("T · DevTools tracks", () => {
     t = 10;
     s.set(shape.rows, [...s.get(shape.rows), { sku: "z", title: "" }]);
     expect(stamp.mock.calls).toEqual([
-      ["title @rows[2]", 10, 14, "behaviors", "form-lib", "primary"],
-      ["behavior runs", 10, 14, "flush", "form-lib", "tertiary-light"],
-      ["listeners", 14, 15, "flush", "form-lib", "tertiary-light"],
-      ["flush", 10, 15, "flush", "form-lib", "tertiary"],
+      ["title @rows[2]", 10, 14, "behaviors", "anyshape", "primary"],
+      ["behavior runs", 10, 14, "flush", "anyshape", "tertiary-light"],
+      ["listeners", 14, 15, "flush", "anyshape", "tertiary-light"],
+      ["flush", 10, 15, "flush", "anyshape", "tertiary"],
     ]);
   });
 
@@ -350,7 +350,7 @@ describe("T · DevTools tracks", () => {
     expect(measured()).toEqual([
       {
         name: "flush over budget", start: 10, end: 51,
-        dataType: "track-entry", track: "flush", trackGroup: "form-lib", color: "error",
+        dataType: "track-entry", track: "flush", trackGroup: "anyshape", color: "error",
         tooltipText: "A flush took 41.0 ms, over the 33.3 ms budget",
         properties: [
           ["Behaviors", "40.0 ms"],
@@ -408,7 +408,7 @@ describe("T · DevTools tracks", () => {
     expect(measured()).toEqual([
       {
         name: "registration @<root>", start: 10, end: 10,
-        dataType: "track-entry", track: "registration", trackGroup: "form-lib", color: "tertiary-dark",
+        dataType: "track-entry", track: "registration", trackGroup: "anyshape", color: "tertiary-dark",
         tooltipText: "1 behavior added, 0 removed, 1 combined key changed",
         properties: [
           ["Added", "copy"],
@@ -418,7 +418,7 @@ describe("T · DevTools tracks", () => {
       },
       {
         name: "registration @<root>", start: 13, end: 13,
-        dataType: "track-entry", track: "registration", trackGroup: "form-lib", color: "tertiary-dark",
+        dataType: "track-entry", track: "registration", trackGroup: "anyshape", color: "tertiary-dark",
         tooltipText: "0 behaviors added, 1 removed, 1 combined key changed",
         properties: [
           ["Removed", "copy"],
@@ -459,7 +459,7 @@ describe("T · DevTools tracks", () => {
     expect(measured()).toEqual([
       {
         name: "settle @<root>", start: 10, end: 30,
-        dataType: "track-entry", track: "async", trackGroup: "form-lib", color: "secondary-dark",
+        dataType: "track-entry", track: "async", trackGroup: "anyshape", color: "secondary-dark",
         tooltipText: "settle() waited 20.0 ms for the runs in flight inside <root>",
         properties: [],
       },

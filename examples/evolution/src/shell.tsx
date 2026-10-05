@@ -76,7 +76,7 @@ export function Shell() {
     <div className="deck">
       <header className="deck__header">
         <h1>
-          form-lib <span>· a form grows up</span>
+          anyshape <span>· a form grows up</span>
         </h1>
         <nav className="deck__tabs" aria-label="Stages">
           {stages.map((s, i) => (

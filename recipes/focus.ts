@@ -12,7 +12,7 @@
 //     result's errors) whose node has a target, in document order.
 // ============================================================
 
-import type { AnyNode, BaseStore, CollectEntry } from "form-lib";
+import type { AnyNode, BaseStore, CollectEntry } from "anyshape";
 
 /** Anything that can receive focus – an input, or a custom component's handle. */
 export interface FocusTarget {

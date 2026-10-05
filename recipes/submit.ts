@@ -11,7 +11,7 @@
 //   5. `submitting` off. If fn throws, the handler's promise rejects.
 // ============================================================
 
-import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "form-lib";
+import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "anyshape";
 import { focusFirst } from "./focus";
 import { validate } from "./validation";
 

@@ -32,13 +32,13 @@ export function locatedAt(trace: Error, message: string, options?: ErrorOptions)
 // ============================================================
 
 /** ObjectNode: its children (also exposed as direct properties). */
-export const FIELDS: unique symbol = Symbol("form-lib.fields");
+export const FIELDS: unique symbol = Symbol("anyshape.fields");
 /** ShapeNode: normalized declarations, one per meta key. */
-export const META_DEFS: unique symbol = Symbol("form-lib.metaDefs");
+export const META_DEFS: unique symbol = Symbol("anyshape.metaDefs");
 /** ShapeNode: default values of all declared meta keys. */
-export const META: unique symbol = Symbol("form-lib.meta");
+export const META: unique symbol = Symbol("anyshape.meta");
 /** ArrayNode: factory for new rows, if declared. */
-export const CREATE: unique symbol = Symbol("form-lib.create");
+export const CREATE: unique symbol = Symbol("anyshape.create");
 
 /** The declaration of the key a meta reference points at. */
 export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {

@@ -13,7 +13,7 @@ import type { AnyNode } from "../shape";
 import type { MetaKeyDef } from "../meta";
 import type { BaseStore, Phase, SubFn, Unsubscribe, WriteOptions } from "../store";
 
-export const KIND: unique symbol = Symbol("form-lib.refKind");
+export const KIND: unique symbol = Symbol("anyshape.refKind");
 
 /** What a write to a writable reference changes: a node's value, or one meta key of a node. */
 export interface Target {

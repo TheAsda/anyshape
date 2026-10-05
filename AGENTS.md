@@ -4,7 +4,7 @@ Work in progress, pre-release: there are no consumers yet. Any public interface,
 
 ## Core and recipes
 
-Recipes (`recipes/`, the React recipes in `recipes/react/`, the examples) build only on the core entries' public interface: import from `form-lib`, plus `form-lib/react` in React code. No code, whether core, recipe or example, finds a meta key by a string: a key is reached through a node's ref (`node.error`) or, for a sweep, through its definition (`collect(node, revealed)`). Node internals (`_`-prefixed members, anything in `src/internal.ts`) belong to the core's own modules. When a recipe needs something the public interface lacks, grow the interface. See [Public shape introspection for recipes](https://github.com/TheAsda/form-lib/issues/27).
+Recipes (`recipes/`, the React recipes in `recipes/react/`, the examples) build only on the core entries' public interface: import from `anyshape`, plus `anyshape/react` in React code. No code, whether core, recipe or example, finds a meta key by a string: a key is reached through a node's ref (`node.error`) or, for a sweep, through its definition (`collect(node, revealed)`). Node internals (`_`-prefixed members, anything in `src/internal.ts`) belong to the core's own modules. When a recipe needs something the public interface lacks, grow the interface. See [Public shape introspection for recipes](https://github.com/TheAsda/form-lib/issues/27).
 
 ## Agent skills
 
