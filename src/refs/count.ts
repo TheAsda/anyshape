@@ -45,34 +45,45 @@ const countRefs = new WeakMap<AnyNode, Map<MetaKeyDef<any, any>, CountRef>>();
 let countIds = 0;
 
 /**
- * Whether any node in the subtree declares `def`. Rows share the array item
- * template's declarations, so walking the template covers them.
+ * Where the subtree first declares `def` (`key "name" on "path"`), or
+ * undefined. Rows share the array item template's declarations, so walking
+ * the template covers them.
  */
-function isDeclared(node: AnyNode, def: MetaKeyDef<any, any>): boolean {
-  if (Object.values(node[META_DEFS]).includes(def)) return true;
+function declaration(node: AnyNode, def: MetaKeyDef<any, any>): string | undefined {
+  for (const [name, d] of Object.entries(node[META_DEFS])) if (d === def) return `key "${name}" on "${node.path || "<root>"}"`;
   if (node instanceof ObjectNode) {
-    for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) if (isDeclared(child, def)) return true;
+    for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) {
+      const found = declaration(child, def);
+      if (found) return found;
+    }
   } else if (node instanceof ArrayNode) {
-    return isDeclared(node.item, def);
+    return declaration(node.item, def);
   }
-  return false;
+  return undefined;
 }
 
-/** Count reference; the same instance for the same (node, def), so it can be used as a hook dependency. */
+/**
+ * Count reference; the same instance for the same (node, def), so it can be
+ * used as a hook dependency. Throws when the count would always be 0: the key
+ * has no aggregate, or no node in the subtree declares it.
+ */
 export function countIn(node: AnyNode, def: MetaKeyDef<any, any>): CountRef {
   let byDef = countRefs.get(node);
   if (!byDef) countRefs.set(node, (byDef = new Map()));
   let ref = byDef.get(def);
   if (!ref) {
-    byDef.set(def, (ref = new CountRef(node, def, `c:${countIds++}`)));
+    const declared = declaration(node, def);
     const problem = !def._steps.aggregate
-      ? "the key has no aggregate"
-      : !isDeclared(node, def)
-        ? `no node under "${node.path || "<root>"}" declares it`
+      ? `${declared ?? "the key"} has no aggregate`
+      : !declared
+        ? "no node in the subtree declares the key"
         : undefined;
     if (problem) {
-      console.warn(`countIn: ${problem} – the count is always 0. Counted keys are declared with metaKey(value).aggregate(…).`);
+      throw new Error(
+        `countIn on "${node.path || "<root>"}": ${problem} – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).`
+      );
     }
+    byDef.set(def, (ref = new CountRef(node, def, `c:${countIds++}`)));
   }
   return ref;
 }
