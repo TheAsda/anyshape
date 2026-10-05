@@ -26,17 +26,18 @@ export { PendingInRef, PendingOfRef, pendingIn, pendingOf } from "./refs/pending
 
 // Stores
 export { createStore } from "./create.js";
-// The type only: createStore is the one way to build a root store.
-export type { RootStore } from "./store.js";
-export {
-  BaseStore, ArrayStore, ItemStore,
-  type Listener, type Unsubscribe, type Origin, type WriteOptions, type AnyRef, type RefValue, type CollectEntry,
-  type NewItemArgs,
+// The stores as types only: createStore builds the root, and the root hands
+// out the substores and rows.
+export type {
+  RootStore, BaseStore, ArrayStore, ItemStore,
+  Listener, Unsubscribe, Origin, WriteOptions, AnyRef, RefValue, CollectEntry, NewItemArgs,
 } from "./store.js";
 
 // Behaviors
+// Behavior and Contribution as types only: defineBehavior and contribute build them.
+export type { Behavior, Contribution } from "./behaviors.js";
 export {
-  Behavior, Contribution, when, defineBehavior, contribute,
+  when, defineBehavior, contribute,
   type AnyBehavior, type BehaviorConfig, type BehaviorContext, type Declaration, type Guard, type WritableRef,
   type OriginKind, type Part, type OwnerContext, type OwnerConfig, type BehaviorErrorInfo, type StoreOptions,
   type BehaviorHandle,
