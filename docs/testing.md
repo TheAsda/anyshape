@@ -10,6 +10,8 @@ Before you open a pull request, run:
 
 - `bun run test`: all four Vitest projects. Each also runs alone: `test:unit`, `test:recipes`, `test:react`, `test:recipes-react`.
 - `bun run typecheck`: `tsc` on the source, the recipes and the type-level tests, then `kiira check` on the code samples in `README.md`, `docs/guide/` and `docs/principles.md`. The type-level tests and the samples are checked only here, never under Vitest, so CI runs both commands.
+- `bun run lint`: oxlint, configured in `.oxlintrc.json`. Its boundary rules check that recipes and examples import only the entries `anyshape` and `anyshape/react` (and the recipes), and that the core, its tests and benches import no recipe. `bun run lint:fix` applies the fixes oxlint can make.
+- `bun run format:check`: oxfmt, configured in `.oxfmtrc.json`, on the code, JSON, YAML and Markdown. `bun run format` rewrites the files.
 
 CI also runs these, which you can run by hand:
 
@@ -54,7 +56,6 @@ Each layer has an ID. A `describe` block is named after the layer it tests (`"F 
 | `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips |
 | `test/types.test.ts` | S | the public type contract (asserted by `tsc`) |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) |
-| `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe |
 | `test/exports.test.ts` | — | each entry's public names, as a snapshot; the API tables in `docs/guide/agents.md` list exactly those names |
 | `test/integration.test.ts` | INT | trip-booking scenarios across all layers |
 | `test/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` |
@@ -64,7 +65,7 @@ Each layer has an ID. A `describe` block is named after the layer it tests (`"F 
 | `recipes/react/control.test.tsx` | P | `useControl`, `showError`, `focusRef`, adapters |
 | `recipes/react/submit.test.tsx` | O | DOM focus order, `handleSubmit` on a real `<form>`, DOM elements beside custom focus handles |
 
-Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) and `test/support/trip.ts`. The core tests declare their meta keys with the test-local features in `test/support/features.ts` and rules in `test/support/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`. The import check forbids sharing across that boundary, so the copies are deliberate.
+Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) and `test/support/trip.ts`. The core tests declare their meta keys with the test-local features in `test/support/features.ts` and rules in `test/support/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`. The tests don't share code across that boundary, and the lint's boundary rules keep the core's tests from importing `recipes/`, so the copies are deliberate.
 
 ## Conventions
 

@@ -1,9 +1,9 @@
 // G · Origins, baselines (initial values) and reset.
 
 import {
-  form, object, array, field, createStore, countIn, initialOf, defineBehavior, type Origin,
+  form, object, field, createStore, countIn, initialOf, defineBehavior, type Origin,
 } from "../src/index";
-import { control, touched, disabled, dirty, error } from "./support/features";
+import { control, disabled, dirty, error } from "./support/features";
 import { rule, max } from "./support/rules";
 import { test as base, describe, expect } from "vitest";
 import { watchOrigins } from "./support/harness";
@@ -78,7 +78,7 @@ describe("G · Origins, baselines and reset", () => {
     expect(s.get(shape.name)).toBe("Cid");
   });
 
-  test("rows keep their own initial value through edits and reordering", ({ store: s, lines }) => {
+  test("rows keep their own initial value through edits and reordering", ({ lines }) => {
     const [a, b] = lines.items();
     a.set(L.qty, 9);
     expect(a.get(initialOf(L.qty))).toBe(1);

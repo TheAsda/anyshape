@@ -63,7 +63,7 @@ it.skipIf(!gc)("removed rows are collectable: stores, values and per-row state",
       values.push(new WeakRef(row.get(L) as object));
       unsubscribe();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
 
   await collectGarbage();
@@ -84,7 +84,7 @@ it.skipIf(!gc)("a row removed while its subscription is still active is collecta
       row.subscribe(L.sku, () => {}); // never unsubscribed, e.g. a leaked listener
       refs.push(new WeakRef(row));
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -103,7 +103,7 @@ it.skipIf(!gc)("a removed row whose own behaviors were disposed is collectable",
       refs.push(new WeakRef(row));
       dispose();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -148,7 +148,7 @@ it.skipIf(!gc)("removed nested rows whose own behaviors were disposed are collec
       refs.push(new WeakRef(line));
       for (const dispose of handles) dispose();
     }
-    for (const line of [...lines.items()]) lines.remove(line);
+    for (const line of lines.items()) lines.remove(line);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -166,7 +166,7 @@ it.skipIf(!gc)("a removed row whose disposed behavior read the whole list is col
       refs.push(new WeakRef(row));
       dispose();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -185,7 +185,7 @@ it.skipIf(!gc)("removed rows whose disposed behaviors were linked to a root beha
       refs.push(new WeakRef(row));
       for (const dispose of handles) dispose();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);

@@ -17,7 +17,7 @@ Each recipe imports only `anyshape`, and the React ones also `anyshape/react`, s
 | [`react/control.ts`](react/control.ts) | `useControl(node)`: an input's binding for a node with `control()`: value, `onChange`, the control keys, `pending`, `showError`, `onBlur` and `focusRef`. | None; reads the `control()` keys. | [`react/control.test.tsx`](react/control.test.tsx) |
 | [`react/adapters.ts`](react/adapters.ts) | `fromInput` and `fromCheckbox`: turn an `onChange` for values into a DOM change handler. | None. | [`react/control.test.tsx`](react/control.test.tsx) |
 
-[`imports.test.ts`](imports.test.ts) is this repository's own check that recipes import only the public entries; it isn't part of any recipe.
+This repository's lint (`bun run lint`, the boundary rules in [`.oxlintrc.json`](../.oxlintrc.json)) checks that recipes import only the public entries.
 
 ## Copying a recipe
 

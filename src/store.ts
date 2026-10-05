@@ -494,7 +494,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** @internal reset every meta entry owned in this subtree */
   _resetAllMeta(): void {
-    for (const node of [...this._metaMap.keys()]) this._resetEntry(node);
+    for (const node of this._metaMap.keys()) this._resetEntry(node);
     for (const child of this._children.values()) child._resetAllMeta();
   }
 
@@ -1041,12 +1041,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> {
 // ============================================================
 // Object substore – a view; reads through the parent's scope
 // ============================================================
-export class ObjectStore<N extends ObjectNode<any>> extends BaseStore<N> {
-  /** @internal – use store.substore(node) */
-  constructor(node: N, parent: BaseStore<any>) {
-    super(node, parent);
-  }
-}
+export class ObjectStore<N extends ObjectNode<any>> extends BaseStore<N> {}
 
 // ============================================================
 // Array substore
@@ -1077,11 +1072,6 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   /** Per walk: the sequence it last walked, and the rows whose object changed since. */
   private walked: Record<Walk, readonly ItemStore<any>[]> = { sync: EMPTY, behavior: EMPTY, listener: EMPTY };
   private readonly rewritten: Record<Walk, Set<ItemStore<any>>> = { sync: new Set(), behavior: new Set(), listener: new Set() };
-
-  /** @internal – use store.substore(node) */
-  constructor(node: N, parent: BaseStore<any>) {
-    super(node, parent);
-  }
 
   /** Current array value ([] when unset or detached). */
   current(): readonly ItemValue<N>[] {
@@ -1174,7 +1164,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
 
   private newItem(input: ItemValue<N> | undefined): ItemValue<N> {
     const create = this.node[CREATE];
-    if (create) return { ...(create() as object), ...(input ?? {}) } as ItemValue<N>;
+    if (create) return { ...(create() as object), ...input } as ItemValue<N>;
     if (input === undefined) {
       throw new Error(`"${this.node.path}" has no \`create\` factory – pass a complete item`);
     }
