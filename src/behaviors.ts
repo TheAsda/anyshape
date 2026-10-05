@@ -33,7 +33,8 @@
 //               per node that declares the key, limited to that node.
 //   • Runtime registration – store.addBehavior(...) runs every check above and
 //               returns a dispose function; disposing resets the meta keys
-//               the behavior wrote to their defaults.
+//               the behavior wrote to their defaults, the values it wrote
+//               stay.
 //   • Contributions – see "Key contributions" below: a combined key's owner is
 //               updated in place as contributions come and go.
 //
@@ -464,7 +465,15 @@ class Binding {
 // ============================================================
 // Handles
 // ============================================================
-/** Returned by addBehavior: call it to remove the behaviors; pass it to replaceBehavior to swap them. */
+/**
+ * Returned by addBehavior: call it to remove the behaviors; pass it to
+ * replaceBehavior to swap them. Removing a behavior resets the meta keys it
+ * wrote to their defaults, since the rule they described is gone; the values
+ * it wrote stay, since they are the user's data. A removed contribution is
+ * absent, as with a failing guard: its owner recomputes without it, and the
+ * key returns to its default with the last one. A behavior whose guard fails
+ * is different: it still exists, so its earlier writes stay.
+ */
 export type BehaviorHandle = (() => void) & { readonly __behaviorHandle?: never };
 
 interface HandleEntry {

@@ -74,6 +74,24 @@ test("registers on mount, before paint; removed on unmount", async () => {
   expect(s.get(shape.name.error), "the rule left with the component").toBe(undefined);
 });
 
+test("unmount resets the meta its behaviors wrote; their values stay", async () => {
+  const s = createStore(shape, initial());
+  function Rules() {
+    useBehaviors((b) => {
+      b.add(defineBehavior({ triggers: [shape.name], writes: [shape.name.hint], run: (c) => c.set(shape.name.hint, `for ${c.get(shape.name)}`) }));
+      b.add(defineBehavior({ triggers: [shape.name], writes: [shape.vat], run: (c) => c.set(shape.vat, c.get(shape.name).toUpperCase()) }));
+    }, []);
+    return null;
+  }
+  const screen = await mount(<StoreProvider store={s}><Rules /></StoreProvider>);
+  s.set(shape.name, "ann");
+  expect(s.get(shape.name.hint)).toBe("for ann");
+  expect(s.get(shape.vat)).toBe("ANN");
+  await screen.unmount();
+  expect(s.get(shape.name.hint), "meta back to its default").toBe("");
+  expect(s.get(shape.vat), "values stay").toBe("ANN");
+});
+
 test("under a row provider the behaviors apply to that row only", async () => {
   const s = createStore(shape, initial());
   const [a, b] = s.substore(shape.lines).items();

@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 452 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 453 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -43,7 +43,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
 | `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` | 12 |
 | `src/react/form.test.tsx` | Q | `useForm`, `useSync` | 10 |
-| `src/react/behaviors.test.tsx` | R | `useBehaviors` | 13 |
+| `src/react/behaviors.test.tsx` | R | `useBehaviors` | 14 |
 | `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
 | `recipes/react/control.test.tsx` | P | `useControl`, `showError`, `focusRef`, adapters | 7 |
 | `recipes/react/submit.test.tsx` | O | DOM focus order, `handleSubmit` on a real `<form>`, DOM elements beside custom focus handles | 3 |
@@ -177,7 +177,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **K6 · P2** Ranks follow each registration change, reranking only what it reaches (#6): a behavior added upstream raises the whole chain; disposing one lowers its dependents, to their next longest chain; a replacement is checked for cycles without the registration it replaces, and a rejected one keeps the previous place; a contribution's trigger moves its owner after the trigger's writer, and its removal moves it back. → `behaviors.test.ts`
 
 ### L. Runtime lifecycle
-**Covered:** init runs, `runOn.init`, `ctx.state`, `ctx.origins` (empty for a run caused only by a tally), `when` skip, throwing behaviors isolated (writes dropped, concrete scope), row instances pause/resume, nested rows, row-level `addBehavior`/dispose.
+**Covered:** init runs, `runOn.init`, `ctx.state`, `ctx.origins` (empty for a run caused only by a tally), `when` skip, throwing behaviors isolated (writes dropped, concrete scope), row instances pause/resume, nested rows, row-level `addBehavior`/dispose (resets the meta it wrote, values stay).
 
 - [x] **L1 · P2** `ctx.changed(ref)` is `false` on the init run and `true` only for triggers that changed since the last run. → `behaviors.test.ts`
 - [x] **L2 · P2** Within one run: two `ctx.set` calls to the same target → the last one wins; `ctx.get` sees the pending write. → `behaviors.test.ts`
@@ -237,7 +237,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.tsx`
 
 ### R. Behaviors in components (`react/behaviors.ts`)
-**Covered:** mount/unmount timing, row scoping, deps-driven atomic swap, latest props in `run`/checks/guards/contribution payloads, declarations changing without deps (warning), builder features, StrictMode, duplicates with the "declare it once" hint, store change moves the registration, explicit `{ store }`.
+**Covered:** mount/unmount timing, unmount resets the meta its behaviors wrote (values stay), row scoping, deps-driven atomic swap, latest props in `run`/checks/guards/contribution payloads, declarations changing without deps (warning), builder features, StrictMode, duplicates with the "declare it once" hint, store change moves the registration, explicit `{ store }`.
 
 - [x] **R1 · P2** Contributions from a component keep their place in `ctx.parts` across a deps change, and the latest payload is used without re-registering. → `react/behaviors.test.tsx`
 - [x] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.tsx`
