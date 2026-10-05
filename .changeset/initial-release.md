@@ -1,0 +1,5 @@
+---
+"anyshape": minor
+---
+
+Initial release.
