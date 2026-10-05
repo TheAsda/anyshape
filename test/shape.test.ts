@@ -1,9 +1,8 @@
 // A · Shape: node instantiation, identity, parents, templates and structural checks.
 
-import {
-  form, object, array, field, createStore,
-} from "../src/index";
 import { test, describe, expect } from "vitest";
+
+import { form, object, array, field, createStore } from "../src/index";
 import { userShape } from "./support/fixtures/user";
 
 describe("A · Nodes", () => {
@@ -53,13 +52,25 @@ describe("A · Reused shapes containing arrays", () => {
     expect(f.a.items.item).not.toBe(f.b.items.item);
     expect(f.a.items.item.x.path).toBe("a.items[].x");
     expect(f.b.items.item.x.path).toBe("b.items[].x");
-    const nodes = [f, f.a, f.a.items, f.a.items.item, f.a.items.item.x, f.b, f.b.items, f.b.items.item, f.b.items.item.x];
+    const nodes = [
+      f,
+      f.a,
+      f.a.items,
+      f.a.items.item,
+      f.a.items.item.x,
+      f.b,
+      f.b.items,
+      f.b.items.item,
+      f.b.items.item.x,
+    ];
     expect(new Set(nodes.map((n) => n.id)).size, "every id is unique").toBe(nodes.length);
 
     const s = createStore(f, { a: { items: [{ x: "1" }] }, b: { items: [{ x: "2" }] } });
     const rowA = s.substore(f.a.items).itemAt(0);
     expect(rowA.get(f.a.items.item.x)).toBe("1");
     expect(s.substore(f.b.items).itemAt(0).get(f.b.items.item.x)).toBe("2");
-    expect(() => rowA.get(f.b.items.item.x), "the other copy's template is not in this row").toThrow(/"b\.items\[\]\.x" is inside an array item/);
+    expect(() => rowA.get(f.b.items.item.x), "the other copy's template is not in this row").toThrow(
+      /"b\.items\[\]\.x" is inside an array item/,
+    );
   });
 });

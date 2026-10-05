@@ -12,6 +12,7 @@
 // ============================================================
 
 import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "anyshape";
+
 import { focusFirst } from "./focus";
 import { validate } from "./validation";
 
@@ -52,7 +53,7 @@ function ownSubmitting(store: BaseStore<any>): MetaRef<boolean> {
 
 export function handleSubmit<N extends Submittable>(
   store: BaseStore<N>,
-  fn: (formData: InferValue<N>) => void | Promise<void>
+  fn: (formData: InferValue<N>) => void | Promise<void>,
 ): FormSubmitHandler {
   const ref = ownSubmitting(store);
   return async (event) => {

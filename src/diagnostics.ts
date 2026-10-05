@@ -16,9 +16,9 @@
 // is not: it is mostly waiting.
 // ============================================================
 
-import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store.js";
-import type { AnyNode } from "./shape.js";
 import { locatedAt, pathLabel } from "./internal.js";
+import type { AnyNode } from "./shape.js";
+import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store.js";
 
 /** One frame at 30 fps, in ms. */
 export const FLUSH_BUDGET = 1000 / 30;
@@ -91,7 +91,13 @@ class FlushBudget {
         } else byName.set(name, { name, time, runs, trace });
       }
       const slowest = [...byName.values()].sort((a, b) => b.time - a.time).slice(0, 3);
-      report = { total, applying: this.carry, behaviors: behaviorsAt - this.start, listeners: at - behaviorsAt, slowest };
+      report = {
+        total,
+        applying: this.carry,
+        behaviors: behaviorsAt - this.start,
+        listeners: at - behaviorsAt,
+        slowest,
+      };
     }
     for (const tally of this.listed) {
       tally.time = 0;
@@ -110,7 +116,11 @@ class FlushBudget {
   runEnd(instance: ProbedInstance, at: number, part: RunPart): void {
     const time = at - this.runAt;
     let tally = this.tallies.get(instance.reg);
-    if (!tally) this.tallies.set(instance.reg, (tally = { name: instance.reg.name, time: 0, runs: 0, trace: instance.reg.behavior._trace, listed: false }));
+    if (!tally)
+      this.tallies.set(
+        instance.reg,
+        (tally = { name: instance.reg.name, time: 0, runs: 0, trace: instance.reg.behavior._trace, listed: false }),
+      );
     if (!tally.listed) {
       tally.listed = true;
       this.listed.push(tally);
@@ -141,7 +151,15 @@ function overBudget(report: FlushReport): string {
 // ============================================================
 const GROUP = "anyshape";
 type Track = "flush" | "behaviors" | "async" | "registration";
-type Color = "primary" | "secondary" | "secondary-light" | "secondary-dark" | "tertiary" | "tertiary-light" | "tertiary-dark" | "error";
+type Color =
+  | "primary"
+  | "secondary"
+  | "secondary-light"
+  | "secondary-dark"
+  | "tertiary"
+  | "tertiary-light"
+  | "tertiary-dark"
+  | "error";
 
 /** console.timeStamp with the extended arguments (Chrome 136+). */
 type TimeStamp = (label: string, start: number, end: number, track: Track, group: string, color: Color) => void;
@@ -159,12 +177,13 @@ class Tracks {
 
   private constructor(
     private readonly stamp: TimeStamp | undefined,
-    private readonly measure: Performance["measure"] | undefined
+    private readonly measure: Performance["measure"] | undefined,
   ) {}
 
   /** Undefined when neither API exists. */
   static detect(): Tracks | undefined {
-    const stamp = typeof console.timeStamp === "function" ? (console.timeStamp.bind(console) as unknown as TimeStamp) : undefined;
+    const stamp =
+      typeof console.timeStamp === "function" ? (console.timeStamp.bind(console) as unknown as TimeStamp) : undefined;
     const measure = typeof performance.measure === "function" ? performance.measure.bind(performance) : undefined;
     return stamp || measure ? new Tracks(stamp, measure) : undefined;
   }
@@ -219,7 +238,9 @@ class Tracks {
     const flight = this.flights.get(instance);
     if (!flight) return;
     this.flights.delete(instance);
-    const [label, color]: [string, Color] = cancelled ? [`${flight.label} (cancelled)`, "secondary-light"] : [flight.label, "secondary"];
+    const [label, color]: [string, Color] = cancelled
+      ? [`${flight.label} (cancelled)`, "secondary-light"]
+      : [flight.label, "secondary"];
     this.stamp?.(label, flight.start, at, "async", GROUP, color);
   }
 
@@ -238,7 +259,11 @@ class Tracks {
         ...(removed.length ? [["Removed", removed.join(", ")] as [string, string]] : []),
         ...owners.flatMap((o): [string, string][] => [
           [`${o.key} triggers`, o.triggers.join(", ")],
-          [`${o.key} contributions`, [...o.contributions, ...(o.more ? [`… and ${o.more} more`] : [])].join(", ") || "none: the key is back to its default"],
+          [
+            `${o.key} contributions`,
+            [...o.contributions, ...(o.more ? [`… and ${o.more} more`] : [])].join(", ") ||
+              "none: the key is back to its default",
+          ],
         ]),
       ],
     });
@@ -252,8 +277,19 @@ class Tracks {
     });
   }
 
-  private detail(name: string, start: number, end: number, track: Track, color: Color, entry: { tooltipText: string; properties: [string, string][] }): void {
-    this.measure?.(name, { start, end, detail: { devtools: { dataType: "track-entry", track, trackGroup: GROUP, color, ...entry } } });
+  private detail(
+    name: string,
+    start: number,
+    end: number,
+    track: Track,
+    color: Color,
+    entry: { tooltipText: string; properties: [string, string][] },
+  ): void {
+    this.measure?.(name, {
+      start,
+      end,
+      detail: { devtools: { dataType: "track-entry", track, trackGroup: GROUP, color, ...entry } },
+    });
   }
 }
 

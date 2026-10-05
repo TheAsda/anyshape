@@ -10,14 +10,10 @@
     "declarationMap": false,
     "sourceMap": false,
     "stripInternal": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": [
-    "src/**/*"
-  ],
+  "include": ["src/**/*"],
   "exclude": []
 }

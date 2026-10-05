@@ -47,19 +47,16 @@
 //   8. Listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
-import type { Meta, MetaKeyDef } from "./meta.js";
 import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors.js";
-import {
-  ShapeNode, ObjectNode, ArrayNode,
-  type AnyNode, type ContainerNode, type InferValue,
-} from "./shape.js";
 import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal.js";
-import { isAncestorOrSelf } from "./tree.js";
-import { kindOf } from "./refs/kind.js";
-import type { MetaRef } from "./refs/meta.js";
+import type { Meta, MetaKeyDef } from "./meta.js";
 import type { CountRef } from "./refs/count.js";
 import type { InitialRef } from "./refs/initial.js";
+import { kindOf } from "./refs/kind.js";
+import type { MetaRef } from "./refs/meta.js";
 import type { PendingInRef, PendingOfRef } from "./refs/pending.js";
+import { ShapeNode, ObjectNode, ArrayNode, type AnyNode, type ContainerNode, type InferValue } from "./shape.js";
+import { isAncestorOrSelf } from "./tree.js";
 
 export type Listener = () => void;
 export type Unsubscribe = () => void;
@@ -79,11 +76,13 @@ export interface ChangeInfo {
 }
 
 export type AnyRef = AnyNode | MetaRef<any> | CountRef | InitialRef<any> | PendingInRef | PendingOfRef;
-export type RefValue<R> =
-  R extends CountRef | PendingInRef ? number
-  : R extends PendingOfRef ? boolean
-  : R extends InitialRef<infer V> ? V
-  : InferValue<R>;
+export type RefValue<R> = R extends CountRef | PendingInRef
+  ? number
+  : R extends PendingOfRef
+    ? boolean
+    : R extends InitialRef<infer V>
+      ? V
+      : InferValue<R>;
 
 export interface CollectEntry<V = unknown> {
   /** Concrete path of the node with row indexes, e.g. "lines[2].qty". */
@@ -233,7 +232,8 @@ interface ScopeHost {
 /** Do two locations overlap (one contains the other)? */
 function related(a: Loc, b: Loc): boolean {
   for (let i = 0; i < a.length && i < b.length; i++) {
-    const x = a[i], y = b[i];
+    const x = a[i],
+      y = b[i];
     if (x.host !== y.host) return false;
     if (i === a.length - 1 || i === b.length - 1) {
       return isAncestorOrSelf(x.node, y.node) || isAncestorOrSelf(y.node, x.node);
@@ -294,9 +294,15 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal live meta per node owned by this store */
   readonly _metaMap = new Map<AnyNode, Meta>();
   /** @internal */ readonly _valueSubs = new Map<AnyNode, Set<Sub>>();
-  /** @internal single-key subscriptions, registered on every source node */ readonly _keySubs = new Map<AnyNode, Set<Sub>>();
+  /** @internal single-key subscriptions, registered on every source node */ readonly _keySubs = new Map<
+    AnyNode,
+    Set<Sub>
+  >();
   /** @internal scope hosts only */ readonly _countSubs = new Map<AnyNode, Map<Slot, Set<Sub>>>();
-  /** @internal scope hosts only: node → slot → tally (node itself + descendants) */ readonly _counts = new Map<AnyNode, Map<Slot, number>>();
+  /** @internal scope hosts only: node → slot → tally (node itself + descendants) */ readonly _counts = new Map<
+    AnyNode,
+    Map<Slot, number>
+  >();
   /** @internal scope hosts only: subscriptions to initial values */ readonly _initialSubs = new Set<Sub>();
   /** @internal cached substores, keyed by node */ readonly _children = new Map<AnyNode, BaseStore<any>>();
   /** @internal focus value / attachment at the last visit, per phase */ _seen!: Record<Phase, Seen>;
@@ -304,7 +310,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   protected constructor(
     readonly node: N,
-    readonly parentStore: BaseStore<any> | undefined
+    readonly parentStore: BaseStore<any> | undefined,
   ) {}
 
   // ---- scope wiring (overridden by RootStore / ItemStore) ----
@@ -361,7 +367,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   _setValue<T>(node: ShapeNode<T>, value: T, options: WriteOptions = {}): void {
     this.assertInScope(node);
     const asInitial = options.as === "initial";
-    const origin: Origin = asInitial ? "initial" : options.origin ?? "program";
+    const origin: Origin = asInitial ? "initial" : (options.origin ?? "program");
     this.root._batch(() => {
       this.assertAttached();
       validateValue(node, value);
@@ -608,7 +614,8 @@ export abstract class BaseStore<N extends ContainerNode> {
         store = rows[index];
         node = node.item;
       } else {
-        if (!(node instanceof ObjectNode) || !Object.prototype.hasOwnProperty.call(node[FIELDS], token)) return undefined;
+        if (!(node instanceof ObjectNode) || !Object.prototype.hasOwnProperty.call(node[FIELDS], token))
+          return undefined;
         node = (node[FIELDS] as Record<string, AnyNode>)[token];
       }
     }
@@ -662,7 +669,10 @@ export abstract class BaseStore<N extends ContainerNode> {
     const owner = this._ownerOf(node);
     const loc = locOf(owner.scopeStore, node);
     const sub: Sub = {
-      phase, fn, active: true, last: undefined,
+      phase,
+      fn,
+      active: true,
+      last: undefined,
       read: () => owner._read(node),
       equals: Object.is,
       origins: (log) => originsWhere(log, (e) => e.key === undefined && related(e.loc, loc)),
@@ -678,10 +688,14 @@ export abstract class BaseStore<N extends ContainerNode> {
     const owner = this._ownerOf(node);
     const host = owner.scopeStore;
     const sub: Sub = {
-      phase, fn, active: true, last: undefined,
+      phase,
+      fn,
+      active: true,
+      last: undefined,
       read: () => this._readMetaRef(ref),
       equals: Object.is,
-      origins: (log) => originsWhere(log, (e) => e.key === key && lastOf(e.loc).host === host && lastOf(e.loc).node === node),
+      origins: (log) =>
+        originsWhere(log, (e) => e.key === key && lastOf(e.loc).host === host && lastOf(e.loc).node === node),
     };
     sub.last = sub.read();
     return register(owner._keySubs, node, sub);
@@ -693,7 +707,10 @@ export abstract class BaseStore<N extends ContainerNode> {
     const host = this.scopeStore;
     const loc = locOf(host, node);
     const sub: Sub = {
-      phase, fn, active: true, last: undefined,
+      phase,
+      fn,
+      active: true,
+      last: undefined,
       read: () => host._readInitial(node),
       equals: Object.is,
       origins: (log) => originsWhere(log, (e) => e.origin === "initial" && e.key === undefined && related(e.loc, loc)),
@@ -712,12 +729,21 @@ export abstract class BaseStore<N extends ContainerNode> {
    * other value a kind keeps per slot). `read` defaults to the subtree tally.
    * Tallies carry no origins.
    */
-  _addTallySub(node: AnyNode, slot: Slot, phase: Phase, fn: SubFn, read?: (host: BaseStore<any>) => unknown): Unsubscribe {
+  _addTallySub(
+    node: AnyNode,
+    slot: Slot,
+    phase: Phase,
+    fn: SubFn,
+    read?: (host: BaseStore<any>) => unknown,
+  ): Unsubscribe {
     this.assertInScope(node);
     this.root._syncWalk();
     const host = this.scopeStore;
     const sub: Sub = {
-      phase, fn, active: true, last: undefined,
+      phase,
+      fn,
+      active: true,
+      last: undefined,
       read: read ? () => read(host) : () => host._countOf(node, slot),
       equals: Object.is,
       origins: () => NO_ORIGINS,
@@ -818,7 +844,9 @@ export abstract class BaseStore<N extends ContainerNode> {
   assertInScope(node: AnyNode): void {
     for (let n: AnyNode | undefined = node; n !== this.node; n = n.parent) {
       if (n === undefined) {
-        throw new Error(`"${node.path ?? "<uninstantiated node>"}" is not part of the store for "${this.node.path || "<root>"}"`);
+        throw new Error(
+          `"${node.path ?? "<uninstantiated node>"}" is not part of the store for "${this.node.path || "<root>"}"`,
+        );
       }
       if (n.parent instanceof ArrayNode) {
         throw new Error(`"${node.path}" is inside an array item – use the item's store (arrayStore.item(...))`);
@@ -846,8 +874,14 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> {
   /** @internal */ readonly _runtime: RuntimeHooks;
   /** @internal */ _probe: Probe | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { behavior: new Set(), listener: new Set() };
-  private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { behavior: new Map(), listener: new Map() };
-  private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { behavior: new Map(), listener: new Map() };
+  private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = {
+    behavior: new Map(),
+    listener: new Map(),
+  };
+  private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = {
+    behavior: new Map(),
+    listener: new Map(),
+  };
 
   /** @internal – use createStore() */
   constructor(shape: N, initialValues: InferValue<N>, createRuntime: (root: RootStore<N>) => RuntimeHooks) {
@@ -1071,7 +1105,11 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   private createdSince: Record<Phase, ItemStore<any>[]> = { behavior: [], listener: [] };
   /** Per walk: the sequence it last walked, and the rows whose object changed since. */
   private walked: Record<Walk, readonly ItemStore<any>[]> = { sync: EMPTY, behavior: EMPTY, listener: EMPTY };
-  private readonly rewritten: Record<Walk, Set<ItemStore<any>>> = { sync: new Set(), behavior: new Set(), listener: new Set() };
+  private readonly rewritten: Record<Walk, Set<ItemStore<any>>> = {
+    sync: new Set(),
+    behavior: new Set(),
+    listener: new Set(),
+  };
 
   /** Current array value ([] when unset or detached). */
   current(): readonly ItemValue<N>[] {

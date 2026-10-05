@@ -63,26 +63,64 @@
 // store.settle(node?) waits until no run writing inside the node is in flight.
 // ============================================================
 
-import { ShapeNode, ObjectNode, ArrayNode, type AnyNode } from "./shape.js";
-import type { MetaRef } from "./refs/meta.js";
 import {
-  refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
-  FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, locatedAt, pathLabel,
-} from "./internal.js";
-import { isAncestorOrSelf } from "./tree.js";
-import {
-  RootStore, BaseStore, ItemStore, ArrayStore,
-  type AnyRef, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks, type RegistrationChange,
-  type Probe, type ProbedInstance, type RunPart, LISTED_CONTRIBUTIONS,
-} from "./store.js";
-import { kindOf, type Target } from "./refs/kind.js";
-import { beginRun, pendingIn, type PendingRun } from "./refs/pending.js";
-import { RunOrder, NodeIndex, type Write } from "./order.js";
-import {
-  Behavior, Contribution,
-  type AnyBehavior, type BehaviorConfig, type BehaviorContext, type BehaviorErrorInfo, type BehaviorHandle,
-  type Declaration, type Guard, type OriginKind, type OwnerConfig, type OwnerContext, type Part, type WritableRef,
+  Behavior,
+  Contribution,
+  type AnyBehavior,
+  type BehaviorConfig,
+  type BehaviorContext,
+  type BehaviorErrorInfo,
+  type BehaviorHandle,
+  type Declaration,
+  type Guard,
+  type OriginKind,
+  type OwnerConfig,
+  type OwnerContext,
+  type Part,
+  type WritableRef,
 } from "./behaviors.js";
+import {
+  refNode,
+  refKey,
+  refLabel,
+  targetOf,
+  scopeOf,
+  chainTo,
+  rootOf,
+  storeWithin,
+  hostFor,
+  concretePath,
+  FIELDS,
+  META_DEFS,
+  metaRefOf,
+  defOf,
+  usedRefs,
+  rowsBetween,
+  locatedAt,
+  pathLabel,
+} from "./internal.js";
+import { RunOrder, NodeIndex, type Write } from "./order.js";
+import { kindOf, type Target } from "./refs/kind.js";
+import type { MetaRef } from "./refs/meta.js";
+import { beginRun, pendingIn, type PendingRun } from "./refs/pending.js";
+import { ShapeNode, ObjectNode, ArrayNode, type AnyNode } from "./shape.js";
+import {
+  RootStore,
+  BaseStore,
+  ItemStore,
+  ArrayStore,
+  type AnyRef,
+  type Origin,
+  type ChangeInfo,
+  type Unsubscribe,
+  type RuntimeHooks,
+  type RegistrationChange,
+  type Probe,
+  type ProbedInstance,
+  type RunPart,
+  LISTED_CONTRIBUTIONS,
+} from "./store.js";
+import { isAncestorOrSelf } from "./tree.js";
 
 /**
  * What onError receives for an error thrown by a run: in dev, for behaviors
@@ -105,7 +143,8 @@ function originKind(origin: Origin): OriginKind {
 
 /** Do two write targets overlap (the same data)? */
 function overlaps(a: Target, b: Target): boolean {
-  if (a.key === undefined && b.key === undefined) return isAncestorOrSelf(a.node, b.node) || isAncestorOrSelf(b.node, a.node);
+  if (a.key === undefined && b.key === undefined)
+    return isAncestorOrSelf(a.node, b.node) || isAncestorOrSelf(b.node, a.node);
   return a.key !== undefined && a.node === b.node && a.key === b.key;
 }
 
@@ -296,7 +335,7 @@ class Binding {
   constructor(
     readonly reg: Registration,
     readonly host: BaseStore<any>,
-    readonly depth: number
+    readonly depth: number,
   ) {}
 
   get isLeaf(): boolean {
@@ -341,7 +380,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   constructor(
     readonly store: RootStore<any>,
-    readonly onError: (error: unknown, info: BehaviorErrorInfo) => void
+    readonly onError: (error: unknown, info: BehaviorErrorInfo) => void,
   ) {}
 
   // ---- RuntimeHooks ----
@@ -375,7 +414,11 @@ export class BehaviorRuntime implements RuntimeHooks {
     return this.swap(entry.host, entry, behaviors);
   }
 
-  private swap(host: BaseStore<any>, previous: HandleEntry | undefined, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+  private swap(
+    host: BaseStore<any>,
+    previous: HandleEntry | undefined,
+    behaviors: AnyBehavior | readonly AnyBehavior[],
+  ): BehaviorHandle {
     const list = (Array.isArray(behaviors) ? behaviors : [behaviors]) as readonly AnyBehavior[];
     if (!host.isAttached()) throw new Error("Cannot add behaviors to a detached row");
     const contributions = list.filter((b): b is Contribution => b instanceof Contribution);
@@ -405,7 +448,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     host: BaseStore<any>,
     behaviors: readonly Behavior[],
     removing: readonly Registration[],
-    owners: OwnerChange = []
+    owners: OwnerChange = [],
   ): Registration[] {
     const probe = this.store._probe;
     probe?.registrationStart(performance.now());
@@ -414,17 +457,14 @@ export class BehaviorRuntime implements RuntimeHooks {
     // already registered then takes over its declarations in place.
     const live = owners.filter((o) => o.size);
     const ownerRegs = live.map((delta) => this.prepare(this.store, this.ownerBehavior(delta), delta.owner));
-    const removed = new Set([
-      ...removing,
-      ...owners.flatMap((o) => (o.owner.reg ? [o.owner.reg] : [])),
-    ]);
+    const removed = new Set([...removing, ...owners.flatMap((o) => (o.owner.reg ? [o.owner.reg] : []))]);
     this.checkWriters([...regs, ...ownerRegs], removed);
     const commitOrder = this.order.plan(
       [
         ...regs.map((reg) => ({ reg, declaredBy: reg })),
         ...live.map(({ owner }, i) => ({ reg: owner.reg ?? ownerRegs[i], declaredBy: ownerRegs[i] })),
       ],
-      removed
+      removed,
     ); // throws on cycles, before any state change
 
     this.store._batch(() => {
@@ -452,7 +492,12 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   /** A committed registration change, for the probe. */
-  private describe(host: BaseStore<any>, added: readonly Registration[], removed: readonly Registration[], owners: OwnerChange): RegistrationChange {
+  private describe(
+    host: BaseStore<any>,
+    added: readonly Registration[],
+    removed: readonly Registration[],
+    owners: OwnerChange,
+  ): RegistrationChange {
     const at = (store: BaseStore<any>) => pathLabel(store, store.node);
     return {
       store: at(host),
@@ -461,7 +506,9 @@ export class BehaviorRuntime implements RuntimeHooks {
       owners: owners.map(({ owner }) => ({
         key: refLabel(owner.ref),
         triggers: owner.reg?.triggers.map(refLabel) ?? [],
-        contributions: firstContributions(owner, LISTED_CONTRIBUTIONS).map((e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`),
+        contributions: firstContributions(owner, LISTED_CONTRIBUTIONS).map(
+          (e) => `${e.contribution.decl.name ?? owner.reg!.name} @${at(e.host)}`,
+        ),
         more: Math.max(0, owner.size - LISTED_CONTRIBUTIONS),
       })),
     };
@@ -477,7 +524,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     host: BaseStore<any>,
     added: readonly Contribution[],
     removed: readonly Entry[],
-    seq: number
+    seq: number,
   ): { change: OwnerChange; added: Entry[] } {
     const byKey = new Map<string, OwnerDelta>();
     const deltaOf = (target: MetaRef<any, any>) => {
@@ -504,7 +551,9 @@ export class BehaviorRuntime implements RuntimeHooks {
         ...delta.added.filter((e) => e.contribution === contribution),
       ];
       if (copies.some((e) => storeWithin(host, e.host) || storeWithin(e.host, host))) {
-        throw new Error(`Contribution "${contribution.decl.name ?? refLabel(contribution.target)}" is registered twice for the same instances`);
+        throw new Error(
+          `Contribution "${contribution.decl.name ?? refLabel(contribution.target)}" is registered twice for the same instances`,
+        );
       }
       const entry: Entry = { contribution, host, id: entryCounter++, seq, index };
       delta.added.push(entry);
@@ -606,17 +655,21 @@ export class BehaviorRuntime implements RuntimeHooks {
     const fail = (msg: string): never => {
       throw new Error(`Contribution "${decl.name ?? refLabel(target)}": ${msg}`);
     };
-    const inForm = (node: AnyNode) => node instanceof ShapeNode && node.id !== undefined && rootOf(node) === this.store.node;
+    const inForm = (node: AnyNode) =>
+      node instanceof ShapeNode && node.id !== undefined && rootOf(node) === this.store.node;
     if (!inForm(target.node)) fail(`"${refLabel(target)}" is not part of this form`);
     if (!defOf(target)._steps.combine) fail(`"${refLabel(target)}" has no \`combine\``);
     const chain = chainTo(scopeOf(target.node));
     if (!chain.includes(host.node)) {
-      fail(`"${refLabel(target)}" is outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`);
+      fail(
+        `"${refLabel(target)}" is outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`,
+      );
     }
     for (const ref of [...(decl.triggers ?? []), ...(decl.reads ?? []), ...guardsOf(decl).flatMap((g) => g.refs)]) {
       const node = refNode(ref);
       if (!inForm(node)) fail(`"${refLabel(ref)}" is not part of this form`);
-      if (!chain.includes(scopeOf(node))) fail(`"${refLabel(ref)}" is outside the target's scope ("${scopeOf(target.node).path || "<root>"}")`);
+      if (!chain.includes(scopeOf(node)))
+        fail(`"${refLabel(ref)}" is outside the target's scope ("${scopeOf(target.node).path || "<root>"}")`);
     }
   }
 
@@ -628,7 +681,16 @@ export class BehaviorRuntime implements RuntimeHooks {
       config = def._steps.combine!(ref.node, ref, usedRefs(ref.node, ref.key, def)) as OwnerConfig<unknown>;
       this.combined.set(refKey(ref), config);
     }
-    return { ref, config, byHost: new Map(), byContribution: new Map(), triggers: new Map(), reads: new Map(), size: 0, reg: undefined };
+    return {
+      ref,
+      config,
+      byHost: new Map(),
+      byContribution: new Map(),
+      triggers: new Map(),
+      reads: new Map(),
+      size: 0,
+      reg: undefined,
+    };
   }
 
   /** The owner behavior once `delta` applies: combine's config plus every contribution's triggers, reads and guard refs, each once. */
@@ -721,7 +783,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     // An origins filter needs triggers that carry origins.
     if (config.origins) {
       for (const ref of triggers) {
-        if (kindOf(ref).tally) fail(`"${refLabel(ref)}" carries no origins (it is a tally) – drop the origins filter or the reference`);
+        if (kindOf(ref).tally)
+          fail(`"${refLabel(ref)}" carries no origins (it is a tally) – drop the origins filter or the reference`);
       }
     }
 
@@ -739,7 +802,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (behavior._self) {
       const self = behavior._self;
       for (const ref of all) {
-        if (refNode(ref) !== self || !kindOf(ref).local) fail(`default behaviors may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`);
+        if (refNode(ref) !== self || !kindOf(ref).local)
+          fail(`default behaviors may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`);
       }
     }
 
@@ -752,26 +816,45 @@ export class BehaviorRuntime implements RuntimeHooks {
     const scope: AnyNode = deepest ?? host.node;
     const chain = chainTo(scope);
     if (!chain.includes(host.node)) {
-      fail(`its references are outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`);
+      fail(
+        `its references are outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`,
+      );
     }
     for (const ref of all) {
       if (!chain.includes(scopeOf(refNode(ref)))) fail(`"${refLabel(ref)}" is in an unrelated row scope`);
     }
     for (const w of writes) {
-      if (scopeOf(refNode(w)) !== scope) fail(`"${refLabel(w)}" is outside the behavior's scope ("${scope.path || "<root>"}") – behaviors write only their own scope`);
+      if (scopeOf(refNode(w)) !== scope)
+        fail(
+          `"${refLabel(w)}" is outside the behavior's scope ("${scope.path || "<root>"}") – behaviors write only their own scope`,
+        );
     }
 
     const triggerKeys = new Set(triggers.map(refKey));
     return {
-      seq, name, behavior, config, host, origin: `behavior:${name}@${seq}`, scope, chain,
-      triggers, reads: reads.filter((r) => !triggerKeys.has(refKey(r))),
-      inputs: [...triggers, ...reads], inputKeys: new Set([...triggers, ...reads].map(refKey)),
-      writes, targets, guards,
+      seq,
+      name,
+      behavior,
+      config,
+      host,
+      origin: `behavior:${name}@${seq}`,
+      scope,
+      chain,
+      triggers,
+      reads: reads.filter((r) => !triggerKeys.has(refKey(r))),
+      inputs: [...triggers, ...reads],
+      inputKeys: new Set([...triggers, ...reads].map(refKey)),
+      writes,
+      targets,
+      guards,
       declared: new Set(all.map(refKey)),
       writable: new Set(writes.map(refKey)),
       kinds: config.origins ? new Set(config.origins) : undefined,
       runInit: config.runOn?.init !== false,
-      rank: 0, disposed: false, root: undefined, owner,
+      rank: 0,
+      disposed: false,
+      root: undefined,
+      owner,
     };
   }
 
@@ -797,12 +880,15 @@ export class BehaviorRuntime implements RuntimeHooks {
       });
       if (conflicts.length) {
         // The earliest registration, then the first write of each.
-        const { other, at } = conflicts.sort((x, y) => x.other.reg.seq - y.other.reg.seq || x.at - y.at || x.other.at - y.other.at)[0];
+        const { other, at } = conflicts.sort(
+          (x, y) => x.other.reg.seq - y.other.reg.seq || x.at - y.at || x.other.at - y.other.at,
+        )[0];
         const w = reg.writes[at];
         const hit = other.reg.writes[other.at];
         throw new Error(
           `Behavior "${reg.name}": "${refLabel(w)}" is already written by "${other.reg.name}"` +
-            (hit === w ? "" : ` (via "${refLabel(hit)}")`) + " – one writer per target"
+            (hit === w ? "" : ` (via "${refLabel(hit)}")`) +
+            " – one writer per target",
         );
       }
       if (batch) reg.targets.forEach((target, at) => batch.add(target.node, { reg, target, at }));
@@ -832,7 +918,7 @@ export class BehaviorRuntime implements RuntimeHooks {
           for (const row of now) this.child(binding, row);
           // Removed rows: their runs in flight are cancelled.
           for (const leaf of this.busy(reg)) if (!leaf.host.isAttached()) this.drop(leaf);
-        })
+        }),
       );
     }
     return binding;
@@ -851,7 +937,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private subscribeTriggers(binding: Binding, refs: AnyRef[]): void {
     binding.triggerKeys = refs.map(refKey);
     binding.triggerOffs = refs.map((ref) =>
-      hostFor(binding.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info))
+      hostFor(binding.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info)),
     );
   }
 
@@ -914,7 +1000,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       flight.offs.push(
         leaf.host._react(ref, () => {
           if (this.flights.get(leaf) === flight) this.cancel(leaf);
-        })
+        }),
       );
     }
     for (const ref of reg.reads) {
@@ -922,7 +1008,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       flight.offs.push(
         hostFor(leaf.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => {
           if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info);
-        })
+        }),
       );
     }
   }
@@ -989,7 +1075,12 @@ export class BehaviorRuntime implements RuntimeHooks {
     if (leaf.reg.disposed || !leaf.host.isAttached()) return;
     const probe = this.store._probe;
     if (!probe) return this.execute(leaf, p);
-    timed(probe, leaf, () => this.execute(leaf, p), () => (this.flights.has(leaf) ? "async" : "sync"));
+    timed(
+      probe,
+      leaf,
+      () => this.execute(leaf, p),
+      () => (this.flights.has(leaf) ? "async" : "sync"),
+    );
   }
 
   private execute(leaf: Binding, p: Cause): void {
@@ -1004,7 +1095,9 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (signal.aborted) throw signal.reason;
       const key = refKey(ref);
       if (!reg.declared.has(key)) {
-        throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in triggers, reads, writes or when`);
+        throw new Error(
+          `Behavior "${reg.name}": "${refLabel(ref)}" is not declared in triggers, reads, writes or when`,
+        );
       }
       const pendingWrite = buffer.get(key);
       if (pendingWrite) return pendingWrite.value;
@@ -1015,7 +1108,8 @@ export class BehaviorRuntime implements RuntimeHooks {
       set: (ref, value) => {
         if (signal.aborted) throw signal.reason;
         const key = refKey(ref);
-        if (!reg.writable.has(key)) throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in writes`);
+        if (!reg.writable.has(key))
+          throw new Error(`Behavior "${reg.name}": "${refLabel(ref)}" is not declared in writes`);
         buffer.delete(key); // keep insertion order = last write
         buffer.set(key, { ref, value });
       },
@@ -1073,12 +1167,19 @@ export class BehaviorRuntime implements RuntimeHooks {
         .filter((e) => guardsOf(e.contribution.decl).every((g) => g.test(...g.refs.map(read))))
         .map((e) => {
           const d = e.contribution.decl;
-          return { payload: e.contribution.payload, name: d.name ?? reg.name, id: e.id, inputs: [...(d.triggers ?? []), ...(d.reads ?? [])] };
+          return {
+            payload: e.contribution.payload,
+            name: d.name ?? reg.name,
+            id: e.id,
+            inputs: [...(d.triggers ?? []), ...(d.reads ?? [])],
+          };
         });
       const pendingRun = beginRun(leaf.host, reg.writes);
       let result: unknown;
       try {
-        result = owner ? (owner.config.run as (ctx: OwnerContext<unknown>) => unknown)({ ...ctx, parts }) : reg.config.run(ctx);
+        result = owner
+          ? (owner.config.run as (ctx: OwnerContext<unknown>) => unknown)({ ...ctx, parts })
+          : reg.config.run(ctx);
       } catch (error) {
         pendingRun.end();
         throw error;
@@ -1110,7 +1211,7 @@ export class BehaviorRuntime implements RuntimeHooks {
           if (signal.aborted) return;
           this.store._batch(() => this.end(leaf, flight, false));
           this.onError(located(reg.behavior, error), info());
-        }
+        },
       );
     } catch (error) {
       this.onError(located(reg.behavior, error), info());
@@ -1164,7 +1265,8 @@ export function defaultBehaviors(root: AnyNode): Behavior[] {
       const config = factory(node, metaRefOf(node, name), uses) as BehaviorConfig;
       out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, { self: node }));
     }
-    if (node instanceof ObjectNode) for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);
+    if (node instanceof ObjectNode)
+      for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);
     if (node instanceof ArrayNode) visit(node.item);
   };
   visit(root);

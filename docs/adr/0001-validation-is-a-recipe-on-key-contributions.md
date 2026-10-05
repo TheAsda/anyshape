@@ -5,6 +5,7 @@ The core names no meta key, not even `error`. It provides one mechanism with no 
 We chose this to keep the founding principle that the library does not hard-code which meta keys exist. Every design for this needs one operation: reconfiguring a single writer as declarations arrive and leave, without losing its state. The core already had that operation, privately, for validation (`QueueChange`). Making it generic and key-driven costs about as much as keeping it private, and the core no longer carries one team's validation policy.
 
 Confirmed by a prototype ([#23](https://github.com/TheAsda/anyshape/issues/23), branch `prototype/key-contributions`):
+
 - The owner is updated in place, keeping `ctx.state`.
 - `E` and payload types infer through `metaKey<V, P>` and `rule(n, check)`.
 - A second user that isn't validation works: `disabled` as an OR of contributions, so `disableWhen` and `exclusive` stop conflicting on one field.

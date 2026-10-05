@@ -8,8 +8,8 @@
 // ============================================================
 
 import type { BehaviorConfig, OwnerConfig } from "./behaviors.js";
-import type { ShapeNode } from "./shape.js";
 import type { MetaRef } from "./refs/meta.js";
+import type { ShapeNode } from "./shape.js";
 
 export type Meta = Record<string, unknown>;
 
@@ -54,7 +54,12 @@ export interface MetaKeySteps<V, P, U extends readonly AnyMetaKeyDef[]> {
  *
  * A definition is immutable: each step returns a new one.
  */
-export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyDef[] = readonly AnyMetaKeyDef[], C extends boolean = boolean> {
+export class MetaKeyDef<
+  V = unknown,
+  P = unknown,
+  U extends readonly AnyMetaKeyDef[] = readonly AnyMetaKeyDef[],
+  C extends boolean = boolean,
+> {
   /** Phantom type – never exists at runtime. */
   declare readonly _value: V;
   /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
@@ -118,7 +123,9 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * key, like `behavior`; `key` is the node's ref under the name it declares
    * the key with. Mutually exclusive with `behavior`.
    */
-  combine(factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>): MetaKeyDef<V, P, U, C> {
+  combine(
+    factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>,
+  ): MetaKeyDef<V, P, U, C> {
     return new MetaKeyDef<V, P, U, C>(this.defaultValue, this.options, { ...this._steps, combine: factory });
   }
 }
@@ -136,5 +143,6 @@ type RefsOf<T> = {
 };
 
 /** Meta references declared by all inputs of one .meta(a, b, c) call, typed with their payloads. */
-export type MergeMetaRefs<Is extends readonly unknown[]> =
-  Is extends readonly [infer H, ...infer R] ? RefsOf<H> & MergeMetaRefs<R> : {};
+export type MergeMetaRefs<Is extends readonly unknown[]> = Is extends readonly [infer H, ...infer R]
+  ? RefsOf<H> & MergeMetaRefs<R>
+  : {};

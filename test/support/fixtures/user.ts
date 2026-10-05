@@ -19,7 +19,7 @@ export const userShape = form(
     shipping: address.meta({ collapsed: false }),
     billing: address,
     items: array(lineShape).meta({ maxItems: 10 }),
-  }).meta({ title: "User" })
+  }).meta({ title: "User" }),
 );
 
 export type User = InferValue<typeof userShape>;

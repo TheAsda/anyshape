@@ -2,6 +2,7 @@
 // a hidden-able company section, a
 // disableable promo ({ disabled }), disableable rows and submission().
 import { form, object, array, field, type InferValue } from "anyshape";
+
 import { control, validation, visible, disabled, submission, rule } from "../../index";
 import { deferred } from "../harness";
 
@@ -25,17 +26,24 @@ export const shape = form(
         qty: field<number>().meta(control()),
         total: field<number>().meta(validation()),
       }),
-      { create: () => ({ sku: "", qty: 1, total: 0 }) }
+      { create: () => ({ sku: "", qty: 1, total: 0 }) },
     ).meta({ disabled }),
-  }).meta(submission())
+  }).meta(submission()),
 );
 export type Values = InferValue<typeof shape>;
 export const L = shape.lines.item;
 
 export function initial(): Values {
   return {
-    type: "person", name: "Ann", email: "ann@x.io", password: "secret", confirm: "secret",
-    taxId: "", note: "", company: { vat: "", secret: "" }, promo: "",
+    type: "person",
+    name: "Ann",
+    email: "ann@x.io",
+    password: "secret",
+    confirm: "secret",
+    taxId: "",
+    note: "",
+    company: { vat: "", secret: "" },
+    promo: "",
     lines: [
       { sku: "A", qty: 1, total: 0 },
       { sku: "B", qty: 2, total: 0 },

@@ -6,10 +6,11 @@
 // errors and focuses the first one.
 // ------------------------------------------------------------
 
-import { useState } from "react";
 import { form, object, field, type InferValue, defineBehaviors } from "anyshape";
-import { control, submission, handleSubmit, required, minLength } from "../../../../../recipes";
 import { StoreProvider, useForm } from "anyshape/react";
+import { useState } from "react";
+
+import { control, submission, handleSubmit, required, minLength } from "../../../../../recipes";
 import { TextField, ResultCard, SubmitButton } from "../../ui";
 
 const shape = form(
@@ -40,10 +41,7 @@ export function Stage() {
   const [submitted, setSubmitted] = useState<object | null>(null);
   return (
     <StoreProvider store={form}>
-      <form
-        className="stage-form"
-        onSubmit={handleSubmit(form, (values) => setSubmitted(values))}
-      >
+      <form className="stage-form" onSubmit={handleSubmit(form, (values) => setSubmitted(values))}>
         <TextField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <TextField node={shape.startDate} label="Departure" type="date" />
         <TextField node={shape.endDate} label="Return" type="date" />

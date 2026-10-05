@@ -27,8 +27,19 @@ The definition is declared once, at module level. Every node that declares it sh
 
 ```ts
 import {
-  form, object, field, metaKey, contribute, when, createStore, defineBehaviors,
-  type AnyNode, type AnyRef, type RefValue, type MetaRef, type Contribution,
+  form,
+  object,
+  field,
+  metaKey,
+  contribute,
+  when,
+  createStore,
+  defineBehaviors,
+  type AnyNode,
+  type AnyRef,
+  type RefValue,
+  type MetaRef,
+  type Contribution,
 } from "anyshape";
 
 export const disabled = metaKey<boolean, string>(false).combine((self, key) => ({

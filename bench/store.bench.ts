@@ -4,6 +4,7 @@
 // ============================================================
 
 import { test, describe, expect, vi } from "vitest";
+
 import { form, object, array, field, createStore, defineBehavior, countIn, metaKey, contribute } from "../src/index";
 import { control, revealed, error } from "../test/support/features";
 import { rule } from "../test/support/rules";
@@ -23,7 +24,9 @@ const createProductionStore: typeof createStore = (...args) => {
 // ---------------------------------------------------------------------------
 // A flat form: 500 fields on the root, each with a listener
 const FLAT = 500;
-const flat = form(object(Object.fromEntries(Array.from({ length: FLAT }, (_, i) => [`f${i}`, field<string>().meta(control())]))));
+const flat = form(
+  object(Object.fromEntries(Array.from({ length: FLAT }, (_, i) => [`f${i}`, field<string>().meta(control())]))),
+);
 const flatNodes = flat as unknown as Record<string, any>;
 const flatValues = () => Object.fromEntries(Array.from({ length: FLAT }, (_, i) => [`f${i}`, ""])) as never;
 
@@ -38,7 +41,7 @@ describe("flat form, 500 fields", () => {
       }),
       bench("createStore", () => {
         createProductionStore(flat, flatValues());
-      })
+      }),
     );
   });
 });
@@ -46,27 +49,37 @@ describe("flat form, 500 fields", () => {
 // ---------------------------------------------------------------------------
 // An order: 200 rows, a per-row calculation, a total over the array, a rule per row
 const ROWS = 200;
-const order = form(object({
-  lines: array(
-    object({
-      sku: field<string>().meta(control()),
-      price: field<number>(),
-      qty: field<number>().meta(control()),
-      lineTotal: field<number>(),
-    }),
-    { create: () => ({ sku: "", price: 1, qty: 1, lineTotal: 1 }) }
-  ),
-  total: field<number>(),
-}));
+const order = form(
+  object({
+    lines: array(
+      object({
+        sku: field<string>().meta(control()),
+        price: field<number>(),
+        qty: field<number>().meta(control()),
+        lineTotal: field<number>(),
+      }),
+      { create: () => ({ sku: "", price: 1, qty: 1, lineTotal: 1 }) },
+    ),
+    total: field<number>(),
+  }),
+);
 const O = order.lines.item;
 const orderBehaviors = [
   defineBehavior({
-    name: "lineTotal", triggers: [O.price, O.qty], writes: [O.lineTotal],
+    name: "lineTotal",
+    triggers: [O.price, O.qty],
+    writes: [O.lineTotal],
     run: (c) => c.set(O.lineTotal, c.get(O.price) * c.get(O.qty)),
   }),
   defineBehavior({
-    name: "total", triggers: [order.lines], writes: [order.total],
-    run: (c) => c.set(order.total, c.get(order.lines).reduce((s, l) => s + l.lineTotal, 0)),
+    name: "total",
+    triggers: [order.lines],
+    writes: [order.total],
+    run: (c) =>
+      c.set(
+        order.total,
+        c.get(order.lines).reduce((s, l) => s + l.lineTotal, 0),
+      ),
   }),
   rule(O.qty, (v) => (v > 0 ? undefined : "Must be positive")),
 ];
@@ -93,7 +106,7 @@ describe("200 rows", () => {
       }),
       bench("createStore with behaviors", () => {
         createProductionStore(order, orderValues(), { behaviors: orderBehaviors });
-      })
+      }),
     );
   });
 });
@@ -112,20 +125,24 @@ describe("dev diagnostics overhead", () => {
   const devOrder = createStore(order, orderValues(), { behaviors: orderBehaviors });
   if (timeStamp) Object.defineProperty(console, "timeStamp", timeStamp);
   else delete (console as Partial<Console>).timeStamp;
-  expect([prodFlat._probe, prodOrder._probe, devFlat._probe && devOrder._probe].map(Boolean)).toEqual([false, false, true]);
+  expect([prodFlat._probe, prodOrder._probe, devFlat._probe && devOrder._probe].map(Boolean)).toEqual([
+    false,
+    false,
+    true,
+  ]);
   const prodRow = prodOrder.substore(order.lines).itemAt(100);
   const devRow = devOrder.substore(order.lines).itemAt(100);
   let n = 0;
   test("keystroke", async ({ bench }) => {
     await bench.compare(
       bench("keystroke, production", () => prodFlat.set(flatNodes.f250, `v${n++}`, { origin: "user" })),
-      bench("keystroke, dev diagnostics", () => devFlat.set(flatNodes.f250, `v${n++}`, { origin: "user" }))
+      bench("keystroke, dev diagnostics", () => devFlat.set(flatNodes.f250, `v${n++}`, { origin: "user" })),
     );
   });
   test("row edit", async ({ bench }) => {
     await bench.compare(
       bench("edit one of 200 rows, production", () => prodRow.set(O.qty, (n++ % 5) + 1, { origin: "user" })),
-      bench("edit one of 200 rows, dev diagnostics", () => devRow.set(O.qty, (n++ % 5) + 1, { origin: "user" }))
+      bench("edit one of 200 rows, dev diagnostics", () => devRow.set(O.qty, (n++ % 5) + 1, { origin: "user" })),
     );
   });
 });
@@ -141,7 +158,7 @@ describe("200 rows, one error", () => {
       }),
       bench("get(countIn(root, error))", () => {
         s.get(errors);
-      })
+      }),
     );
   });
 });
@@ -155,7 +172,10 @@ const mounted = metaKey<readonly string[], string>([]).combine((self, key) => ({
   writes: [key],
   run: (ctx) => {
     ownerRuns++;
-    ctx.set(key, ctx.parts.map((p) => p.payload));
+    ctx.set(
+      key,
+      ctx.parts.map((p) => p.payload),
+    );
   },
 }));
 const grid = form(object({ rows: array(object({ v: field<string>().meta({ mounted }) })) }));
@@ -163,7 +183,9 @@ const G = grid.rows.item;
 
 function mountRowByRow(rows: number): void {
   const s = createProductionStore(grid, { rows: Array.from({ length: rows }, () => ({ v: "" })) });
-  s.substore(grid.rows).items().forEach((row, i) => row.addBehavior(contribute(G.v.mounted, `row ${i}`)));
+  s.substore(grid.rows)
+    .items()
+    .forEach((row, i) => row.addBehavior(contribute(G.v.mounted, `row ${i}`)));
 }
 
 describe("row-by-row contribution mounts", () => {
@@ -175,7 +197,7 @@ describe("row-by-row contribution mounts", () => {
     }
     await bench.compare(
       bench("400 rows", () => mountRowByRow(400)),
-      bench("800 rows", () => mountRowByRow(800))
+      bench("800 rows", () => mountRowByRow(800)),
     );
   });
 });
@@ -192,7 +214,9 @@ const double = () =>
 
 function calculateRowByRow(rows: number): void {
   const s = createProductionStore(sheet, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: 0 })) });
-  s.substore(sheet.rows).items().forEach((row) => row.addBehavior(double()));
+  s.substore(sheet.rows)
+    .items()
+    .forEach((row) => row.addBehavior(double()));
 }
 
 describe("row-by-row behavior mounts", () => {
@@ -202,7 +226,7 @@ describe("row-by-row behavior mounts", () => {
       bench("400 rows", () => calculateRowByRow(400)),
       bench("800 rows", () => calculateRowByRow(800)),
       bench("1600 rows", () => calculateRowByRow(1600)),
-      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
+      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 },
     );
   });
 });
@@ -220,8 +244,13 @@ const chained = () => [
 ];
 
 function chainRowByRow(rows: number): void {
-  const s = createProductionStore(chain, { rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: i * 2, c: i * 2 + 1 })) });
-  const handles = s.substore(chain.rows).items().flatMap((row) => chained().map((b) => row.addBehavior(b)));
+  const s = createProductionStore(chain, {
+    rows: Array.from({ length: rows }, (_, i) => ({ a: i, b: i * 2, c: i * 2 + 1 })),
+  });
+  const handles = s
+    .substore(chain.rows)
+    .items()
+    .flatMap((row) => chained().map((b) => row.addBehavior(b)));
   for (const dispose of handles) dispose();
 }
 
@@ -232,7 +261,7 @@ describe("row-by-row chained mounts", () => {
       bench("200 rows", () => chainRowByRow(200)),
       bench("400 rows", () => chainRowByRow(400)),
       bench("800 rows", () => chainRowByRow(800)),
-      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 }
+      { time: 500, iterations: 5, warmupTime: 0, warmupIterations: 1 },
     );
   });
 });

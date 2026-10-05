@@ -1,14 +1,24 @@
 // The ready-made rules (recipes/rules.ts): messages, reference limits, guarded by a builder block.
-import {
-  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
-} from "anyshape";
-import {
-  control, required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf, calculate,
-  exclusive, dirty,
-} from "./index";
+import { form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn } from "anyshape";
 import { test as base, describe, expect } from "vitest";
-import { shape, L, initial } from "./test/fixtures/profile";
+
+import {
+  control,
+  required,
+  minLength,
+  maxLength,
+  min,
+  max,
+  pattern,
+  email,
+  isEmpty,
+  labelOf,
+  calculate,
+  exclusive,
+  dirty,
+} from "./index";
 import * as limits from "./test/fixtures/limits";
+import { shape, L, initial } from "./test/fixtures/profile";
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {
@@ -33,12 +43,21 @@ export function typeOnlyChecks() {
   min(shape.age, 0); // number | undefined is numeric
 }
 
-const test = base
-  .extend("store", () => createStore(shape, initial()));
+const test = base.extend("store", () => createStore(shape, initial()));
 
 describe("N · Rules", () => {
   test("isEmpty and labelOf", () => {
-    expect([undefined, null, "", "  ", [], 0, "x", [1], false].map(isEmpty)).toEqual([true, true, true, true, true, false, false, false, false]);
+    expect([undefined, null, "", "  ", [], 0, "x", [1], false].map(isEmpty)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
     expect(labelOf(shape.name), "the `label` key is not read").toBe("name");
     expect(labelOf(shape.company.vat)).toBe("vat");
     expect(labelOf(L.qty)).toBe("qty");
@@ -61,8 +80,18 @@ describe("N · Rules", () => {
   test("a switchable requirement is a guard on the `required` key", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehaviors(shape, (b) => {
-        b.when([shape.taxId.required], (r) => r, (b) => b.add(required(shape.taxId)));
-        b.add(defineBehavior({ triggers: [shape.type], writes: [shape.taxId.required], run: (c) => c.set(shape.taxId.required, c.get(shape.type) === "company") }));
+        b.when(
+          [shape.taxId.required],
+          (r) => r,
+          (b) => b.add(required(shape.taxId)),
+        );
+        b.add(
+          defineBehavior({
+            triggers: [shape.type],
+            writes: [shape.taxId.required],
+            run: (c) => c.set(shape.taxId.required, c.get(shape.type) === "company"),
+          }),
+        );
       }),
     });
     expect(s.get(shape.taxId.error)).toBe(undefined);
@@ -76,9 +105,13 @@ describe("N · Rules", () => {
   test("format rules pass on empty values and combine with required", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
-        minLength(shape.name, 3), maxLength(shape.name, 5),
-        min(shape.age, 18), max(shape.age, 99, { message: (v) => `${v} is too old` }),
-        pattern(shape.zip, /^LV-\d{4}$/), email(shape.email), required(shape.email),
+        minLength(shape.name, 3),
+        maxLength(shape.name, 5),
+        min(shape.age, 18),
+        max(shape.age, 99, { message: (v) => `${v} is too old` }),
+        pattern(shape.zip, /^LV-\d{4}$/),
+        email(shape.email),
+        required(shape.email),
         minLength(shape.tags, 2, { message: "Two tags" }),
       ],
     });
@@ -111,7 +144,10 @@ describe("N · Messages", () => {
       behaviors: [
         min(shape.age, 18, { message: (v) => `${v} is too young` }),
         pattern(shape.zip, /^LV-\d{4}$/, { message: (v) => `"${v}" is not a zip` }),
-        ...exclusive([shape.price, shape.discount], { required: true, message: { tooMany: "Pick one", missing: "Need one" } }),
+        ...exclusive([shape.price, shape.discount], {
+          required: true,
+          message: { tooMany: "Pick one", missing: "Need one" },
+        }),
       ],
     });
     s.set(shape.age, 12);
@@ -150,7 +186,9 @@ describe("N · Reference limits", () => {
   });
 
   test("minLength with a reference from an enclosing scope-less key", () => {
-    const s = createStore(shape, initial(), { behaviors: minLength(shape.code, shape.code.minCode, { message: "Too short" }) });
+    const s = createStore(shape, initial(), {
+      behaviors: minLength(shape.code, shape.code.minCode, { message: "Too short" }),
+    });
     expect(s.get(shape.code.error)).toBe(undefined);
     s.set(shape.code.minCode, 3);
     expect(s.get(shape.code.error)).toBe("Too short");
@@ -164,10 +202,12 @@ describe("N · Reference limits", () => {
   // ---------------------------------------------------------------------------
   // A count as a rule limit
   test("a count as a rule limit: re-checked whenever the count changes", () => {
-    const f = form(object({
-      wanted: field<number>().meta(control()),
-      rows: array(object({ v: field<string>().meta(control()) }), { create: () => ({ v: "" }) }),
-    }));
+    const f = form(
+      object({
+        wanted: field<number>().meta(control()),
+        rows: array(object({ v: field<string>().meta(control()) }), { create: () => ({ v: "" }) }),
+      }),
+    );
     const s = createStore(f, { wanted: 2, rows: [] }, { behaviors: max(f.wanted, countIn(f.rows, dirty)) });
     const rows = s.substore(f.rows);
     expect(s.get(f.wanted.error)).toBe("Must be at most 0");
@@ -181,9 +221,15 @@ describe("N · Reference limits", () => {
 describe("N · Guarded recipes", () => {
   test("a builder block guards a rule and a behavior: absent while false, run when it turns true", () => {
     const behaviors = defineBehaviors(shape, (b) =>
-      b.when([shape.type], (t) => t === "company", (b) =>
-        b.add(required(shape.personalId), calculate(shape.slug, [shape.title], (t) => t.toLowerCase()))
-      )
+      b.when(
+        [shape.type],
+        (t) => t === "company",
+        (b) =>
+          b.add(
+            required(shape.personalId),
+            calculate(shape.slug, [shape.title], (t) => t.toLowerCase()),
+          ),
+      ),
     );
     const s = createStore(shape, initial(), { behaviors });
     const seen: unknown[] = [];
@@ -206,4 +252,3 @@ describe("N · Guarded recipes", () => {
     ]);
   });
 });
-

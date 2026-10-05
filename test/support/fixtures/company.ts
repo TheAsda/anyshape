@@ -18,10 +18,10 @@ export const shape = form(
         qty: field<number>(),
         notes: array(object({ text: field<string>().meta(validation(), { revealed }) })),
       }).meta({ touched }),
-      { create: () => ({ sku: "", qty: 1, notes: [] }) }
+      { create: () => ({ sku: "", qty: 1, notes: [] }) },
     ).meta({ disabled }),
     tags: array(object({ text: field<string>() })),
-  }).meta({ disabled })
+  }).meta({ disabled }),
 );
 export type Values = InferValue<typeof shape>;
 export const L = shape.lines.item;

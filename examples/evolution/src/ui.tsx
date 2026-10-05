@@ -4,10 +4,11 @@
 // slide code stays pure shape + behaviors.
 // ============================================================
 
-import { useId } from "react";
-import { useStore, useValue } from "anyshape/react";
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 import type { FieldNode } from "anyshape";
+import { useStore, useValue } from "anyshape/react";
+import { useId } from "react";
+
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 
 /** What each stage exports alongside its component. */
 export type StageMeta = {
@@ -150,24 +151,12 @@ export function NumberField({
   );
 }
 
-export function CheckboxField({
-  node,
-  label,
-}: {
-  node: BooleanNode;
-  label: string;
-}) {
+export function CheckboxField({ node, label }: { node: BooleanNode; label: string }) {
   const { focusRef, ...c } = useControl(node);
   return (
     <div className="field field--checkbox">
       <label className="field__label">
-        <input
-          ref={focusRef}
-          type="checkbox"
-          checked={c.value}
-          onChange={fromCheckbox(c.onChange)}
-          onBlur={c.onBlur}
-        />{" "}
+        <input ref={focusRef} type="checkbox" checked={c.value} onChange={fromCheckbox(c.onChange)} onBlur={c.onBlur} />{" "}
         {label}
       </label>
       {c.showError && c.error && <p className="field__error">{c.error}</p>}
@@ -186,13 +175,7 @@ export function ReadonlyRow({ label, value }: { label: string; value: string }) 
 }
 
 /** The "what the server receives" card. */
-export function ResultCard({
-  title,
-  values,
-}: {
-  title: string;
-  values: unknown;
-}) {
+export function ResultCard({ title, values }: { title: string; values: unknown }) {
   return (
     <aside className="result">
       <h3>{title}</h3>

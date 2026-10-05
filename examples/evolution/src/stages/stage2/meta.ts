@@ -13,4 +13,3 @@ export const meta: StageMeta = {
   notes:
     "Nothing changed in the shape's field list — control() is metadata a field opts into. The binding swap from useValue+set to useControl gives the input everything a real form control needs. Note what did NOT happen: no useState for touched, no refs bookkeeping, no per-field blur handlers.",
 };
-

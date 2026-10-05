@@ -8,14 +8,32 @@
 
 // Shapes
 export {
-  ShapeNode, FieldNode, ObjectNode, ArrayNode, field, object, array, form,
-  type FieldId, type AnyNode, type ContainerNode, type InferValue, type InferMeta, type Ref, type ArrayOptions,
+  ShapeNode,
+  FieldNode,
+  ObjectNode,
+  ArrayNode,
+  field,
+  object,
+  array,
+  form,
+  type FieldId,
+  type AnyNode,
+  type ContainerNode,
+  type InferValue,
+  type InferMeta,
+  type Ref,
+  type ArrayOptions,
 } from "./shape.js";
 
 // Meta keys
 export {
-  MetaKeyDef, metaKey,
-  type Meta, type NoPayload, type MetaKeyOptions, type UsedRefs, type MergeMetaRefs,
+  MetaKeyDef,
+  metaKey,
+  type Meta,
+  type NoPayload,
+  type MetaKeyOptions,
+  type UsedRefs,
+  type MergeMetaRefs,
 } from "./meta.js";
 
 // References
@@ -29,17 +47,39 @@ export { createStore } from "./create.js";
 // The stores as types only: createStore builds the root, and the root hands
 // out the substores and rows.
 export type {
-  RootStore, BaseStore, ArrayStore, ItemStore,
-  Listener, Unsubscribe, Origin, WriteOptions, AnyRef, RefValue, CollectEntry, NewItemArgs,
+  RootStore,
+  BaseStore,
+  ArrayStore,
+  ItemStore,
+  Listener,
+  Unsubscribe,
+  Origin,
+  WriteOptions,
+  AnyRef,
+  RefValue,
+  CollectEntry,
+  NewItemArgs,
 } from "./store.js";
 
 // Behaviors
 // Behavior and Contribution as types only: defineBehavior and contribute build them.
 export type { Behavior, Contribution } from "./behaviors.js";
 export {
-  when, defineBehavior, contribute,
-  type AnyBehavior, type BehaviorConfig, type BehaviorContext, type Declaration, type Guard, type WritableRef,
-  type OriginKind, type Part, type OwnerContext, type OwnerConfig, type BehaviorErrorInfo, type StoreOptions,
+  when,
+  defineBehavior,
+  contribute,
+  type AnyBehavior,
+  type BehaviorConfig,
+  type BehaviorContext,
+  type Declaration,
+  type Guard,
+  type WritableRef,
+  type OriginKind,
+  type Part,
+  type OwnerContext,
+  type OwnerConfig,
+  type BehaviorErrorInfo,
+  type StoreOptions,
   type BehaviorHandle,
 } from "./behaviors.js";
 export { BehaviorBuilder, defineBehaviors } from "./builder.js";

@@ -1,15 +1,37 @@
+import { test as base, describe, expect } from "vitest";
+
 // Key contributions: a combined key (metaKey with `combine`) is written by one
 // owner behavior per node instance, fed by contribute(ref, payload, decl).
 // The keys here are test-local and unrelated to validation: `tags` lists the
 // payloads of its active contributions.
-import { form, object, array, field, createStore, contribute, defineBehavior, defineBehaviors, metaKey, when, pendingOf, type InferValue } from "../src/index";
-import { test as base, describe, expect } from "vitest";
+import {
+  form,
+  object,
+  array,
+  field,
+  createStore,
+  contribute,
+  defineBehavior,
+  defineBehaviors,
+  metaKey,
+  when,
+  pendingOf,
+  type InferValue,
+} from "../src/index";
 import { deferred, flush } from "./support/harness";
 
 /** Every owner run: the instance's run counter (ctx.state) and the parts it saw. */
-interface Run { path: string; runs: number; tags: string[]; origins: string[] }
+interface Run {
+  path: string;
+  runs: number;
+  tags: string[];
+  origins: string[];
+}
 
-interface Log { runs: Run[]; combined: string[] }
+interface Log {
+  runs: Run[];
+  combined: string[];
+}
 let log: Log = { runs: [], combined: [] };
 
 const tags = metaKey<readonly string[], string>([]).combine((self, key) => {
@@ -35,7 +57,7 @@ const shape = form(
     a: field<string>().meta({ tags }),
     b: field<string>().meta({ note: "" }),
     rows: array(object({ x: field<number>().meta({ tags }) }), { create: () => ({ x: 0 }) }),
-  })
+  }),
 );
 const R = shape.rows.item;
 const initial = (): InferValue<typeof shape> => ({ mode: "", other: "", a: "", b: "", rows: [{ x: 0 }, { x: 0 }] });
@@ -45,13 +67,20 @@ const test = base.extend("log", (): Log => (log = { runs: [], combined: [] }));
 describe("Registration", () => {
   test("a tally trigger from a contribution throws when the owner filters origins, and adds nothing", () => {
     const filtered = metaKey<readonly string[], string>([]).combine((self, key) => ({
-      triggers: [self], writes: [key], origins: ["user"], run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
+      triggers: [self],
+      writes: [key],
+      origins: ["user"],
+      run: (ctx) =>
+        ctx.set(
+          key,
+          ctx.parts.map((p) => p.payload),
+        ),
     }));
     const sh = form(object({ f: field<string>().meta({ filtered }), g: field<string>() }));
     const s = createStore(sh, { f: "", g: "" });
     s.addBehavior(contribute(sh.f.filtered, "plain"));
     expect(() => s.addBehavior(contribute(sh.f.filtered, "tally", { triggers: [pendingOf(sh.g)] }))).toThrow(
-      `"${pendingOf(sh.g).path}" carries no origins (it is a tally) – drop the origins filter or the reference`
+      `"${pendingOf(sh.g).path}" carries no origins (it is a tally) – drop the origins filter or the reference`,
     );
     s.set(sh.f, "x", { origin: "user" });
     expect(s.get(sh.f.filtered), "the owner still runs, without the rejected part").toEqual(["plain"]);
@@ -63,8 +92,16 @@ describe("Registration", () => {
   });
 
   test("`combine` and `behavior` are mutually exclusive, in either order", () => {
-    expect(() => metaKey(0).behavior(() => ({ run() {} })).combine(() => ({ run() {} }))).toThrow(/mutually exclusive/);
-    expect(() => metaKey(0).combine(() => ({ run() {} })).behavior(() => ({ run() {} }))).toThrow(/mutually exclusive/);
+    expect(() =>
+      metaKey(0)
+        .behavior(() => ({ run() {} }))
+        .combine(() => ({ run() {} })),
+    ).toThrow(/mutually exclusive/);
+    expect(() =>
+      metaKey(0)
+        .combine(() => ({ run() {} }))
+        .behavior(() => ({ run() {} })),
+    ).toThrow(/mutually exclusive/);
   });
 
   test("each step returns a new definition: the one it was called on is unchanged", () => {
@@ -84,7 +121,9 @@ describe("Registration", () => {
   });
 
   test("combine(self, key) runs once per node: not per contribution, change or row", ({ log }) => {
-    const s = createStore(shape, initial(), { behaviors: [contribute(shape.a.tags, "one"), contribute(R.x.tags, "row")] });
+    const s = createStore(shape, initial(), {
+      behaviors: [contribute(shape.a.tags, "one"), contribute(R.x.tags, "row")],
+    });
     const h = s.addBehavior(contribute(shape.a.tags, "two"));
     h();
     s.addBehavior(contribute(shape.a.tags, "three"));
@@ -94,7 +133,9 @@ describe("Registration", () => {
 
   test("a combined key is written only by its owner among behaviors; application code may write it", () => {
     const writer = defineBehavior({ triggers: [shape.mode], writes: [shape.a.tags], run: () => {} });
-    expect(() => createStore(shape, initial(), { behaviors: writer }), "even with no owner yet").toThrow(/is written only by the owner of its key/);
+    expect(() => createStore(shape, initial(), { behaviors: writer }), "even with no owner yet").toThrow(
+      /is written only by the owner of its key/,
+    );
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "one") });
     expect(() => s.addBehavior(writer)).toThrow(/is written only by the owner of its key/);
     s.set(shape.a.tags, ["server"]);
@@ -105,15 +146,17 @@ describe("Registration", () => {
 describe("Uses", () => {
   /** Set to force a recheck; the owner clears it. */
   const forced = metaKey(false);
-  const checked = metaKey<string, string>("").uses(forced).combine((self, key, [force]) => ({
-    triggers: [self, force],
-    writes: [key, force],
-    run(ctx) {
-      const isForced = ctx.get(force);
-      ctx.set(key, `${ctx.parts.map((p) => p.payload)}${isForced ? " (forced)" : ""}`);
-      if (isForced) ctx.set(force, false);
-    },
-  }));
+  const checked = metaKey<string, string>("")
+    .uses(forced)
+    .combine((self, key, [force]) => ({
+      triggers: [self, force],
+      writes: [key, force],
+      run(ctx) {
+        const isForced = ctx.get(force);
+        ctx.set(key, `${ctx.parts.map((p) => p.payload)}${isForced ? " (forced)" : ""}`);
+        if (isForced) ctx.set(force, false);
+      },
+    }));
 
   test("combine receives refs to the keys it uses, under whatever name the node declares them, in any .meta() call", () => {
     const sh = form(object({ f: field<string>().meta({ problem: checked }).meta({ recheck: forced }) }));
@@ -125,11 +168,13 @@ describe("Uses", () => {
   });
 
   test("a default behavior receives them too", () => {
-    const mirrored = metaKey(false).uses(forced).behavior((_self, key, [force]) => ({
-      triggers: [force],
-      writes: [key],
-      run: (ctx) => ctx.set(key, ctx.get(force)),
-    }));
+    const mirrored = metaKey(false)
+      .uses(forced)
+      .behavior((_self, key, [force]) => ({
+        triggers: [force],
+        writes: [key],
+        run: (ctx) => ctx.set(key, ctx.get(force)),
+      }));
     const sh = form(object({ f: field<string>().meta({ shown: mirrored, recheck: forced }) }));
     const s = createStore(sh, { f: "" });
     s.set(sh.f.recheck, true);
@@ -139,35 +184,51 @@ describe("Uses", () => {
   test("a used key the node doesn't declare throws in createStore, before anything contributes", () => {
     const sh = form(object({ rows: array(object({ x: field<string>().meta({ problem: checked }) })) }));
     expect(() => createStore(sh, { rows: [] })).toThrow(
-      `Key "problem" on "rows[].x" uses a key the node doesn't declare (uses[0], default false) – declare it in .meta()`
+      `Key "problem" on "rows[].x" uses a key the node doesn't declare (uses[0], default false) – declare it in .meta()`,
     );
   });
 
   test("uses grants no access: the owner still declares the refs it reads or writes", () => {
     const errors: unknown[] = [];
-    const undeclared = metaKey<string, string>("").uses(forced).combine((_self, key, [force]) => ({
-      writes: [key],
-      run: (ctx) => ctx.set(key, String(ctx.get(force))),
-    }));
+    const undeclared = metaKey<string, string>("")
+      .uses(forced)
+      .combine((_self, key, [force]) => ({
+        writes: [key],
+        run: (ctx) => ctx.set(key, String(ctx.get(force))),
+      }));
     const sh = form(object({ f: field<string>().meta({ problem: undeclared, recheck: forced }) }));
-    const s = createStore(sh, { f: "" }, { behaviors: contribute(sh.f.problem, "base"), onError: (e) => errors.push(e) });
+    const s = createStore(
+      sh,
+      { f: "" },
+      { behaviors: contribute(sh.f.problem, "base"), onError: (e) => errors.push(e) },
+    );
     expect(String(errors[0])).toMatch(/"f#recheck" is not declared in triggers, reads, writes or when/);
     expect(s.get(sh.f.problem)).toBe("");
   });
 
   test(".uses() comes before .combine() and .behavior(): the refs they receive are fixed then", () => {
-    expect(() => metaKey(0).combine(() => ({ run() {} })).uses(forced)).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
-    expect(() => metaKey(0).behavior(() => ({ run() {} })).uses(forced)).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
+    expect(() =>
+      metaKey(0)
+        .combine(() => ({ run() {} }))
+        .uses(forced),
+    ).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
+    expect(() =>
+      metaKey(0)
+        .behavior(() => ({ run() {} }))
+        .uses(forced),
+    ).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
   });
 
   test(".uses() is declared once: a second call throws instead of dropping the first one's keys", () => {
-    expect(() => metaKey(0).uses(forced).uses(metaKey(""))).toThrow(/\.uses\(\) is declared once – list every used key in one call/);
+    expect(() => metaKey(0).uses(forced).uses(metaKey(""))).toThrow(
+      /\.uses\(\) is declared once – list every used key in one call/,
+    );
   });
 
   test("a used key the node declares twice is ambiguous and throws in createStore", () => {
     const sh = form(object({ f: field<string>().meta({ problem: checked, recheck: forced }).meta({ again: forced }) }));
     expect(() => createStore(sh, { f: "" })).toThrow(
-      `Key "problem" on "f" uses a key the node declares twice ("recheck", "again") (uses[0], default false) – declare it once`
+      `Key "problem" on "f" uses a key the node declares twice ("recheck", "again") (uses[0], default false) – declare it once`,
     );
   });
 });
@@ -182,7 +243,10 @@ describe("Parts", () => {
 
   test("a false guard makes the contribution absent; its refs trigger the owner", () => {
     const s = createStore(shape, initial(), {
-      behaviors: [contribute(shape.a.tags, "always"), contribute(shape.a.tags, "strict", { when: when([shape.mode], (m) => m === "strict") })],
+      behaviors: [
+        contribute(shape.a.tags, "always"),
+        contribute(shape.a.tags, "strict", { when: when([shape.mode], (m) => m === "strict") }),
+      ],
     });
     expect(s.get(shape.a.tags)).toEqual(["always"]);
     s.set(shape.mode, "strict");
@@ -193,7 +257,10 @@ describe("Parts", () => {
 
   test("a contribution's triggers rerun the owner; its reads do not", () => {
     const s = createStore(shape, initial(), {
-      behaviors: [contribute(shape.a.tags, "t", { triggers: [shape.mode] }), contribute(shape.a.tags, "r", { reads: [shape.other] })],
+      behaviors: [
+        contribute(shape.a.tags, "t", { triggers: [shape.mode] }),
+        contribute(shape.a.tags, "r", { reads: [shape.other] }),
+      ],
     });
     log.runs.length = 0;
     s.set(shape.other, "x");
@@ -208,10 +275,16 @@ describe("Parts", () => {
       writes: [key],
       run: (ctx) => void seen.push(...ctx.parts.flatMap((p) => p.inputs.map((r) => ctx.get(r)))),
     }));
-    const sh = form(object({ f: field<string>().meta({ probe }), t: field<string>(), r: field<string>(), g: field<string>() }));
-    createStore(sh, { f: "", t: "T", r: "R", g: "G" }, {
-      behaviors: contribute(sh.f.probe, null, { triggers: [sh.t], reads: [sh.r], when: when([sh.g], () => true) }),
-    });
+    const sh = form(
+      object({ f: field<string>().meta({ probe }), t: field<string>(), r: field<string>(), g: field<string>() }),
+    );
+    createStore(
+      sh,
+      { f: "", t: "T", r: "R", g: "G" },
+      {
+        behaviors: contribute(sh.f.probe, null, { triggers: [sh.t], reads: [sh.r], when: when([sh.g], () => true) }),
+      },
+    );
     expect(seen).toEqual(["T", "R"]);
   });
 
@@ -228,14 +301,22 @@ describe("In-place update", () => {
     s.set(shape.mode, "x");
     h();
     expect(s.get(shape.a.tags)).toEqual(["base"]);
-    expect(log.runs.map((r) => r.runs), "one counter across every change").toEqual([1, 2, 3, 4]);
+    expect(
+      log.runs.map((r) => r.runs),
+      "one counter across every change",
+    ).toEqual([1, 2, 3, 4]);
   });
 
   test("the owner keeps its place in the run order: a behavior registered after it still runs after it", ({ log }) => {
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "base") });
     const ownerRunsBefore: number[] = [];
     s.addBehavior(
-      defineBehavior({ name: "after", triggers: [shape.a], writes: [shape.other], run: () => void ownerRunsBefore.push(log.runs.length) })
+      defineBehavior({
+        name: "after",
+        triggers: [shape.a],
+        writes: [shape.other],
+        run: () => void ownerRunsBefore.push(log.runs.length),
+      }),
     );
     s.addBehavior(contribute(shape.a.tags, "late"));
     log.runs.length = 0;
@@ -294,7 +375,11 @@ describe("Order and dedup", () => {
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "base") });
     const h1 = s.addBehavior([contribute(shape.a.tags, "one a"), contribute(shape.a.tags, "one b")]);
     s.addBehavior(contribute(shape.a.tags, "two"));
-    const h1b = s.replaceBehavior(h1, [contribute(shape.a.tags, "new a"), contribute(shape.a.tags, "new b"), contribute(shape.a.tags, "new c")]);
+    const h1b = s.replaceBehavior(h1, [
+      contribute(shape.a.tags, "new a"),
+      contribute(shape.a.tags, "new b"),
+      contribute(shape.a.tags, "new c"),
+    ]);
     expect(s.get(shape.a.tags)).toEqual(["base", "new a", "new b", "new c", "two"]);
     h1b();
     s.addBehavior(contribute(shape.a.tags, "three"));
@@ -314,11 +399,16 @@ describe("Order and dedup", () => {
 
   test("the same contribution on sibling rows is fine; equal contributions are never merged", () => {
     const c = contribute(R.x.tags, "c");
-    const s = createStore(shape, initial(), { behaviors: [contribute(R.x.tags, "same"), contribute(R.x.tags, "same")] });
+    const s = createStore(shape, initial(), {
+      behaviors: [contribute(R.x.tags, "same"), contribute(R.x.tags, "same")],
+    });
     const [row0, row1] = s.substore(shape.rows).items();
     row0.addBehavior(c);
     row1.addBehavior(c);
-    expect([row0.get(R.x.tags), row1.get(R.x.tags)]).toEqual([["same", "same", "c"], ["same", "same", "c"]]);
+    expect([row0.get(R.x.tags), row1.get(R.x.tags)]).toEqual([
+      ["same", "same", "c"],
+      ["same", "same", "c"],
+    ]);
   });
 });
 
@@ -331,7 +421,7 @@ describe("Checks", () => {
         contribute(shape.a.tags, "doomed"),
         defineBehavior({ triggers: [shape.a], writes: [shape.other], run: () => {} }),
         defineBehavior({ triggers: [shape.a], writes: [shape.other], run: () => {} }),
-      ])
+      ]),
     ).toThrow(/one writer per target/);
     s.set(shape.a, "x");
     expect(log.runs.map((r) => r.tags)).toEqual([["base"]]);
@@ -339,17 +429,21 @@ describe("Checks", () => {
 
   test("a contribution's refs must be in its target's scope chain; nothing changes when they aren't", () => {
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "base") });
-    expect(() => s.addBehavior([contribute(shape.a.tags, "late"), contribute(shape.a.tags, "row ref", { triggers: [R.x] })])).toThrow(
-      /"rows\[\]\.x" is outside the target's scope/
+    expect(() =>
+      s.addBehavior([contribute(shape.a.tags, "late"), contribute(shape.a.tags, "row ref", { triggers: [R.x] })]),
+    ).toThrow(/"rows\[\]\.x" is outside the target's scope/);
+    expect(() => s.addBehavior(contribute(shape.a.tags, "guard", { when: when([R.x], () => true) }))).toThrow(
+      /outside the target's scope/,
     );
-    expect(() => s.addBehavior(contribute(shape.a.tags, "guard", { when: when([R.x], () => true) }))).toThrow(/outside the target's scope/);
     expect(s.get(shape.a.tags)).toEqual(["base"]);
   });
 
   test("a contribution's refs and target belong to this form", () => {
     const other = form(object({ a: field<string>().meta({ tags }), y: field<string>() }));
     const s = createStore(shape, initial());
-    expect(() => s.addBehavior(contribute(shape.a.tags, "x", { reads: [other.y] }))).toThrow(/"y" is not part of this form/);
+    expect(() => s.addBehavior(contribute(shape.a.tags, "x", { reads: [other.y] }))).toThrow(
+      /"y" is not part of this form/,
+    );
     expect(() => s.addBehavior(contribute(other.a.tags, "x"))).toThrow(/"a#tags" is not part of this form/);
   });
 
@@ -361,12 +455,17 @@ describe("Checks", () => {
 });
 
 describe("Rows", () => {
-  test("a contribution added on a row applies to that row only; the others keep the default without running the owner", ({ log }) => {
+  test("a contribution added on a row applies to that row only; the others keep the default without running the owner", ({
+    log,
+  }) => {
     const s = createStore(shape, initial());
     const [row0, row1] = s.substore(shape.rows).items();
     const h = row1.addBehavior(contribute(R.x.tags, "row 1"));
     expect([row0.get(R.x.tags), row1.get(R.x.tags)]).toEqual([[], ["row 1"]]);
-    expect(log.runs.map((r) => r.path), "only row 1's instance ran").toEqual(["rows[].x"]);
+    expect(
+      log.runs.map((r) => r.path),
+      "only row 1's instance ran",
+    ).toEqual(["rows[].x"]);
     h();
     expect(row1.get(R.x.tags)).toEqual([]);
   });
@@ -399,13 +498,30 @@ describe("Rows", () => {
     row1.addBehavior(contribute(R.x.tags, "row 1"));
     log.runs.length = 0;
     s.addBehavior(contribute(R.x.tags, "all rows"));
-    expect(log.runs.map((r) => r.tags), "parts in call order").toEqual([["row 0", "all rows"], ["row 1", "all rows"]]);
+    expect(
+      log.runs.map((r) => r.tags),
+      "parts in call order",
+    ).toEqual([
+      ["row 0", "all rows"],
+      ["row 1", "all rows"],
+    ]);
   });
 
-  test("a row's contribution triggers its row even when another row's contribution declared the same trigger first", ({ log }) => {
+  test("a row's contribution triggers its row even when another row's contribution declared the same trigger first", ({
+    log,
+  }) => {
     const sh = form(object({ rows: array(object({ x: field<number>().meta({ tags }), y: field<number>() })) }));
     const Y = sh.rows.item;
-    const s = createStore(sh, { rows: [{ x: 0, y: 0 }, { x: 0, y: 0 }] }, { behaviors: contribute(Y.x.tags, "base") });
+    const s = createStore(
+      sh,
+      {
+        rows: [
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+        ],
+      },
+      { behaviors: contribute(Y.x.tags, "base") },
+    );
     const [row0, row1] = s.substore(sh.rows).items();
     row0.addBehavior(contribute(Y.x.tags, "row 0", { triggers: [Y.y] }));
     row1.addBehavior(contribute(Y.x.tags, "row 1", { triggers: [Y.y] }));
@@ -421,7 +537,10 @@ describe("Rows", () => {
     const row2 = s.substore(shape.rows).items()[2];
     expect(row2.get(R.x.tags)).toEqual(["all rows"]);
     s.set(shape.mode, "strict");
-    expect(row2.get(R.x.tags), "the enclosing-scope guard ref triggers the new row").toEqual(["all rows", "strict rows"]);
+    expect(row2.get(R.x.tags), "the enclosing-scope guard ref triggers the new row").toEqual([
+      "all rows",
+      "strict rows",
+    ]);
   });
 });
 
@@ -429,11 +548,23 @@ describe("Builder", () => {
   test("when adds its guard to contributions; nested guards accumulate", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehaviors(shape, (b, s) => {
-        b.when([s.mode], (m) => m !== "", (b) => {
-          b.when([s.other], (o) => o === "x", (b) => b.add(contribute(s.a.tags, "both")));
-          b.add(contribute(s.a.tags, "mode"));
-        });
-        b.when([s.mode], (m) => m === "", (b) => b.add(contribute(s.a.tags, "no mode"), contribute(s.a.tags, "no mode either")));
+        b.when(
+          [s.mode],
+          (m) => m !== "",
+          (b) => {
+            b.when(
+              [s.other],
+              (o) => o === "x",
+              (b) => b.add(contribute(s.a.tags, "both")),
+            );
+            b.add(contribute(s.a.tags, "mode"));
+          },
+        );
+        b.when(
+          [s.mode],
+          (m) => m === "",
+          (b) => b.add(contribute(s.a.tags, "no mode"), contribute(s.a.tags, "no mode either")),
+        );
       }),
     });
     expect(s.get(shape.a.tags)).toEqual(["no mode", "no mode either"]);
@@ -450,7 +581,13 @@ describe("In-flight runs", () => {
    * contribution change at rest). "First" is kept in ctx.state: no run has
    * completed yet.
    */
-  interface Call { signal: AbortSignal; d: ReturnType<typeof deferred<string>>; origins: string[]; changed: boolean; first: boolean }
+  interface Call {
+    signal: AbortSignal;
+    d: ReturnType<typeof deferred<string>>;
+    origins: string[];
+    changed: boolean;
+    first: boolean;
+  }
   let calls: Call[] = [];
 
   const answer = metaKey<string, string>("").combine((self, key) => ({
@@ -471,7 +608,11 @@ describe("In-flight runs", () => {
   function setup() {
     calls = [];
     const errors: unknown[] = [];
-    const s = createStore(sh, { f: "" }, { behaviors: contribute(sh.f.answer, "base"), onError: (error) => errors.push(error) });
+    const s = createStore(
+      sh,
+      { f: "" },
+      { behaviors: contribute(sh.f.answer, "base"), onError: (error) => errors.push(error) },
+    );
     return { s, errors };
   }
 
@@ -483,7 +624,11 @@ describe("In-flight runs", () => {
     s.set(sh.f, "x", { origin: "user" });
     s.addBehavior(contribute(sh.f.answer, "late"));
     expect(calls[1].signal.aborted).toBe(true);
-    expect(calls[2], "rerun with the cancelled run's origins and changed inputs").toMatchObject({ origins: ["user"], changed: true, first: false });
+    expect(calls[2], "rerun with the cancelled run's origins and changed inputs").toMatchObject({
+      origins: ["user"],
+      changed: true,
+      first: false,
+    });
     calls[1].d.resolve("stale");
     await flush();
     expect(s.get(sh.f.answer)).toBe("init base (#1)");

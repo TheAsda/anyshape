@@ -4,13 +4,13 @@
 //     only meta targets declared with it, whatever their name.
 //   • pendingOf – whether that exact target is pending (one writer per target).
 
-import type { AnyNode } from "../shape.js";
-import type { MetaRef } from "./meta.js";
-import type { MetaKeyDef } from "../meta.js";
 import { refNode, refKey, refLabel, targetOf } from "../internal.js";
-import { isAncestorOrSelf } from "../tree.js";
+import type { MetaKeyDef } from "../meta.js";
+import type { AnyNode } from "../shape.js";
 import type { AnyRef, BaseStore } from "../store.js";
+import { isAncestorOrSelf } from "../tree.js";
 import { KIND, type RefKind } from "./kind.js";
+import type { MetaRef } from "./meta.js";
 
 /** The slot of pendingIn(node) without a definition: every target. */
 const ANY: object = Object.freeze({});
@@ -24,7 +24,11 @@ export class PendingInRef {
    * kinds' ids: a definition has no name of its own. pendingIn caches one ref
    * per (node, def), so equal refs still share it.
    */
-  constructor(readonly node: AnyNode, readonly def: MetaKeyDef<any> | undefined, readonly _id: string) {}
+  constructor(
+    readonly node: AnyNode,
+    readonly def: MetaKeyDef<any> | undefined,
+    readonly _id: string,
+  ) {}
   get path(): string {
     return `${this.node.path ?? ""}#pendingIn`;
   }
@@ -65,7 +69,8 @@ const pendingInKind: RefKind<PendingInRef> = {
     return store._addTallySub(ref.node, slotOf(ref), phase, fn);
   },
   // A value write can add or remove rows, and their pending targets with them.
-  affectedBy: (ref, t) => t.key === undefined && (isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node)),
+  affectedBy: (ref, t) =>
+    t.key === undefined && (isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node)),
   local: false,
   tally: true,
   readOnly: "Pending tallies are read-only",
@@ -84,7 +89,13 @@ const pendingOfKind: RefKind<PendingOfRef> = {
   },
   subscribe: (store, ref, phase, fn) => {
     countAll();
-    return store._addTallySub(refNode(ref.target), ref.target, phase, fn, (host) => inFlight.get(host)?.has(ref.target) ?? false);
+    return store._addTallySub(
+      refNode(ref.target),
+      ref.target,
+      phase,
+      fn,
+      (host) => inFlight.get(host)?.has(ref.target) ?? false,
+    );
   },
   affectedBy: (ref, t) => t.key === undefined && isAncestorOrSelf(t.node, refNode(ref.target)),
   local: true,

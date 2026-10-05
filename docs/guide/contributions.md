@@ -92,7 +92,11 @@ const endRequired = contribute(dates.endDate.error, (value) => (value === "" ? "
   name: "endRequired",
 });
 
-const datesStore = createStore(dates, { startDate: "2026-05-01", endDate: "" }, { behaviors: [endRequired, endAfterStart] });
+const datesStore = createStore(
+  dates,
+  { startDate: "2026-05-01", endDate: "" },
+  { behaviors: [endRequired, endAfterStart] },
+);
 ```
 
 `endAfterStart` declares `startDate` as a trigger, so the owner reads it and reruns when it changes: fixing the departure re-checks the return.

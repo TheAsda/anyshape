@@ -9,15 +9,24 @@
 // extracted in stage 11.
 // ------------------------------------------------------------
 
-import { useState } from "react";
-import {
-  form, object, field, type InferValue, array, defineBehaviors, defineBehavior, type FieldNode,
-} from "anyshape";
-import {
-  control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
-  clearWhen, rule, asyncRule, error,
-} from "../../../../../recipes";
+import { form, object, field, type InferValue, array, defineBehaviors, defineBehavior, type FieldNode } from "anyshape";
 import { StoreProvider, useForm, useArray, useValue } from "anyshape/react";
+import { useState } from "react";
+
+import {
+  control,
+  submission,
+  handleSubmit,
+  visible,
+  required,
+  minLength,
+  calculate,
+  visibleWhen,
+  clearWhen,
+  rule,
+  asyncRule,
+  error,
+} from "../../../../../recipes";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -89,9 +98,7 @@ const RESTRICTED = new Set(["antarctica", "north korea", "mars"]);
 /** Pretend server round-trip for the async rule. */
 async function checkDestination(value: string): Promise<string | undefined> {
   await new Promise((resolve) => setTimeout(resolve, 500));
-  return RESTRICTED.has(value.trim().toLowerCase())
-    ? "We don't book trips to there (yet)"
-    : undefined;
+  return RESTRICTED.has(value.trim().toLowerCase()) ? "We don't book trips to there (yet)" : undefined;
 }
 
 /** A server-side rejection: field errors addressed by path, as the server sees them. */
@@ -123,43 +130,41 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
       s.endDate,
       (end, ctx) => {
         const start = ctx.get(s.startDate);
-        return end !== "" && start !== "" && end <= start
-          ? "The return must be after the departure"
-          : undefined;
+        return end !== "" && start !== "" && end <= start ? "The return must be after the departure" : undefined;
       },
       { triggers: [s.startDate] },
     ),
   );
-  b.add(calculate(s.nights, [s.startDate, s.endDate], (start, end) =>
-    start !== "" && end !== ""
-      ? Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS)
-      : undefined,
-  ));
-  b.add(calculate(
-    s.estimatedBudget,
-    [s.nights, s.nightlyRate, s.travelers],
-    (nights, rate, travelers) =>
+  b.add(
+    calculate(s.nights, [s.startDate, s.endDate], (start, end) =>
+      start !== "" && end !== "" ? Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS) : undefined,
+    ),
+  );
+  b.add(
+    calculate(s.estimatedBudget, [s.nights, s.nightlyRate, s.travelers], (nights, rate, travelers) =>
       nights !== undefined && rate !== undefined && nights >= 0
         ? Math.round(nights * rate * travelers.length * 100) / 100
         : undefined,
-  ));
+    ),
+  );
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
   // One writer per field: the clearing is scoped to the license
   // fields; twoDates owns the date pair (see stage 11).
   const hidden = (visible: boolean) => !visible;
   b.add(clearWhen(s.car.license, [s.car.visible], hidden), clearWhen(s.car.licenseExpiry, [s.car.visible], hidden));
   // The car rules apply only while the group is shown.
-  b.when([s.car.visible], (v) => v, (b) => {
-    b.add(required(s.car.license), minLength(s.car.license, 3));
-    b.add(required(s.car.licenseExpiry));
-  });
+  b.when(
+    [s.car.visible],
+    (v) => v,
+    (b) => {
+      b.add(required(s.car.license), minLength(s.car.license, 3));
+      b.add(required(s.car.licenseExpiry));
+    },
+  );
   b.each(s.travelers, (b, t) => {
     b.add(required(t.name));
   });
-  b.add(
-    twoDates(s.startDate, s.endDate, 7),
-    twoDates(s.car.pickupOn, s.car.dropoffOn, 3),
-  );
+  b.add(twoDates(s.startDate, s.endDate, 7), twoDates(s.car.pickupOn, s.car.dropoffOn, 3));
 });
 
 function Derived() {
@@ -168,10 +173,7 @@ function Derived() {
   return (
     <div className="field-group">
       <ReadonlyRow label="Nights" value={nights === undefined ? "—" : String(nights)} />
-      <ReadonlyRow
-        label="Estimated budget"
-        value={budget === undefined ? "—" : `€${budget.toFixed(2)}`}
-      />
+      <ReadonlyRow label="Estimated budget" value={budget === undefined ? "—" : `€${budget.toFixed(2)}`} />
     </div>
   );
 }

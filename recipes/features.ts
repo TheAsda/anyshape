@@ -7,24 +7,29 @@
 // ============================================================
 
 import { metaKey, initialOf } from "anyshape";
+
 import { reveal } from "./submit";
 import { validation } from "./validation";
 
 /** true once the user changed the value (origin "user"); stays true. Counted per subtree. */
-export const touched = metaKey(false).aggregate((t) => t).behavior((self, key) => ({
-  triggers: [self],
-  writes: [key],
-  origins: ["user"],
-  runOn: { init: false },
-  run: (ctx) => ctx.set(key, true),
-}));
+export const touched = metaKey(false)
+  .aggregate((t) => t)
+  .behavior((self, key) => ({
+    triggers: [self],
+    writes: [key],
+    origins: ["user"],
+    runOn: { init: false },
+    run: (ctx) => ctx.set(key, true),
+  }));
 
 /** true while the value differs (Object.is) from its initial value. Counted per subtree. */
-export const dirty = metaKey(false).aggregate((d) => d).behavior((self, key) => ({
-  triggers: [self, initialOf(self)],
-  writes: [key],
-  run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.get(initialOf(self)))),
-}));
+export const dirty = metaKey(false)
+  .aggregate((d) => d)
+  .behavior((self, key) => ({
+    triggers: [self, initialOf(self)],
+    writes: [key],
+    run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.get(initialOf(self)))),
+  }));
 
 /**
  * Whether the node is shown. Only the node's own value: a hidden group says

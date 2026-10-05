@@ -32,9 +32,18 @@
 // ============================================================
 
 import {
-  metaKey, contribute, pendingOf, MetaRef,
-  type AnyNode, type AnyRef, type RefValue, type Contribution, type Origin, type Part,
-  type BaseStore, type CollectEntry,
+  metaKey,
+  contribute,
+  pendingOf,
+  MetaRef,
+  type AnyNode,
+  type AnyRef,
+  type RefValue,
+  type Contribution,
+  type Origin,
+  type Part,
+  type BaseStore,
+  type CollectEntry,
 } from "anyshape";
 
 export interface RuleContext {
@@ -103,7 +112,8 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-const same = (a: readonly unknown[], b: readonly unknown[]) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+const same = (a: readonly unknown[], b: readonly unknown[]) =>
+  a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 
 /**
  * Set by validate() on the fields it checks: the next run starts the async
@@ -199,9 +209,13 @@ export interface RuleOptions {
 export function rule<V>(
   node: Validatable<V>,
   check: (value: V, ctx: RuleContext) => string | undefined,
-  options: RuleOptions = {}
+  options: RuleOptions = {},
 ): Contribution<RulePart> {
-  return contribute(errorOf(node), { kind: "sync", check }, { ...options, name: options.name ?? `rule(${node.path || "<root>"})` });
+  return contribute(
+    errorOf(node),
+    { kind: "sync", check },
+    { ...options, name: options.name ?? `rule(${node.path || "<root>"})` },
+  );
 }
 
 function errorOf(node: Validatable): Validatable["error"] {
@@ -220,10 +234,14 @@ export interface AsyncRuleOptions extends RuleOptions {
 export function asyncRule<V>(
   node: Validatable<V>,
   check: (value: V, ctx: AsyncRuleContext) => Promise<string | undefined>,
-  options: AsyncRuleOptions = {}
+  options: AsyncRuleOptions = {},
 ): Contribution<RulePart> {
   const { start = "user", debounce = 0, ...decl } = options;
-  return contribute(errorOf(node), { kind: "async", check, start, debounce }, { ...decl, name: decl.name ?? `asyncRule(${node.path || "<root>"})` });
+  return contribute(
+    errorOf(node),
+    { kind: "async", check, start, debounce },
+    { ...decl, name: decl.name ?? `asyncRule(${node.path || "<root>"})` },
+  );
 }
 
 export interface ValidationError extends CollectEntry<string | undefined> {
