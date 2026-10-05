@@ -6,17 +6,7 @@ anyshape is pre-release. Any public interface, name or behavior may still change
 
 ## Setup and checks
 
-```sh
-bun install
-bunx playwright install chromium   # once per machine, for the React tests
-```
-
-Before you open a pull request, run:
-
-- `bun run test`: all four test projects;
-- `bun run typecheck`: the source, the recipes and the type-level tests, which run only here.
-
-CI also builds the examples and checks the packed tarball (`bun run build && bun run check:package`). How the tests are laid out, and the conventions they follow, are in [`docs/testing.md`](docs/testing.md).
+How to set up a machine, the checks to run before you open a pull request, and what CI runs besides are in [`docs/testing.md`](docs/testing.md#setup-and-commands), with the test layout and conventions.
 
 ## Tests
 
@@ -24,6 +14,7 @@ CI also builds the examples and checks the packed tarball (`bun run build && bun
 - Show a new test failing before you make it pass. For a fix, that means the test fails on the code before the fix.
 - A test that passes at once proves nothing yet: break the code it covers on purpose and check that the test fails. [`docs/testing.md`](docs/testing.md#mechanisms-to-mutation-check) lists the mechanisms that always get this check.
 - A known bug without a fix is pinned with `test.fails` and a comment naming its issue.
+- Test fixtures and examples follow the [fixture conventions](docs/testing.md#conventions) in `docs/testing.md`.
 
 ## Changing observable behavior
 
@@ -39,10 +30,6 @@ CI also builds the examples and checks the packed tarball (`bun run build && bun
 ## Comments
 
 Comments describe the code as it is now, not how it got there. Drop notes like "stage 2" or "(unchanged)". When a change makes a comment wrong, fix the comment in the same pull request.
-
-## Examples and fixtures
-
-Examples and test fixtures keep declarations and key access in plain view. Don't wrap which keys a node declares, or how a key is reached, in a helper: showing that is what an example is for.
 
 ## Where a rule goes
 
