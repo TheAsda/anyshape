@@ -1,0 +1,183 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // A rule is either "error" or "off", never "warn": oxlint exits 0 on warnings, so they would pile up unseen.
+  // An override's `plugins` must name the plugin of each rule it sets, or the setting is dropped.
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-console": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "import/no-duplicates": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    // The `_` prefix is the core's convention for node internals.
+    "no-underscore-dangle": "off",
+    // A helper stays next to its one use, which is where it reads best.
+    "unicorn/consistent-function-scoping": "off",
+    // `toSorted` is ES2023 and the build targets ES2022; every sort here is on a fresh array.
+    "unicorn/no-array-sort": "off",
+    // A map that spreads builds new objects on purpose and leaves its source unchanged.
+    "oxc/no-map-spread": "off",
+    // The loops that await are sequential on purpose: each step waits for the one before.
+    "no-await-in-loop": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/**"],
+      "rules": {
+        // The default `onError` and the development diagnostics report through the console on purpose.
+        "no-console": ["error", { "allow": ["warn", "error", "timeStamp"] }]
+      }
+    },
+    {
+      "files": ["recipes/**"],
+      "rules": {
+        // The validation recipe reports a check that throws through `console.error`.
+        "no-console": ["error", { "allow": ["error"] }]
+      }
+    },
+    {
+      "files": ["src/react/**", "recipes/react/**", "test/react/**", "examples/**"],
+      "plugins": ["react"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error",
+        // The `react-jsx` transform needs no React in scope.
+        "react/react-in-jsx-scope": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "test/**", "recipes/test/**", "recipes/react/test-utils.tsx"],
+      "plugins": ["vitest"],
+      "rules": {
+        // Vitest's `expect` takes a message as its second argument.
+        "vitest/valid-expect": ["error", { "maxArgs": 2 }],
+        // It doesn't see the fixtures of `test.extend`.
+        "vitest/no-standalone-expect": "off",
+        // Tests capture warnings and log what they observe.
+        "no-console": "off",
+        // A test's locals are named after the fixtures and nodes around them.
+        "no-shadow": "off"
+      }
+    },
+    {
+      "files": ["test/react/**", "recipes/react/*.test.tsx", "recipes/react/test-utils.tsx"],
+      "plugins": ["react"],
+      "rules": {
+        // Test components capture their renders in refs.
+        "react/refs": "off",
+        // Test components capture their renders in variables outside them.
+        "react/globals": "off",
+        // `typeOnlyChecks` call hooks without running them, for their types.
+        "react/rules-of-hooks": "off"
+      }
+    },
+    {
+      "files": ["bench/**", "**/*.memory.ts"],
+      "plugins": ["vitest"],
+      "rules": {
+        // Benches and memory checks report their measurements through the console.
+        "no-console": "off",
+        // A bench measures; it has nothing to expect.
+        "vitest/expect-expect": "off",
+        // A bench checks its setup in the `describe` body, outside any test.
+        "vitest/no-standalone-expect": "off"
+      }
+    },
+    {
+      "files": ["examples/**"],
+      "rules": {
+        // A component's locals are named after the module's nodes and fields.
+        "no-shadow": "off",
+        // The examples log what they submit, to show it.
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        // The scripts are command-line tools that report through the console.
+        "no-console": "off"
+      }
+    },
+
+    // Module boundaries (AGENTS.md, "Core and recipes"). A later override replaces an earlier one's patterns.
+    // Not caught: a recipe reaching a path outside `recipes/` and `src/` by a relative path.
+    {
+      "files": ["recipes/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "regex": "^anyshape/", "message": "A recipe imports the core entry `anyshape`, not a core module." },
+              { "regex": "(^|/)src(/|$)", "message": "A recipe imports the core entry `anyshape`, not a core module." }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["recipes/react/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^anyshape/(?!react$)",
+                "message": "A React recipe imports the core entries `anyshape` and `anyshape/react`, not a core module."
+              },
+              {
+                "regex": "(^|/)src(/|$)",
+                "message": "A React recipe imports the core entries `anyshape` and `anyshape/react`, not a core module."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/**", "test/**", "bench/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)recipes(/|$)",
+                "message": "The core, its tests and benches included, imports no recipe."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["examples/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^anyshape/(?!react$)",
+                "message": "An example imports the core entries `anyshape` and `anyshape/react`, and the recipes, not a core module."
+              },
+              {
+                "regex": "(^|/)src(/|$)",
+                "message": "An example imports the core entries `anyshape` and `anyshape/react`, and the recipes, not a core module."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
