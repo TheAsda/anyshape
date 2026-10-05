@@ -129,10 +129,10 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **E3 · P3** A write through a row store that would make the array contain the same object twice is rejected by `_replaceItem`. → `store.test.ts`
 
 ### F. Notifications & flush (the 8 rules)
-**Covered:** every rule has at least one test; cycles hit the 100-round limit; UI can't write; unsubscribe mid-flush.
+**Covered:** every rule has at least one test; cycles hit the 100-round limit; listeners can't write; unsubscribe mid-flush.
 
-- [x] **F1 · P1** A **UI listener that throws**: the other listeners of the same flush are still called, the first error is rethrown from the write, and the next flush is consistent. → `notifications.test.ts`
-- [x] **F2 · P1** A **reaction that throws**: the error propagates out of `set()`, UI listeners are not called for that flush, and the next write delivers the UI notification with the settled state (subscriptions caught up). → `notifications.test.ts`
+- [x] **F1 · P1** A **listener that throws**: the other listeners of the same flush are still called, the first error is rethrown from the write, and the next flush is consistent. → `notifications.test.ts`
+- [x] **F2 · P1** A **reaction that throws**: the error propagates out of `set()`, listeners are not called for that flush, and the next write notifies the listeners with the settled state (subscriptions caught up). → `notifications.test.ts`
 - ~~**F3 · P2** Store-wide `subscribe(l)` on views~~: the store-wide subscription was removed (#93); code that wants every value change subscribes to the root node.
 - [x] **F4 · P3** `subscribeItems` fires when the array is replaced from outside with the *same length but new objects*. → `notifications.test.ts`
 - [x] **F5 · P3** Flat-form constraint: with 300 fields on the root, one write calls only the changed field's listener (pin the "no extra listener calls" guarantee; cost is covered in §4). → `notifications.test.ts`
@@ -262,8 +262,8 @@ Type assertions are spread across the files today. Collect the public-API type c
 Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`src/diagnostics.test.ts`**.
 
 - [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed; disposing a handle that registered nothing is none.
-- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, behaviors vs UI listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
-- [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its behavior runs and UI listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
+- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, behaviors vs listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
+- [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its behavior runs and listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
 - [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. Checked once by hand, not in CI: `cd examples/basic && bunx vite build`, then the bundle contains none of `diagnostics.ts` (no `track-entry`, `over budget` or `A flush took`), only the `_probe == null` call sites.
 
 ---
@@ -306,7 +306,7 @@ When touching any of these, break it deliberately and confirm that at least one 
 | New row object re-mapped to the same store | `ArrayStore._replaceItem` | identity through row writes |
 | Older row version re-attaches | `ArrayStore._sync` | undo / both-versions tests |
 | Rule 4: attachment change notifies | `BaseStore._visit` (`attachChanged`) | rule 4 tests |
-| Per-phase "last seen" | `_seen[phase]` | behaviors-then-UI tests |
+| Per-phase "last seen" | `_seen[phase]` | behaviors-then-listeners tests |
 | Own-origin filter | `BehaviorRuntime.onTrigger` | `link` tests |
 | Rank ordering | `RunOrder.plan` (`order.ts`) / `runNext` | dependency order, K1–K3, K6 |
 | Host filter of the run order | `HostIndex.near` / `readerOf` (`order.ts`) | K5, "Run order between scope hosts", one writer between rows |

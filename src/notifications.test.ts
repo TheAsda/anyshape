@@ -305,8 +305,8 @@ function withTotal() {
   return { s, lines: s.substore(shape.lines) };
 }
 
-describe("F · Rule 7 – behaviors, then UI", () => {
-  test("rule 7: derived writes settle before UI; UI sees the final state once", () => {
+describe("F · Rule 7 – behaviors, then listeners", () => {
+  test("rule 7: derived writes settle before listeners; listeners see the final state once", () => {
     const { s, lines } = withTotal();
     const seen: number[] = [];
     s.subscribe(shape.total, () => seen.push(s.get(shape.total)));
@@ -363,9 +363,9 @@ describe("F · Rule 7 – behaviors, then UI", () => {
     s.batch(() => {});
   });
 
-  test("rule 7: UI listeners cannot write", ({ store: s }) => {
+  test("rule 7: listeners cannot write", ({ store: s }) => {
     s.subscribe(shape.name, () => s.set(shape.total, 1));
-    expect(() => s.set(shape.name, "B")).toThrow(/Cannot write while UI listeners/);
+    expect(() => s.set(shape.name, "B")).toThrow(/Cannot write while listeners/);
   });
 
   test("reactions do not run on registration", ({ store: s }) => {
@@ -399,7 +399,7 @@ describe("F · Subscription housekeeping", () => {
 });
 
 describe("F · Errors during the flush", () => {
-  test("a throwing UI listener: the others still run, the first error is rethrown", ({ store: s, recorder: r }) => {
+  test("a throwing listener: the others still run, the first error is rethrown", ({ store: s, recorder: r }) => {
     s.subscribe(shape.name, () => {
       r.log.push("a");
       throw new Error("first");
@@ -413,20 +413,20 @@ describe("F · Errors during the flush", () => {
     expect(r.take(), "every listener was called").toEqual(["a", "b", "c"]);
     expect(s.get(shape.name), "the write itself happened").toBe("Bob");
 
-    // The store is not stuck in the UI phase: the next write flushes normally.
+    // The store is not stuck in the listener phase: the next write flushes normally.
     s.subscribe(shape.total, r.on("total"));
     s.set(shape.total, 5);
     expect(r.take()).toEqual(["total"]);
   });
 
-  test("a throwing reaction: the write throws, UI is skipped, the next flush catches up", ({ store: s, recorder: r }) => {
+  test("a throwing reaction: the write throws, listeners are skipped, the next flush catches up", ({ store: s, recorder: r }) => {
     let fail = true;
     s._react(shape.name, () => {
       if (fail) throw new Error("reaction");
     });
     s.subscribe(shape.name, r.on("name"));
     expect(() => s.set(shape.name, "Bob")).toThrow("reaction");
-    expect(r.take(), "UI listeners are not called for the failed flush").toEqual([]);
+    expect(r.take(), "listeners are not called for the failed flush").toEqual([]);
     expect(s.get(shape.name)).toBe("Bob");
 
     fail = false;

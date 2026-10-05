@@ -4,9 +4,9 @@
 // createStore installs a probe on the root in dev (isDev); a production build
 // installs none, so nothing is measured. The probe feeds two consumers:
 //   • the flush budget: a flush over FLUSH_BUDGET logs one console.warn with
-//     its time applying async writes (if any), in behaviors and in UI
-//     listeners, and the three behaviors that took the most time across their
-//     instances;
+//     its time applying async writes (if any), in behaviors and in
+//     listeners, and the three behaviors that took the most time across
+//     their instances;
 //   • the DevTools performance tracks (track group "form-lib"): frequent
 //     entries through the extended console.timeStamp, rare detailed ones
 //     through performance.measure with detail.devtools. Both are
@@ -42,7 +42,7 @@ interface FlushReport {
   /** Applying async runs' writes, in the batch that started the flush. */
   readonly applying: number;
   readonly behaviors: number;
-  readonly ui: number;
+  readonly listeners: number;
   /** At most three, slowest first. */
   readonly slowest: readonly Spent[];
 }
@@ -91,7 +91,7 @@ class FlushBudget {
         } else byName.set(name, { name, time, runs, trace });
       }
       const slowest = [...byName.values()].sort((a, b) => b.time - a.time).slice(0, 3);
-      report = { total, applying: this.carry, behaviors: behaviorsAt - this.start, ui: at - behaviorsAt, slowest };
+      report = { total, applying: this.carry, behaviors: behaviorsAt - this.start, listeners: at - behaviorsAt, slowest };
     }
     for (const tally of this.listed) {
       tally.time = 0;
@@ -131,7 +131,7 @@ function overBudget(report: FlushReport): string {
   return (
     `[form] A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget: ` +
     (report.applying ? `${ms(report.applying)} applying async writes, ` : "") +
-    `${ms(report.behaviors)} in behaviors, ${ms(report.ui)} in UI listeners.` +
+    `${ms(report.behaviors)} in behaviors, ${ms(report.listeners)} in listeners.` +
     (slowest ? ` Slowest behaviors: ${slowest}.` : "")
   );
 }
@@ -187,7 +187,7 @@ class Tracks {
   flushEnd(at: number, report: FlushReport | undefined): void {
     const behaviorsAt = this.behaviorsAt ?? at;
     this.stamp?.("behavior runs", this.flushAt, behaviorsAt, "flush", GROUP, "tertiary-light");
-    if (this.behaviorsAt !== undefined) this.stamp?.("UI listeners", behaviorsAt, at, "flush", GROUP, "tertiary-light");
+    if (this.behaviorsAt !== undefined) this.stamp?.("listeners", behaviorsAt, at, "flush", GROUP, "tertiary-light");
     if (!report) this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
     else this.overBudget(at, report);
   }
@@ -198,7 +198,7 @@ class Tracks {
       properties: [
         ...(report.applying ? [["Applying async writes", ms(report.applying)] as [string, string]] : []),
         ["Behaviors", ms(report.behaviors)],
-        ["UI listeners", ms(report.ui)],
+        ["listeners", ms(report.listeners)],
         ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.name}`, spentLabel(t)]),
       ],
     });

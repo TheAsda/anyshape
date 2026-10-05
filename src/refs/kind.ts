@@ -32,7 +32,7 @@ export interface RefKind<R = any> {
   label(ref: R): string;
   /** The value on `store`, whose scope contains the reference's node. */
   read(store: BaseStore<any>, ref: R): unknown;
-  /** Calls `fn` on `store` when the value changes (phase: behavior or UI). */
+  /** Calls `fn` on `store` when the value changes (phase: behavior or listener). */
   subscribe(store: BaseStore<any>, ref: R, phase: Phase, fn: SubFn): Unsubscribe;
   /**
    * Can writing `target` change the value? Orders behaviors. Only when the
