@@ -107,7 +107,7 @@ export interface RuntimeHooks {
   /** After reset(node) on `store`: re-run (as init) every instance that writes inside the reset part. */
   reinit(store: BaseStore<any>, node: AnyNode): void;
   /** The behaviors settled: the end of the flush's behavior phase. */
-  flushed(): void;
+  behaviorsEnd(): void;
   /** See BaseStore.settle. */
   settle(store: BaseStore<any>, node: AnyNode): Promise<void>;
 }
@@ -1008,7 +1008,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
           // writes are picked up as triggers in the next round.
           if (this._runtime.hasWork()) this._runtime.runNext();
         }
-        this._runtime.flushed();
+        this._runtime.behaviorsEnd();
       } finally {
         this.depth--;
       }
