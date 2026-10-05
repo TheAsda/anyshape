@@ -109,8 +109,9 @@ function withHint(error: unknown): unknown {
 /**
  * Register behaviors and contributions from a component. `build` uses the same
  * builder as defineBehaviors; `deps` re-register (atomically) when they change.
- * On unmount they are removed, as by a handle's dispose (see BehaviorHandle
- * for what removal resets).
+ * On unmount they are removed, as by a handle's dispose: the meta keys they
+ * wrote reset to their defaults, the values they wrote stay (see
+ * BehaviorHandle).
  */
 export function useBehaviors(build: (b: BehaviorBuilder) => void, deps: readonly unknown[], options: UseBehaviorsOptions = {}): void {
   const host = useStore(options).scopeStore;
