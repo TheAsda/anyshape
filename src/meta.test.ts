@@ -69,7 +69,6 @@ describe("C · Declarations", () => {
 
   test("key definitions keep their capabilities", () => {
     const defs = shape.name[META_DEFS];
-    expect(defs.touched.options.owner).toBe("feature");
     expect(defs.error._steps.aggregate!("x")).toBe(true);
     expect(defs.error._steps.aggregate!(undefined)).toBe(false);
     expect(defs.focusTarget.options.reactive).toBe(false);

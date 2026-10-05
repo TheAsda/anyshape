@@ -16,13 +16,13 @@ import { focusFirst } from "./focus";
 import { validate } from "./validation";
 
 /** true while a submit of the node is running. */
-export const submitting = metaKey(false, { owner: "feature" });
+export const submitting = metaKey(false);
 
 /** Makes a node submittable: handleSubmit accepts a store whose own node declares it. */
 export const submission = () => ({ submitting });
 
 /** true once the field's error may be shown: set on blur by the bindings and by a submit. Cleared by reset(). */
-export const revealed = metaKey(false, { owner: "feature" });
+export const revealed = metaKey(false);
 
 export const reveal = () => ({ revealed });
 
