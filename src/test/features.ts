@@ -43,7 +43,7 @@ export const touched = metaKey(false).aggregate((t) => t).behavior((self, key) =
 export const dirty = metaKey(false).aggregate((d) => d).behavior((self, key) => ({
   triggers: [self, initialOf(self)],
   writes: [key],
-  run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),
+  run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.get(initialOf(self)))),
 }));
 
 export const visible = metaKey(true);

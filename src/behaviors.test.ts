@@ -886,7 +886,7 @@ describe("K · Run order between scope hosts", () => {
       defineBehavior({ name, triggers: [shape.lines], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.lines).length) });
     a.addBehavior(fromList("a"));
     expect(() => b.addBehavior(fromList("b"))).toThrow(
-      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "a", "b" – merge them into one behavior (see link())'
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "a", "b" – merge them into one behavior that writes all their targets'
     );
   });
 
@@ -909,7 +909,7 @@ describe("K · Run order between scope hosts", () => {
     b.addBehavior(defineBehavior({ name: "unrelated", triggers: [L.price], writes: [L.sku.disabled], run: () => {} }));
     const qty = defineBehavior({ name: "qty", triggers: [shape.discount], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.discount)) });
     expect(() => a.addBehavior(qty)).toThrow(
-      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "sum", "after", "hint", "qty" – merge them into one behavior (see link())'
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "sum", "after", "hint", "qty" – merge them into one behavior that writes all their targets'
     );
     s.set(shape.discount, 9);
     expect(a.get(L.qty), "not registered").toBe(1);
@@ -922,7 +922,7 @@ describe("L · The run context", () => {
     const b = defineBehavior({
       name: "c", triggers: [shape.start, shape.end], writes: [shape.total],
       run: (ctx) => {
-        seen.push(`${ctx.isInit}:${ctx.changed(shape.start)}:${ctx.changed(shape.end)}`);
+        seen.push(`${ctx.changed(shape.start)}:${ctx.changed(shape.end)}`);
         ctx.set(shape.total, 0);
       },
     });
@@ -932,7 +932,7 @@ describe("L · The run context", () => {
       s.set(shape.start, 2);
       s.set(shape.end, 6);
     });
-    expect(seen).toEqual(["true:false:false", "false:false:true", "false:true:true"]);
+    expect(seen).toEqual(["false:false", "false:true", "true:true"]);
   });
 
   test("within one run the last ctx.set wins, and ctx.get sees the pending write", () => {
@@ -950,18 +950,18 @@ describe("L · The run context", () => {
     expect(s.get(shape.total)).toBe(2);
   });
 
-  test("ctx.initial needs initialOf(node) to be declared", () => {
+  test("a run reads an initial value through initialOf(node), which it declares", () => {
     const e = errors();
     const undeclared = defineBehavior({
       name: "undeclared", triggers: [shape.title], writes: [shape.slug],
-      run: (ctx) => ctx.set(shape.slug, ctx.initial(shape.title)),
+      run: (ctx) => ctx.set(shape.slug, ctx.get(initialOf(shape.title))),
     });
     createStore(shape, initial(), { behaviors: undeclared, onError: e.onError });
     expect(String(e.list[0]?.error)).toMatch(/"title#initial" is not declared in triggers, reads, writes or when/);
 
     const declared = defineBehavior({
       name: "declared", triggers: [shape.start], reads: [initialOf(shape.title)], writes: [shape.slug],
-      run: (ctx) => ctx.set(shape.slug, ctx.initial(shape.title) + "!"),
+      run: (ctx) => ctx.set(shape.slug, ctx.get(initialOf(shape.title)) + "!"),
     });
     const s = createStore(shape, initial(), { behaviors: declared });
     expect(s.get(shape.slug)).toBe("Hello!");

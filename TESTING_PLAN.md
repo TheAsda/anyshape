@@ -27,7 +27,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 70 |
 | `src/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 43 |
-| `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
+| `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 28 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 36 |
@@ -37,7 +37,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
 | `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
 | `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips | 8 |
-| `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
+| `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 3 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
 | `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
@@ -168,7 +168,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **J4 · P3** `replaceBehavior` with a handle from another store / runtime throws; with an already-disposed handle throws. → `behaviors.test.ts`
 
 ### K. Ordering & ownership
-**Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), nor do siblings' writes of the same behavior, one writer, opposite `when/otherwise` branches may share a target.
+**Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), nor do siblings' writes of the same behavior, one writer (opposite `when` guards don't exempt two writers: a target with a value under a condition and another otherwise is one behavior, #92).
 
 - [x] **K1 · P2** **Container edge:** a row behavior writing a row field runs before a root behavior that triggers on the whole array (assert run order with a log, not only final values). → `behaviors.test.ts`
 - [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
@@ -181,7 +181,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **L1 · P2** `ctx.changed(ref)` is `false` on the init run and `true` only for triggers that changed since the last run. → `behaviors.test.ts`
 - [x] **L2 · P2** Within one run: two `ctx.set` calls to the same target → the last one wins; `ctx.get` sees the pending write. → `behaviors.test.ts`
-- [x] **L3 · P2** `ctx.initial(node)` without `initialOf(node)` declared throws the undeclared-read error. → `behaviors.test.ts`
+- [x] **L3 · P2** A run reads an initial value with `ctx.get(initialOf(node))`; without `initialOf(node)` declared, that throws the undeclared-read error. → `behaviors.test.ts`
 - [x] **L4 · P3** The default `onError` logs `[form] "<name>" failed at "<scope>"` via `console.error` (spy). → `behaviors.test.ts`
 
 ### L′. Key contributions (`combine`, `contribute`)
@@ -203,7 +203,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Ready-made rules, behaviors & builder
-**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (a user edit is overwritten, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen` (to the initial value, edits reset while the test holds), `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
+**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (a user edit is overwritten, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen` (to the initial value, edits reset while the test holds), `exclusive` (incl. several filled, required, omitted values), builder `when`, a target with a value under a condition and another otherwise as one behavior (#92), nested guards, `each`, fragments, output to `addBehavior`.
 
 - [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `exclusive`'s default text uses `labelOf` (the last path segment). → `recipes/rules.test.ts`
 - [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhen` takes its condition as explicit refs (`[s.car.visible]`). → `recipes/behaviors.test.ts`
