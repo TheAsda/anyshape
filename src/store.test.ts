@@ -227,20 +227,6 @@ describe("D, E · Reference API and array helpers", () => {
     expect(s.getMeta(shape.name).error).toBe("Bad");
   });
 
-  test("a meta key that an ancestor also declares reads its own node only (#90)", ({ store: s, lines }) => {
-    const row = lines.itemAt(0);
-    const seen: unknown[] = [];
-    s.subscribe(shape.company.address.city.visible, () => seen.push("city"));
-    row.subscribe(L.sku.disabled, () => seen.push("sku"));
-    s.set(shape.company.visible, false);
-    s.set(shape.company.address.visible, false);
-    s.set(shape.disabled, true);
-    s.set(shape.lines.disabled, true);
-    expect(s.get(shape.company.address.city.visible)).toBe(true);
-    expect(row.get(L.sku.disabled), "across a row boundary").toBe(false);
-    expect(seen, "an ancestor's write does not notify").toEqual([]);
-  });
-
   // ---------------------------------------------------------------------------
   // Array helpers
   test("append / insert / remove / move", ({ store: s, lines }) => {
@@ -306,5 +292,26 @@ describe("D, E · Reference API and array helpers", () => {
     expect(rows.items().length).toBe(2);
     expect(s.get(f.rows)[0]).not.toBe(shared);
     expect(shared, "the factory's object is never written").toEqual({ t: "" });
+  });
+});
+
+describe("I · Own-node meta keys", () => {
+  const { shape, L, initial } = company;
+  const test = base
+    .extend("store", () => createStore(shape, initial()))
+    .extend("lines", ({ store }) => store.substore(shape.lines));
+
+  test("a meta key that an ancestor also declares reads its own node only (#90)", ({ store: s, lines }) => {
+    const row = lines.itemAt(0);
+    const seen: unknown[] = [];
+    s.subscribe(shape.company.address.city.visible, () => seen.push("city"));
+    row.subscribe(L.sku.disabled, () => seen.push("sku"));
+    s.set(shape.company.visible, false);
+    s.set(shape.company.address.visible, false);
+    s.set(shape.disabled, true);
+    s.set(shape.lines.disabled, true);
+    expect(s.get(shape.company.address.city.visible)).toBe(true);
+    expect(row.get(L.sku.disabled), "across a row boundary").toBe(false);
+    expect(seen, "an ancestor's write does not notify").toEqual([]);
   });
 });

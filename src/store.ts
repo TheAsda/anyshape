@@ -512,7 +512,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     return (this.substore(node.parent as any) as BaseStore<any>)._ownerOf(node);
   }
 
-  /** @internal */
+  /** @internal one key of a node's live meta */
   _readMetaRef(ref: MetaRef<any>): any {
     return (this.getMeta(ref.node) as Meta)[ref.key];
   }
@@ -693,7 +693,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     return this._addRefSub(node, "ui", () => listener());
   }
 
-  /** Whole (own) meta object of a node. */
+  /** Whole meta object of a node. */
   subscribeMeta(node: AnyNode, listener: Listener): Unsubscribe {
     return this._addMetaSub(node, "ui", () => listener());
   }
@@ -745,15 +745,16 @@ export abstract class BaseStore<N extends ContainerNode> {
   _addKeySub(ref: MetaRef<any>, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(ref.node);
     const { node, key } = ref;
-    const host = this._host;
+    const owner = this._ownerOf(node);
+    const host = owner._host;
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
-      read: () => this._readMetaRef(ref),
+      read: () => (owner._metaOf(node) as Meta)[key],
       equals: Object.is,
       origins: (log) => originsWhere(log, (e) => e.key === key && lastOf(e.loc).host === host && lastOf(e.loc).node === node),
     };
     sub.last = sub.read();
-    return register(host._ownerOf(node)._keySubs, node, sub);
+    return register(owner._keySubs, node, sub);
   }
 
   /** @internal baseline channel: marked by { as: "initial" } writes on this scope */
