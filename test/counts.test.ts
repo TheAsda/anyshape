@@ -175,9 +175,11 @@ describe.each(["development", "production"])("H · countIn rejects a key it can'
   });
 
   test("a key without aggregate throws, naming the node and the key", ({ warn }) => {
+    // @ts-expect-error countIn takes only a key declared with .aggregate()
     expect(() => countIn(f, flag)).toThrow(
       'countIn on "<root>": key "flag" on "b" has no aggregate – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).'
     );
+    // @ts-expect-error countIn takes only a key declared with .aggregate()
     expect(() => countIn(f, flag), "a failed call caches nothing").toThrow(/has no aggregate/);
     expect(warn).not.toHaveBeenCalled();
   });

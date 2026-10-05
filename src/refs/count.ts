@@ -67,7 +67,7 @@ function declaration(node: AnyNode, def: MetaKeyDef<any, any>): string | undefin
  * used as a hook dependency. Throws when the count would always be 0: the key
  * has no aggregate, or no node in the subtree declares it.
  */
-export function countIn(node: AnyNode, def: MetaKeyDef<any, any>): CountRef {
+export function countIn(node: AnyNode, def: MetaKeyDef<any, any, any, true>): CountRef {
   let byDef = countRefs.get(node);
   if (!byDef) countRefs.set(node, (byDef = new Map()));
   let ref = byDef.get(def);
