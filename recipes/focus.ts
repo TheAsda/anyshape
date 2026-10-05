@@ -44,8 +44,8 @@ export type FocusEntry = Pick<CollectEntry, "ref" | "store">;
 
 /**
  * Orders focus targets by their position in the document. Targets that are
- * not DOM nodes (custom focus handles) compare equal, so they keep their
- * shape order relative to each other.
+ * not DOM nodes (custom focus handles) compare equal, so they keep the
+ * entries' order relative to each other.
  */
 function domOrder(a: FocusTarget, b: FocusTarget): number {
   if (typeof Node === "undefined" || !(a instanceof Node) || !(b instanceof Node) || a === b) return 0;

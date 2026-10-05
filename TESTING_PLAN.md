@@ -30,7 +30,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
-| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 34 |
+| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 36 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, guarded by a builder block | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 17 |
 | `recipes/features.test.ts` | N | the default behaviors of `touched` and `dirty` | 1 |

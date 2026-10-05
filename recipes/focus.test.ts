@@ -51,7 +51,7 @@ describe("Focus", () => {
     expect(focused).toEqual(["b"]);
   });
 
-  test("focusFirst: undefined without a target; focus() then scrollIntoView() with one", ({ store: s }) => {
+  test("focusFirst: nothing focused without a target; focus() then scrollIntoView() with one", ({ store: s }) => {
     expect(focusOn(s, shape.name.error)).toBe(false);
     const calls: string[] = [];
     registerFocus(s, shape.name, { focus: () => calls.push("focus"), scrollIntoView: () => calls.push("scroll") });

@@ -69,10 +69,12 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
   const start = useStore(options);
   const store = resolveStore(start, ref);
 
-  const def = targetOf(ref)?.def;
-  if (isDev() && def && !def.options.keepOnReset && !warned.has(ref)) {
-    warned.add(ref);
-    console.warn(`useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
+  if (isDev() && !warned.has(ref)) {
+    const def = targetOf(ref)?.def;
+    if (def && !def.options.keepOnReset) {
+      warned.add(ref);
+      console.warn(`useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
+    }
   }
 
   useLayoutEffect(() => {
