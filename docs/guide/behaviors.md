@@ -176,4 +176,4 @@ The fix is one behavior that triggers on both and writes both, using `ctx.change
 - [Guards](guards.md): switching behaviors on and off.
 - [Combined keys](contributions.md): several declarations feeding one key.
 - [Async behaviors](async.md): runs that wait for a server.
-- The design records for [declared dependencies, one ordered pass and one writer per target](https://github.com/TheAsda/anyshape/tree/master/docs/adr).
+- The design records: [behaviors declare their dependencies](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0003-behaviors-declare-their-dependencies.md), [one ordered pass per change](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0004-one-ordered-pass-per-flush.md), [one writer per target](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0005-one-writer-per-target.md).
