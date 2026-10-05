@@ -12,6 +12,7 @@ export const metaKind: RefKind<MetaRef<any>> = {
   subscribe: (store, ref, phase, fn) => store._addKeySub(ref, phase, fn),
   affectedBy: (ref, t) => t.key === ref.key && t.node === ref.node,
   local: true,
+  tally: false,
   writer: {
     target: (ref) => ({ node: ref.node, key: ref.key, def: defOf(ref) }),
     write: (store, ref, value, options) => store._setMetaKey(ref, value, options),

@@ -27,3 +27,7 @@ _Avoid_: task, job, shared promise
 **Pending**:
 The state of a behavior target while a run that writes it is in flight. Derived by the core, never declared or written.
 _Avoid_: loading, validating, busy
+
+**Tally**:
+A read-only value the core derives over the tree: a count of a key over a subtree (`countIn`), the pending targets in a subtree (`pendingIn`), or whether one target is pending (`pendingOf`). Its changes carry no origins, so a behavior with an origins filter can't trigger on one.
+_Avoid_: aggregate (that is the step a key declares to be counted)

@@ -42,6 +42,8 @@ export interface RefKind<R = any> {
   affectedBy(ref: R, target: Target): boolean;
   /** Depends on its node only, not on a subtree. Default behaviors may use only local references. */
   readonly local: boolean;
+  /** On the tally channel (see Tally in GLOSSARY.md): its changes carry no origins, so an origins filter can't apply. */
+  readonly tally: boolean;
   /** Writable kinds only. */
   readonly writer?: {
     target(ref: R): Target;

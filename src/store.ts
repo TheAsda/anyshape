@@ -189,7 +189,7 @@ interface Sub<V = any> {
   equals: (a: V, b: V) => boolean;
   fn: (next: V, prev: V, info: ChangeInfo) => void;
   /** Origins of the log entries relevant to this subscription. */
-  origins: (log: readonly WriteEntry[]) => Set<Origin>;
+  origins: (log: readonly WriteEntry[]) => ReadonlySet<Origin>;
 }
 
 /** @internal */
@@ -235,18 +235,6 @@ function related(a: Loc, b: Loc): boolean {
     if (i === a.length - 1 || i === b.length - 1) {
       return isAncestorOrSelf(x.node, y.node) || isAncestorOrSelf(y.node, x.node);
     }
-    if (x.node !== y.node) return false;
-  }
-  return false;
-}
-
-/** Is `inner` inside `outer` (or equal to it)? */
-function within(inner: Loc, outer: Loc): boolean {
-  for (let i = 0; i < inner.length && i < outer.length; i++) {
-    const x = inner[i], y = outer[i];
-    if (x.host !== y.host) return false;
-    if (i === outer.length - 1) return isAncestorOrSelf(y.node, x.node);
-    if (i === inner.length - 1) return false;
     if (x.node !== y.node) return false;
   }
   return false;
@@ -717,18 +705,17 @@ export abstract class BaseStore<N extends ContainerNode> {
    * @internal Tally channel: marks of `slot` at `node` on this scope host
    * (_applyCountDelta moves subtree tallies with rows, _markCount marks any
    * other value a kind keeps per slot). `read` defaults to the subtree tally.
-   * Origins: for a key name, the writes of that key inside the subtree.
+   * Tallies carry no origins.
    */
   _addTallySub(node: AnyNode, slot: Slot, phase: Phase, fn: SubFn, read?: (host: BaseStore<any>) => unknown): Unsubscribe {
     this.assertInScope(node);
     this.root._syncWalk();
     const host = this.scopeStore;
-    const loc = locOf(host, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
       read: read ? () => read(host) : () => host._countOf(node, slot),
       equals: Object.is,
-      origins: (log) => (typeof slot === "string" ? originsWhere(log, (e) => e.key === slot && within(e.loc, loc)) : new Set()),
+      origins: () => NO_ORIGINS,
     };
     sub.last = sub.read();
     let bySlot = host._countSubs.get(node);
@@ -1106,7 +1093,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
       read: () => this._sync(),
       equals: Object.is,
       fn: () => listener(),
-      origins: () => new Set(),
+      origins: () => NO_ORIGINS,
     };
     this.itemsSubs.add(sub);
     return () => {

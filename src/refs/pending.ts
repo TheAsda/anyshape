@@ -66,6 +66,7 @@ const pendingInKind: RefKind<PendingInRef> = {
   // A value write can add or remove rows, and their pending targets with them.
   affectedBy: (ref, t) => t.key === undefined && (isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node)),
   local: false,
+  tally: true,
   readOnly: "Pending tallies are read-only",
 };
 
@@ -86,6 +87,7 @@ const pendingOfKind: RefKind<PendingOfRef> = {
   },
   affectedBy: (ref, t) => t.key === undefined && isAncestorOrSelf(t.node, refNode(ref.target)),
   local: true,
+  tally: true,
   readOnly: "Pending tallies are read-only",
 };
 
