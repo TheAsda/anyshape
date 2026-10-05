@@ -1,8 +1,8 @@
-# form-lib testing plan
+# anyshape testing plan
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 453 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `test/lens.test.ts`, `test/types.test.ts` and `test/integration.test.ts` were added for them.
+- **Current state:** 457 tests in 30 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `test/lens.test.ts`, `test/types.test.ts` and `test/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -29,7 +29,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `test/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 43 |
 | `test/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 28 |
 | `test/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
-| `test/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
+| `test/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production or without `process` | 20 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 36 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, guarded by a builder block | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 17 |
@@ -40,6 +40,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `test/types.test.ts` | S | the public type contract (asserted by `tsc`) | 3 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
+| `test/exports.test.ts` | — | each entry's public names, as a snapshot | 3 |
 | `test/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
 | `test/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` | 12 |
 | `test/react/form.test.tsx` | Q | `useForm`, `useSync` | 10 |
@@ -53,9 +54,9 @@ Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) a
 **Conventions (keep them):**
 - **Projects** (`vitest.config.ts`):
   - `unit`: the core, in Node, with no DOM.
-  - `recipes`: `recipes/`, in Node, importing the core entry as `form-lib`.
+  - `recipes`: `recipes/`, in Node, importing the core entry as `anyshape`.
   - `react`: the bindings in real Chromium, through Vitest browser mode (Playwright provider) and `vitest-browser-react`.
-  - `recipes-react`: `recipes/react/`, in real Chromium like `react`, importing the core entries as `form-lib` and `form-lib/react` (both aliased to `src/`, so recipes and core hooks share one core copy).
+  - `recipes-react`: `recipes/react/`, in real Chromium like `react`, importing the core entries as `anyshape` and `anyshape/react` (both aliased to `src/`, so recipes and core hooks share one core copy).
   - Commands: `bun run test` runs all four; also `test:unit`, `test:react`, `test:recipes`, `test:recipes-react`, `bench` (NF3), `test:memory` (NF4).
   - First run on a machine: `bunx playwright install chromium`.
 - **Structure:** one file per layer (table above). Inside a file, a `describe` per section, named with the layer ID (`"F · Rule 3 – array structure channel"`). Test titles state the guarantee ("a removed row drops its async result"), not the function.
@@ -268,7 +269,7 @@ Time comes from a stubbed `performance.now` that the test's reactions, listeners
 
 - [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed; disposing a handle that registered nothing is none.
 - [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, behaviors vs listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
-- [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its behavior runs and listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
+- [x] **T3 · P2** DevTools tracks in the `anyshape` group: `flush` (each flush, its behavior runs and listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
 - [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. Checked once by hand, not in CI: `cd examples/basic && bunx vite build`, then the bundle contains none of `diagnostics.ts` (no `track-entry`, `over budget` or `A flush took`), only the `_probe == null` call sites.
 
 ---
@@ -293,7 +294,7 @@ The unit suites test each mechanism in isolation. Add **`test/integration.test.t
 
 | ID | Pri | Check | How |
 |---|---|---|---|
-| **NF1** | P1 | **Packaging:** the build emits both entries (`form-lib`, `form-lib/react`) with `.d.ts`; `package.json` `exports` resolve both; the core bundle contains no `react` import. | After fixing `vite.config.ts` (it builds only `src/index.ts`) and adding `exports`/`types`: a script that runs `vite build`, then imports `dist/` from a temp project and type-checks a small consumer. |
+| **NF1** ✅ | P1 | **Packaging:** the build emits both entries (`anyshape`, `anyshape/react`) with `.d.ts`; `package.json` `exports` resolve both; the core bundle contains no `react` import. | **Done:** `bun run check:package` (`scripts/check-package.ts`, the `package` CI job) on the packed tarball: its contents, one copy of the core internals, consumers with and without react, publint and @arethetypeswrong/cli. |
 | **NF2** | P2 | **CI gates:** `npm test`, `npm run typecheck`, and `cd examples/basic && npm run typecheck`. | CI workflow. The type-level tests only run under `tsc`. |
 | **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal); the dev diagnostics overhead on a keystroke and a row edit (#17). The benches run in dev, so they include the diagnostics. | `vitest bench` in `bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`bench/store.bench.ts`); found #6. |
 | **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable; so do removed nested rows, a row whose disposed behavior read the whole list, rows whose disposed behaviors were linked to a root behavior that stays, and a dropped store with its rows and behaviors (#63). The heap a store keeps per row with row-by-row chained behaviors is recorded, not asserted: it should stay flat as the rows double (before #63 it grew 27 → 37 → 58 KB per row at 200/400/800 rows). | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |

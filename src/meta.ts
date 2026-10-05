@@ -7,9 +7,9 @@
 // Features are plain objects of key definitions (see recipes/features.ts).
 // ============================================================
 
-import type { BehaviorConfig, OwnerConfig } from "./behaviors";
-import type { ShapeNode } from "./shape";
-import type { MetaRef } from "./refs/meta";
+import type { BehaviorConfig, OwnerConfig } from "./behaviors.js";
+import type { ShapeNode } from "./shape.js";
+import type { MetaRef } from "./refs/meta.js";
 
 export type Meta = Record<string, unknown>;
 
@@ -61,6 +61,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
   readonly options: Readonly<MetaKeyOptions<V>>;
   /** @internal */
   readonly _steps: Readonly<MetaKeySteps<V, P, U>>;
+  /** @internal – use metaKey() */
   constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, steps: MetaKeySteps<V, P, U> = {}) {
     if (steps.combine && steps.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
     if (steps.aggregate && steps.aggregate(defaultValue)) {

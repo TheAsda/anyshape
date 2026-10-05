@@ -12,13 +12,13 @@
 // ============================================================
 
 import { useLayoutEffect, useRef, useState } from "react";
-import type { AnyNode, InferValue, ObjectNode } from "../shape";
-import type { MetaRef } from "../refs/meta";
-import { createStore } from "../create";
-import type { StoreOptions } from "../behaviors";
-import type { RootStore } from "../store";
-import { useStore, resolveStore, type HookOptions } from "./hooks";
-import { refLabel, targetOf, isDev } from "../internal";
+import type { AnyNode, InferValue, ObjectNode } from "../shape.js";
+import type { MetaRef } from "../refs/meta.js";
+import { createStore } from "../create.js";
+import type { StoreOptions } from "../behaviors.js";
+import type { RootStore } from "../store.js";
+import { useStore, resolveStore, type HookOptions } from "./hooks.js";
+import { refLabel, targetOf, isDev } from "../internal.js";
 
 // ============================================================
 // useForm

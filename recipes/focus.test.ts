@@ -1,6 +1,6 @@
 // Focus recipe: registerFocus(store, node, target), focusFirst(entries).
 
-import { form, object, field, createStore, type MetaRef, type BaseStore } from "form-lib";
+import { form, object, field, createStore, type MetaRef, type BaseStore } from "anyshape";
 import { control } from "./features";
 import { rule, validate } from "./validation";
 import { test as base, describe, expect } from "vitest";

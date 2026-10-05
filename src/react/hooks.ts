@@ -14,10 +14,10 @@ import {
   createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ShapeNode, type AnyNode, type InferValue } from "../shape";
-import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store";
-import type { ArrayNode } from "../shape";
-import { refNode, refLabel, rootOf, scopeOf } from "../internal";
+import { ShapeNode, type AnyNode, type InferValue } from "../shape.js";
+import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store.js";
+import type { ArrayNode } from "../shape.js";
+import { refNode, refLabel, rootOf, scopeOf } from "../internal.js";
 
 // ============================================================
 // Context

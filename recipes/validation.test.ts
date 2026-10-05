@@ -1,6 +1,6 @@
 // The validation recipe (recipes/validation.ts): rules contribute to `error`,
 // whose owner is the queue; validate(store, node) forces and collects.
-import { form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn, pendingOf, pendingIn } from "form-lib";
+import { form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn, pendingOf, pendingIn } from "anyshape";
 import { rule, asyncRule, validate, error, control, validation, visible } from "./index";
 import { flush, sleep } from "./test/harness";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";

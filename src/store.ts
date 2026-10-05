@@ -47,19 +47,19 @@
 //   8. Listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
-import type { Meta, MetaKeyDef } from "./meta";
-import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors";
+import type { Meta, MetaKeyDef } from "./meta.js";
+import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors.js";
 import {
   ShapeNode, ObjectNode, ArrayNode,
   type AnyNode, type ContainerNode, type InferValue,
-} from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal";
-import { isAncestorOrSelf } from "./tree";
-import { kindOf } from "./refs/kind";
-import type { MetaRef } from "./refs/meta";
-import type { CountRef } from "./refs/count";
-import type { InitialRef } from "./refs/initial";
-import type { PendingInRef, PendingOfRef } from "./refs/pending";
+} from "./shape.js";
+import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal.js";
+import { isAncestorOrSelf } from "./tree.js";
+import { kindOf } from "./refs/kind.js";
+import type { MetaRef } from "./refs/meta.js";
+import type { CountRef } from "./refs/count.js";
+import type { InitialRef } from "./refs/initial.js";
+import type { PendingInRef, PendingOfRef } from "./refs/pending.js";
 
 export type Listener = () => void;
 export type Unsubscribe = () => void;
@@ -73,7 +73,6 @@ export interface WriteOptions {
   as?: "initial";
 }
 
-/** @internal */
 export interface ChangeInfo {
   /** Origins of the writes that changed this reaction's target since its last run. */
   readonly origins: ReadonlySet<Origin>;
@@ -97,7 +96,13 @@ export interface CollectEntry<V = unknown> {
 
 export const MAX_BEHAVIOR_ROUNDS = 100;
 
-/** @internal The behavior runtime (runtime.ts): built by the factory createStore passes to the root. */
+// ============================================================
+// Core-only types. Other core modules import them, so they stay public in
+// store.d.ts and private by being left out of the entry's export list: with
+// the internal tag, stripInternal would drop them and break the importers'
+// declarations.
+// ============================================================
+/** The behavior runtime (runtime.ts): built by the factory createStore passes to the root. */
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;
@@ -112,7 +117,7 @@ export interface RuntimeHooks {
 }
 
 /**
- * @internal Where a form's time goes. Dev only: createStore installs one on
+ * Where a form's time goes. Dev only: createStore installs one on
  * the root (diagnostics.ts); in production the root has none and nothing is
  * measured. Every point carries `at`, a performance.now() time.
  */
@@ -139,7 +144,7 @@ export interface Probe {
   settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void;
 }
 
-/** @internal A registration change, for the registration track. */
+/** A registration change, for the registration track. */
 export interface RegistrationChange {
   /** Concrete path of the store it was made on ("<root>" for the root). */
   readonly store: string;
@@ -160,24 +165,22 @@ export interface RegistrationChange {
 }
 
 /**
- * @internal An owner's contributions listed per registration entry. Rows that
+ * An owner's contributions listed per registration entry. Rows that
  * each contribute on mount would otherwise list every row on every mount.
  */
 export const LISTED_CONTRIBUTIONS = 20;
 
-/** @internal A behavior instance as a probe sees it: instances of one registration share `reg`. */
+/** A behavior instance as a probe sees it: instances of one registration share `reg`. */
 export interface ProbedInstance {
   readonly reg: { readonly name: string; readonly behavior: Behavior };
   readonly host: BaseStore<any>;
 }
 
-/** @internal */
 export type RunPart = "sync" | "async" | "apply";
 
 // ============================================================
 // Internals: phases, subscriptions, write log
 // ============================================================
-/** @internal */
 export type Phase = "behavior" | "listener";
 const PHASES: readonly Phase[] = ["behavior", "listener"];
 const NO_ORIGINS: ReadonlySet<Origin> = new Set();
@@ -193,10 +196,9 @@ interface Sub<V = any> {
   origins: (log: readonly WriteEntry[]) => ReadonlySet<Origin>;
 }
 
-/** @internal */
 export type SubFn = Sub["fn"];
 
-/** @internal A subtree tally: an object owned by a reference kind (aggregate counts, pending tallies). */
+/** A subtree tally: an object owned by a reference kind (aggregate counts, pending tallies). */
 export type Slot = object;
 
 interface Seen {
@@ -769,6 +771,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this._visitChildren(phase, calls, log);
   }
 
+  /** @internal */
   protected _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     for (const child of this._children.values()) child._visit(phase, calls, log);
   }
@@ -798,6 +801,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this._syncChildren();
   }
 
+  /** @internal */
   protected _syncChildren(): void {
     for (const child of this._children.values()) child._syncVisit();
   }
@@ -832,7 +836,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 // ============================================================
 // Root store – owns the value, the baseline, batching and the flush
 // ============================================================
-export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
+export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> {
   private value: InferValue<N>;
   private initial: InferValue<N>;
   private depth = 0;
@@ -1288,10 +1292,12 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     return rows;
   }
 
+  /** @internal */
   protected override _syncChildren(): void {
     for (const row of this.rowsToWalk("sync", this._sync())) row._syncVisit();
   }
 
+  /** @internal */
   override _refreshInitials(): void {
     for (const row of this._sync()) {
       if (this._baselineHas(row._currentRef as object) && row._initial !== row._currentRef) {
@@ -1302,10 +1308,12 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     }
   }
 
+  /** @internal */
   override _resetAllMeta(): void {
     for (const row of this._sync()) row._resetAllMeta();
   }
 
+  /** @internal */
   protected override _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     for (const store of this.rowsToWalk(phase, this._sync())) store._visit(phase, calls, log);
 
@@ -1351,7 +1359,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
 // Item store – a scope: node lenses inside the item template are
 // resolved against the current item object (and its initial value).
 // ============================================================
-export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
+export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> {
   /** Stable for the lifetime of the item (survives edits and reordering). Use as React key. */
   readonly stableId: string;
   /** @internal */ _currentRef: unknown;
@@ -1376,6 +1384,7 @@ export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   protected override get ownsFocusMeta(): boolean {
     return true;
   }
+  /** @internal */
   override get _countedInParent(): boolean {
     return this._counted;
   }

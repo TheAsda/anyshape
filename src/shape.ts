@@ -15,15 +15,15 @@
 //                    doesn't reserve is free for fields and meta keys
 // ============================================================
 
-import { type Lens, identityLens, propLens, composeLens } from "./lens";
+import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
 import {
   MetaKeyDef,
   type Meta, type MergeMetaRefs,
-} from "./meta";
-import { FIELDS, META_DEFS, META, CREATE } from "./internal";
-import { KIND, type RefKind } from "./refs/kind";
-import { valueKind } from "./refs/value";
-import { MetaRef } from "./refs/meta";
+} from "./meta.js";
+import { FIELDS, META_DEFS, META, CREATE } from "./internal.js";
+import { KIND, type RefKind } from "./refs/kind.js";
+import { valueKind } from "./refs/value.js";
+import { MetaRef } from "./refs/meta.js";
 
 declare const FieldIdBrand: unique symbol;
 export type FieldId = string & { readonly [FieldIdBrand]: true };
@@ -151,6 +151,7 @@ export class FieldNode<T = unknown> extends ShapeNode<T> {
     super();
   }
 
+  /** @internal – use field() */
   static create<T>(): FieldNode<T> {
     return new FieldNode<T>();
   }
@@ -176,6 +177,7 @@ export class ObjectNode<
     Object.assign(this, fields);
   }
 
+  /** @internal – use object() */
   static create<TFields extends Record<string, AnyNode>>(fields: TFields): ObjectNode<TFields> & TFields {
     return new ObjectNode(fields) as any;
   }
@@ -213,6 +215,7 @@ export class ArrayNode<
     (this as any)[CREATE] = create;
   }
 
+  /** @internal – use array() */
   static create<TItem extends ObjectNode<any>>(
     item: TItem,
     create?: () => InferValue<TItem>

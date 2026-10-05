@@ -63,26 +63,26 @@
 // store.settle(node?) waits until no run writing inside the node is in flight.
 // ============================================================
 
-import { ShapeNode, ObjectNode, ArrayNode, type AnyNode } from "./shape";
-import type { MetaRef } from "./refs/meta";
+import { ShapeNode, ObjectNode, ArrayNode, type AnyNode } from "./shape.js";
+import type { MetaRef } from "./refs/meta.js";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
   FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, locatedAt, pathLabel,
-} from "./internal";
-import { isAncestorOrSelf } from "./tree";
+} from "./internal.js";
+import { isAncestorOrSelf } from "./tree.js";
 import {
   RootStore, BaseStore, ItemStore, ArrayStore,
   type AnyRef, type Origin, type ChangeInfo, type Unsubscribe, type RuntimeHooks, type RegistrationChange,
   type Probe, type ProbedInstance, type RunPart, LISTED_CONTRIBUTIONS,
-} from "./store";
-import { kindOf, type Target } from "./refs/kind";
-import { beginRun, pendingIn, type PendingRun } from "./refs/pending";
-import { RunOrder, NodeIndex, type Write } from "./order";
+} from "./store.js";
+import { kindOf, type Target } from "./refs/kind.js";
+import { beginRun, pendingIn, type PendingRun } from "./refs/pending.js";
+import { RunOrder, NodeIndex, type Write } from "./order.js";
 import {
   Behavior, Contribution,
   type AnyBehavior, type BehaviorConfig, type BehaviorContext, type BehaviorErrorInfo, type BehaviorHandle,
   type Declaration, type Guard, type OriginKind, type OwnerConfig, type OwnerContext, type Part, type WritableRef,
-} from "./behaviors";
+} from "./behaviors.js";
 
 /**
  * What onError receives for an error thrown by a run: in dev, for behaviors

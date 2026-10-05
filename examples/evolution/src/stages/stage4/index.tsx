@@ -6,9 +6,9 @@
 // ------------------------------------------------------------
 
 import { useState } from "react";
-import { form, object, field, type InferValue, defineBehaviors } from "form-lib";
+import { form, object, field, type InferValue, defineBehaviors } from "anyshape";
 import { control, submission, handleSubmit, required, minLength, calculate } from "../../../../../recipes";
-import { StoreProvider, useForm, useValue } from "form-lib/react";
+import { StoreProvider, useForm, useValue } from "anyshape/react";
 import { TextField, NumberField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;

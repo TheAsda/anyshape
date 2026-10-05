@@ -15,7 +15,7 @@ import {
   metaKey,
   type InferValue,
   type FieldNode,
-} from 'form-lib';
+} from 'anyshape';
 import {
   control,
   submission,
@@ -144,7 +144,7 @@ export const CATALOG: Record<string, { name: string; unitPrice: number }> = {
 
 const EMPLOYEES: Record<string, string> = {
   'ada@example.com': 'Ada Lovelace',
-  'dev@form-lib.dev': 'Dev Ovan',
+  'dev@anyshape.dev': 'Dev Ovan',
 };
 
 const DEPARTMENTS: Record<string, { budget: number; frozen?: boolean }> = {
@@ -156,7 +156,7 @@ const DEPARTMENTS: Record<string, { budget: number; frozen?: boolean }> = {
 /** Pretend employee-directory round-trip for the async rule. */
 async function checkEmployee(value: string): Promise<string | undefined> {
   await new Promise((resolve) => setTimeout(resolve, 500));
-  if (value.toLowerCase() === 'dev@form-lib.dev')
+  if (value.toLowerCase() === 'dev@anyshape.dev')
     return 'This employee already has an open requisition';
   if (!EMPLOYEES[value.toLowerCase()]) return 'Unknown employee – is the address correct?';
   return undefined;

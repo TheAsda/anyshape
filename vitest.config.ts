@@ -36,10 +36,10 @@ export default defineConfig({
         },
       },
       {
-        // Recipes: built only on the core entry, imported as `form-lib`.
+        // Recipes: built only on the core entry, imported as `anyshape`.
         extends: true,
         resolve: {
-          alias: [{ find: /^form-lib$/, replacement: resolve(here, 'src/index.ts') }],
+          alias: [{ find: /^anyshape$/, replacement: resolve(here, 'src/index.ts') }],
         },
         test: {
           name: 'recipes',
@@ -64,8 +64,8 @@ export default defineConfig({
         extends: true,
         resolve: {
           alias: [
-            { find: /^form-lib$/, replacement: resolve(here, 'src/index.ts') },
-            { find: /^form-lib\/react$/, replacement: resolve(here, 'src/react/index.ts') },
+            { find: /^anyshape$/, replacement: resolve(here, 'src/index.ts') },
+            { find: /^anyshape\/react$/, replacement: resolve(here, 'src/react/index.ts') },
           ],
         },
         optimizeDeps,

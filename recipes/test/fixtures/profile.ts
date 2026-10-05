@@ -1,7 +1,7 @@
 // A profile form with a field for each ready-made rule and behavior: string,
 // array and number values, a `visible` section, `disabled` fields for
 // exclusive, and rows. Used by the rule and behavior recipe tests.
-import { form, object, array, field, type InferValue } from "form-lib";
+import { form, object, array, field, type InferValue } from "anyshape";
 import { control, visible, disabled } from "../../index";
 
 export const shape = form(object({
