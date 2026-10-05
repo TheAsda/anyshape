@@ -1,7 +1,7 @@
 // H · Counts: countIn, collect, aggregate keys, counts across rows.
 
 import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, when,
+  form, object, array, field, metaKey, createStore, countIn, initialOf,
 } from "../src/index";
 import { control, revealed, dirty, error } from "./support/features";
 import { test, test as base, describe, expect } from "vitest";
@@ -9,7 +9,7 @@ import * as company from "./support/fixtures/company";
 import * as limits from "./support/fixtures/limits";
 
 describe("H · Counts and collect", () => {
-  const { shape, L, initial, originsOf } = company;
+  const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
     .extend("lines", ({ store }) => store.substore(shape.lines));
@@ -180,7 +180,7 @@ describe("H · Counts by definition", () => {
 });
 
 describe("H · Stable count references", () => {
-  const { shape, L, initial } = limits;
+  const { shape } = limits;
 
   // ---------------------------------------------------------------------------
   // Stable references

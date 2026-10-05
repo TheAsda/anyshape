@@ -255,8 +255,8 @@ describe("T · Flush budget", () => {
     const [, ...definedAt] = warn.mock.calls[0] as [string, ...Error[]];
     expect(definedAt.map((e) => e.message)).toEqual(['"total" is defined here', '"sum" is defined here']);
     for (const e of definedAt) {
-      const frames = e.stack!.split("\n").filter((l) => l.trim().startsWith("at "));
-      expect(frames[0]).toMatch(/diagnostics\.test\.ts/); // the call to defineBehavior in `slow`
+      const frame = e.stack!.split("\n").find((l) => l.trim().startsWith("at "));
+      expect(frame).toMatch(/diagnostics\.test\.ts/); // the call to defineBehavior in `slow`
     }
   });
 
@@ -402,7 +402,7 @@ describe("T · DevTools tracks", () => {
     t = 10;
     const handle = s.addBehavior([
       required(L.email),
-      defineBehavior({ name: "copy", triggers: [signup.email], writes: [signup.copy], run: (ctx) => void (t += 3) }),
+      defineBehavior({ name: "copy", triggers: [signup.email], writes: [signup.copy], run: () => void (t += 3) }),
     ]);
     handle();
     expect(measured()).toEqual([
@@ -486,7 +486,7 @@ describe("T · DevTools tracks", () => {
 
 describe("T · Production", () => {
   test("in production nothing is measured: no clock reads, no warning, no entries", async () => {
-    const stamp = (console.timeStamp = vi.fn());
+    const stamp = (console.timeStamp = vi.fn<Console["timeStamp"]>());
     const measure = vi.spyOn(performance, "measure");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubEnv("NODE_ENV", "production");

@@ -1,10 +1,10 @@
 import { test as base, describe, expect } from "vitest";
 import * as company from "./support/fixtures/company";
-import { form, object, array, field, createStore, countIn, type InferValue } from "../src/index";
+import { form, object, array, field, createStore, countIn } from "../src/index";
 import { watchOrigins } from "./support/harness";
 import { error } from "./support/features";
 
-import { address, userShape, initial, type User } from "./support/fixtures/user";
+import { address, userShape, initial } from "./support/fixtures/user";
 
 const test = base
   .extend("store", () => createStore(userShape, initial()));
@@ -219,7 +219,7 @@ describe("D · Foreign nodes and duplicate rows", () => {
 });
 
 describe("D, E · Reference API and array helpers", () => {
-  const { shape, L, initial, originsOf } = company;
+  const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
     .extend("lines", ({ store }) => store.substore(shape.lines));
@@ -251,7 +251,7 @@ describe("D, E · Reference API and array helpers", () => {
 
   // ---------------------------------------------------------------------------
   // Array helpers
-  test("append / insert / remove / move", ({ store: s, lines }) => {
+  test("append / insert / remove / move", ({ lines }) => {
     const c = lines.append({ sku: "C" });
     expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "C"]);
     expect(c.get(L.qty), "factory default kept").toBe(1);
@@ -279,7 +279,7 @@ describe("D, E · Reference API and array helpers", () => {
     expect(seen).toEqual([["user"]]);
   });
 
-  test("helpers reject out-of-range indexes", ({ store: s, lines }) => {
+  test("helpers reject out-of-range indexes", ({ lines }) => {
     const [a] = lines.items();
     expect(() => lines.itemAt(-1)).toThrow(RangeError);
     expect(() => lines.itemAt(2)).toThrow(RangeError);
@@ -290,7 +290,7 @@ describe("D, E · Reference API and array helpers", () => {
     expect(lines.items().map((r) => r.get(L.sku)), "nothing changed").toEqual(["A", "B"]);
   });
 
-  test("helpers reject objects and rows that are not in this array", ({ store: s, lines }) => {
+  test("helpers reject objects and rows that are not in this array", ({ lines }) => {
     expect(() => lines.item({ sku: "A", qty: 1, notes: [] })).toThrow(/not currently in "lines"/);
     const [note] = lines.itemAt(0).substore(L.notes).items();
     expect(() => lines.remove(note as never)).toThrow(/does not belong to "lines"/);

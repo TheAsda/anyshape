@@ -598,7 +598,6 @@ describe("K · Rows created by the helpers while behaviors edit them", () => {
 
 describe("J · Feature default behaviors", () => {
   test("a feature's default behavior may only use its own node", () => {
-    let other: unknown;
     const mirror = () => ({
       mirror: metaKey("").behavior((self, key) => ({
         triggers: [self],
@@ -608,7 +607,7 @@ describe("J · Feature default behaviors", () => {
       })),
     });
     const f = form(object({ a: field<string>(), b: field<string>().meta(mirror()) }));
-    other = f.a;
+    const other: unknown = f.a;
     expect(() => createStore(f, { a: "", b: "" })).toThrow(/default behaviors may only use their own node \("b"\), got "a"/);
   });
 });
@@ -638,7 +637,7 @@ describe("J · More registration checks", () => {
     expect(() => createStore(shape, initial(), { behaviors: writeInitial })).toThrow(/only values and meta keys are writable/);
   });
 
-  test("behaviors can't be added to a detached row", ({ store: s, lines }) => {
+  test("behaviors can't be added to a detached row", ({ lines }) => {
     const row = lines.itemAt(0);
     lines.remove(row);
     expect(() => row.addBehavior(defineBehavior({ triggers: [L.qty], run: () => {} }))).toThrow(/detached row/);

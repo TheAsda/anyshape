@@ -4,7 +4,7 @@ import {
   form, object, array, field, createStore,
 } from "../src/index";
 import { test, describe, expect } from "vitest";
-import { userShape, initial } from "./support/fixtures/user";
+import { userShape } from "./support/fixtures/user";
 
 describe("A · Nodes", () => {
   test("parent links", () => {
@@ -60,6 +60,6 @@ describe("A · Reused shapes containing arrays", () => {
     const rowA = s.substore(f.a.items).itemAt(0);
     expect(rowA.get(f.a.items.item.x)).toBe("1");
     expect(s.substore(f.b.items).itemAt(0).get(f.b.items.item.x)).toBe("2");
-    expect(() => rowA.get(f.b.items.item.x), "the other copy's template is not in this row").toThrow();
+    expect(() => rowA.get(f.b.items.item.x), "the other copy's template is not in this row").toThrow(/"b\.items\[\]\.x" is inside an array item/);
   });
 });

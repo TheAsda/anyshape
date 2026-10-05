@@ -1,4 +1,4 @@
-import { useState, StrictMode, Component, type ReactNode } from "react";
+import { StrictMode, Component, type ReactNode } from "react";
 import { test, expect } from "vitest";
 import { cleanup } from "vitest-browser-react";
 import {
