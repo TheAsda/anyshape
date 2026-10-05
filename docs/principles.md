@@ -147,7 +147,7 @@ Argued in [#23], [#25], [#26], [#43], [#45].
 
 ### 17. Same semantics in development and production; development only adds diagnostics
 
-A rule that throws in development throws in production too. Traces, the flush budget warning and the DevTools tracks are the only development-only parts.
+A rule that throws in development throws in production too. What development mode adds never changes a result: an error thrown by a behavior points at the place where the behavior was defined, a slow flush logs a warning and shows on a DevTools track, and a few likely mistakes in the React bindings log a warning. The [store page](guide/store.md#development-checks) lists them.
 
 **Why:** if production warned and carried on, an undeclared read would be invisible to cancellation and ordering, and data would go stale only in production, where nobody is looking.
 
