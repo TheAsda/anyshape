@@ -6,6 +6,7 @@ import {
 import { control, touched, disabled, type FocusTarget, dirty, error } from "./test/features";
 import { rule, max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
+import { watchOrigins } from "./test/harness";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";
 
@@ -162,10 +163,9 @@ describe("G · Origins, baselines and reset", () => {
   });
 
   // ---------------------------------------------------------------------------
-  test("reset writes with origin \"initial\": reactions see it, touched does not flip", ({ store: s }) => {
+  test("reset writes with origin \"initial\": behaviors see it, touched does not flip", ({ store: s }) => {
     s.set(shape.name, "Bob");
-    const origins: Origin[][] = [];
-    s._react(shape.name, (_n, _p, info) => origins.push([...info.origins]));
+    const origins = watchOrigins(s, shape.name);
     s.reset();
     expect(s.get(shape.name)).toBe("Ann");
     expect(origins).toEqual([["initial"]]);
