@@ -31,7 +31,10 @@ export interface UseFormOptions<N extends ObjectNode<any>> extends StoreOptions 
   values?: InferValue<N>;
 }
 
-/** Create a form store once per mount. Render it with <StoreProvider store={form}>. */
+/**
+ * Create a form store once per mount. Render it with <StoreProvider store={form}>.
+ * @see {@link https://github.com/TheAsda/anyshape/blob/master/docs/guide/react.md | React} in the guide.
+ */
 export function useForm<N extends ObjectNode<any>>(
   shape: N,
   initialValues: InferValue<N>,

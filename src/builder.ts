@@ -76,7 +76,10 @@ export class BehaviorBuilder {
   }
 }
 
-/** Build a list of behaviors and contributions for `shape` (pass it to createStore or addBehavior). */
+/**
+ * Build a list of behaviors and contributions for `shape` (pass it to createStore or addBehavior).
+ * @see {@link https://github.com/TheAsda/anyshape/blob/master/docs/guide/behaviors.md | Behaviors} in the guide.
+ */
 export function defineBehaviors<S extends ObjectNode<any>>(shape: S, fn: (b: BehaviorBuilder, shape: S) => void): AnyBehavior[] {
   const out: AnyBehavior[] = [];
   fn(new BehaviorBuilder(out, []), shape);

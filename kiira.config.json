@@ -1,0 +1,6 @@
+{
+  "include": ["README.md", "docs/guide/**/*.md", "docs/principles.md"],
+  "tsconfig": "tsconfig.docs.json",
+  "defaultGroup": "file",
+  "checkRelativeImports": true
+}
