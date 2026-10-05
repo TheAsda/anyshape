@@ -1,6 +1,6 @@
 // A form with a nested company section (`visible` and `disabled` at several
 // levels), rows with nested rows and `touched`, and a root `disabled`.
-// Used by reference-API, origin, baseline, count and inheritance tests.
+// Used by reference-API, origin, baseline and count tests.
 import { form, object, array, field, type InferValue, type Origin } from "../../index";
 import { control, validation, touched, visible, disabled, revealed } from "../features";
 

@@ -21,8 +21,6 @@
 //     MetaRef (one meta key), and the read-only countIn, initialOf, pendingIn
 //     and pendingOf. Each kind is one module in src/refs/ and answers through
 //     RefKind (src/refs/kind.ts); the store keeps only the change channels.
-//   • Inherited keys (declared with `inherit`): get(ref) returns the
-//     effective value; getOwn(ref) the value written on the node itself.
 //   • Non-reactive keys (`reactive: false`) are stored in place: no flush, no
 //     notification, allowed on detached stores, kept by reset().
 //
@@ -359,16 +357,11 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Reference API
   // ==========================================================
-  /** Value of a node, value of a meta key (effective for inherited keys) or a count. */
+  /** Value of a node, value of a meta key or a count. */
   get<R extends AnyRef>(ref: R): RefValue<R> {
     const kind = kindOf(ref);
     this.assertInScope(kind.node(ref));
     return kind.read(this, ref) as RefValue<R>;
-  }
-
-  /** The value written on the node itself, ignoring inheritance. */
-  getOwn<V>(ref: MetaRef<V>): V {
-    return (this.getMeta(ref.node) as Meta)[ref.key] as V;
   }
 
   set<R extends AnyNode | MetaRef<any>>(ref: R, value: InferValue<R>, options?: WriteOptions): void {
@@ -449,7 +442,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Meta
   // ==========================================================
-  /** Own (non-inherited) meta of a node. */
+  /** Live meta of a node. */
   getMeta<M extends AnyNode>(node: M): LiveMeta<M> {
     this.assertInScope(node);
     return this._ownerOf(node)._metaOf(node) as LiveMeta<M>;
@@ -519,30 +512,9 @@ export abstract class BaseStore<N extends ContainerNode> {
     return (this.substore(node.parent as any) as BaseStore<any>)._ownerOf(node);
   }
 
-  /** Nodes whose `key` feeds the value of `ref`: the node itself, plus ancestors for inherited keys. */
-  private _metaSources(ref: MetaRef<any>): LocLevel[] {
-    if (!defOf(ref).options.inherit) return [{ host: this._host, node: ref.node }];
-    const out: LocLevel[] = [];
-    let host = this._host;
-    let from: AnyNode = ref.node;
-    for (;;) {
-      for (let n: AnyNode | undefined = from; n; n = n.parent) {
-        if (ref.key in n[META_DEFS]) out.push({ host, node: n });
-        if (n === host.node) break;
-      }
-      if (!(host instanceof ItemStore)) break;
-      from = host.arrayStore.node;
-      host = host.arrayStore._host;
-    }
-    return out;
-  }
-
-  /** @internal effective value, no scope check */
+  /** @internal */
   _readMetaRef(ref: MetaRef<any>): any {
-    const inherit = defOf(ref).options.inherit;
-    if (!inherit) return (this.getMeta(ref.node) as Meta)[ref.key];
-    const values = this._metaSources(ref).map((s) => (s.host.getMeta(s.node) as Meta)[ref.key]);
-    return inherit === "all" ? values.every(Boolean) : values.some(Boolean);
+    return (this.getMeta(ref.node) as Meta)[ref.key];
   }
 
   private _resetMeta(node: AnyNode): void {
@@ -772,19 +744,16 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal */
   _addKeySub(ref: MetaRef<any>, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(ref.node);
-    const sources = this._metaSources(ref);
+    const { node, key } = ref;
+    const host = this._host;
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
       read: () => this._readMetaRef(ref),
       equals: Object.is,
-      origins: (log) =>
-        originsWhere(log, (e) =>
-          e.key === ref.key && sources.some((s) => lastOf(e.loc).host === s.host && lastOf(e.loc).node === s.node)
-        ),
+      origins: (log) => originsWhere(log, (e) => e.key === key && lastOf(e.loc).host === host && lastOf(e.loc).node === node),
     };
     sub.last = sub.read();
-    const offs = sources.map((s) => register(s.host._ownerOf(s.node)._keySubs, s.node, sub));
-    return () => offs.forEach((off) => off());
+    return register(host._ownerOf(node)._keySubs, node, sub);
   }
 
   /** @internal baseline channel: marked by { as: "initial" } writes on this scope */
