@@ -198,7 +198,7 @@ class Tracks {
       properties: [
         ...(report.applying ? [["Applying async writes", ms(report.applying)] as [string, string]] : []),
         ["Behaviors", ms(report.behaviors)],
-        ["listeners", ms(report.listeners)],
+        ["Listeners", ms(report.listeners)],
         ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.name}`, spentLabel(t)]),
       ],
     });

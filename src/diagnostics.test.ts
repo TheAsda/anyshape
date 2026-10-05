@@ -354,7 +354,7 @@ describe("T · DevTools tracks", () => {
         tooltipText: "A flush took 41.0 ms, over the 33.3 ms budget",
         properties: [
           ["Behaviors", "40.0 ms"],
-          ["listeners", "1.0 ms"],
+          ["Listeners", "1.0 ms"],
           ["1. title", "40.0 ms (2 runs)"],
         ],
       },
