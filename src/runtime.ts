@@ -1075,21 +1075,21 @@ export class BehaviorRuntime implements RuntimeHooks {
           const d = e.contribution.decl;
           return { payload: e.contribution.payload, name: d.name ?? reg.name, id: e.id, inputs: [...(d.triggers ?? []), ...(d.reads ?? [])] };
         });
-      const tally = beginRun(leaf.host, reg.writes);
+      const pendingRun = beginRun(leaf.host, reg.writes);
       let result: unknown;
       try {
         result = owner ? (owner.config.run as (ctx: OwnerContext<unknown>) => unknown)({ ...ctx, parts }) : reg.config.run(ctx);
       } catch (error) {
-        tally.end();
+        pendingRun.end();
         throw error;
       }
       if (!(result && typeof (result as PromiseLike<unknown>).then === "function")) {
-        tally.end();
+        pendingRun.end();
         commit();
         return;
       }
-      tally.hold();
-      const flight: Flight = { controller, cause: p, tally, offs: [] };
+      pendingRun.hold();
+      const flight: Flight = { controller, cause: p, tally: pendingRun, offs: [] };
       this.flights.set(leaf, flight);
       this.watch(leaf, flight);
       (result as PromiseLike<unknown>).then(
