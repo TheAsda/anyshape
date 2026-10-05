@@ -64,7 +64,6 @@ export default defineConfig({
           alias: [
             { find: /^form-lib$/, replacement: resolve(here, 'src/index.ts') },
             { find: /^form-lib\/react$/, replacement: resolve(here, 'src/react/index.ts') },
-            { find: /^form-lib\/recipes\/react$/, replacement: resolve(here, 'recipes/react/index.ts') },
           ],
         },
         optimizeDeps,

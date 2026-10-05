@@ -12,8 +12,8 @@
 import { useEffect, useRef, useState } from "react";
 import { countIn, pendingIn, type RootStore } from "form-lib";
 import { StoreProvider, useForm, useStore, useValue } from "form-lib/react";
-import { handleSubmit, error, dirty } from "form-lib/recipes";
-import { useControl } from "form-lib/recipes/react";
+import { handleSubmit, error, dirty } from "../../../recipes";
+import { useControl } from "../../../recipes/react";
 import {
   shape,
   initialValues,

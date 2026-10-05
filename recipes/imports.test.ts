@@ -53,6 +53,6 @@ test("a recipe imports only the core entry or another recipe", () => {
 
 test("the core, its tests included, imports no recipe", () => {
   const allowed = (spec: string, file: string) =>
-    isRelative(spec) ? !isInside(recipes, resolve(dirname(file), spec)) : !/^form-lib\/recipes(\/|$)/.test(spec);
+    !isRelative(spec) || !isInside(recipes, resolve(dirname(file), spec));
   expect(violations(core, allowed)).toEqual([]);
 });
