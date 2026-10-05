@@ -12,6 +12,7 @@ export const valueKind: RefKind<AnyNode> = {
   subscribe: (store, node, phase, fn) => store._addValueSub(node, phase, fn),
   affectedBy: (node, t) => t.key === undefined && (isAncestorOrSelf(t.node, node) || isAncestorOrSelf(node, t.node)),
   local: true,
+  origins: true,
   writer: {
     target: (node) => ({ node }),
     write: (store, node, value, options) => store._setValue(node as ShapeNode<any>, value, options),

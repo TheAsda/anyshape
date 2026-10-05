@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext, type WritableRef,
+  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, pendingIn, pendingOf, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext, type WritableRef,
 } from "./index";
 import { control, visible, disabled, touched, dirty } from "./test/features";
 import { rule, max } from "./test/rules";
@@ -250,6 +250,28 @@ describe("L · Origins and guards", () => {
     });
     s.set(shape.title, "x", { origin: "user" });
     expect(seen).toEqual([["user"]]);
+  });
+
+  test("tallies carry no origins: a run caused only by a count change has none", () => {
+    const seen: Origin[][] = [];
+    const s = createStore(shape, initial(), {
+      behaviors: defineBehavior({ triggers: [countIn(shape, touched)], runOn: { init: false }, run: (ctx) => void seen.push([...ctx.origins]) }),
+    });
+    s.set(shape.name.touched, true, { origin: "user" });
+    expect(seen).toEqual([[]]);
+  });
+
+  test.each([
+    ["countIn", countIn(shape, touched)],
+    ["pendingIn", pendingIn(shape)],
+    ["pendingOf", pendingOf(shape.title)],
+  ])("an origins filter on a %s trigger throws at registration", (_, tally) => {
+    const config = { name: "filtered", origins: ["user"] as const, run: () => {} };
+    const fails = (behavior: ReturnType<typeof defineBehavior>) => () => createStore(shape, initial(), { behaviors: behavior });
+    const message = `Behavior "filtered": "${tally.path}" carries no origins (it is a tally) – drop the origins filter or the reference`;
+    expect(fails(defineBehavior({ ...config, triggers: [tally] }))).toThrow(message);
+    expect(fails(defineBehavior({ ...config, when: when([tally], () => true) })), "a guard reference triggers too").toThrow(message);
+    expect(fails(defineBehavior({ ...config, triggers: [shape.title], reads: [tally] })), "reads are fine").not.toThrow();
   });
 
   test("when: skipped while false, guard references trigger", () => {
