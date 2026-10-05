@@ -9,7 +9,6 @@
 
 import type { BehaviorConfig, OwnerConfig } from "./behaviors";
 import type { MetaRef, ShapeNode } from "./shape";
-import { PLAIN } from "./internal";
 
 export type Meta = Record<string, unknown>;
 
@@ -61,10 +60,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
   readonly options: Readonly<MetaKeyOptions<V>>;
   /** @internal */
   readonly _steps: Readonly<MetaKeySteps<V, P, U>>;
-  /** @internal true when created from a plain value in .meta({...}) */
-  declare readonly [PLAIN]: boolean;
-
-  constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, plain = false, steps: MetaKeySteps<V, P, U> = {}) {
+  constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, steps: MetaKeySteps<V, P, U> = {}) {
     if (steps.combine && steps.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
     if (steps.aggregate && steps.aggregate(defaultValue)) {
       // Subtree counts start at zero, so untouched nodes never need to be visited.
@@ -73,7 +69,6 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
     this.defaultValue = defaultValue;
     this.options = Object.freeze({ ...options });
     this._steps = Object.freeze({ ...steps });
-    (this as any)[PLAIN] = plain;
   }
 
   /**
@@ -83,7 +78,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    */
   aggregate(isCounted: (value: V) => boolean): MetaKeyDef<V, P, U> {
     if (this._steps.aggregate) throw new Error(".aggregate() is declared once");
-    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, aggregate: isCounted });
+    return new MetaKeyDef(this.defaultValue, this.options, { ...this._steps, aggregate: isCounted });
   }
 
   /**
@@ -96,7 +91,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
     const { behavior, combine, ...before } = this._steps;
     if (combine || behavior) throw new Error("call .uses() before .combine() or .behavior()");
     if (before.uses) throw new Error(".uses() is declared once – list every used key in one call");
-    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, false, { ...before, uses: defs });
+    return new MetaKeyDef<V, P, U2>(this.defaultValue, this.options, { ...before, uses: defs });
   }
 
   /**
@@ -107,7 +102,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * declared before the node exists.
    */
   behavior(factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig): MetaKeyDef<V, P, U> {
-    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, behavior: factory });
+    return new MetaKeyDef(this.defaultValue, this.options, { ...this._steps, behavior: factory });
   }
 
   /**
@@ -118,7 +113,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * the key with. Mutually exclusive with `behavior`.
    */
   combine(factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>): MetaKeyDef<V, P, U> {
-    return new MetaKeyDef(this.defaultValue, this.options, false, { ...this._steps, combine: factory });
+    return new MetaKeyDef(this.defaultValue, this.options, { ...this._steps, combine: factory });
   }
 }
 

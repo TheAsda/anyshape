@@ -38,8 +38,6 @@ export const META_DEFS: unique symbol = Symbol("form-lib.metaDefs");
 export const META: unique symbol = Symbol("form-lib.meta");
 /** ArrayNode: factory for new rows, if declared. */
 export const CREATE: unique symbol = Symbol("form-lib.create");
-/** MetaKeyDef: true when created from a plain value in .meta({...}). */
-export const PLAIN: unique symbol = Symbol("form-lib.plain");
 
 /** The declaration of the key a meta reference points at. */
 export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {
