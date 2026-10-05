@@ -297,13 +297,13 @@ The unit suites test each mechanism in isolation. Add **`test/integration.test.t
 | **NF2** | P2 | **CI gates:** `npm test`, `npm run typecheck`, and `cd examples/basic && npm run typecheck`. | CI workflow. The type-level tests only run under `tsc`. |
 | **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal); the dev diagnostics overhead on a keystroke and a row edit (#17). The benches run in dev, so they include the diagnostics. | `vitest bench` in `bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`bench/store.bench.ts`); found #6. |
 | **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable; so do removed nested rows, a row whose disposed behavior read the whole list, rows whose disposed behaviors were linked to a root behavior that stays, and a dropped store with its rows and behaviors (#63). The heap a store keeps per row with row-by-row chained behaviors is recorded, not asserted: it should stay flat as the rows double (before #63 it grew 27 → 37 → 58 KB per row at 200/400/800 rows). | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |
-| **NF5** | P3 | **Mutation testing:** automate the "break it on purpose" habit (§5). | Try Stryker on `src/` (excluding `react/`); start with `lens.ts`, `store.ts`, `behaviors.ts`. |
+| **NF5** | P3 | **Mutation testing:** automate the "break it on purpose" habit (§5). | Try Stryker on `src/` (excluding `react/`); start with `lens.ts`, `store.ts`, `runtime.ts`. |
 
 ---
 
 ## 5. Mechanisms to mutation-check
 
-When touching any of these, break it deliberately and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), registration and disposal (`behaviors.ts`) or the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows only as a leak.
+When touching any of these, break it deliberately and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), registration and disposal (`runtime.ts`) or the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows only as a leak.
 
 | Mechanism | Where | Expected to fail |
 |---|---|---|

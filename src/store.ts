@@ -96,7 +96,7 @@ export interface CollectEntry<V = unknown> {
 
 export const MAX_BEHAVIOR_ROUNDS = 100;
 
-/** @internal The behavior runtime (behaviors.ts): built by the factory createStore passes to the root. */
+/** @internal The behavior runtime (runtime.ts): built by the factory createStore passes to the root. */
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;
