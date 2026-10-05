@@ -1,8 +1,10 @@
+// ============================================================
 // The core entry, `anyshape`. Every public name is listed here, and
 // test/exports.test.ts snapshots the list: a change to the surface is a
 // reviewed diff. Internal names stay out.
-// (No comment in this file may contain the internal tag: stripInternal
-// drops the declaration that follows it, a whole export list included.)
+// No comment in this file may contain the internal tag: stripInternal
+// drops the declaration that follows it, a whole export list included.
+// ============================================================
 
 // Shapes
 export {
