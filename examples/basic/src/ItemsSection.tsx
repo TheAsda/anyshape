@@ -9,7 +9,7 @@
 import { useId, useRef } from "react";
 import { countIn } from "form-lib";
 import { StoreProvider, useArray, useValue } from "form-lib/react";
-import { useControl } from "form-lib/recipes/react";
+import { useControl } from "../../../recipes/react";
 import { shape, CATALOG, lookingUp } from "./form";
 import { NumberField, ReadonlyField } from "./fields";
 

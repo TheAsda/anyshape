@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { form, object, field, type InferValue, defineBehaviors } from "form-lib";
-import { control, submission, handleSubmit, required, minLength, calculate } from "form-lib/recipes";
+import { control, submission, handleSubmit, required, minLength, calculate } from "../../../../../recipes";
 import { StoreProvider, useForm, useValue } from "form-lib/react";
 import { TextField, NumberField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 

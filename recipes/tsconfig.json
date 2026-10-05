@@ -4,8 +4,7 @@
     "types": ["node", "vitest-browser-react", "@vitest/browser-playwright"],
     "paths": {
       "form-lib": ["../src/index.ts"],
-      "form-lib/react": ["../src/react/index.ts"],
-      "form-lib/recipes/react": ["./react/index.ts"]
+      "form-lib/react": ["../src/react/index.ts"]
     }
   },
   "include": ["./**/*"]

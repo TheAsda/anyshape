@@ -11,7 +11,7 @@ import { form, object, field, type InferValue, array, defineBehaviors } from "fo
 import {
   control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen,
-} from "form-lib/recipes";
+} from "../../../../../recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 

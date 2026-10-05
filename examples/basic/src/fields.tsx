@@ -16,7 +16,7 @@
 
 import { useId } from "react";
 import { useValue } from "form-lib/react";
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "form-lib/recipes/react";
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 import type { AnyNode } from "form-lib";
 
 // Node types accepted by each component: a ControlNode whose value type
