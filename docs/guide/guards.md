@@ -83,7 +83,7 @@ const showCar = defineBehavior({
 });
 ```
 
-The same holds for any target that takes one value under a condition and another value otherwise: one behavior, one `ctx.set` of the computed value. The [recipes](../../GLOSSARY.md)' `visibleWhen` is this behavior as a function ([source](https://github.com/TheAsda/anyshape/blob/master/recipes/behaviors.ts)).
+The same holds for any target that takes one value under a condition and another value otherwise: one behavior, one `ctx.set` of the computed value. The [recipes](../../GLOSSARY.md)' `visibleWhen` is this behavior as a function ([source](https://github.com/TheAsda/anyshape/blob/master/recipes/behaviors.ts); used in [stage 5](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage5)).
 
 Use a guard when the rule itself comes and goes: a requirement that applies only to long stays, rules that apply only while a section is shown. Use a computed value when the rule always applies and only its result changes.
 
