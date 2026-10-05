@@ -205,7 +205,7 @@ test("resolution errors", async () => {
 test("useField: value, onChange (origin user)", async () => {
   const s = createStore(shape, initial());
   const origins: Origin[][] = [];
-  s.react(shape.label, (_n, _p, info) => origins.push([...info.origins]));
+  s._react(shape.label, (_n, _p, info) => origins.push([...info.origins]));
   let field!: ReturnType<typeof useField<typeof shape.label>>;
   function F() {
     field = useField(shape.label);
@@ -268,7 +268,7 @@ test("useArray: the list re-renders on structure only; a row edit re-renders tha
   expect(c.counts, "only row B re-rendered").toEqual({ "row:B": 1 });
 
   const origins: Origin[][] = [];
-  s.react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
+  s._react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
   await settle(() => void lines.append({ sku: "C" }));
   await expect.element(list).toHaveTextContent("A=1B=7C=1");
   expect(origins, "helpers write as the user").toEqual([["user"]]);
@@ -338,7 +338,7 @@ test("useArray: insert and move through the hook; an explicit origin replaces th
     );
   }
   const origins: Origin[][] = [];
-  s.react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
+  s._react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
   const screen = await render(
     <StoreProvider store={s}>
       <List />
@@ -366,7 +366,7 @@ test("useField on a node without meta: onChange writes as the user", async () =>
     return <span data-testid="note">{field.value}</span>;
   }
   const origins: Origin[][] = [];
-  s.react(shape.note, (_n, _p, info) => origins.push([...info.origins]));
+  s._react(shape.note, (_n, _p, info) => origins.push([...info.origins]));
   const screen = await render(
     <StoreProvider store={s}>
       <Note />
