@@ -14,7 +14,7 @@ import {
   createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ShapeNode, type AnyNode, type InferValue, type InferMeta } from "../shape";
+import { ShapeNode, type AnyNode, type InferValue } from "../shape";
 import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store";
 import type { ArrayNode } from "../shape";
 import { refNode, refLabel, rootOf, scopeOf } from "../internal";
@@ -127,12 +127,6 @@ export function useValue(
 // ============================================================
 // useField
 // ============================================================
-function useOwnMeta(store: BaseStore<any>, node: AnyNode): any {
-  const subscribe = useCallback((listener: () => void) => store.subscribeMeta(node, listener), [store, node]);
-  const get = useCallback(() => store.getMeta(node), [store, node]);
-  return useSyncExternalStore(subscribe, get, get);
-}
-
 function useSetter<N extends AnyNode>(store: BaseStore<any>, node: N): (value: InferValue<N>) => void {
   return useCallback((value: InferValue<N>) => store.set(node, value, { origin: "user" }), [store, node]);
 }
@@ -141,19 +135,16 @@ export interface FieldBinding<N extends AnyNode> {
   value: InferValue<N>;
   /** Stable; writes with origin "user". */
   onChange: (value: InferValue<N>) => void;
-  /** The node's meta. */
-  meta: Readonly<InferMeta<N>>;
   /** The store the field was resolved to. */
   store: BaseStore<any>;
 }
 
-/** Any node: value, onChange and its own meta. */
+/** Any node: value and onChange. Its meta keys are read with useValue(node.key). */
 export function useField<N extends AnyNode>(node: N, options?: HookOptions): FieldBinding<N> {
   const store = useResolved(node, options);
   const value = useValue(node, { store }) as InferValue<N>;
-  const meta = useOwnMeta(store, node);
   const onChange = useSetter(store, node);
-  return { value, onChange, meta, store };
+  return { value, onChange, store };
 }
 
 // ============================================================

@@ -1,4 +1,4 @@
-// A node: its value. Written by set / setValue, subscribed on the value channel.
+// A node: its value. Written by set, subscribed on the value channel.
 
 import type { ShapeNode, AnyNode } from "../shape";
 import { isAncestorOrSelf } from "../tree";
@@ -14,6 +14,6 @@ export const valueKind: RefKind<AnyNode> = {
   local: true,
   writer: {
     target: (node) => ({ node }),
-    write: (store, node, value, options) => store.setValue(node as ShapeNode<any>, value, options),
+    write: (store, node, value, options) => store._setValue(node as ShapeNode<any>, value, options),
   },
 };

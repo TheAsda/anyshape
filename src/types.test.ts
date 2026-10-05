@@ -8,6 +8,7 @@ import {
   form, object, array, field, metaKey, createStore, countIn, initialOf, contribute,
   type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef, type NoPayload,
 } from "./index";
+import * as core from "./index";
 import { control, visible, disabled, submission, error } from "./test/features";
 import { rule } from "./test/rules";
 import { test, expect, expectTypeOf } from "vitest";
@@ -91,6 +92,8 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   new MetaRef(t.text, "error");
   // @ts-expect-error – counts are read-only
   s.set(countIn(t, error), 1);
+  // @ts-expect-error – createStore is the one way to build a root store
+  new core.RootStore(t, {} as InferValue<typeof t>, () => ({}) as never);
 
   // @ts-expect-error – `plain` has no validation()
   rule(t.plain, () => undefined);

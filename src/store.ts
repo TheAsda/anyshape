@@ -35,22 +35,21 @@
 //   3. ArrayStore.subscribeItems fires only when the sequence of item stores
 //      changes; items() returns the same array until then.
 //   4. When an item store's attachment changes, all its subscribers fire.
-//   5. store.subscribe(listener) fires for anything inside the store's focus.
-//   6. Every write is a batch of one; batch(fn) groups writes; notifications
+//   5. Every write is a batch of one; batch(fn) groups writes; notifications
 //      run when the outermost batch ends.
-//   7. The flush is synchronous: its reactions and sync behavior runs settle
+//   6. The flush is synchronous: its reactions and sync behavior runs settle
 //      inside it. Async behavior runs may still be in flight after it, so the
 //      form is not final; code that needs that awaits store.settle().
-//   8. Reactions run first (repeating until settled, max MAX_REACTION_ROUNDS),
+//   7. Reactions run first (repeating until settled, max MAX_REACTION_ROUNDS),
 //      then UI listeners once; writing during the UI phase throws.
-//   9. UI listeners are () => void; reactions get (next, prev, info).
+//   8. UI listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
 import type { Meta, MetaKeyDef } from "./meta";
 import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors";
 import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
-  type AnyNode, type ContainerNode, type InferValue, type InferMeta,
+  type AnyNode, type ContainerNode, type InferValue,
 } from "./shape";
 import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf, concretePath } from "./internal";
 import { isAncestorOrSelf } from "./tree";
@@ -67,7 +66,7 @@ export type Origin = "user" | "program" | "initial" | `behavior:${string}`;
 export interface WriteOptions {
   /** Who made the write. Default "program". */
   origin?: Origin;
-  /** "initial": also set the baseline (getInitial / dirty / reset). Values only. */
+  /** "initial": also set the baseline (initialOf / dirty / reset). Values only. */
   as?: "initial";
 }
 
@@ -75,9 +74,6 @@ export interface ChangeInfo {
   /** Origins of the writes that changed this reaction's target since its last run. */
   readonly origins: ReadonlySet<Origin>;
 }
-
-/** Live meta: exactly the keys declared on the node (meta is closed). */
-export type LiveMeta<N> = InferMeta<N>;
 
 export type AnyRef = AnyNode | MetaRef<any> | CountRef | InitialRef<any> | PendingInRef | PendingOfRef;
 export type RefValue<R> =
@@ -97,7 +93,7 @@ export interface CollectEntry<V = unknown> {
 
 export const MAX_REACTION_ROUNDS = 100;
 
-/** @internal Installed on the root by the behavior runtime (behaviors.ts). */
+/** @internal The behavior runtime (behaviors.ts): built by the factory createStore passes to the root. */
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;
@@ -204,7 +200,6 @@ interface Seen {
   attached: boolean;
 }
 type Calls = (() => void)[];
-type StoreSet = Set<BaseStore<any>>;
 
 /** A location: one (scope host, node) level per scope, outermost first. */
 interface LocLevel {
@@ -298,13 +293,6 @@ function check(sub: Sub, calls: Calls, log: readonly WriteEntry[] | undefined, f
   });
 }
 
-function shallowEqual(a: Meta, b: Meta): boolean {
-  if (a === b) return true;
-  const ka = Object.keys(a);
-  if (ka.length !== Object.keys(b).length) return false;
-  return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && Object.is(a[k], b[k]));
-}
-
 // ============================================================
 // Base store – shared by all store kinds
 // ============================================================
@@ -312,11 +300,9 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal live meta per node owned by this store */
   readonly _metaMap = new Map<AnyNode, Meta>();
   /** @internal */ readonly _valueSubs = new Map<AnyNode, Set<Sub>>();
-  /** @internal whole-meta subscriptions */ readonly _metaSubs = new Map<AnyNode, Set<Sub>>();
   /** @internal single-key subscriptions, registered on every source node */ readonly _keySubs = new Map<AnyNode, Set<Sub>>();
   /** @internal scope hosts only */ readonly _countSubs = new Map<AnyNode, Map<Slot, Set<Sub>>>();
   /** @internal scope hosts only: node → slot → tally (node itself + descendants) */ readonly _counts = new Map<AnyNode, Map<Slot, number>>();
-  /** @internal */ readonly _storeSubs = new Set<Listener>();
   /** @internal scope hosts only: subscriptions to initial values */ readonly _initialSubs = new Set<Sub>();
   /** @internal cached substores, keyed by node */ readonly _children = new Map<AnyNode, BaseStore<any>>();
   /** @internal focus value / attachment at the last visit, per phase */ _seen!: Record<Phase, Seen>;
@@ -373,12 +359,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Values
   // ==========================================================
-  getValue<T>(node: ShapeNode<T>): T {
-    this.assertInScope(node);
-    return this._read(node);
-  }
-
-  setValue<T>(node: ShapeNode<T>, value: T, options: WriteOptions = {}): void {
+  /** @internal set() of a node, through the value kind */
+  _setValue<T>(node: ShapeNode<T>, value: T, options: WriteOptions = {}): void {
     this.assertInScope(node);
     const asInitial = options.as === "initial";
     const origin: Origin = asInitial ? "initial" : options.origin ?? "program";
@@ -391,8 +373,8 @@ export abstract class BaseStore<N extends ContainerNode> {
     });
   }
 
-  getInitial<T>(node: ShapeNode<T>): T {
-    this.assertInScope(node);
+  /** @internal the baseline value of a node; no scope check (get() and subscribe check it) */
+  _readInitial(node: AnyNode): any {
     return node.lens.get(this.scope.getScopeInitial());
   }
 
@@ -401,13 +383,13 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.assertInScope(node);
     this.root._batch(() => {
       this.assertAttached();
-      const initial = node.lens.get(this.scope.getScopeInitial());
+      const initial = this._readInitial(node);
       this.root._log({ loc: locOf(this._host, node), origin: "initial" });
       this._write(node, initial);
       this._resetMeta(node);
       // Behavior-written meta (errors, disabled flags, ...) was reset to its
       // defaults: recompute it as if the form were created with these values.
-      this.root._runtime?.reinit(this, node);
+      this.root._runtime.reinit(this, node);
     });
   }
 
@@ -442,12 +424,6 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Meta
   // ==========================================================
-  /** Live meta of a node. */
-  getMeta<M extends AnyNode>(node: M): LiveMeta<M> {
-    this.assertInScope(node);
-    return this._ownerOf(node)._metaOf(node) as LiveMeta<M>;
-  }
-
   /** @internal */
   _setMetaKey(ref: MetaRef<any>, value: unknown, options: WriteOptions = {}): void {
     const { node, key } = ref;
@@ -538,7 +514,6 @@ export abstract class BaseStore<N extends ContainerNode> {
     for (const [key, def] of Object.entries(node[META_DEFS])) {
       if (def.options.reactive === false || def.options.keepOnReset) next[key] = current[key];
     }
-    if (shallowEqual(current, next)) return;
     this._commitMeta(node, current, next, "initial");
   }
 
@@ -592,7 +567,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * nested in it). Returns a function that removes them again.
    */
   addBehavior(behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
-    return this._runtimeOrThrow().add(this._host, behaviors);
+    return this.root._runtime.add(this._host, behaviors);
   }
 
   /**
@@ -601,7 +576,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * `previous` stays registered. Returns the new handle.
    */
   replaceBehavior(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
-    return this._runtimeOrThrow().replace(previous, behaviors);
+    return this.root._runtime.replace(previous, behaviors);
   }
 
   /**
@@ -612,13 +587,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    */
   settle(node: AnyNode = this.node): Promise<void> {
     this.assertInScope(node);
-    return this.root._runtime?.settle(this, node) ?? Promise.resolve();
-  }
-
-  private _runtimeOrThrow(): RuntimeHooks {
-    const runtime = this.root._runtime;
-    if (!runtime) throw new Error("This store has no behavior runtime – create it with createStore()");
-    return runtime;
+    return this.root._runtime.settle(this, node);
   }
 
   // ==========================================================
@@ -678,33 +647,14 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Subscriptions
   // ==========================================================
-  /** Store-wide (rule 5), or one reference (node value, meta key, count). */
-  subscribe(listener: Listener): Unsubscribe;
-  subscribe(ref: AnyRef, listener: Listener): Unsubscribe;
-  subscribe(a: Listener | AnyRef, b?: Listener): Unsubscribe {
-    if (typeof a === "function") {
-      this._storeSubs.add(a);
-      return () => void this._storeSubs.delete(a);
-    }
-    return this._addRefSub(a, "ui", () => b!());
-  }
-
-  subscribeValue(node: AnyNode, listener: Listener): Unsubscribe {
-    return this._addRefSub(node, "ui", () => listener());
-  }
-
-  /** Whole meta object of a node. */
-  subscribeMeta(node: AnyNode, listener: Listener): Unsubscribe {
-    return this._addMetaSub(node, "ui", () => listener());
+  /** UI phase: called after the flush when the reference's value changed. */
+  subscribe(ref: AnyRef, listener: Listener): Unsubscribe {
+    return this._addRefSub(ref, "ui", () => listener());
   }
 
   /** Reaction phase: may write; receives next, prev and the origins of the change. */
   react<R extends AnyRef>(ref: R, fn: (next: RefValue<R>, prev: RefValue<R>, info: ChangeInfo) => void): Unsubscribe {
     return this._addRefSub(ref, "reaction", fn as any);
-  }
-
-  reactMeta<M extends AnyNode>(node: M, fn: (next: LiveMeta<M>, prev: LiveMeta<M>, info: ChangeInfo) => void): Unsubscribe {
-    return this._addMetaSub(node, "reaction", fn as any);
   }
 
   private _addRefSub(ref: AnyRef, phase: Phase, fn: SubFn): Unsubscribe {
@@ -725,20 +675,6 @@ export abstract class BaseStore<N extends ContainerNode> {
     };
     sub.last = sub.read();
     return register(owner._valueSubs, node, sub);
-  }
-
-  private _addMetaSub(node: AnyNode, phase: Phase, fn: SubFn): Unsubscribe {
-    this.assertInScope(node);
-    const owner = this._ownerOf(node);
-    const host = owner._host;
-    const sub: Sub = {
-      phase, fn, active: true, last: undefined,
-      read: () => owner._metaOf(node),
-      equals: shallowEqual,
-      origins: (log) => originsWhere(log, (e) => e.key !== undefined && lastOf(e.loc).host === host && lastOf(e.loc).node === node),
-    };
-    sub.last = sub.read();
-    return register(owner._metaSubs, node, sub);
   }
 
   /** @internal */
@@ -764,7 +700,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     const loc = locOf(host, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
-      read: () => host.getInitial(node),
+      read: () => host._readInitial(node),
       equals: Object.is,
       origins: (log) => originsWhere(log, (e) => e.origin === "initial" && e.key === undefined && related(e.loc, loc)),
     };
@@ -819,7 +755,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * visit of `phase` and collects the calls to make. Skips the whole subtree
    * when neither the focus value nor the attachment changed.
    */
-  _visit(phase: Phase, calls: Calls, changed: StoreSet | undefined, log: readonly WriteEntry[] | undefined): void {
+  _visit(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     const seen = this._seen[phase];
     const attached = this.isAttached();
     const focus = this._read(this.node);
@@ -832,34 +768,24 @@ export abstract class BaseStore<N extends ContainerNode> {
       for (const sub of subs) if (sub.phase === phase) check(sub, calls, log);
     }
 
-    // Rule 4: attachment changed → meta subscribers re-check (UI: always fire).
+    // Rule 4: attachment changed → meta key subscribers re-check (UI: always fire).
     if (attachChanged) {
-      for (const map of [this._metaSubs, this._keySubs]) {
-        for (const subs of map.values()) {
-          for (const sub of subs) if (sub.phase === phase) check(sub, calls, log, phase === "ui");
-        }
+      for (const subs of this._keySubs.values()) {
+        for (const sub of subs) if (sub.phase === phase) check(sub, calls, log, phase === "ui");
       }
     }
 
-    changed?.add(this);
-    this._visitChildren(phase, calls, changed, log);
+    this._visitChildren(phase, calls, log);
   }
 
-  protected _visitChildren(phase: Phase, calls: Calls, changed: StoreSet | undefined, log: readonly WriteEntry[] | undefined): void {
-    for (const child of this._children.values()) child._visit(phase, calls, changed, log);
+  protected _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
+    for (const child of this._children.values()) child._visit(phase, calls, log);
   }
 
   /** @internal Meta of `node` (owned by this store) changed. */
-  _collectMeta(node: AnyNode, phase: Phase, calls: Calls, changed: StoreSet | undefined, log: readonly WriteEntry[] | undefined): void {
-    for (const map of [this._metaSubs, this._keySubs]) {
-      const subs = map.get(node);
-      if (subs) for (const sub of subs) if (sub.phase === phase) check(sub, calls, log);
-    }
-    if (changed) {
-      const focused = node === this.node ? this : this._children.get(node);
-      if (focused) changed.add(focused);
-      for (let s: BaseStore<any> | undefined = this; s; s = s.parentStore) changed.add(s);
-    }
+  _collectMeta(node: AnyNode, phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
+    const subs = this._keySubs.get(node);
+    if (subs) for (const sub of subs) if (sub.phase === phase) check(sub, calls, log);
   }
 
   /** @internal this = scope host */
@@ -871,15 +797,6 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal this = scope host */
   _collectInitial(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     for (const sub of this._initialSubs) if (sub.phase === phase) check(sub, calls, log);
-  }
-
-  /** @internal */
-  _collectStoreSubs(calls: Calls): void {
-    for (const listener of this._storeSubs) {
-      calls.push(() => {
-        if (this._storeSubs.has(listener)) listener();
-      });
-    }
   }
 
   /** @internal bring array stores in changed regions up to date (row attach/detach → counts) */
@@ -925,13 +842,14 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   private flushing = false;
   private phase: "idle" | Phase = "idle";
   private writeLog: WriteEntry[] = [];
-  /** @internal */ _runtime: RuntimeHooks | undefined;
+  /** @internal */ readonly _runtime: RuntimeHooks;
   /** @internal */ _probe: Probe | undefined;
   private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { reaction: new Set(), ui: new Set() };
   private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { reaction: new Map(), ui: new Map() };
   private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { reaction: new Map(), ui: new Map() };
 
-  constructor(shape: N, initialValues: InferValue<N>) {
+  /** @internal – use createStore() */
+  constructor(shape: N, initialValues: InferValue<N>, createRuntime: (root: RootStore<N>) => RuntimeHooks) {
     super(shape, undefined);
     if (shape.id === undefined || shape.parent !== undefined) {
       throw new Error("RootStore needs the root returned by form()");
@@ -940,6 +858,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     this.value = initialValues;
     this.initial = initialValues;
     this._initSeen();
+    this._runtime = createRuntime(this);
   }
 
   protected override get scope(): ScopeHost {
@@ -950,16 +869,6 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   }
   override get root(): RootStore<any> {
     return this;
-  }
-
-  getValues(): InferValue<N> {
-    return this.value;
-  }
-  setValues(values: InferValue<N>, options?: WriteOptions): void {
-    this.setValue(this.node, values, options);
-  }
-  getInitialValues(): InferValue<N> {
-    return this.initial;
   }
 
   /** @internal */ getScopeValue() {
@@ -1050,11 +959,11 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     this._syncVisit();
   }
 
-  private drain(phase: Phase, calls: Calls, changed: StoreSet | undefined, log: readonly WriteEntry[] | undefined): void {
+  private drain(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     const meta = this.dirtyMeta[phase];
     if (meta.size) {
       this.dirtyMeta[phase] = new Map();
-      for (const [owner, nodes] of meta) for (const node of nodes) owner._collectMeta(node, phase, calls, changed, log);
+      for (const [owner, nodes] of meta) for (const node of nodes) owner._collectMeta(node, phase, calls, log);
     }
     const initial = this.dirtyInitial[phase];
     if (initial.size) {
@@ -1070,7 +979,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
     }
   }
 
-  // ---- flush (rules 6–8) ----
+  // ---- flush (rules 5–7) ----
   private flush(): void {
     this.flushing = true;
     const probe = this._probe;
@@ -1083,18 +992,18 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
           const log = this.writeLog;
           this.writeLog = [];
           const calls: Calls = [];
-          this.drain("reaction", calls, undefined, log);
-          this._visit("reaction", calls, undefined, log);
-          if (calls.length === 0 && !this._runtime?.hasWork()) break;
+          this.drain("reaction", calls, log);
+          this._visit("reaction", calls, log);
+          if (calls.length === 0 && !this._runtime.hasWork()) break;
           if (round >= MAX_REACTION_ROUNDS) {
             throw new Error(`Reactions did not settle after ${MAX_REACTION_ROUNDS} rounds – check for cycles`);
           }
           for (const call of calls) call();
           // Behaviors: run the pending instances with the lowest rank. Their
           // writes are picked up as triggers in the next round.
-          if (this._runtime?.hasWork()) this._runtime.runNext();
+          if (this._runtime.hasWork()) this._runtime.runNext();
         }
-        this._runtime?.flushed();
+        this._runtime.flushed();
       } finally {
         this.depth--;
       }
@@ -1103,10 +1012,8 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
       this._syncWalk();
       this.phase = "ui";
       const calls: Calls = [];
-      const changed: StoreSet = new Set();
-      this.drain("ui", calls, changed, undefined);
-      this._visit("ui", calls, changed, undefined);
-      for (const store of changed) store._collectStoreSubs(calls);
+      this.drain("ui", calls, undefined);
+      this._visit("ui", calls, undefined);
 
       let failed = false;
       let error: unknown;
@@ -1232,7 +1139,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const item = this.newItem(input);
     const next = arr.slice();
     next.splice(index, 0, item);
-    this.setValue(this.node, next as any, options);
+    this._setValue(this.node, next as any, options);
     // Behaviors may already have edited the new row during the flush, which
     // moves its store to a new object; the original object still maps to it.
     return this.itemStores.get(item) ?? this.item(item);
@@ -1241,7 +1148,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   remove(row: ItemStore<ItemOf<N>>, options?: WriteOptions): void {
     const arr = this.current();
     const index = this.indexOfRow(row, arr);
-    this.setValue(this.node, arr.filter((_, i) => i !== index) as any, options);
+    this._setValue(this.node, arr.filter((_, i) => i !== index) as any, options);
   }
 
   move(row: ItemStore<ItemOf<N>>, toIndex: number, options?: WriteOptions): void {
@@ -1254,7 +1161,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const next = arr.slice();
     const [moved] = next.splice(from, 1);
     next.splice(toIndex, 0, moved);
-    this.setValue(this.node, next as any, options);
+    this._setValue(this.node, next as any, options);
   }
 
   private indexOfRow(row: ItemStore<any>, arr: readonly object[]): number {
@@ -1402,8 +1309,8 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     for (const row of this._sync()) row._resetAllMeta();
   }
 
-  protected override _visitChildren(phase: Phase, calls: Calls, changed: StoreSet | undefined, log: readonly WriteEntry[] | undefined): void {
-    for (const store of this.rowsToWalk(phase, this._sync())) store._visit(phase, calls, changed, log);
+  protected override _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
+    for (const store of this.rowsToWalk(phase, this._sync())) store._visit(phase, calls, log);
 
     if (phase === "ui") {
       for (const sub of this.itemsSubs) check(sub, calls, undefined);
