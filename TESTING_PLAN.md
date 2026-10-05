@@ -27,7 +27,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
 | `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 70 |
 | `src/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 43 |
-| `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
+| `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 28 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 36 |
@@ -37,7 +37,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
 | `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
 | `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips | 8 |
-| `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
+| `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 3 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
 | `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
@@ -203,7 +203,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Ready-made rules, behaviors & builder
-**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (a user edit is overwritten, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen` (to the initial value, edits reset while the test holds), `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
+**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (a user edit is overwritten, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen` (to the initial value, edits reset while the test holds), `exclusive` (incl. several filled, required, omitted values), builder `when`, a target with a value under a condition and another otherwise as one behavior (#92), nested guards, `each`, fragments, output to `addBehavior`.
 
 - [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `exclusive`'s default text uses `labelOf` (the last path segment). → `recipes/rules.test.ts`
 - [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhen` takes its condition as explicit refs (`[s.car.visible]`). → `recipes/behaviors.test.ts`

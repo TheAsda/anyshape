@@ -198,8 +198,9 @@ export function contributionChecks() {
   return def;
 }
 
-// One way to say each thing (#92).
-export function oneWayChecks() {
+// ---------------------------------------------------------------------------
+// Removed behavior options: each had another way to say the same thing.
+export function removedOptionChecks() {
   // A run reaches the form only through its declared refs: no store, no initial(), no isInit.
   expectTypeOf<BehaviorContext>().not.toHaveProperty("store");
   expectTypeOf<BehaviorContext>().not.toHaveProperty("initial");

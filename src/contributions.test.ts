@@ -526,7 +526,8 @@ describe("In-flight runs", () => {
     row0.addBehavior(contribute(F.answer, "row 0"));
     row1.addBehavior(contribute(F.answer, "row 1"));
     expect(calls[0].signal.aborted).toBe(false);
-    for (const c of calls) c.d.resolve("init"); // row 1's run too: it is that instance's first
+    expect(calls, "row 0's run, then row 1's first run with a part").toHaveLength(2);
+    for (const c of calls) c.d.resolve("init");
     await s.settle();
     expect(row0.get(F.answer)).toBe("init row 0 (#1)");
   });

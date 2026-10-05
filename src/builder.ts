@@ -50,9 +50,8 @@ export class BehaviorBuilder {
     refs: Rs,
     test: (...values: Values<Rs>) => boolean,
     fn: (b: BehaviorBuilder) => void
-  ): this {
+  ): void {
     fn(new BehaviorBuilder(this.out, [...this.guards, guardOf(refs, test)]));
-    return this;
   }
 
   /** Behaviors for array items: `item` is the row template (behaviors on it run once per row). */
