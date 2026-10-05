@@ -245,7 +245,7 @@ class Tracks {
   }
 
   settled(store: BaseStore<any>, node: AnyNode, start: number, end: number): void {
-    const at = pathLabel(store._host, node);
+    const at = pathLabel(store.scopeStore, node);
     this.detail(`settle @${at}`, start, end, "async", "secondary-dark", {
       tooltipText: `settle() waited ${ms(end - start)} for the runs in flight inside ${at}`,
       properties: [],

@@ -110,7 +110,7 @@ function withHint(error: unknown): unknown {
  * builder as defineBehaviors; `deps` re-register (atomically) when they change.
  */
 export function useBehaviors(build: (b: BehaviorBuilder) => void, deps: readonly unknown[], options: UseBehaviorsOptions = {}): void {
-  const host = useStore(options)._host;
+  const host = useStore(options).scopeStore;
   const current = useRef<{ host: BaseStore<any>; registration: Registration } | null>(null);
   const warned = useRef(false);
 

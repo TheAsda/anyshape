@@ -93,7 +93,6 @@ export function useControl<N extends ControlNode>(node: N, options?: UseControlO
   const unregister = useRef<(() => void) | null>(null);
   const focusRef = useCallback(
     (target: FocusTarget | null) => {
-      // Clears only what this ref registered (another element may have taken over).
       unregister.current?.();
       unregister.current = target ? registerFocus(store, node, target) : null;
     },
