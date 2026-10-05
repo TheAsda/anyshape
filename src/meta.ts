@@ -8,7 +8,8 @@
 // ============================================================
 
 import type { BehaviorConfig, OwnerConfig } from "./behaviors";
-import type { MetaRef, ShapeNode } from "./shape";
+import type { ShapeNode } from "./shape";
+import type { MetaRef } from "./refs/meta";
 
 export type Meta = Record<string, unknown>;
 

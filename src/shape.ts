@@ -23,7 +23,7 @@ import {
 import { FIELDS, META_DEFS, META, CREATE } from "./internal";
 import { KIND, type RefKind } from "./refs/kind";
 import { valueKind } from "./refs/value";
-import { metaKind } from "./refs/meta";
+import { MetaRef } from "./refs/meta";
 
 declare const FieldIdBrand: unique symbol;
 export type FieldId = string & { readonly [FieldIdBrand]: true };
@@ -52,34 +52,6 @@ interface InstantiateContext {
   lens: Lens<any, any>;
   parent: ContainerNode | undefined;
   nextId: () => FieldId;
-}
-
-// ============================================================
-// Meta reference – points at one meta key of one node
-// ============================================================
-export class MetaRef<V = unknown, P = unknown> {
-  /** Phantom type – never exists at runtime. */
-  declare readonly _value: V;
-  /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
-  declare readonly _payload: P;
-
-  private constructor(readonly node: AnyNode, readonly key: string) {}
-
-  /** @internal Refs are attached to nodes (node.error); everything else reads them from there. */
-  static _create(node: AnyNode, key: string): MetaRef<any> {
-    return new MetaRef(node, key);
-  }
-
-  /** e.g. "shipping.city#error" */
-  get path(): string {
-    return `${this.node.path ?? ""}#${this.key}`;
-  }
-
-  /** @internal */
-  get [KIND](): RefKind<MetaRef<any>> {
-    return metaKind;
-  }
-
 }
 
 /** A value reference (a node) or a meta reference. */

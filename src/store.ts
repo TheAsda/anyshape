@@ -50,12 +50,13 @@
 import type { Meta, MetaKeyDef } from "./meta";
 import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors";
 import {
-  ShapeNode, ObjectNode, ArrayNode, MetaRef,
+  ShapeNode, ObjectNode, ArrayNode,
   type AnyNode, type ContainerNode, type InferValue,
 } from "./shape";
 import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal";
 import { isAncestorOrSelf } from "./tree";
 import { kindOf } from "./refs/kind";
+import type { MetaRef } from "./refs/meta";
 import type { CountRef } from "./refs/count";
 import type { InitialRef } from "./refs/initial";
 import type { PendingInRef, PendingOfRef } from "./refs/pending";
@@ -96,7 +97,7 @@ export interface CollectEntry<V = unknown> {
 
 export const MAX_BEHAVIOR_ROUNDS = 100;
 
-/** @internal The behavior runtime (behaviors.ts): built by the factory createStore passes to the root. */
+/** @internal The behavior runtime (runtime.ts): built by the factory createStore passes to the root. */
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;

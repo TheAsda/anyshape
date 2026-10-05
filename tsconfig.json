@@ -12,6 +12,6 @@
     "rootDir": ".",
     "types": ["node", "vitest-browser-react", "@vitest/browser-playwright"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*", "bench/**/*"],
   "exclude": ["node_modules"]
 }

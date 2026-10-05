@@ -1,5 +1,5 @@
 // ============================================================
-// Run order (internal, behaviors.ts only)
+// Run order (internal, runtime.ts only)
 // ------------------------------------------------------------
 // The dependency graph between registrations (A writes what B triggers on or
 // reads → A before B) and each registration's rank: the longest path to it.
@@ -13,7 +13,7 @@
 // enclosing scope. A write and an input are linked only when those hosts are
 // on one line of the host tree: a row's writes never reach a sibling row's
 // inputs of its own scope, but do reach a sibling's reads of the whole list.
-// The one-writer check (behaviors.ts) lists the writes through the same index.
+// The one-writer check (runtime.ts) lists the writes through the same index.
 // ============================================================
 
 import type { AnyNode } from "./shape";

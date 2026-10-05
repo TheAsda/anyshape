@@ -11,7 +11,7 @@ import { form, object, field, type InferValue, defineBehaviors } from "form-lib"
 import {
   control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen, disabled, disableWhen, exclusive,
-} from "form-lib/recipes";
+} from "../../../../../recipes";
 import { StoreProvider, useForm, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 

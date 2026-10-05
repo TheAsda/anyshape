@@ -3,7 +3,7 @@
 // recipes"): a file under recipes/ imports the core entry (`form-lib`) or
 // another file under recipes/, never a core module; a file under
 // recipes/react/ may also import the core React entry (`form-lib/react`).
-// The core, its tests included, imports no recipe.
+// The core, its tests and benches included, imports no recipe.
 // ============================================================
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -13,7 +13,8 @@ import { test, expect } from "vitest";
 
 const recipes = dirname(fileURLToPath(import.meta.url));
 const reactRecipes = resolve(recipes, "react");
-const core = resolve(recipes, "../src");
+/** The core's shipped code, its tests and its benches. */
+const core = ["src", "test", "bench"].map((dir) => resolve(recipes, "..", dir));
 
 /** The .ts / .tsx files under `dir`, as absolute paths. */
 function sources(dir: string): string[] {
@@ -51,8 +52,8 @@ test("a recipe imports only the core entry or another recipe", () => {
   expect(violations(recipes, allowed)).toEqual([]);
 });
 
-test("the core, its tests included, imports no recipe", () => {
+test("the core, its tests and benches included, imports no recipe", () => {
   const allowed = (spec: string, file: string) =>
-    isRelative(spec) ? !isInside(recipes, resolve(dirname(file), spec)) : !/^form-lib\/recipes(\/|$)/.test(spec);
-  expect(violations(core, allowed)).toEqual([]);
+    !isRelative(spec) || !isInside(recipes, resolve(dirname(file), spec));
+  expect(core.flatMap((dir) => violations(dir, allowed))).toEqual([]);
 });

@@ -15,7 +15,7 @@ import {
 import {
   control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
   clearWhen, rule, asyncRule, error,
-} from "form-lib/recipes";
+} from "../../../../../recipes";
 import { StoreProvider, useForm, useArray, useValue } from "form-lib/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard } from "../../ui";
 

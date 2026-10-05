@@ -6,7 +6,7 @@
 
 import { useId } from "react";
 import { useStore, useValue } from "form-lib/react";
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "form-lib/recipes/react";
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 import type { FieldNode } from "form-lib";
 
 /** What each stage exports alongside its component. */
