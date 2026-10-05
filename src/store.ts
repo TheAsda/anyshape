@@ -553,9 +553,8 @@ export abstract class BaseStore<N extends ContainerNode> {
   /**
    * Register behaviors after creation. On the root, behaviors on row template
    * nodes apply to every row; on a row's store, only to that row (and rows
-   * nested in it). Returns a function that removes them again: the meta keys
-   * they wrote go back to their defaults, the values they wrote stay (see
-   * BehaviorHandle).
+   * nested in it). Returns a function that removes them again (see
+   * BehaviorHandle for what removal resets).
    */
   addBehavior(behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
     return this.root._runtime.add(this.scopeStore, behaviors);
