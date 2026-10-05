@@ -1,6 +1,6 @@
 # anyshape for agents
 
-Read this page before writing anyshape code. It ships inside the package, so it matches the installed version. It gives the rules, every public name with the page that explains it, the mistakes agents make most often, and which page to open for a task. Every other page in this folder stands alone: open only the ones the task needs.
+Read this page before writing anyshape code. It ships inside the package, so it matches the installed version. Its links to recipes, examples and ADRs point at the repository's `master`, which may be newer. It gives the rules, every public name with the page that explains it, the mistakes agents make most often, and which page to open for a task. Every other page in this folder stands alone: open only the ones the task needs.
 
 ## Rules
 
