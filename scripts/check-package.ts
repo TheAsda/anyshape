@@ -30,9 +30,9 @@ const bin = (name: string) => join(root, "node_modules", ".bin", name);
 const REQUIRED = [
   "package.json", "LICENSE",
   "dist/index.js", "dist/index.d.ts", "dist/react/index.js", "dist/react/index.d.ts",
-  // The docs agents read at node_modules/anyshape/…: docs/principles.md and
-  // docs/guide/ join this list when they're written (#84, #86).
-  "GLOSSARY.md",
+  // The docs agents read at node_modules/anyshape/…: docs/guide/ joins this
+  // list when it's written (#86).
+  "GLOSSARY.md", "docs/principles.md",
 ];
 /** Path prefixes the tarball must not hold. */
 const FORBIDDEN = ["src/", "test/", "bench/", "recipes/", "examples/", "scripts/", ".changeset/"];
