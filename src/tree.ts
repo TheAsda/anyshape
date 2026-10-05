@@ -4,7 +4,7 @@
 // Not exported from the package index.
 // ============================================================
 
-import type { AnyNode } from "./shape";
+import type { AnyNode } from "./shape.js";
 
 export function isAncestorOrSelf(ancestor: AnyNode, node: AnyNode): boolean {
   for (let n: AnyNode | undefined = node; n; n = n.parent) if (n === ancestor) return true;

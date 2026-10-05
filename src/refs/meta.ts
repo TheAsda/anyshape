@@ -1,8 +1,8 @@
 // node.key: one meta key of one node.
 
-import type { AnyNode } from "../shape";
-import { defOf } from "../internal";
-import { KIND, type RefKind } from "./kind";
+import type { AnyNode } from "../shape.js";
+import { defOf } from "../internal.js";
+import { KIND, type RefKind } from "./kind.js";
 
 export class MetaRef<V = unknown, P = unknown> {
   /** Phantom type – never exists at runtime. */

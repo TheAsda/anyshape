@@ -15,15 +15,15 @@
 //                    doesn't reserve is free for fields and meta keys
 // ============================================================
 
-import { type Lens, identityLens, propLens, composeLens } from "./lens";
+import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
 import {
   MetaKeyDef,
   type Meta, type MergeMetaRefs,
-} from "./meta";
-import { FIELDS, META_DEFS, META, CREATE } from "./internal";
-import { KIND, type RefKind } from "./refs/kind";
-import { valueKind } from "./refs/value";
-import { MetaRef } from "./refs/meta";
+} from "./meta.js";
+import { FIELDS, META_DEFS, META, CREATE } from "./internal.js";
+import { KIND, type RefKind } from "./refs/kind.js";
+import { valueKind } from "./refs/value.js";
+import { MetaRef } from "./refs/meta.js";
 
 declare const FieldIdBrand: unique symbol;
 export type FieldId = string & { readonly [FieldIdBrand]: true };

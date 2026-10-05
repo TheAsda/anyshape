@@ -11,10 +11,10 @@
 // reading the outside world (fetch) is fine.
 // ============================================================
 
-import type { AnyNode, InferValue } from "./shape";
-import { MetaRef } from "./refs/meta";
-import { isDev } from "./internal";
-import type { AnyRef, RefValue, Origin } from "./store";
+import type { AnyNode, InferValue } from "./shape.js";
+import { MetaRef } from "./refs/meta.js";
+import { isDev } from "./internal.js";
+import type { AnyRef, RefValue, Origin } from "./store.js";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
 export type WritableRef = AnyNode | MetaRef<any>;
