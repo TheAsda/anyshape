@@ -172,7 +172,7 @@ const checkedStore = createStore(checked, { code: "" }, { behaviors: checks });
 |---|---|
 | Declare a form, its fields and rows | [shape.md](shape.md), [arrays.md](arrays.md) |
 | Read, write, load, reset or watch values | [store.md](store.md) |
-| Add state beside values (an error, a flag, a label) | [meta-keys.md](meta-keys.md) |
+| Add a meta key beside a value (such as `error`, `visible` or `touched`) | [meta-keys.md](meta-keys.md) |
 | Compute a field from others, or keep two fields consistent | [behaviors.md](behaviors.md) |
 | Add validation | the [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts), [contributions.md](contributions.md) |
 | Apply a rule only under a condition, or show a section conditionally | [guards.md](guards.md) |
