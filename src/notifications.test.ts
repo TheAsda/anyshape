@@ -1,4 +1,4 @@
-import { form, object, array, field, createStore, type InferValue } from "./index";
+import { form, object, array, field, createStore, defineBehavior, type InferValue } from "./index";
 import { test as base, describe, expect } from "vitest";
 import * as company from "./test/fixtures/company";
 import type { FocusTarget } from "./test/features";
@@ -296,18 +296,17 @@ describe("F · Rule 5 – batching", () => {
 });
 
 function withTotal() {
-  const s = createStore(shape, initial());
-  const lines = s.substore(shape.lines);
-  const recalc = () => {
-    const total = lines.current().reduce((sum, l) => sum + l.price * l.qty, 0);
-    s.set(shape.total, total);
-  };
-  s.react(shape.lines, recalc);
-  return { s, lines };
+  const s = createStore(shape, initial(), {
+    behaviors: defineBehavior({
+      triggers: [shape.lines], writes: [shape.total],
+      run: (ctx) => ctx.set(shape.total, ctx.get(shape.lines).reduce((sum, l) => sum + l.price * l.qty, 0)),
+    }),
+  });
+  return { s, lines: s.substore(shape.lines) };
 }
 
 describe("F · Rule 7 – reactions, then UI", () => {
-  test("rule 7: reactions settle before UI; UI sees the final state once", () => {
+  test("rule 7: derived writes settle before UI; UI sees the final state once", () => {
     const { s, lines } = withTotal();
     const seen: number[] = [];
     s.subscribe(shape.total, () => seen.push(s.get(shape.total)));
@@ -315,9 +314,19 @@ describe("F · Rule 7 – reactions, then UI", () => {
     expect(seen).toEqual([70]);
   });
 
-  test("rule 7: chained reactions settle", ({ store: s }) => {
-    s.react(shape.name, (name) => s.set(shape.shipping.street, `${name} St`));
-    s.react(shape.shipping.street, (street) => s.set(shape.billing.street, street));
+  test("rule 7: chained derived writes settle", () => {
+    const s = createStore(shape, initial(), {
+      behaviors: [
+        defineBehavior({
+          triggers: [shape.shipping.street], writes: [shape.billing.street], runOn: { init: false },
+          run: (ctx) => ctx.set(shape.billing.street, ctx.get(shape.shipping.street)),
+        }),
+        defineBehavior({
+          triggers: [shape.name], writes: [shape.shipping.street], runOn: { init: false },
+          run: (ctx) => ctx.set(shape.shipping.street, `${ctx.get(shape.name)} St`),
+        }),
+      ],
+    });
     const r = recorder();
     s.subscribe(shape, r.on("root"));
     s.set(shape.name, "Kate");
@@ -327,15 +336,20 @@ describe("F · Rule 7 – reactions, then UI", () => {
 
   test("rule 7: reactions receive next and prev", ({ store: s }) => {
     const calls: [string, string][] = [];
-    s.react(shape.name, (next, prev) => calls.push([next, prev]));
+    s._react(shape.name, (next, prev) => calls.push([next, prev]));
     s.set(shape.name, "B");
     s.set(shape.name, "C");
     expect(calls).toEqual([["B", "Ann"], ["C", "B"]]);
   });
 
-  test("rule 7: meta reactions", ({ store: s }) => {
-    s.react(shape.name.touched, (touched) => {
-      if (touched) s.set(shape.name.error, s.get(shape.name) ? undefined : "Required");
+  test("rule 7: a meta change triggers a derived write", () => {
+    const s = createStore(shape, initial(), {
+      behaviors: defineBehavior({
+        triggers: [shape.name.touched], reads: [shape.name], writes: [shape.name.error], runOn: { init: false },
+        run: (ctx) => {
+          if (ctx.get(shape.name.touched)) ctx.set(shape.name.error, ctx.get(shape.name) ? undefined : "Required");
+        },
+      }),
     });
     s.set(shape.name, "");
     s.set(shape.name.touched, true);
@@ -343,7 +357,7 @@ describe("F · Rule 7 – reactions, then UI", () => {
   });
 
   test("rule 7: cycles are detected", ({ store: s }) => {
-    s.react(shape.total, (t) => s.set(shape.total, t + 1));
+    s._react(shape.total, (t) => s.set(shape.total, t + 1));
     expect(() => s.set(shape.total, 1)).toThrow(/did not settle/);
     // store is still usable afterwards
     s.batch(() => {});
@@ -356,7 +370,7 @@ describe("F · Rule 7 – reactions, then UI", () => {
 
   test("reactions do not run on registration", ({ store: s }) => {
     let calls = 0;
-    s.react(shape.name, () => calls++);
+    s._react(shape.name, () => calls++);
     expect(calls).toBe(0);
   });
 });
@@ -407,7 +421,7 @@ describe("F · Errors during the flush", () => {
 
   test("a throwing reaction: the write throws, UI is skipped, the next flush catches up", ({ store: s, recorder: r }) => {
     let fail = true;
-    s.react(shape.name, () => {
+    s._react(shape.name, () => {
       if (fail) throw new Error("reaction");
     });
     s.subscribe(shape.name, r.on("name"));

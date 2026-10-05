@@ -1001,7 +1001,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       let seq = arrStore.items();
       for (const row of seq) this.child(binding, row);
       binding.offs.push(
-        host.react(arrStore.node, () => {
+        host._react(arrStore.node, () => {
           if (reg.disposed) return;
           const now = arrStore.items();
           if (now === seq) return;
@@ -1028,7 +1028,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private subscribeTriggers(binding: Binding, refs: AnyRef[]): void {
     binding.triggerKeys = refs.map(refKey);
     binding.triggerOffs = refs.map((ref) =>
-      hostFor(binding.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info))
+      hostFor(binding.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => this.onTrigger(binding, ref, info))
     );
   }
 
@@ -1090,7 +1090,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const ref of reg.writes) {
       if (reg.inputKeys.has(refKey(ref))) continue; // an input change reruns it
       flight.offs.push(
-        leaf.host.react(ref, () => {
+        leaf.host._react(ref, () => {
           if (this.flights.get(leaf) === flight) this.cancel(leaf);
         })
       );
@@ -1098,7 +1098,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const ref of reg.reads) {
       const key = refKey(ref);
       flight.offs.push(
-        hostFor(leaf.host, scopeOf(refNode(ref))).react(ref, (_n, _p, info) => {
+        hostFor(leaf.host, scopeOf(refNode(ref)))._react(ref, (_n, _p, info) => {
           if (this.flights.get(leaf) === flight) this.onInput(leaf, key, info, false);
         })
       );

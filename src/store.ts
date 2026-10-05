@@ -17,10 +17,11 @@
 //     store to the new reference. Each item store keeps its own initial value.
 //
 // References:
-//   • get / set / subscribe / react accept any reference: a node (value), a
-//     MetaRef (one meta key), and the read-only countIn, initialOf, pendingIn
-//     and pendingOf. Each kind is one module in src/refs/ and answers through
-//     RefKind (src/refs/kind.ts); the store keeps only the change channels.
+//   • get / set / subscribe (and the internal _react) accept any reference: a
+//     node (value), a MetaRef (one meta key), and the read-only countIn,
+//     initialOf, pendingIn and pendingOf. Each kind is one module in
+//     src/refs/ and answers through RefKind (src/refs/kind.ts); the store
+//     keeps only the change channels.
 //   • Non-reactive keys (`reactive: false`) are stored in place: no flush, no
 //     notification, allowed on detached stores, kept by reset().
 //
@@ -42,6 +43,10 @@
 //      form is not final; code that needs that awaits store.settle().
 //   7. Reactions run first (repeating until settled, max MAX_REACTION_ROUNDS),
 //      then UI listeners once; writing during the UI phase throws.
+//      Reactions are internal (_react): the behavior runtime is their only
+//      user, so derived writes are behaviors, which declare what they read and
+//      write, have one writer per target and run in order. Side effects are
+//      UI listeners (subscribe).
 //   8. UI listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
@@ -652,8 +657,8 @@ export abstract class BaseStore<N extends ContainerNode> {
     return this._addRefSub(ref, "ui", () => listener());
   }
 
-  /** Reaction phase: may write; receives next, prev and the origins of the change. */
-  react<R extends AnyRef>(ref: R, fn: (next: RefValue<R>, prev: RefValue<R>, info: ChangeInfo) => void): Unsubscribe {
+  /** @internal reaction phase, for the behavior runtime: may write; receives next, prev and the origins of the change. */
+  _react<R extends AnyRef>(ref: R, fn: (next: RefValue<R>, prev: RefValue<R>, info: ChangeInfo) => void): Unsubscribe {
     return this._addRefSub(ref, "reaction", fn as any);
   }
 
@@ -902,7 +907,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   /** @internal */
   _assertWritable(): void {
     if (this.phase === "ui") {
-      throw new Error("Cannot write while UI listeners are notified – use store.react(...) for derived writes");
+      throw new Error("Cannot write while UI listeners are notified – write derived values with a behavior");
     }
   }
 

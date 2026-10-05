@@ -251,7 +251,7 @@ describe("D, E · Reference API and array helpers", () => {
 
   test("helpers pass the origin through", ({ store: s }) => {
     const seen: Origin[][] = [];
-    s.react(shape.lines, (_n, _p, i) => seen.push([...i.origins]));
+    s._react(shape.lines, (_n, _p, i) => seen.push([...i.origins]));
     s.substore(shape.lines).append(undefined, { origin: "user" });
     expect(seen).toEqual([["user"]]);
   });

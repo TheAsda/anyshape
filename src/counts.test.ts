@@ -58,7 +58,7 @@ describe("H · Counts and collect", () => {
     note.set(f.rows.item.notes.item.text.flagged, true);
     note.set(f.rows.item.notes.item.text, "n");   // a flush that walks the rows first
     const seen: number[] = [];
-    s.react(countIn(f, flaggedKey), (next) => seen.push(next));
+    s._react(countIn(f, flaggedKey), (next) => seen.push(next));
     row.set(f.rows.item.notes, []);
     expect(seen).toEqual([0]);
   });

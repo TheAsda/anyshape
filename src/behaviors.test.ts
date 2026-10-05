@@ -219,7 +219,7 @@ describe("K · Own writes, two-way links, state", () => {
     seen.length = 0;
     // A reaction to the user's edit writes in the same round as the share runs:
     // the next change of the array carries both the program's and the siblings' origins.
-    lines.itemAt(0).react(R.price, () => void lines.itemAt(2).set(R.price, 50));
+    lines.itemAt(0)._react(R.price, () => void lines.itemAt(2).set(R.price, 50));
     lines.itemAt(0).set(R.price, 40, { origin: "user" });
     expect(seen).toEqual([["user"], ["user"], ["user"], ["program"], ["program"], ["program"]]);
     expect(values()).toEqual([33, 25, 42]);

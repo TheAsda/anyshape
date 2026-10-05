@@ -68,7 +68,7 @@ describe("Pending", () => {
 
     const fired: string[] = [];
     s.subscribe(pendingIn(shape, checked), () => fired.push("subscribe pendingIn"));
-    s.react(pendingIn(shape), () => fired.push("react pendingIn"));
+    s._react(pendingIn(shape), () => fired.push("react pendingIn"));
     row.subscribe(pendingOf(R.qty.ok), () => fired.push("subscribe pendingOf"));
     s.addBehavior(
       defineBehavior({

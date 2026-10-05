@@ -56,7 +56,7 @@ describe("T · Probe", () => {
   test("a flush reports its start, the end of its reactions and its end", () => {
     const s = createStore(shape, initial());
     const events = record(s);
-    s.react(shape.code, () => void (t += 3));
+    s._react(shape.code, () => void (t += 3));
     s.subscribe(shape.code, () => void (t += 2));
     t = 10;
     s.set(shape.code, "b");
@@ -103,7 +103,7 @@ describe("T · Probe", () => {
         },
       })
     );
-    s.react(shape.name, () => void (t += 5));
+    s._react(shape.name, () => void (t += 5));
     const events = record(s);
     t = 10;
     s.set(shape.code, "b");
@@ -220,7 +220,7 @@ describe("T · Flush budget", () => {
         slow("tiny", 0.5, [order.note]),
       ],
     });
-    s.react(order.sum, () => void (t += 2));
+    s._react(order.sum, () => void (t += 2));
     s.subscribe(order.lines, () => void (t += 4));
     warn.mockClear();
     s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
