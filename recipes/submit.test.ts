@@ -178,8 +178,9 @@ describe("Submit: submittable nodes", () => {
     // @ts-expect-error – still rejected on a second call: nothing is cached
     expect(() => handleSubmit(plain, async () => {}), "a second call").toThrow(/submission\(\)/);
     const section = form(object({ step: object({ x: field<string>() }) }));
+    const step = createStore(section, { step: { x: "" } }).substore(section.step);
     // @ts-expect-error – a section is submittable only if it declares submission() itself
-    expect(() => handleSubmit(createStore(section, { step: { x: "" } }).substore(section.step), async () => {})).toThrow(/"step"/);
+    expect(() => handleSubmit(step, async () => {})).toThrow(/"step"/);
     expect(() => handleSubmit(s.substore(shape.rows).itemAt(0), async () => {})).not.toThrow();
   });
 
