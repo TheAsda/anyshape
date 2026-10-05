@@ -63,7 +63,8 @@
 // store.settle(node?) waits until no run writing inside the node is in flight.
 // ============================================================
 
-import { ShapeNode, ObjectNode, ArrayNode, MetaRef, type AnyNode } from "./shape";
+import { ShapeNode, ObjectNode, ArrayNode, type AnyNode } from "./shape";
+import type { MetaRef } from "./refs/meta";
 import {
   refNode, refKey, refLabel, targetOf, scopeOf, chainTo, rootOf, storeWithin, hostFor, concretePath,
   FIELDS, META_DEFS, metaRefOf, defOf, usedRefs, rowsBetween, locatedAt, pathLabel,

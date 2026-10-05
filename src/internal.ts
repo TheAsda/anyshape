@@ -3,7 +3,8 @@
 // Not exported from the package index.
 // ============================================================
 
-import { ArrayNode, type MetaRef, type AnyNode } from "./shape";
+import { ArrayNode, type AnyNode } from "./shape";
+import type { MetaRef } from "./refs/meta";
 import type { MetaKeyDef } from "./meta";
 import { BaseStore, ItemStore, type AnyRef } from "./store";
 import { kindOf, type Target } from "./refs/kind";

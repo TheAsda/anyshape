@@ -5,7 +5,7 @@
 // RefKind, reached through `ref[KIND]`. The store, the behavior runtime and the
 // hooks only call this interface, so a new kind is one module in src/refs/.
 //
-// This module has no runtime imports: classes in shape.ts use KIND as a
+// This module has no runtime imports: the node and ref classes use KIND as a
 // computed member name while the other modules are still being evaluated.
 // ============================================================
 
