@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 453 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 453 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `test/lens.test.ts`, `test/types.test.ts` and `test/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -18,37 +18,37 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 
 | File | Layer | Area | Tests |
 |---|---|---|---|
-| `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 8 |
-| `src/lens.test.ts` | B | lens unit tests | 8 |
-| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 18 |
-| `src/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers | 32 |
-| `src/notifications.test.ts` | F | the notification rules, flush | 33 |
-| `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
-| `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
-| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 70 |
-| `src/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 43 |
-| `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 28 |
-| `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
-| `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
+| `test/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 8 |
+| `test/lens.test.ts` | B | lens unit tests | 8 |
+| `test/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 18 |
+| `test/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers | 32 |
+| `test/notifications.test.ts` | F | the notification rules, flush | 33 |
+| `test/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
+| `test/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
+| `test/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 70 |
+| `test/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 43 |
+| `test/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 28 |
+| `test/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
+| `test/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
 | `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 36 |
 | `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, guarded by a builder block | 10 |
 | `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 17 |
 | `recipes/features.test.ts` | N | the default behaviors of `touched` and `dirty` | 1 |
-| `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
+| `test/paths.test.ts` | O | `resolvePath`, server errors | 4 |
 | `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
 | `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips | 8 |
-| `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 3 |
+| `test/types.test.ts` | S | the public type contract (asserted by `tsc`) | 3 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
-| `src/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
-| `src/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` | 12 |
-| `src/react/form.test.tsx` | Q | `useForm`, `useSync` | 10 |
-| `src/react/behaviors.test.tsx` | R | `useBehaviors` | 14 |
-| `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
+| `test/integration.test.ts` | INT | trip-booking scenarios across all layers | 8 |
+| `test/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` | 12 |
+| `test/react/form.test.tsx` | Q | `useForm`, `useSync` | 10 |
+| `test/react/behaviors.test.tsx` | R | `useBehaviors` | 14 |
+| `test/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
 | `recipes/react/control.test.tsx` | P | `useControl`, `showError`, `focusRef`, adapters | 7 |
 | `recipes/react/submit.test.tsx` | O | DOM focus order, `handleSubmit` on a real `<form>`, DOM elements beside custom focus handles | 3 |
 
-Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`. The core tests declare their meta keys with the test-local features in `src/test/features.ts` and rules in `src/test/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`.
+Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) and `test/support/trip.ts`. The core tests declare their meta keys with the test-local features in `test/support/features.ts` and rules in `test/support/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`.
 
 **Conventions (keep them):**
 - **Projects** (`vitest.config.ts`):
@@ -60,18 +60,18 @@ Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `acco
   - First run on a machine: `bunx playwright install chromium`.
 - **Structure:** one file per layer (table above). Inside a file, a `describe` per section, named with the layer ID (`"F · Rule 3 – array structure channel"`). Test titles state the guarantee ("a removed row drops its async result"), not the function.
 - **Fixtures:**
-  - A file's form and `initial()` stay local unless several files need them; then they live in `src/test/fixtures/`.
+  - A file's form and `initial()` stay local unless several files need them; then they live in `test/support/fixtures/`.
   - Repeated setup comes from `test.extend` builder fixtures: `store`, `lines`, `recorder`, `lookup`, e.g. `test("…", ({ store: s, lines }) => …)`.
   - Use a fixture only where it removes repetition without hiding the setup the test is about. A test with its own store options creates its store explicitly.
   - A `describe` that uses another file's fixture binds it at the top (`const { shape, L, initial } = company;`) and defines its own `test`.
-- **React tests** (`src/react/*.test.tsx` and `recipes/react/*.test.tsx`, each with its own copy of `test-utils.tsx`). The core React tests use only the core hooks; a field binding there is `useField` with inline handlers:
+- **React tests** (`test/react/*.test.tsx` and `recipes/react/*.test.tsx`, each with its own copy of `test-utils.tsx`). The core React tests use only the core hooks; a field binding there is `useField` with inline handlers:
   - Render with `render()` from `vitest-browser-react`; it's async and cleaned up before each test.
   - Drive inputs through locators and `userEvent` (`fill`, `click`, `keyboard`); these are real browser events, so focus moves and blur fires as with a user.
   - Assert DOM with retrying `await expect.element(locator)`. `toHaveTextContent("…")` is an exact match in Vitest 5; `toMatchTextContent` is the substring/regex form.
   - Wrap writes from outside React in `settle(fn)` (act) before render-count assertions, especially "nothing re-rendered", where there is no DOM change to wait for.
 - **Async and timers:**
   - Control async rules with `deferred()` / the `lookup` fixture.
-  - Let results land with `flush()` (`src/test/harness.ts`).
+  - Let results land with `flush()` (`test/support/harness.ts`).
   - Test debounce and other delays with `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync`, restoring with `onTestFinished(() => vi.useRealTimers())`.
 - **Type-level assertions:** `Expect<Equal<A, B>>` and `// @ts-expect-error` inside the test files. They run under `bun run typecheck`, not under vitest, so **CI must run both**.
 - **Known bugs** are pinned with `test.fails` and a comment naming the GitHub issue (`#N`). Switch the test to `test` when the fix lands.
@@ -94,14 +94,14 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### B. Lenses (`lens.ts`)
 **Covered:** only indirectly, through stores (structural sharing, no-op writes).
 
-- [x] **B1 · P1** Direct unit tests in a new `src/lens.test.ts`:
+- [x] **B1 · P1** Direct unit tests in a new `test/lens.test.ts`:
   - `propLens.get` on a `null`/`undefined` parent returns `undefined`;
   - `set` uses `Object.is` (`NaN` → `NaN` returns the source; `+0` → `-0` does not);
   - `composeLens` returns the *outer source* when the inner write is a no-op, at every depth;
   - `identityLens` short-circuits composition;
   - a changed write copies only the path to the leaf (siblings keep their references).
 
-### C. Meta declarations & references (`meta.ts`, `shape.ts`)
+### C. Meta declarations & references (`meta.ts`, `shape.ts`, `refs/meta.ts`)
 **Covered:** defaults, capabilities kept, variadic and chained `.meta()`, each key declared once on a node (a second declaration throws, #95), reserved keys, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
 
 - [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
@@ -243,7 +243,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **R2 · P2** A deps change whose new registration fails a check (e.g. a new writer conflict) keeps the old registration active and surfaces the error with the hint. → `react/behaviors.test.tsx`
 
 ### S. Type-level tests
-Type assertions are spread across the files today. Collect the public-API type contract in one place: **new `src/types.test.ts`** (checked by `npm run typecheck`).
+Type assertions are spread across the files today. Collect the public-API type contract in one place: **new `test/types.test.ts`** (checked by `npm run typecheck`).
 
 - [x] **S1 · P1** `InferValue` for nested objects, reused shapes and arrays of arrays; `InferMeta` merging variadic `.meta()`, features and `metaKey`.
 - [x] **S1 (cont.)** `RefValue` for each reference kind: node, `MetaRef`, `CountRef` → `number`, `InitialRef`.
@@ -264,7 +264,7 @@ Type assertions are spread across the files today. Collect the public-API type c
   - `form()` on a record of fields instead of an `object()` node (#101).
 
 ### T. Diagnostics, dev only (`diagnostics.ts`, the probe in `store.ts`)
-Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`src/diagnostics.test.ts`**.
+Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`test/diagnostics.test.ts`**.
 
 - [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed; disposing a handle that registered nothing is none.
 - [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, behaviors vs listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
@@ -275,7 +275,7 @@ Time comes from a stubbed `performance.now` that the test's reactions, listeners
 
 ## 3. Integration scenarios
 
-The unit suites test each mechanism in isolation. Add **`src/integration.test.ts`** with one realistic form exercising the layers together: a trip booking with contact, reused `person`, travelers rows with a per-row computed `isAdult`, dates → nights → price → total with a budget rule, `seats` limited by a synced `seatsLeft`, a visa section shown for some destinations with `clearWhen`, and promo/voucher `exclusive`. (A verified version of this form exists from the architecture deck work; it can seed the file.)
+The unit suites test each mechanism in isolation. Add **`test/integration.test.ts`** with one realistic form exercising the layers together: a trip booking with contact, reused `person`, travelers rows with a per-row computed `isAdult`, dates → nights → price → total with a budget rule, `seats` limited by a synced `seatsLeft`, a visa section shown for some destinations with `clearWhen`, and promo/voucher `exclusive`. (A verified version of this form exists from the architecture deck work; it can seed the file.)
 
 - [x] **INT1 · P1** Load a saved booking with `{ as: "initial" }`: nothing dirty or touched, sync errors present, async rules unchecked, `validate()` runs them.
 - [x] **INT2 · P1** A user edit of `returnDate` updates nights → price → total → budget error, **each behavior running exactly once** (count runs with named behaviors).
@@ -295,15 +295,15 @@ The unit suites test each mechanism in isolation. Add **`src/integration.test.ts
 |---|---|---|---|
 | **NF1** | P1 | **Packaging:** the build emits both entries (`form-lib`, `form-lib/react`) with `.d.ts`; `package.json` `exports` resolve both; the core bundle contains no `react` import. | After fixing `vite.config.ts` (it builds only `src/index.ts`) and adding `exports`/`types`: a script that runs `vite build`, then imports `dist/` from a temp project and type-checks a small consumer. |
 | **NF2** | P2 | **CI gates:** `npm test`, `npm run typecheck`, and `cd examples/basic && npm run typecheck`. | CI workflow. The type-level tests only run under `tsc`. |
-| **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal); the dev diagnostics overhead on a keystroke and a row edit (#17). The benches run in dev, so they include the diagnostics. | `vitest bench` in `src/bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`src/bench/store.bench.ts`); found #6. |
-| **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable; so do removed nested rows, a row whose disposed behavior read the whole list, rows whose disposed behaviors were linked to a root behavior that stays, and a dropped store with its rows and behaviors (#63). The heap a store keeps per row with row-by-row chained behaviors is recorded, not asserted: it should stay flat as the rows double (before #63 it grew 27 → 37 → 58 KB per row at 200/400/800 rows). | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`src/bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |
-| **NF5** | P3 | **Mutation testing:** automate the "break it on purpose" habit (§5). | Try Stryker on `src/` (excluding `react/`); start with `lens.ts`, `store.ts`, `behaviors.ts`. |
+| **NF3** ✅ | P3 | **Performance baselines:** keystroke in a flat form (500 fields); an edit in one of 200 rows; append/remove in a 200-row array; `collect` over 200 rows with 1 error; mounts row by row (contributions, plain behaviors, chained behaviors with disposal); the dev diagnostics overhead on a keystroke and a row edit (#17). The benches run in dev, so they include the diagnostics. | `vitest bench` in `bench/*.bench.ts`; track numbers over time rather than asserting hard limits. **Done:** `npm run bench` (`bench/store.bench.ts`); found #6. |
+| **NF4** ✅ | P3 | **Memory:** removed rows (and their stores/meta) become collectable; so do removed nested rows, a row whose disposed behavior read the whole list, rows whose disposed behaviors were linked to a root behavior that stays, and a dropped store with its rows and behaviors (#63). The heap a store keeps per row with row-by-row chained behaviors is recorded, not asserted: it should stay flat as the rows double (before #63 it grew 27 → 37 → 58 KB per row at 200/400/800 rows). | Optional script with `node --expose-gc` and a `FinalizationRegistry`; run manually, since it's too flaky for CI. **Done:** `npm run test:memory` (`bench/rows.memory.ts`, `vitest.memory.config.ts`), WeakRef-based. |
+| **NF5** | P3 | **Mutation testing:** automate the "break it on purpose" habit (§5). | Try Stryker on `src/` (excluding `react/`); start with `lens.ts`, `store.ts`, `runtime.ts`. |
 
 ---
 
 ## 5. Mechanisms to mutation-check
 
-When touching any of these, break it deliberately and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), registration and disposal (`behaviors.ts`) or the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows only as a leak.
+When touching any of these, break it deliberately and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), registration and disposal (`runtime.ts`) or the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows only as a leak.
 
 | Mechanism | Where | Expected to fail |
 |---|---|---|
@@ -327,7 +327,7 @@ When touching any of these, break it deliberately and confirm that at least one 
 ## 6. Suggested order of work
 
 1. **P1 unit gaps:** B1, E1, E2, F1, F2, J1, M1, P1. These are small, local, and protect core guarantees.
-2. **Type contract:** S1, S2 in `src/types.test.ts`, and add CI (NF2) so type tests actually gate merges.
+2. **Type contract:** S1, S2 in `test/types.test.ts`, and add CI (NF2) so type tests actually gate merges.
 3. **Integration suite:** INT1–INT5 first, then INT6–INT9.
 4. **Packaging:** fix the build and add NF1, since a release depends on it.
 5. **P2 gaps,** layer by layer (A → R).

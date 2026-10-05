@@ -2,7 +2,8 @@
 // createStore – wires the store and the behavior runtime.
 // ============================================================
 
-import { BehaviorRuntime, defaultBehaviors, type StoreOptions } from "./behaviors";
+import { BehaviorRuntime, defaultBehaviors } from "./runtime";
+import type { StoreOptions } from "./behaviors";
 import { RootStore } from "./store";
 import type { ObjectNode, InferValue } from "./shape";
 import { Diagnostics } from "./diagnostics";

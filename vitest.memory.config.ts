@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 // --expose-gc. Run manually with `npm run test:memory`; too timing-sensitive for CI.
 export default defineConfig({
   test: {
-    include: ['src/bench/**/*.memory.ts'],
+    include: ['bench/**/*.memory.ts'],
     pool: 'forks',
     execArgv: ['--expose-gc'],
     environment: 'node',

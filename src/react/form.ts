@@ -12,7 +12,8 @@
 // ============================================================
 
 import { useLayoutEffect, useRef, useState } from "react";
-import type { AnyNode, InferValue, MetaRef, ObjectNode } from "../shape";
+import type { AnyNode, InferValue, ObjectNode } from "../shape";
+import type { MetaRef } from "../refs/meta";
 import { createStore } from "../create";
 import type { StoreOptions } from "../behaviors";
 import type { RootStore } from "../store";

@@ -31,7 +31,7 @@ import {
   visibleWhen,
   clearWhen,
   isEmpty,
-} from 'form-lib/recipes';
+} from '../../../recipes';
 
 // A per-field "lookup in flight" tag. metaKey (not a plain value)
 // so the key is countable: countIn(shape, lookingUp) counts every

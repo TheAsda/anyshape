@@ -4,7 +4,8 @@
 //     only meta targets declared with it, whatever their name.
 //   • pendingOf – whether that exact target is pending (one writer per target).
 
-import type { AnyNode, MetaRef } from "../shape";
+import type { AnyNode } from "../shape";
+import type { MetaRef } from "./meta";
 import type { MetaKeyDef } from "../meta";
 import { refNode, refKey, refLabel, targetOf } from "../internal";
 import { isAncestorOrSelf } from "../tree";
