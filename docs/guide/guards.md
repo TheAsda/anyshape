@@ -110,7 +110,7 @@ const clearLicense = defineBehavior({
 });
 ```
 
-So hiding a section and showing it again keeps what the user typed, unless you chose otherwise, and a team whose "disabled" means "read-only but submitted" gets exactly that. The recipes' `clearWhen` is this behavior as a function.
+So hiding a section and showing it again keeps what the user typed, unless you chose otherwise, and a team whose "disabled" means "read-only but submitted" gets exactly that. The recipes' `clearWhen` is this behavior as a function ([source](https://github.com/TheAsda/anyshape/blob/master/recipes/behaviors.ts); used in [stage 5](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage5)).
 
 ## Groups
 
