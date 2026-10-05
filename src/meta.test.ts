@@ -59,10 +59,10 @@ export function typeOnlyChecks() {
 describe("C · Declarations", () => {
   test("defaults from plain values and key definitions", () => {
     const s = createStore(shape, values());
-    expect(s.getMeta(shape.name)).toEqual({
-      error: undefined, touched: false, dirty: false, revealed: false, focusTarget: undefined, label: "Name",
-    });
-    expect(s.getMeta(shape)).toEqual({ submitting: false });
+    const n = shape.name;
+    expect([s.get(n.error), s.get(n.touched), s.get(n.dirty), s.get(n.revealed), s.get(n.focusTarget), s.get(n.label)])
+      .toEqual([undefined, false, false, false, undefined, "Name"]);
+    expect(s.get(shape.submitting)).toBe(false);
   });
 
   test("key definitions keep their capabilities", () => {
@@ -153,7 +153,7 @@ describe("C · Closed meta in the store", () => {
   test("only declared keys have refs", () => {
     const s = createStore(shape, values());
     s.set(shape.name.label, "Full name");
-    expect(s.getMeta(shape.name).label).toBe("Full name");
+    expect(s.get(shape.name.label)).toBe("Full name");
     // @ts-expect-error – `hint` is not declared on `name`
     expect(shape.name.hint).toBe(undefined);
     // @ts-expect-error – `note` declares no meta at all
@@ -203,7 +203,7 @@ describe("C · Reserved names, table-driven", () => {
     });
     const s = createStore(f, { group: { x: "a" } });
     s.set(f.group._meta, "n");
-    expect(s.getMeta(f.group)).toEqual({ _fields: 1, _meta: "n", _metaDefs: false });
+    expect([s.get(f.group._fields), s.get(f.group._meta), s.get(f.group._metaDefs)]).toEqual([1, "n", false]);
     expect(s.get(f.group.x), "the node's own children still work").toBe("a");
   });
 });

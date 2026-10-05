@@ -37,8 +37,8 @@ export function typeOnlyChecks() {
   const n: number = useValue(countIn(shape, error));
   const e: string | undefined = useValue(shape.name.error);
   const len: number = useValue(shape.lines, (lines) => lines.length);
-  const hint: string = useField(shape.label).meta.hint;
-  return [n, e, len, hint];
+  const label: string = useField(shape.label).value;
+  return [n, e, len, label];
 }
 
 // ---------------------------------------------------------------------------
@@ -202,16 +202,15 @@ test("resolution errors", async () => {
 
 // ---------------------------------------------------------------------------
 // useField
-test("useField: value, onChange (origin user), own meta", async () => {
+test("useField: value, onChange (origin user)", async () => {
   const s = createStore(shape, initial());
   const origins: Origin[][] = [];
   s.react(shape.label, (_n, _p, info) => origins.push([...info.origins]));
   let field!: ReturnType<typeof useField<typeof shape.label>>;
-  let bare!: ReturnType<typeof useField<typeof shape.note>>;
   function F() {
     field = useField(shape.label);
-    bare = useField(shape.note);
-    return <span data-testid="f">{`${field.value}:${field.meta.hint}`}</span>;
+    const hint = useValue(shape.label.hint);
+    return <span data-testid="f">{`${field.value}:${hint}`}</span>;
   }
   const screen = await render(
     <StoreProvider store={s}>
@@ -220,7 +219,6 @@ test("useField: value, onChange (origin user), own meta", async () => {
   );
   const f = screen.getByTestId("f");
   await expect.element(f).toHaveTextContent("L:tip");
-  expect(bare.meta).toEqual({});
   const first = field.onChange;
   await settle(() => field.onChange("M"));
   await expect.element(f).toHaveTextContent("M:tip");
@@ -360,7 +358,7 @@ test("useArray: insert and move through the hook; an explicit origin replaces th
 });
 
 // ---------------------------------------------------------------------------
-test("useField on a node without meta: meta is {}, onChange writes as the user", async () => {
+test("useField on a node without meta: onChange writes as the user", async () => {
   const s = createStore(shape, initial());
   let field!: ReturnType<typeof useField<typeof shape.note>>;
   function Note() {
@@ -374,7 +372,6 @@ test("useField on a node without meta: meta is {}, onChange writes as the user",
       <Note />
     </StoreProvider>
   );
-  expect(field.meta).toEqual({});
   await settle(() => field.onChange("hello"));
   await expect.element(screen.getByTestId("note")).toHaveTextContent("hello");
   expect(origins).toEqual([["user"]]);

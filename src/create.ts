@@ -13,17 +13,14 @@ export function createStore<N extends ObjectNode<any>>(
   initialValues: InferValue<N>,
   options: StoreOptions = {}
 ): RootStore<N> {
-  const store = new RootStore(shape, initialValues);
+  const onError = options.onError ?? ((error, info) => console.error(`[form] "${info.behavior}" failed at "${info.scope}"`, error));
+  const runtime = (root: RootStore<N>) => new BehaviorRuntime(root, onError);
+  const store = new RootStore(shape, initialValues, runtime);
   if (isDev()) store._probe = new Diagnostics();
-  const runtime = new BehaviorRuntime(
-    store,
-    options.onError ?? ((error, info) => console.error(`[form] "${info.behavior}" failed at "${info.scope}"`, error))
-  );
-  store._runtime = runtime;
   store._batch(() => {
     const defaults = defaultBehaviors(shape);
-    if (defaults.length) runtime.add(store, defaults);
-    if (options.behaviors) runtime.add(store, options.behaviors);
+    if (defaults.length) store._runtime.add(store, defaults);
+    if (options.behaviors) store._runtime.add(store, options.behaviors);
   });
   return store;
 }

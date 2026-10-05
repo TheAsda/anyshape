@@ -18,23 +18,23 @@ describe("D · Static meta", () => {
 
 describe("D · Root + object substores", () => {
   test("get/set through root", ({ store: s }) => {
-    s.setValue(userShape.shipping.city, "Vilnius");
-    expect(s.getValue(userShape.shipping.city)).toBe("Vilnius");
-    expect(s.getValues().billing.city).toBe("Tallinn");
+    s.set(userShape.shipping.city, "Vilnius");
+    expect(s.get(userShape.shipping.city)).toBe("Vilnius");
+    expect(s.get(userShape).billing.city).toBe("Tallinn");
   });
 
   test("structural sharing: unchanged branches keep references", ({ store: s }) => {
-    const billing = s.getValues().billing;
-    const items = s.getValues().items;
-    s.setValue(userShape.shipping.city, "Vilnius");
-    expect(s.getValues().billing).toBe(billing);
-    expect(s.getValues().items).toBe(items);
+    const billing = s.get(userShape).billing;
+    const items = s.get(userShape).items;
+    s.set(userShape.shipping.city, "Vilnius");
+    expect(s.get(userShape).billing).toBe(billing);
+    expect(s.get(userShape).items).toBe(items);
   });
 
   test("same-value write is a no-op", ({ store: s }) => {
-    const before = s.getValues();
-    s.setValue(userShape.name, "Ann");
-    expect(s.getValues()).toBe(before);
+    const before = s.get(userShape);
+    s.set(userShape.name, "Ann");
+    expect(s.get(userShape)).toBe(before);
   });
 
   test("substores are cached", ({ store: s }) => {
@@ -44,30 +44,29 @@ describe("D · Root + object substores", () => {
 
   test("substore rejects nodes outside its focus", ({ store: s }) => {
     const shipping = s.substore(userShape.shipping);
-    expect(() => shipping.getValue(userShape.name)).toThrow(/not part of/);
-    expect(() => shipping.getValue(userShape.billing.city)).toThrow(/not part of/);
+    expect(() => shipping.get(userShape.name)).toThrow(/not part of/);
+    expect(() => shipping.get(userShape.billing.city)).toThrow(/not part of/);
     // @ts-expect-error – fields are not substores
     expect(() => s.substore(userShape.name)).toThrow(/object or array/);
   });
 
   test("root cannot reach into array items", ({ store: s }) => {
-    expect(() => s.getValue(userShape.items.item.sku)).toThrow(/array item/);
+    expect(() => s.get(userShape.items.item.sku)).toThrow(/array item/);
   });
 
   test("meta: one owner per node, seeded from static meta", ({ store: s }) => {
     const shipping = s.substore(userShape.shipping);
-    expect(s.getMeta(userShape.shipping.city).label).toBe("City");
+    expect(s.get(userShape.shipping.city.label)).toBe("City");
     shipping.set(userShape.shipping.city.error, "Bad city");
-    expect(s.getMeta(userShape.shipping.city).error).toBe("Bad city");          // delegated to owner
-    expect(s.getMeta(userShape.billing.city).error).toBe(undefined);            // reused shape, separate meta
+    expect(s.get(userShape.shipping.city.error)).toBe("Bad city");          // delegated to owner
+    expect(s.get(userShape.billing.city.error)).toBe(undefined);            // reused shape, separate meta
     s.set(userShape.shipping.collapsed, true);                  // section meta owned by root
-    expect(shipping.getMeta(userShape.shipping).collapsed).toBe(true);
+    expect(shipping.get(userShape.shipping.collapsed)).toBe(true);
   });
 
   test("meta keeps static types", ({ store: s }) => {
-    const m = s.getMeta(userShape.name);
-    const label: string = m.label;
-    const required: boolean = m.required;
+    const label: string = s.get(userShape.name.label);
+    const required: boolean = s.get(userShape.name.required);
     expect(label).toBe("Full name");
     expect(required).toBe(true);
   });
@@ -77,8 +76,8 @@ describe("E · Arrays", () => {
   test("items() returns stores in order with stable ids", ({ store: s }) => {
     const items = s.substore(userShape.items);
     const [a, b] = items.items();
-    expect(a.getValue(userShape.items.item.sku)).toBe("A");
-    expect(b.getValue(userShape.items.item.sku)).toBe("B");
+    expect(a.get(userShape.items.item.sku)).toBe("A");
+    expect(b.get(userShape.items.item.sku)).toBe("B");
     expect(items.items()[0]).toBe(a);
     expect(a.stableId === b.stableId).toBe(false);
   });
@@ -86,34 +85,34 @@ describe("E · Arrays", () => {
   test("writes through an item store preserve identity and meta", ({ store: s }) => {
     const items = s.substore(userShape.items);
     const a = items.itemAt(0);
-    const oldRef = s.getValues().items[0];
+    const oldRef = s.get(userShape).items[0];
     a.set(userShape.items.item.sku.touched, true);
 
-    a.setValue(userShape.items.item.qty, 5);
+    a.set(userShape.items.item.qty, 5);
 
-    const newRef = s.getValues().items[0];
+    const newRef = s.get(userShape).items[0];
     expect(newRef === oldRef, "item reference changed").toBe(false);
     expect(newRef.qty).toBe(5);
     expect(items.item(newRef), "same store for the new reference").toBe(a);
     expect(items.itemAt(0).stableId).toBe(a.stableId);
-    expect(a.getMeta(userShape.items.item.sku).touched).toBe(true);
+    expect(a.get(userShape.items.item.sku.touched)).toBe(true);
     expect(() => items.item(oldRef)).toThrow(/not currently in/);
   });
 
   test("per-item meta is isolated", ({ store: s }) => {
     const [a, b] = s.substore(userShape.items).items();
     a.set(userShape.items.item.sku.error, "Required");
-    expect(b.getMeta(userShape.items.item.sku).error).toBe(undefined);
-    expect(b.getMeta(userShape.items.item.sku).required).toBe(true);   // static meta seeded per item
+    expect(b.get(userShape.items.item.sku.error)).toBe(undefined);
+    expect(b.get(userShape.items.item.sku.required)).toBe(true);   // static meta seeded per item
     a.set(userShape.items.item.rowError, "Bad row");   // whole-row meta on the item store
-    expect(b.getMeta(userShape.items.item).rowError).toBe(undefined);
+    expect(b.get(userShape.items.item.rowError)).toBe(undefined);
   });
 
   test("reordering keeps stores", ({ store: s }) => {
     const items = s.substore(userShape.items);
     const [a, b] = items.items();
-    const [ra, rb] = s.getValues().items;
-    s.setValue(userShape.items, [rb, ra]);
+    const [ra, rb] = s.get(userShape).items;
+    s.set(userShape.items, [rb, ra]);
     expect(items.itemAt(0)).toBe(b);
     expect(items.itemAt(1)).toBe(a);
   });
@@ -121,8 +120,8 @@ describe("E · Arrays", () => {
   test("new object from outside = new store", ({ store: s }) => {
     const items = s.substore(userShape.items);
     const a = items.itemAt(0);
-    const [ra, rb] = s.getValues().items;
-    s.setValue(userShape.items, [{ ...ra }, rb]);
+    const [ra, rb] = s.get(userShape).items;
+    s.set(userShape.items, [{ ...ra }, rb]);
     expect(items.itemAt(0) === a).toBe(false);
     expect(a.isAttached()).toBe(false);
   });
@@ -130,10 +129,10 @@ describe("E · Arrays", () => {
   test("detached store: reads undefined, writes throw", ({ store: s }) => {
     const items = s.substore(userShape.items);
     const b = items.itemAt(1);
-    s.setValue(userShape.items, [s.getValues().items[0]]);
+    s.set(userShape.items, [s.get(userShape).items[0]]);
     expect(b.isAttached()).toBe(false);
-    expect(b.getValue(userShape.items.item.sku)).toBe(undefined);
-    expect(() => b.setValue(userShape.items.item.sku, "Z")).toThrow(/detached/);
+    expect(b.get(userShape.items.item.sku)).toBe(undefined);
+    expect(() => b.set(userShape.items.item.sku, "Z")).toThrow(/detached/);
     expect(() => b.set(userShape.items.item.sku.error, "x")).toThrow(/detached/);
   });
 
@@ -141,8 +140,8 @@ describe("E · Arrays", () => {
     const line = s.substore(userShape.items).itemAt(0);
     const notes = line.substore(userShape.items.item.notes);
     const note = notes.itemAt(0);
-    note.setValue(userShape.items.item.notes.item.text, "edited");
-    expect(s.getValues().items[0].notes[0].text).toBe("edited");
+    note.set(userShape.items.item.notes.item.text, "edited");
+    expect(s.get(userShape).items[0].notes[0].text).toBe("edited");
     expect(s.substore(userShape.items).itemAt(0)).toBe(line);
     expect(notes.itemAt(0)).toBe(note);
     expect(line.isAttached() && note.isAttached()).toBe(true);
@@ -151,27 +150,26 @@ describe("E · Arrays", () => {
   test("object substore inside an item reads through the item scope", ({ store: s }) => {
     const line = s.substore(userShape.items).itemAt(1);
     const notes = line.substore(userShape.items.item.notes);
-    notes.setValue(userShape.items.item.notes, [{ text: "b1" }]);
-    expect(s.getValues().items[1].notes[0].text).toBe("b1");
+    notes.set(userShape.items.item.notes, [{ text: "b1" }]);
+    expect(s.get(userShape).items[1].notes[0].text).toBe("b1");
     expect(s.substore(userShape.items).itemAt(1)).toBe(line);
   });
 
   test("structural validation", ({ store: s }) => {
-    const r = s.getValues().items[0];
-    expect(() => s.setValue(userShape.items, [r, r])).toThrow(/same object twice/);
-    expect(() => s.setValue(userShape.items, [1 as any])).toThrow(/must be an object/);
+    const r = s.get(userShape).items[0];
+    expect(() => s.set(userShape.items, [r, r])).toThrow(/same object twice/);
+    expect(() => s.set(userShape.items, [1 as any])).toThrow(/must be an object/);
     expect(() => createStore(userShape, { ...initial(), items: "x" as any })).toThrow(/must be an array/);
   });
 });
 
 describe("D · Meta delegation and substore arguments", () => {
-  test("meta of a deep node is one object, whichever store is asked", ({ store: s }) => {
+  test("meta of a deep node is one value, whichever store is asked", ({ store: s }) => {
     const section = s.substore(userShape.shipping);
-    expect(section.getMeta(userShape.shipping.city)).toBe(s.getMeta(userShape.shipping.city));
     section.set(userShape.shipping.city.error, "Bad");
-    expect(s.getMeta(userShape.shipping.city).error).toBe("Bad");
     expect(s.get(userShape.shipping.city.error)).toBe("Bad");
-    expect(s.getMeta(userShape.billing.city).error, "the reused shape's other copy is separate").toBe(undefined);
+    expect(section.get(userShape.shipping.city.error)).toBe("Bad");
+    expect(s.get(userShape.billing.city.error), "the reused shape's other copy is separate").toBe(undefined);
   });
 
   test("substore() needs an object or array node", ({ store: s }) => {
@@ -221,10 +219,10 @@ describe("D, E · Reference API and array helpers", () => {
   test("get / set with value and meta refs", ({ store: s }) => {
     expect(s.get(shape.name)).toBe("Ann");
     s.set(shape.name, "Bob");
-    expect(s.getValue(shape.name)).toBe("Bob");
+    expect(s.get(shape.name)).toBe("Bob");
     s.set(shape.name.error, "Bad");
     expect(s.get(shape.name.error)).toBe("Bad");
-    expect(s.getMeta(shape.name).error).toBe("Bad");
+    expect(s.get(shape.name.error)).toBe("Bad");
   });
 
   // ---------------------------------------------------------------------------

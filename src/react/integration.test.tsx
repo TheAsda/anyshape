@@ -85,12 +85,13 @@ test("INT9 a keystroke in one traveler re-renders only that field, and the count
   expect(c.counts, "now invalid: the counter too").toEqual({ "name:1": 1, counter: 1 });
   c.reset();
 
-  // Moving to the passport field blurs Tim's name, which reveals it: one more
-  // render of that field, in a real browser as with a real user.
+  // Moving to the passport field blurs Tim's name, which reveals it, in a real
+  // browser as with a real user. The name field reads no meta: no render.
   const timPassport = screen.getByTestId("passport-1");
   await timPassport.fill("12345678");
   expect(tim.get(T.passport.error), "the rule registered by the component, on Tim's row").toBe("Starts with a letter");
-  expect(c.counts).toEqual({ "name:1": 1, "passport:1": 1 });
+  expect(tim.get(T.name.revealed)).toBe(true);
+  expect(c.counts).toEqual({ "passport:1": 1 });
   await expect.element(errors, { message: "Required swapped for another error: same count" }).toHaveTextContent("2");
 
   await screen.unmount();

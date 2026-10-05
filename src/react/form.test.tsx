@@ -1,7 +1,7 @@
 import { useState, StrictMode } from "react";
 import { test, expect } from "vitest";
 import {
-  form, object, array, field, metaKey, countIn, createStore, type InferValue, type RootStore,
+  form, object, array, field, metaKey, countIn, initialOf, createStore, type InferValue, type RootStore,
 } from "../index";
 import { control, submission, error } from "../test/features";
 import { rule, max } from "../test/rules";
@@ -91,7 +91,8 @@ test("values: loading data becomes the baseline; same object keeps edits; a new 
   }
   function Name() {
     const c = useField(shape.name);
-    return <span data-testid="name">{`${c.value}|${c.meta.dirty}`}</span>;
+    const dirty = useValue(shape.name.dirty);
+    return <span data-testid="name">{`${c.value}|${dirty}`}</span>;
   }
   const screen = await render(<App />);
   const name = screen.getByTestId("name");
@@ -120,7 +121,7 @@ test("values given on the first render are used at creation", async () => {
   }
   await render(<App />);
   expect(f.get(shape.name)).toBe("Ready");
-  expect(f.getInitial(shape.name)).toBe("Ready");
+  expect(f.get(initialOf(shape.name))).toBe("Ready");
 });
 
 // ---------------------------------------------------------------------------
