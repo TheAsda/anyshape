@@ -735,7 +735,7 @@ export class BehaviorRuntime implements RuntimeHooks {
         if (seen.has(binding)) continue;
         seen.add(binding);
         this.rewire(binding);
-        if (binding.isLeaf && binding.host.isAttached() && !this.supersede(binding)) this.mark(binding, {});
+        if (binding.isLeaf && binding.host.isAttached() && !this.supersede(binding)) this.mark(binding);
       }
     }
   }
@@ -849,7 +849,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const leaf of this.leaves(reg.root)) {
         if (!inside(leaf.host)) continue;
         this.drop(leaf); // its cause is not passed on
-        if (reg.runInit) this.mark(leaf, {});
+        if (reg.runInit) this.mark(leaf);
       }
     }
   }
@@ -976,7 +976,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     this.subscribeTriggers(binding, this.triggersOf(binding));
 
     if (binding.isLeaf) {
-      if (reg.runInit) this.mark(binding, {});
+      if (reg.runInit) this.mark(binding);
     } else {
       const next = reg.chain[depth + 1];
       const arrStore = host.substore(next.parent as ArrayNode<any, any>) as ArrayStore<any>;
@@ -1137,7 +1137,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     gate?.resolve();
   }
 
-  private mark(leaf: Binding, change: { changed?: Iterable<string>; origins?: Iterable<Origin> }): void {
+  private mark(leaf: Binding, change: { changed?: Iterable<string>; origins?: Iterable<Origin> } = {}): void {
     let p = this.pending.get(leaf);
     if (!p) this.pending.set(leaf, (p = { changed: new Set(), origins: new Set() }));
     if (change.changed) for (const k of change.changed) p.changed.add(k);
