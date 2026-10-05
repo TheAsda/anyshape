@@ -60,7 +60,7 @@ describe("Focus", () => {
   });
 
   test("a target registered through a section's store is found from any store in its scope", () => {
-    const f = form({ step: object({ x: field<string>().meta(control()), y: field<string>().meta(control()) }) });
+    const f = form(object({ step: object({ x: field<string>().meta(control()), y: field<string>().meta(control()) }) }));
     const s = createStore(f, { step: { x: "", y: "" } });
     const calls: string[] = [];
     registerFocus(s, f.step.x, { focus: () => calls.push("x") });
@@ -84,7 +84,7 @@ describe("Focus", () => {
   });
 
   test("registerFocus rejects a node the store does not address", ({ store: s }) => {
-    const other = form({ name: field<string>() });
+    const other = form(object({ name: field<string>() }));
     const target: FocusTarget = { focus: () => {} };
     expect(() => registerFocus(s, L.qty, target), "a row node through the root store").toThrow(/inside an array item – use the item's store/);
     expect(() => registerFocus(s, other.name, target), "a node of another form").toThrow(/is not part of the store/);

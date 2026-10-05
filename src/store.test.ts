@@ -304,7 +304,7 @@ describe("D, E · Reference API and array helpers", () => {
   // Factories and baselines
   test("the create factory's result is copied, so even a shared default gives distinct rows", () => {
     const shared = { t: "" };
-    const f = form({ rows: array(object({ t: field<string>() }), { create: () => shared }) });
+    const f = form(object({ rows: array(object({ t: field<string>() }), { create: () => shared }) }));
     const s = createStore(f, { rows: [] });
     const rows = s.substore(f.rows);
     const a = rows.append();

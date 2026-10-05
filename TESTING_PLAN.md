@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 451 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 452 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -18,7 +18,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 
 | File | Layer | Area | Tests |
 |---|---|---|---|
-| `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
+| `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 8 |
 | `src/lens.test.ts` | B | lens unit tests | 8 |
 | `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 18 |
 | `src/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers | 32 |
@@ -84,7 +84,7 @@ Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `acco
 Each area lists what's covered (briefly, so you know where to look) and the cases to add.
 
 ### A. Shape & instantiation (`shape.ts`)
-**Covered:** parent links, reused shapes get distinct nodes, item template lenses, reserved field names, primitive arrays rejected, `.meta()` after `form()` rejected, `create` kept and must be a function.
+**Covered:** parent links, reused shapes get distinct nodes, item template lenses, reserved field names, primitive arrays rejected, `form()` takes only an object node (#101), `.meta()` after `form()` rejected, `create` kept and must be a function.
 
 - [x] **A1 · P2** Reused shape *containing an array*, used twice: each copy has its own `item` template, unique ids at every level, and paths like `a.items[].x` and `b.items[].x`. → `shape.test.ts`
 - [x] **A2 · P2** Table-driven: `object()` rejects every name in `NODE_INTERNALS` (`id`, `lens`, `path`, `parent`, `meta`, `constructor`, `_type`, `_hasCreate`). Same for meta keys, plus `item`. Node internals are symbol-keyed, so `_fields`, `_meta` and `_metaDefs` are ordinary names; a meta key that matches a child throws. → `meta.test.ts`

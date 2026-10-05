@@ -37,10 +37,10 @@ describe("N · Behaviors", () => {
   });
 
   test("calculate in rows with an enclosing source", () => {
-    const f = form({
+    const f = form(object({
       rate: field<number>(),
       rows: array(object({ net: field<number>(), gross: field<number>() })),
-    });
+    }));
     const s = createStore(f, { rate: 0.2, rows: [{ net: 10, gross: 0 }] }, {
       behaviors: calculate(f.rows.item.gross, [f.rows.item.net, f.rate], (net, rate) => net * (1 + rate)),
     });

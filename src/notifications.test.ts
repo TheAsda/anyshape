@@ -7,7 +7,7 @@ const address = object({
   city: field<string>().meta({ error: undefined as string | undefined }),
 });
 
-const shape = form({
+const shape = form(object({
   name: field<string>().meta({ required: true, touched: false, error: undefined as string | undefined }),
   total: field<number>(),
   shipping: address,
@@ -20,7 +20,7 @@ const shape = form({
       notes: array(object({ text: field<string>() })),
     })
   ),
-});
+}));
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 
