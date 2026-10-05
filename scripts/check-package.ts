@@ -12,7 +12,8 @@
 //   • a consumer with react typechecks both entries, passes a node created
 //     through `anyshape` to an `anyshape/react` hook, and renders it;
 //   • publint and @arethetypeswrong/cli pass.
-// Exits non-zero on the first failed check.
+// Runs every check and exits non-zero if any failed; a failing setup step
+// (npm pack, npm install, the consumer's emit) stops it at once.
 // ============================================================
 
 import { execFileSync } from "node:child_process";
