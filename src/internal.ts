@@ -125,7 +125,7 @@ export function storeWithin(inner: BaseStore<any>, outer: BaseStore<any>): boole
 
 /** The scope host enclosing a scope host: a row's, none for the root. */
 export function outerHost(host: BaseStore<any>): BaseStore<any> | undefined {
-  return host instanceof ItemStore ? host.arrayStore._host : undefined;
+  return host instanceof ItemStore ? host.arrayStore.scopeStore : undefined;
 }
 
 /** The scope host (root or row store) at `scope`, walking up from `host`; none when `scope` isn't `host`'s or an enclosing one. */
@@ -148,7 +148,7 @@ export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemSt
   while (h !== outer) {
     if (!(h instanceof ItemStore)) throw new Error(`"${host.node.path || "<root>"}" is not inside "${outer.node.path || "<root>"}"`);
     rows.unshift(h);
-    h = h.arrayStore._host;
+    h = h.arrayStore.scopeStore;
   }
   return rows;
 }
@@ -159,7 +159,7 @@ export function concretePath(host: BaseStore<any>, node: AnyNode): string {
   const arr = host.arrayStore;
   const index = (arr.current() as readonly unknown[]).indexOf(host._currentRef);
   const relative = node.path.slice(host.node.path.length);
-  return `${concretePath(arr._host, arr.node)}[${index}]${relative}`;
+  return `${concretePath(arr.scopeStore, arr.node)}[${index}]${relative}`;
 }
 
 /** concretePath for labels and messages: "<root>" for the form root. */

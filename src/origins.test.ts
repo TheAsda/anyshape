@@ -3,7 +3,7 @@
 import {
   form, object, array, field, createStore, countIn, initialOf, defineBehavior, type Origin,
 } from "./index";
-import { control, touched, disabled, type FocusTarget, dirty, error } from "./test/features";
+import { control, touched, disabled, dirty, error } from "./test/features";
 import { rule, max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import { watchOrigins } from "./test/harness";
@@ -101,12 +101,10 @@ describe("G · Origins, baselines and reset", () => {
     expect(row.get(initialOf(L.sku))).toBe("N");
   });
 
-  test("reset restores values and meta, keeps rows and focus targets", ({ store: s, lines }) => {
+  test("reset restores values and meta, keeps rows", ({ store: s, lines }) => {
     const row = lines.itemAt(0);
-    const target: FocusTarget = { focus() {} };
     s.set(shape.name, "Bob");
     s.set(shape.name.error, "x");
-    s.set(shape.name.focusTarget, target);
     row.set(L.qty, 5);
     row.set(L.sku.error, "bad");
     lines.append();
@@ -115,7 +113,6 @@ describe("G · Origins, baselines and reset", () => {
 
     expect(s.get(shape.name)).toBe("Ann");
     expect(s.get(shape.name.error)).toBe(undefined);
-    expect(s.get(shape.name.focusTarget), "focus target kept").toBe(target);
     expect(lines.items().length).toBe(2);
     expect(lines.itemAt(0), "same row store after reset").toBe(row);
     expect(row.get(L.qty)).toBe(1);

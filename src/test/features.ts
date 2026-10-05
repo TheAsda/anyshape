@@ -5,11 +5,6 @@
 
 import { metaKey, initialOf, type BehaviorContext } from "../index";
 
-/** A focus target, as the focus recipe defines it: here only a non-reactive value. */
-export interface FocusTarget {
-  focus(): void;
-}
-
 /** A check contributed to `error`: an error message, or undefined. */
 export type Check = (value: any, ctx: Pick<BehaviorContext, "get">) => string | undefined;
 
@@ -62,13 +57,10 @@ export const submission = () => ({ submitting });
 /** true once the field's error may be shown. */
 export const revealed = metaKey(false);
 
-export const focusTarget = metaKey<FocusTarget | undefined>(undefined, { reactive: false });
-
-/** validation, touched, dirty, revealed and a focus target. */
+/** validation, touched, dirty and revealed. */
 export const control = () => ({
   ...validation(),
   touched,
   dirty,
   revealed,
-  focusTarget,
 });

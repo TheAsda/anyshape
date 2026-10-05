@@ -3,6 +3,7 @@
 import { form, object, array, field, metaKey, createStore } from "form-lib";
 import { test as base, describe, expect } from "vitest";
 import { handleSubmit, submission } from "./submit";
+import { registerFocus } from "./focus";
 import { control } from "./features";
 import { rule } from "./validation";
 import { deferred } from "./test/harness";
@@ -51,8 +52,8 @@ describe("Submit", () => {
   test("an invalid form focuses the first error and does not call fn", async () => {
     const s = createStore(shape, initial(), { behaviors: [rule(shape.name, () => "bad"), rule(shape.code, () => "bad")] });
     const focused: string[] = [];
-    s.set(shape.name.focusTarget, { focus: () => focused.push("name") });
-    s.set(shape.code.focusTarget, { focus: () => focused.push("code") });
+    registerFocus(s, shape.name, { focus: () => focused.push("name") });
+    registerFocus(s, shape.code, { focus: () => focused.push("code") });
     let calls = 0;
     await handleSubmit(s, async () => void calls++)();
     expect(calls).toBe(0);

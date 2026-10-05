@@ -31,7 +31,7 @@ const countKind: RefKind<CountRef> = {
   label: (ref) => ref.path,
   read: (store, ref) => {
     store.root._syncWalk();
-    return store._host._countOf(ref.node, countSlotOf(ref.def));
+    return store.scopeStore._countOf(ref.node, countSlotOf(ref.def));
   },
   subscribe: (store, ref, phase, fn) => store._addTallySub(ref.node, countSlotOf(ref.def), phase, fn),
   affectedBy: (ref, t) =>

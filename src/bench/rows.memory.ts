@@ -59,7 +59,6 @@ it.skipIf(!gc)("removed rows are collectable: stores, values and per-row state",
       const unsubscribe = row.subscribe(L.qty, () => {});
       row.set(L.qty, 2, { origin: "user" });
       row.set(L.sku, "taken", { origin: "user" }); // starts an async run
-      row.set(L.sku.focusTarget, { focus() {} });
       stores.push(new WeakRef(row));
       values.push(new WeakRef(row.get(L) as object));
       unsubscribe();
