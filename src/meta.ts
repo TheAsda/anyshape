@@ -20,7 +20,7 @@ declare const NoPayloadBrand: unique symbol;
  */
 export type NoPayload = { readonly [NoPayloadBrand]: true };
 
-export interface MetaKeyOptions<V> {
+export interface MetaKeyOptions {
   /** Kept by reset(): for keys fed from outside the form (e.g. useSync), not user input. */
   keepOnReset?: boolean;
 }
@@ -58,11 +58,11 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
   /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
   declare readonly _payload: P;
   readonly defaultValue: V;
-  readonly options: Readonly<MetaKeyOptions<V>>;
+  readonly options: Readonly<MetaKeyOptions>;
   /** @internal */
   readonly _steps: Readonly<MetaKeySteps<V, P, U>>;
   /** @internal – use metaKey() */
-  constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, steps: MetaKeySteps<V, P, U> = {}) {
+  constructor(defaultValue: V, options: MetaKeyOptions = {}, steps: MetaKeySteps<V, P, U> = {}) {
     if (steps.combine && steps.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
     if (steps.aggregate && steps.aggregate(defaultValue)) {
       // Subtree counts start at zero, so untouched nodes never need to be visited.
@@ -120,7 +120,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
 }
 
 /** Declare a meta key with capabilities. Count it with .aggregate(); add a default behavior or an owner with .behavior() / .combine(). */
-export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions<V>): MetaKeyDef<V, P, []> {
+export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOptions): MetaKeyDef<V, P, []> {
   return new MetaKeyDef(defaultValue, options);
 }
 
