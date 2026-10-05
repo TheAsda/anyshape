@@ -11,7 +11,8 @@
 // reading the outside world (fetch) is fine.
 // ============================================================
 
-import { MetaRef, type AnyNode, type InferValue } from "./shape";
+import type { AnyNode, InferValue } from "./shape";
+import { MetaRef } from "./refs/meta";
 import { isDev } from "./internal";
 import type { AnyRef, RefValue, Origin } from "./store";
 

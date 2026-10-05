@@ -9,6 +9,7 @@ export {
 } from "./store";
 // The type only: createStore is the one way to build a root store.
 export type { RootStore } from "./store";
+export { MetaRef } from "./refs/meta";
 export { CountRef, countIn } from "./refs/count";
 export { InitialRef, initialOf } from "./refs/initial";
 export { PendingInRef, PendingOfRef, pendingIn, pendingOf } from "./refs/pending";
