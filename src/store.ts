@@ -815,7 +815,13 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Checks
   // ==========================================================
-  protected assertInScope(node: AnyNode): void {
+  /**
+   * Throw unless this store addresses `node`: the node is this store's node
+   * or below it, and not inside an array item (a row node needs the row's
+   * store). The check get(), set() and subscribe() run, for code that keeps
+   * state beside the form.
+   */
+  assertInScope(node: AnyNode): void {
     for (let n: AnyNode | undefined = node; n !== this.node; n = n.parent) {
       if (n === undefined) {
         throw new Error(`"${node.path ?? "<uninstantiated node>"}" is not part of the store for "${this.node.path || "<root>"}"`);

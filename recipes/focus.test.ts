@@ -81,6 +81,15 @@ describe("Focus", () => {
     expect(calls).toEqual(["a", "b"]);
   });
 
+  test("registerFocus and focus reject a node the store does not address", ({ store: s }) => {
+    const other = form({ name: field<string>() });
+    const target: FocusTarget = { focus: () => {} };
+    expect(() => registerFocus(s, L.qty, target), "a row node through the root store").toThrow(/inside an array item – use the item's store/);
+    expect(() => focus(s, L.qty), "a row node through the root store").toThrow(/inside an array item – use the item's store/);
+    expect(() => registerFocus(s, other.name, target), "a node of another form").toThrow(/is not part of the store/);
+    expect(() => focus(s, other.name), "a node of another form").toThrow(/is not part of the store/);
+  });
+
   test("a row's target is its own, and is skipped once the row is removed", ({ store: s }) => {
     const lines = s.substore(shape.lines);
     const [a, b] = lines.items();
