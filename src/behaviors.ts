@@ -467,10 +467,12 @@ class Binding {
 // ============================================================
 /**
  * Returned by addBehavior: call it to remove the behaviors; pass it to
- * replaceBehavior to swap them. A removed behavior's meta keys go back to
- * their defaults, since the rule they described is gone; the values it wrote
- * stay, since they are the user's data. A guard turning false is different:
- * the behavior still exists, so its earlier writes stand.
+ * replaceBehavior to swap them. Removing a behavior resets the meta keys it
+ * wrote to their defaults, since the rule they described is gone; the values
+ * it wrote stay, since they are the user's data. A removed contribution is
+ * absent, as with a failing guard: its owner recomputes without it, and the
+ * key returns to its default with the last one. A behavior whose guard fails
+ * is different: it still exists, so its earlier writes stay.
  */
 export type BehaviorHandle = (() => void) & { readonly __behaviorHandle?: never };
 

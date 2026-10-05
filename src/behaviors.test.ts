@@ -416,7 +416,7 @@ describe("L · Runtime registration", () => {
     const [a, b] = s.substore(shape.lines).items();
     const off = a.addBehavior(
       defineBehavior({
-        name: "lock", triggers: [L.qty], writes: [L.sku.disabled, L.lineTotal],
+        name: "lockAndTotal", triggers: [L.qty], writes: [L.sku.disabled, L.lineTotal],
         run: (ctx) => {
           ctx.set(L.sku.disabled, ctx.get(L.qty) > 1);
           ctx.set(L.lineTotal, ctx.get(L.qty) * 100);
@@ -433,7 +433,7 @@ describe("L · Runtime registration", () => {
     expect(a.get(L.lineTotal), "values stay").toBe(200);
     a.set(L.qty, 3);
     expect(a.get(L.sku.disabled), "no longer runs").toBe(false);
-    expect(a.get(L.lineTotal)).toBe(200);
+    expect(a.get(L.lineTotal), "no longer writes").toBe(200);
   });
 
   test("row-level writers: separate rows are fine, a template writer conflicts", ({ store: s }) => {
