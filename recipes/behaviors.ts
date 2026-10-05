@@ -7,10 +7,20 @@
 // ============================================================
 
 import {
-  defineBehavior, contribute, when, initialOf,
-  type AnyNode, type InferValue, type MetaRef, type AnyBehavior, type Behavior,
-  type AnyRef, type RefValue, type Contribution,
+  defineBehavior,
+  contribute,
+  when,
+  initialOf,
+  type AnyNode,
+  type InferValue,
+  type MetaRef,
+  type AnyBehavior,
+  type Behavior,
+  type AnyRef,
+  type RefValue,
+  type Contribution,
 } from "anyshape";
+
 import { isEmpty, labelOf } from "./rules";
 import { rule, type Validatable } from "./validation";
 
@@ -24,7 +34,7 @@ export function calculate<N extends AnyNode, const Rs extends readonly AnyRef[]>
   target: N,
   sources: Rs,
   fn: (...values: Values<Rs>) => InferValue<N>,
-  options: { name?: string } = {}
+  options: { name?: string } = {},
 ): Behavior {
   return defineBehavior({
     name: options.name ?? `calculate(${target.path})`,
@@ -47,7 +57,11 @@ export interface LinkOptions<A, B> {
  * One behavior: its own writes never re-trigger it. When both change in the
  * same batch (e.g. loading), they are assumed consistent and left alone.
  */
-export function link<A extends AnyNode, B extends AnyNode>(a: A, b: B, options: LinkOptions<InferValue<A>, InferValue<B>>): Behavior {
+export function link<A extends AnyNode, B extends AnyNode>(
+  a: A,
+  b: B,
+  options: LinkOptions<InferValue<A>, InferValue<B>>,
+): Behavior {
   return defineBehavior({
     name: options.name ?? `link(${a.path}, ${b.path})`,
     triggers: [a, b],
@@ -68,7 +82,7 @@ export function visibleWhen<const Rs extends readonly AnyRef[]>(
   target: WithKey<"visible", boolean>,
   refs: Rs,
   test: (...values: Values<Rs>) => boolean,
-  options: { name?: string } = {}
+  options: { name?: string } = {},
 ): Behavior {
   return defineBehavior({
     name: options.name ?? `visibleWhen(${target.path})`,
@@ -83,7 +97,7 @@ export function disableWhen<const Rs extends readonly AnyRef[]>(
   target: Disableable,
   refs: Rs,
   test: (...values: Values<Rs>) => boolean,
-  options: { name?: string } = {}
+  options: { name?: string } = {},
 ): Contribution<string> {
   const name = options.name ?? `disableWhen(${target.path})`;
   return contribute(target.disabled, name, { name, when: when(refs, test) });
@@ -98,7 +112,7 @@ export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>
   target: N,
   refs: Rs,
   test: (...values: Values<Rs>) => boolean,
-  options: { name?: string } = {}
+  options: { name?: string } = {},
 ): Behavior {
   const initial = initialOf(target);
   return defineBehavior({
@@ -145,7 +159,7 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
         const filled = values.map((v) => !isEmpty(v));
         return filled.filter(Boolean).length === 1 && !filled[i];
       }),
-    })
+    }),
   );
 
   const rules: AnyBehavior[] = fields.map((field) =>
@@ -157,8 +171,8 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
         if (options.required && count === 0) return missing;
         return undefined;
       },
-      { name: `${name}:${field.path}`, triggers: fields.filter((f) => f !== field) }
-    )
+      { name: `${name}:${field.path}`, triggers: fields.filter((f) => f !== field) },
+    ),
   );
   return [...disablers, ...rules];
 }

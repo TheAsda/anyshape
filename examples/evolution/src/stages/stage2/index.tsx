@@ -5,10 +5,11 @@
 // plumbing every input needs; rules arrive in stage 3.
 // ------------------------------------------------------------
 
-import { useState } from "react";
 import { form, object, field, type InferValue } from "anyshape";
-import { control } from "../../../../../recipes";
 import { StoreProvider, useForm, useValue } from "anyshape/react";
+import { useState } from "react";
+
+import { control } from "../../../../../recipes";
 import { TextField, ResultCard, SubmitButton } from "../../ui";
 
 const shape = form(
@@ -33,7 +34,13 @@ export function Stage() {
   const [submitted, setSubmitted] = useState<typeof values | null>(null);
   return (
     <StoreProvider store={form}>
-      <form className="stage-form" onSubmit={(e) => { e.preventDefault(); setSubmitted(values); }}>
+      <form
+        className="stage-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSubmitted(values);
+        }}
+      >
         <TextField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <TextField node={shape.startDate} label="Departure" type="date" />
         <TextField node={shape.endDate} label="Return" type="date" />

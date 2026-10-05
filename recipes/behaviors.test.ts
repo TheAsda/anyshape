@@ -1,13 +1,29 @@
 // The ready-made behaviors (recipes/behaviors.ts) and the builder with them.
 import {
-  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
+  form,
+  object,
+  array,
+  field,
+  createStore,
+  defineBehavior,
+  defineBehaviors,
+  countIn,
   type BehaviorBuilder,
 } from "anyshape";
-import {
-  required, maxLength, min, calculate, link, visibleWhen,
-  disableWhen, clearWhen, exclusive, error,
-} from "./index";
 import { test as base, describe, expect } from "vitest";
+
+import {
+  required,
+  maxLength,
+  min,
+  calculate,
+  link,
+  visibleWhen,
+  disableWhen,
+  clearWhen,
+  exclusive,
+  error,
+} from "./index";
 import { shape, L, initial, type Values } from "./test/fixtures/profile";
 
 // Compile-time only – never called.
@@ -21,8 +37,7 @@ export function typeOnlyChecks() {
   calculate(shape.slug, [shape.title, shape.start], (title, start) => `${title}-${start.toFixed(0)}`);
 }
 
-const test = base
-  .extend("store", () => createStore(shape, initial()));
+const test = base.extend("store", () => createStore(shape, initial()));
 
 describe("N · Behaviors", () => {
   test("calculate: recalculated on every source change, a user edit included", () => {
@@ -37,13 +52,19 @@ describe("N · Behaviors", () => {
   });
 
   test("calculate in rows with an enclosing source", () => {
-    const f = form(object({
-      rate: field<number>(),
-      rows: array(object({ net: field<number>(), gross: field<number>() })),
-    }));
-    const s = createStore(f, { rate: 0.2, rows: [{ net: 10, gross: 0 }] }, {
-      behaviors: calculate(f.rows.item.gross, [f.rows.item.net, f.rate], (net, rate) => net * (1 + rate)),
-    });
+    const f = form(
+      object({
+        rate: field<number>(),
+        rows: array(object({ net: field<number>(), gross: field<number>() })),
+      }),
+    );
+    const s = createStore(
+      f,
+      { rate: 0.2, rows: [{ net: 10, gross: 0 }] },
+      {
+        behaviors: calculate(f.rows.item.gross, [f.rows.item.net, f.rate], (net, rate) => net * (1 + rate)),
+      },
+    );
     const row = s.substore(f.rows).itemAt(0);
     expect(row.get(f.rows.item.gross)).toBe(12);
     s.set(f.rate, 0.5);
@@ -69,7 +90,11 @@ describe("N · Behaviors", () => {
     const behaviors = defineBehaviors(shape, (b) => {
       b.add(visibleWhen(shape.company, [shape.type], (t) => t === "company"));
       b.add(disableWhen(shape.note, [shape.name], (n) => n === ""));
-      b.when([shape.company.visible], (v) => v, (b) => b.add(required(shape.company.vat)));
+      b.when(
+        [shape.company.visible],
+        (v) => v,
+        (b) => b.add(required(shape.company.vat)),
+      );
     });
     const s = createStore(shape, initial(), { behaviors });
     expect(s.get(shape.company.visible)).toBe(false);
@@ -101,12 +126,18 @@ describe("N · Behaviors", () => {
 });
 
 function exclusiveStore(values: Partial<Values> = {}, required = false) {
-  return createStore(shape, { ...initial(), ...values }, {
-    behaviors: exclusive([shape.price, shape.discount, shape.promo], { required }),
-  });
+  return createStore(
+    shape,
+    { ...initial(), ...values },
+    {
+      behaviors: exclusive([shape.price, shape.discount, shape.promo], { required }),
+    },
+  );
 }
-const disabledOf = (s: ReturnType<typeof exclusiveStore>) => [shape.price, shape.discount, shape.promo].map((f) => s.get(f.disabled));
-const errorsOf = (s: ReturnType<typeof exclusiveStore>) => [shape.price, shape.discount, shape.promo].map((f) => s.get(f.error));
+const disabledOf = (s: ReturnType<typeof exclusiveStore>) =>
+  [shape.price, shape.discount, shape.promo].map((f) => s.get(f.disabled));
+const errorsOf = (s: ReturnType<typeof exclusiveStore>) =>
+  [shape.price, shape.discount, shape.promo].map((f) => s.get(f.error));
 
 describe("N · exclusive", () => {
   test("exclusive: filling one disables the others", () => {
@@ -121,7 +152,11 @@ describe("N · exclusive", () => {
   test("exclusive: several filled (loaded data) → all enabled, errors on the filled ones", () => {
     const s = exclusiveStore({ price: 10, promo: "SAVE" });
     expect(disabledOf(s)).toEqual([false, false, false]);
-    expect(errorsOf(s)).toEqual(["Only one of price, discount, promo can be set", undefined, "Only one of price, discount, promo can be set"]);
+    expect(errorsOf(s)).toEqual([
+      "Only one of price, discount, promo can be set",
+      undefined,
+      "Only one of price, discount, promo can be set",
+    ]);
     s.set(shape.promo, "", { origin: "user" });
     expect(errorsOf(s)).toEqual([undefined, undefined, undefined]);
     expect(disabledOf(s)).toEqual([false, true, true]);
@@ -176,8 +211,16 @@ describe("N · Builder", () => {
   test("builder: when with rules", () => {
     const behaviors = defineBehaviors(shape, (b) => {
       b.add(required(shape.name));
-      b.when([shape.type], (t) => t === "company", (b) => b.add(required(shape.taxId)));
-      b.when([shape.type], (t) => t !== "company", (b) => b.add(required(shape.personalId)));
+      b.when(
+        [shape.type],
+        (t) => t === "company",
+        (b) => b.add(required(shape.taxId)),
+      );
+      b.when(
+        [shape.type],
+        (t) => t !== "company",
+        (b) => b.add(required(shape.personalId)),
+      );
     });
     expect(behaviors.length).toBe(3);
     const s = createStore(shape, initial(), { behaviors });
@@ -190,7 +233,8 @@ describe("N · Builder", () => {
 
   test("builder: a target with a value under a condition and another otherwise is one behavior", () => {
     const hint = defineBehavior({
-      triggers: [shape.type], writes: [shape.note.hint],
+      triggers: [shape.type],
+      writes: [shape.note.hint],
       run: (c) => c.set(shape.note.hint, c.get(shape.type) === "company" ? "company" : "person"),
     });
     const s = createStore(shape, initial(), { behaviors: defineBehaviors(shape, (b) => b.add(hint)) });
@@ -198,19 +242,39 @@ describe("N · Builder", () => {
     s.set(shape.type, "company");
     expect(s.get(shape.note.hint)).toBe("company");
 
-    const fixed = (text: string) => defineBehavior({ triggers: [shape.name], writes: [shape.note.hint], run: (c) => c.set(shape.note.hint, text) });
+    const fixed = (text: string) =>
+      defineBehavior({ triggers: [shape.name], writes: [shape.note.hint], run: (c) => c.set(shape.note.hint, text) });
     const opposite = defineBehaviors(shape, (b) => {
-      b.when([shape.type], (t) => t === "company", (b) => b.add(fixed("company")));
-      b.when([shape.type], (t) => t !== "company", (b) => b.add(fixed("person")));
+      b.when(
+        [shape.type],
+        (t) => t === "company",
+        (b) => b.add(fixed("company")),
+      );
+      b.when(
+        [shape.type],
+        (t) => t !== "company",
+        (b) => b.add(fixed("person")),
+      );
     });
-    expect(() => createStore(shape, initial(), { behaviors: opposite }), "opposite guards don't exempt two writers").toThrow(/already written/);
+    expect(
+      () => createStore(shape, initial(), { behaviors: opposite }),
+      "opposite guards don't exempt two writers",
+    ).toThrow(/already written/);
   });
 
   test("builder: nested blocks accumulate guards", () => {
     const behaviors = defineBehaviors(shape, (b) => {
-      b.when([shape.type], (t) => t === "company", (b) => {
-        b.when([shape.name], (n) => n.startsWith("A"), (b) => b.add(required(shape.personalId)));
-      });
+      b.when(
+        [shape.type],
+        (t) => t === "company",
+        (b) => {
+          b.when(
+            [shape.name],
+            (n) => n.startsWith("A"),
+            (b) => b.add(required(shape.personalId)),
+          );
+        },
+      );
     });
     const s = createStore(shape, initial(), { behaviors });
     expect(s.get(shape.personalId.error)).toBe(undefined);
@@ -248,7 +312,10 @@ describe("N · link on load", () => {
   test("link: loading a whole new value changes both sides, nothing is written", () => {
     let writes = 0;
     const s = createStore(shape, initial(), {
-      behaviors: link(shape.start, shape.end, { forward: (v) => (writes++, v + 2), backward: (v) => (writes++, v - 2) }),
+      behaviors: link(shape.start, shape.end, {
+        forward: (v) => (writes++, v + 2),
+        backward: (v) => (writes++, v - 2),
+      }),
     });
     s.set(shape, { ...initial(), start: 5, end: 100 });
     expect([s.get(shape.start), s.get(shape.end)]).toEqual([5, 100]);
@@ -261,4 +328,3 @@ describe("N · Misuse", () => {
     expect(() => exclusive([shape.price])).toThrow("exclusive() needs at least two fields");
   });
 });
-

@@ -7,33 +7,34 @@
 
 import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
-import type { StageMeta } from "./ui";
-import { meta as meta1 } from "./stages/stage1/meta";
+
 import { Stage as Stage1 } from "./stages/stage1";
-import { meta as meta2 } from "./stages/stage2/meta";
+import { meta as meta1 } from "./stages/stage1/meta";
 import { Stage as Stage2 } from "./stages/stage2";
-import { meta as meta3 } from "./stages/stage3/meta";
+import { meta as meta2 } from "./stages/stage2/meta";
 import { Stage as Stage3 } from "./stages/stage3";
-import { meta as meta4 } from "./stages/stage4/meta";
+import { meta as meta3 } from "./stages/stage3/meta";
 import { Stage as Stage4 } from "./stages/stage4";
-import { meta as meta5 } from "./stages/stage5/meta";
+import { meta as meta4 } from "./stages/stage4/meta";
 import { Stage as Stage5 } from "./stages/stage5";
-import { meta as meta6 } from "./stages/stage6/meta";
+import { meta as meta5 } from "./stages/stage5/meta";
 import { Stage as Stage6 } from "./stages/stage6";
-import { meta as meta7 } from "./stages/stage7/meta";
+import { meta as meta6 } from "./stages/stage6/meta";
 import { Stage as Stage7 } from "./stages/stage7";
-import { meta as meta8 } from "./stages/stage8/meta";
+import { meta as meta7 } from "./stages/stage7/meta";
 import { Stage as Stage8 } from "./stages/stage8";
-import { meta as meta9 } from "./stages/stage9/meta";
+import { meta as meta8 } from "./stages/stage8/meta";
 import { Stage as Stage9 } from "./stages/stage9";
-import { meta as meta10 } from "./stages/stage10/meta";
+import { meta as meta9 } from "./stages/stage9/meta";
 import { Stage as Stage10 } from "./stages/stage10";
-import { meta as meta11 } from "./stages/stage11/meta";
+import { meta as meta10 } from "./stages/stage10/meta";
 import { Stage as Stage11 } from "./stages/stage11";
-import { meta as meta12 } from "./stages/stage12/meta";
+import { meta as meta11 } from "./stages/stage11/meta";
 import { Stage as Stage12 } from "./stages/stage12";
-import { meta as meta13 } from "./stages/stage13/meta";
+import { meta as meta12 } from "./stages/stage12/meta";
 import { Stage as Stage13 } from "./stages/stage13";
+import { meta as meta13 } from "./stages/stage13/meta";
+import type { StageMeta } from "./ui";
 
 type StageDef = {
   meta: StageMeta;
@@ -115,21 +116,13 @@ export function Shell() {
       </main>
 
       <footer className="deck__footer">
-        <button
-          className="button"
-          disabled={index === 0}
-          onClick={() => setIndex((i) => i - 1)}
-        >
+        <button className="button" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}>
           ← Prev
         </button>
         <span className="deck__counter">
           {index + 1} / {stages.length}
         </span>
-        <button
-          className="button"
-          disabled={index === stages.length - 1}
-          onClick={() => setIndex((i) => i + 1)}
-        >
+        <button className="button" disabled={index === stages.length - 1} onClick={() => setIndex((i) => i + 1)}>
           Next →
         </button>
       </footer>

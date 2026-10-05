@@ -3,13 +3,14 @@
 // adapters. The core is reached only through its entries.
 // ============================================================
 
-import { test, expect } from "vitest";
 import { form, object, array, field, createStore, type BaseStore, type InferValue } from "anyshape";
 import { StoreProvider } from "anyshape/react";
+import { test, expect } from "vitest";
+
 import { control } from "../features";
-import { rule, asyncRule } from "../validation";
-import { handleSubmit, submission } from "../submit";
 import { focusFirst } from "../focus";
+import { handleSubmit, submission } from "../submit";
+import { rule, asyncRule } from "../validation";
 import { useControl, fromInput, fromCheckbox } from "./index";
 import { render, settle } from "./test-utils";
 
@@ -22,7 +23,7 @@ const shape = form(
     lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
       create: () => ({ sku: "", qty: 1 }),
     }),
-  }).meta(submission())
+  }).meta(submission()),
 );
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
@@ -31,7 +32,16 @@ const L = shape.lines.item;
 const focusName = (store: BaseStore<any>) => focusFirst([{ ref: shape.name.error, store }]) !== undefined;
 
 function initial(): Values {
-  return { name: "Ann", agree: false, age: 30, note: "", lines: [{ sku: "A", qty: 1 }, { sku: "B", qty: 2 }] };
+  return {
+    name: "Ann",
+    agree: false,
+    age: 30,
+    note: "",
+    lines: [
+      { sku: "A", qty: 1 },
+      { sku: "B", qty: 2 },
+    ],
+  };
 }
 
 // Compile-time only – never called.
@@ -50,7 +60,9 @@ export function typeOnlyChecks() {
 }
 
 test("useControl: state, user writes set touched/dirty, errors", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
+  const s = createStore(shape, initial(), {
+    behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")),
+  });
   let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
     c = useControl(shape.name);
@@ -59,7 +71,7 @@ test("useControl: state, user writes set touched/dirty, errors", async () => {
   const screen = await render(
     <StoreProvider store={s}>
       <C />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const state = screen.getByTestId("c");
   await expect.element(state).toHaveTextContent("Ann|-|false|false");
@@ -70,7 +82,9 @@ test("useControl: state, user writes set touched/dirty, errors", async () => {
 });
 
 test("useControl: onBlur reveals, showError once revealed", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
+  const s = createStore(shape, initial(), {
+    behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")),
+  });
   let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
     c = useControl(shape.name);
@@ -79,7 +93,7 @@ test("useControl: onBlur reveals, showError once revealed", async () => {
   const screen = await render(
     <StoreProvider store={s}>
       <C />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const state = screen.getByTestId("c");
   const onBlur = c.onBlur;
@@ -112,7 +126,7 @@ test("useControl: pending while a check runs; the error shows when revealed and 
   const screen = await render(
     <StoreProvider store={s}>
       <C />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const state = screen.getByTestId("c");
   await settle(() => c.onBlur());
@@ -121,7 +135,9 @@ test("useControl: pending while a check runs; the error shows when revealed and 
   await settle(() => lookup.resolve("Taken"));
   await expect.element(state).toHaveTextContent("false|Taken|true");
   await settle(() => c.onChange("Bobby"));
-  await expect.element(state, { message: "the last result is hidden while a new check runs" }).toHaveTextContent("true|Taken|false");
+  await expect
+    .element(state, { message: "the last result is hidden while a new check runs" })
+    .toHaveTextContent("true|Taken|false");
 });
 
 test("useControl: onBlur after its row was removed does nothing", async () => {
@@ -136,7 +152,7 @@ test("useControl: onBlur after its row was removed does nothing", async () => {
   await render(
     <StoreProvider store={row}>
       <Sku />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const onBlur = c.onBlur;
   await settle(() => lines.remove(row)); // e.g. a blur fired while the removed row unmounts
@@ -154,7 +170,7 @@ test("focusRef registers the element, submit focuses it, unmount clears it", asy
   const screen = await render(
     <StoreProvider store={s}>
       <Input />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const input = screen.getByTestId("in");
   await settle(() => handleSubmit(s, async () => {})());
@@ -211,7 +227,7 @@ test("fromInput / fromCheckbox with real events; handlers are cached", async () 
   const screen = await render(
     <StoreProvider store={s}>
       <Inputs />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const name = screen.getByTestId("name");
   await name.fill("Zoe");

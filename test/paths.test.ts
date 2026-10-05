@@ -1,8 +1,9 @@
 // O · Paths: resolvePath, and setting server errors through it.
 
+import { test as base, describe, expect } from "vitest";
+
 import { createStore, countIn, defineBehavior } from "../src/index";
 import { error } from "./support/features";
-import { test as base, describe, expect } from "vitest";
 import * as limits from "./support/fixtures/limits";
 
 describe("O · Paths", () => {
@@ -30,7 +31,16 @@ describe("O · Paths", () => {
   });
 
   test("resolvePath: unknown paths are undefined", ({ store: s }) => {
-    for (const p of ["nope", "lines[9].qty", "lines[1].nope", "lines..qty", "lines[x].qty", "name[0]", ".name", "name."]) {
+    for (const p of [
+      "nope",
+      "lines[9].qty",
+      "lines[1].nope",
+      "lines..qty",
+      "lines[x].qty",
+      "name[0]",
+      ".name",
+      "name.",
+    ]) {
       expect(s.resolvePath(p), p).toBe(undefined);
     }
   });
@@ -57,13 +67,25 @@ describe("O · Paths", () => {
     const s = createStore(shape, initial(), {
       onError: (_, info) => void scopes.push(info.scope),
       behaviors: defineBehavior({
-        name: "noteBoom", triggers: [N.text], runOn: { init: false },
-        run: () => { throw new Error("x"); },
+        name: "noteBoom",
+        triggers: [N.text],
+        runOn: { init: false },
+        run: () => {
+          throw new Error("x");
+        },
       }),
     });
     const lines = s.substore(shape.lines);
-    const note = () => lines.itemAt(lines.items().length - 1).substore(L.notes).itemAt(0);
-    const notePaths = () => s.collect(shape, error).filter((e) => e.ref.node === N.text).map((e) => e.path);
+    const note = () =>
+      lines
+        .itemAt(lines.items().length - 1)
+        .substore(L.notes)
+        .itemAt(0);
+    const notePaths = () =>
+      s
+        .collect(shape, error)
+        .filter((e) => e.ref.node === N.text)
+        .map((e) => e.path);
 
     note().set(N.text, "y");
     expect(scopes.at(-1)).toBe("lines[1].notes[0]");

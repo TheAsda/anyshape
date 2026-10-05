@@ -35,12 +35,12 @@ Each node gets a reference per key: `shape.destination.error`. Read and write it
 
 A definition's steps add capabilities, and each step returns a new definition:
 
-| Step | What it adds |
-|---|---|
-| `.aggregate(isCounted)` | The key can be counted per subtree with `countIn`. |
-| `.uses(...definitions)` | The default [behavior](../../GLOSSARY.md) or owner gets references to other keys of the same node. |
-| `.behavior(factory)` | A default behavior, registered on every node that declares the key. |
-| `.combine(factory)` | The key is written by one owner that combines [contributions](../../GLOSSARY.md) ([contributions.md](contributions.md)). |
+| Step                    | What it adds                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `.aggregate(isCounted)` | The key can be counted per subtree with `countIn`.                                                                       |
+| `.uses(...definitions)` | The default [behavior](../../GLOSSARY.md) or owner gets references to other keys of the same node.                       |
+| `.behavior(factory)`    | A default behavior, registered on every node that declares the key.                                                      |
+| `.combine(factory)`     | The key is written by one owner that combines [contributions](../../GLOSSARY.md) ([contributions.md](contributions.md)). |
 
 ## Features
 

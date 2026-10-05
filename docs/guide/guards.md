@@ -8,7 +8,16 @@ First shown in [stage 5](https://github.com/TheAsda/anyshape/tree/master/example
 
 ```ts
 import {
-  form, object, field, metaKey, when, defineBehavior, defineBehaviors, contribute, createStore, initialOf,
+  form,
+  object,
+  field,
+  metaKey,
+  when,
+  defineBehavior,
+  defineBehaviors,
+  contribute,
+  createStore,
+  initialOf,
 } from "anyshape";
 
 const visible = metaKey(true);
@@ -19,7 +28,10 @@ const error = metaKey<string | undefined, (value: unknown) => string | undefined
   writes: [key],
   run: (ctx) => {
     const value = ctx.get(self);
-    ctx.set(key, ctx.parts.map((part) => part.payload(value)).find((message) => message !== undefined));
+    ctx.set(
+      key,
+      ctx.parts.map((part) => part.payload(value)).find((message) => message !== undefined),
+    );
   },
 }));
 
@@ -34,10 +46,14 @@ const shape = form(
   }),
 );
 
-const requireNotes = contribute(shape.notes.error, (value) => (value === "" ? "Tell us why you stay this long" : undefined), {
-  name: "requireNotes",
-  when: when([shape.nights], (nights) => nights > 30),
-});
+const requireNotes = contribute(
+  shape.notes.error,
+  (value) => (value === "" ? "Tell us why you stay this long" : undefined),
+  {
+    name: "requireNotes",
+    when: when([shape.nights], (nights) => nights > 30),
+  },
+);
 ```
 
 A guard is `when(refs, test)`: `test` gets the references' values, typed, and returns whether the declaration applies. Put it in a behavior's or a contribution's `when` (an array of guards must all pass). Its references become triggers, so the guard is checked again whenever they change.
@@ -47,9 +63,17 @@ Inside `defineBehaviors`, `b.when(refs, test, (b) => { ... })` guards everything
 ```ts
 const rules = defineBehaviors(shape, (b, s) => {
   b.add(requireNotes);
-  b.when([s.car.visible], (shown) => shown, (b) => {
-    b.add(contribute(s.car.license.error, (value) => (value === "" ? "Required" : undefined), { name: "licenseRequired" }));
-  });
+  b.when(
+    [s.car.visible],
+    (shown) => shown,
+    (b) => {
+      b.add(
+        contribute(s.car.license.error, (value) => (value === "" ? "Required" : undefined), {
+          name: "licenseRequired",
+        }),
+      );
+    },
+  );
 });
 ```
 

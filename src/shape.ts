@@ -15,15 +15,12 @@
 //                    doesn't reserve is free for fields and meta keys
 // ============================================================
 
-import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
-import {
-  MetaKeyDef,
-  type Meta, type MergeMetaRefs,
-} from "./meta.js";
 import { FIELDS, META_DEFS, META, CREATE } from "./internal.js";
+import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
+import { MetaKeyDef, type Meta, type MergeMetaRefs } from "./meta.js";
 import { KIND, type RefKind } from "./refs/kind.js";
-import { valueKind } from "./refs/value.js";
 import { MetaRef } from "./refs/meta.js";
+import { valueKind } from "./refs/value.js";
 
 declare const FieldIdBrand: unique symbol;
 export type FieldId = string & { readonly [FieldIdBrand]: true };
@@ -38,7 +35,12 @@ export type InferValue<N> = N extends ShapeNode<infer V> ? V : N extends MetaRef
  * not keys.
  */
 export type InferMeta<N> = {
-  [K in keyof N as 0 extends 1 & N[K] ? never : N[K] extends MetaRef<any, any> ? K : never]: N[K] extends MetaRef<infer V, any> ? V : never;
+  [K in keyof N as 0 extends 1 & N[K] ? never : N[K] extends MetaRef<any, any> ? K : never]: N[K] extends MetaRef<
+    infer V,
+    any
+  >
+    ? V
+    : never;
 };
 
 // Names used by the node itself. Neither fields nor meta keys may use them.
@@ -94,13 +96,11 @@ export abstract class ShapeNode<T = unknown> {
    * A node declares each key once: declaring it again throws, whether as a
    * plain value or a key definition (metaKey / feature).
    */
-  meta<Is extends readonly Meta[]>(
-    ...inputs: Is
-  ): this & MergeMetaRefs<Is> {
+  meta<Is extends readonly Meta[]>(...inputs: Is): this & MergeMetaRefs<Is> {
     if (this.id !== undefined) {
       throw new Error(
         `.meta() must be called before form() (node "${this.path || "<root>"}"). ` +
-          `For root meta use form(object({...}).meta(...)).`
+          `For root meta use form(object({...}).meta(...)).`,
       );
     }
 
@@ -160,9 +160,9 @@ export class FieldNode<T = unknown> extends ShapeNode<T> {
 // ============================================================
 // Object
 // ============================================================
-export class ObjectNode<
-  TFields extends Record<string, AnyNode> = any
-> extends ShapeNode<{ [K in keyof TFields]: InferValue<TFields[K]> }> {
+export class ObjectNode<TFields extends Record<string, AnyNode> = any> extends ShapeNode<{
+  [K in keyof TFields]: InferValue<TFields[K]>;
+}> {
   /** @internal – children; also exposed as direct properties. */
   declare readonly [FIELDS]: TFields;
 
@@ -181,7 +181,6 @@ export class ObjectNode<
   static create<TFields extends Record<string, AnyNode>>(fields: TFields): ObjectNode<TFields> & TFields {
     return new ObjectNode(fields) as any;
   }
-
 }
 
 // ============================================================
@@ -192,10 +191,9 @@ export interface ArrayOptions<TItem extends ObjectNode<any>> {
   create: () => InferValue<TItem>;
 }
 
-export class ArrayNode<
-  TItem extends ObjectNode<any> = any,
-  THasCreate extends boolean = boolean
-> extends ShapeNode<InferValue<TItem>[]> {
+export class ArrayNode<TItem extends ObjectNode<any> = any, THasCreate extends boolean = boolean> extends ShapeNode<
+  InferValue<TItem>[]
+> {
   /** Item template. Its lens is relative to the item object itself. */
   declare readonly item: TItem;
   /** @internal Factory for new rows, if declared. */
@@ -216,10 +214,7 @@ export class ArrayNode<
   }
 
   /** @internal – use array() */
-  static create<TItem extends ObjectNode<any>>(
-    item: TItem,
-    create?: () => InferValue<TItem>
-  ): ArrayNode<TItem, any> {
+  static create<TItem extends ObjectNode<any>>(item: TItem, create?: () => InferValue<TItem>): ArrayNode<TItem, any> {
     return new ArrayNode(item, create);
   }
 }
@@ -285,7 +280,8 @@ export function array(item: any, options?: ArrayOptions<any>): any {
  * @see {@link https://github.com/TheAsda/anyshape/blob/master/docs/guide/shape.md | Shapes and nodes} in the guide.
  */
 export function form<N extends ObjectNode<any>>(root: N): N {
-  if (!(root instanceof ObjectNode)) throw new Error("form() takes an object node – wrap the fields, e.g. form(object({ ... }))");
+  if (!(root instanceof ObjectNode))
+    throw new Error("form() takes an object node – wrap the fields, e.g. form(object({ ... }))");
   let counter = 0;
   return instantiate(root, {
     path: "",

@@ -85,6 +85,7 @@ These docs follow `master`. For the docs of a published version, open its [relea
 [Glossary](GLOSSARY.md): the terms used across the docs and the code.
 
 **Using anyshape**
+
 - [Guide](docs/guide/README.md): the concepts, one page per topic, ending with writing your own recipe.
 - [Evolution example](examples/evolution/README.md): one form in 13 stages.
 - [Basic example](examples/basic/README.md): a complete form.
@@ -94,6 +95,7 @@ These docs follow `master`. For the docs of a published version, open its [relea
 - [Security](SECURITY.md): how to report a vulnerability privately.
 
 **Contributing**
+
 - [Contributing](CONTRIBUTING.md): setup, tests, changesets.
 - [Testing](docs/testing.md)
 - [Architecture decisions](docs/adr/)

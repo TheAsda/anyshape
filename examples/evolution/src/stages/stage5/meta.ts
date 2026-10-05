@@ -14,4 +14,3 @@ export const meta: StageMeta = {
   notes:
     "Visibility is metadata on the group — the fields inside don't know about it, and the core doesn't pass it down to them. Nothing follows from it implicitly; each consequence is declared: rules guarded on it aren't checked while hidden, and clearWhen wipes stale values. Submit with the box unchecked: the car fields are back to empty and no car rule fired — the result card shows exactly what the server receives.",
 };
-

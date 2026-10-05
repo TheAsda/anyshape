@@ -1,7 +1,7 @@
 // node.key: one meta key of one node.
 
-import type { AnyNode } from "../shape.js";
 import { defOf } from "../internal.js";
+import type { AnyNode } from "../shape.js";
 import { KIND, type RefKind } from "./kind.js";
 
 export class MetaRef<V = unknown, P = unknown> {
@@ -10,7 +10,10 @@ export class MetaRef<V = unknown, P = unknown> {
   /** Phantom type: the payload contributions to this key carry (NoPayload: none). */
   declare readonly _payload: P;
 
-  private constructor(readonly node: AnyNode, readonly key: string) {}
+  private constructor(
+    readonly node: AnyNode,
+    readonly key: string,
+  ) {}
 
   /** @internal Refs are attached to nodes (node.error); everything else reads them from there. */
   static _create(node: AnyNode, key: string): MetaRef<any> {

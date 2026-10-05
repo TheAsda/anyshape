@@ -1,11 +1,21 @@
 import { useState, StrictMode } from "react";
 import { test, expect } from "vitest";
+
 import {
-  form, object, array, field, metaKey, countIn, initialOf, createStore, type InferValue, type RootStore,
+  form,
+  object,
+  array,
+  field,
+  metaKey,
+  countIn,
+  initialOf,
+  createStore,
+  type InferValue,
+  type RootStore,
 } from "../../src/index";
+import { StoreProvider, useForm, useSync, useField, useValue } from "../../src/react/index";
 import { control, submission, error } from "../support/features";
 import { rule, max } from "../support/rules";
-import { StoreProvider, useForm, useSync, useField, useValue } from "../../src/react/index";
 import { render, settle, captureWarnings } from "../support/test-utils";
 
 const shape = form(
@@ -16,9 +26,9 @@ const shape = form(
     lines: array(
       object({
         qty: field<number>().meta(control(), { maxQty: metaKey<number | undefined>(undefined, { keepOnReset: true }) }),
-      })
+      }),
     ),
-  }).meta(submission())
+  }).meta(submission()),
 );
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
@@ -207,7 +217,7 @@ test("useSync under StrictMode ends with the synced value", async () => {
   await render(
     <StrictMode>
       <App />
-    </StrictMode>
+    </StrictMode>,
   );
   restore();
   expect(f.get(shape.name)).toBe("synced");
@@ -224,7 +234,7 @@ test("useSync on a value node writes it; the value stays after unmount", async (
   const screen = await render(
     <StoreProvider store={s}>
       <Sync value="synced" />
-    </StoreProvider>
+    </StoreProvider>,
   );
   expect(s.get(shape.note)).toBe("synced");
   await screen.unmount();

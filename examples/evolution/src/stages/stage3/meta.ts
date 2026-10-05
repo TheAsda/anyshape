@@ -14,4 +14,3 @@ export const meta: StageMeta = {
   notes:
     "Rules live outside the shape, as behaviors — the same shape can carry different rules in different apps. Submit is a recipe over the store: handleSubmit(form, fn) validates, reveals, focuses. Try submitting empty, then type one character and blur: minLength is live once the field was left.",
 };
-

@@ -6,12 +6,13 @@
 // shows a computed chain plus a cross-field budget rule.
 // ============================================================
 
-import { useId, useRef } from "react";
 import { countIn } from "anyshape";
 import { StoreProvider, useArray, useValue } from "anyshape/react";
+import { useId, useRef } from "react";
+
 import { useControl } from "../../../recipes/react";
-import { shape, CATALOG, lookingUp } from "./form";
 import { NumberField, ReadonlyField } from "./fields";
+import { shape, CATALOG, lookingUp } from "./form";
 
 // The row template: fields inside a StoreProvider row are addressed
 // through the template and resolved against that row's store.
@@ -80,9 +81,7 @@ function SkuField() {
             </option>
           ))}
       </select>
-      {c.showError && (
-        <p className="field__error">{c.error}</p>
-      )}
+      {c.showError && <p className="field__error">{c.error}</p>}
       {c.pending && <p className="field__status">Checking…</p>}
     </div>
   );

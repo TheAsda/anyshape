@@ -1,5 +1,6 @@
-import { form, object, array, field, createStore, defineBehavior, type InferValue } from "../src/index";
 import { test as base, describe, expect } from "vitest";
+
+import { form, object, array, field, createStore, defineBehavior, type InferValue } from "../src/index";
 import * as company from "./support/fixtures/company";
 
 const address = object({
@@ -7,20 +8,22 @@ const address = object({
   city: field<string>().meta({ error: undefined as string | undefined }),
 });
 
-const shape = form(object({
-  name: field<string>().meta({ required: true, touched: false, error: undefined as string | undefined }),
-  total: field<number>(),
-  shipping: address,
-  billing: address,
-  lines: array(
-    object({
-      sku: field<string>().meta({ touched: false, error: undefined as string | undefined }),
-      price: field<number>(),
-      qty: field<number>(),
-      notes: array(object({ text: field<string>() })),
-    })
-  ),
-}));
+const shape = form(
+  object({
+    name: field<string>().meta({ required: true, touched: false, error: undefined as string | undefined }),
+    total: field<number>(),
+    shipping: address,
+    billing: address,
+    lines: array(
+      object({
+        sku: field<string>().meta({ touched: false, error: undefined as string | undefined }),
+        price: field<number>(),
+        qty: field<number>(),
+        notes: array(object({ text: field<string>() })),
+      }),
+    ),
+  }),
+);
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 
@@ -159,16 +162,16 @@ describe("F · Rule 4 – attachment changes", () => {
   test("rule 4: restoring an old snapshot re-attaches the same store (undo)", ({ store: s, lines }) => {
     const row = lines.itemAt(0);
     row.set(L.sku.touched, true);
-    row.set(L.qty, 7);                 // row now points at a new reference
-    const snapshot = initial().lines;       // unrelated objects → would be new stores
+    row.set(L.qty, 7); // row now points at a new reference
+    const snapshot = initial().lines; // unrelated objects → would be new stores
     const undo = s.get(shape).lines.slice();
 
-    s.set(shape.lines, [undo[1]]);     // remove row 0
+    s.set(shape.lines, [undo[1]]); // remove row 0
     expect(row.isAttached()).toBe(false);
 
     const r = recorder();
     row.subscribe(L.qty, r.on("qty"));
-    s.set(shape.lines, undo);          // put it back
+    s.set(shape.lines, undo); // put it back
     expect(r.take()).toEqual(["qty"]);
     expect(row.isAttached()).toBe(true);
     expect(lines.itemAt(0)).toBe(row);
@@ -178,9 +181,9 @@ describe("F · Rule 4 – attachment changes", () => {
 
   test("bug fix: an older version of a row re-attaches to its store", ({ store: s, lines }) => {
     const row = lines.itemAt(0);
-    const older = s.get(shape).lines;      // row at version 1
-    row.set(L.qty, 9);                 // version 2
-    s.set(shape.lines, older);         // restore version 1
+    const older = s.get(shape).lines; // row at version 1
+    row.set(L.qty, 9); // version 2
+    s.set(shape.lines, older); // restore version 1
     expect(lines.itemAt(0)).toBe(row);
     expect(row.isAttached()).toBe(true);
     expect(row.get(L.qty)).toBe(1);
@@ -212,7 +215,7 @@ describe("F · Rule 4 – attachment changes", () => {
 describe("F · Row writes", () => {
   test("rows written in one batch notify in array order", ({ store: s, lines }) => {
     const [a, b] = lines.items();
-    a.set(L.price, 11);                // a flush that walks the rows first
+    a.set(L.price, 11); // a flush that walks the rows first
     const r = recorder();
     a.subscribe(L.qty, r.on("a"));
     b.subscribe(L.qty, r.on("b"));
@@ -237,12 +240,12 @@ describe("F · Row writes", () => {
 
   test("every write inside a row gives the row a new object, so its subscribers see it", ({ lines }) => {
     const [a, b] = lines.items();
-    b.set(L.price, 21);                // a flush that walks the rows first
+    b.set(L.price, 21); // a flush that walks the rows first
     const note = a.substore(L.notes).itemAt(0);
     const r = recorder();
     a.subscribe(L, r.on("a"));
     b.subscribe(L, r.on("b"));
-    note.set(L.notes.item.text, "x");  // through a nested row
+    note.set(L.notes.item.text, "x"); // through a nested row
     expect(r.take()).toEqual(["a"]);
     a.set(L.qty, 5, { as: "initial" });
     expect(r.take()).toEqual(["a"]);
@@ -297,8 +300,13 @@ describe("F · Rule 5 – batching", () => {
 function withTotal() {
   const s = createStore(shape, initial(), {
     behaviors: defineBehavior({
-      triggers: [shape.lines], writes: [shape.total],
-      run: (ctx) => ctx.set(shape.total, ctx.get(shape.lines).reduce((sum, l) => sum + l.price * l.qty, 0)),
+      triggers: [shape.lines],
+      writes: [shape.total],
+      run: (ctx) =>
+        ctx.set(
+          shape.total,
+          ctx.get(shape.lines).reduce((sum, l) => sum + l.price * l.qty, 0),
+        ),
     }),
   });
   return { s, lines: s.substore(shape.lines) };
@@ -309,7 +317,7 @@ describe("F · Rule 7 – behaviors, then listeners", () => {
     const { s, lines } = withTotal();
     const seen: number[] = [];
     s.subscribe(shape.total, () => seen.push(s.get(shape.total)));
-    lines.itemAt(0).set(L.qty, 3);     // 30 + 40
+    lines.itemAt(0).set(L.qty, 3); // 30 + 40
     expect(seen).toEqual([70]);
   });
 
@@ -317,11 +325,15 @@ describe("F · Rule 7 – behaviors, then listeners", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
         defineBehavior({
-          triggers: [shape.shipping.street], writes: [shape.billing.street], runOn: { init: false },
+          triggers: [shape.shipping.street],
+          writes: [shape.billing.street],
+          runOn: { init: false },
           run: (ctx) => ctx.set(shape.billing.street, ctx.get(shape.shipping.street)),
         }),
         defineBehavior({
-          triggers: [shape.name], writes: [shape.shipping.street], runOn: { init: false },
+          triggers: [shape.name],
+          writes: [shape.shipping.street],
+          runOn: { init: false },
           run: (ctx) => ctx.set(shape.shipping.street, `${ctx.get(shape.name)} St`),
         }),
       ],
@@ -338,13 +350,19 @@ describe("F · Rule 7 – behaviors, then listeners", () => {
     s._react(shape.name, (next, prev) => calls.push([next, prev]));
     s.set(shape.name, "B");
     s.set(shape.name, "C");
-    expect(calls).toEqual([["B", "Ann"], ["C", "B"]]);
+    expect(calls).toEqual([
+      ["B", "Ann"],
+      ["C", "B"],
+    ]);
   });
 
   test("rule 7: a meta change triggers a derived write", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehavior({
-        triggers: [shape.name.touched], reads: [shape.name], writes: [shape.name.error], runOn: { init: false },
+        triggers: [shape.name.touched],
+        reads: [shape.name],
+        writes: [shape.name.error],
+        runOn: { init: false },
         run: (ctx) => {
           if (ctx.get(shape.name.touched)) ctx.set(shape.name.error, ctx.get(shape.name) ? undefined : "Required");
         },
@@ -382,7 +400,10 @@ describe("F · Subscription housekeeping", () => {
     expect(r.take()).toEqual([]);
   });
 
-  test("a listener unsubscribed by an earlier listener in the same flush is not called", ({ store: s, recorder: r }) => {
+  test("a listener unsubscribed by an earlier listener in the same flush is not called", ({
+    store: s,
+    recorder: r,
+  }) => {
     let offSecond = () => {};
     s.subscribe(shape.name, () => offSecond());
     offSecond = s.subscribe(shape.name, r.on("second"));
@@ -418,7 +439,10 @@ describe("F · Errors during the flush", () => {
     expect(r.take()).toEqual(["total"]);
   });
 
-  test("a throwing reaction: the write throws, listeners are skipped, the next flush catches up", ({ store: s, recorder: r }) => {
+  test("a throwing reaction: the write throws, listeners are skipped, the next flush catches up", ({
+    store: s,
+    recorder: r,
+  }) => {
     let fail = true;
     s._react(shape.name, () => {
       if (fail) throw new Error("reaction");
@@ -435,11 +459,17 @@ describe("F · Errors during the flush", () => {
 });
 
 describe("F · Array replacement and flat forms", () => {
-  test("rule 3: replacing the array with new objects of the same length fires subscribeItems", ({ store: s, lines }) => {
+  test("rule 3: replacing the array with new objects of the same length fires subscribeItems", ({
+    store: s,
+    lines,
+  }) => {
     const before = lines.items();
     let fired = 0;
     lines.subscribeItems(() => fired++);
-    s.set(shape.lines, s.get(shape.lines).map((l) => ({ ...l })));
+    s.set(
+      shape.lines,
+      s.get(shape.lines).map((l) => ({ ...l })),
+    );
     expect(fired).toBe(1);
     expect(lines.items().length).toBe(2);
     expect(lines.items()[0], "new objects, new row stores").not.toBe(before[0]);
@@ -459,8 +489,7 @@ describe("F · Array replacement and flat forms", () => {
 
 describe("F · Meta-key subscriptions", () => {
   const { shape, initial } = company;
-  const test = base
-    .extend("store", () => createStore(shape, initial()));
+  const test = base.extend("store", () => createStore(shape, initial()));
 
   test("subscribe to a single meta key ignores other keys", ({ store: s }) => {
     let calls = 0;

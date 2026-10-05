@@ -4,11 +4,10 @@
 // ============================================================
 
 import { form, object, field } from "anyshape";
-import {
-  control, visible, disabled, required, min, pattern, visibleWhen, disableWhen, exclusive,
-} from "./index";
-import type { useControl } from "./react";
 import { test, expectTypeOf } from "vitest";
+
+import { control, visible, disabled, required, min, pattern, visibleWhen, disableWhen, exclusive } from "./index";
+import type { useControl } from "./react";
 
 const t = form(
   object({
@@ -18,7 +17,7 @@ const t = form(
     hidden: object({ x: field<string>() }).meta({ visible }),
     off: field<string>().meta(control(), { disabled }),
     other: field<string>().meta(control(), { disabled }),
-  })
+  }),
 );
 
 // Calls that must (and must not) compile. Never called.

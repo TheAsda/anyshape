@@ -2,12 +2,12 @@
 // createStore – wires the store and the behavior runtime.
 // ============================================================
 
-import { BehaviorRuntime, defaultBehaviors } from "./runtime.js";
 import type { StoreOptions } from "./behaviors.js";
-import { RootStore } from "./store.js";
-import type { ObjectNode, InferValue } from "./shape.js";
 import { Diagnostics } from "./diagnostics.js";
 import { isDev } from "./internal.js";
+import { BehaviorRuntime, defaultBehaviors } from "./runtime.js";
+import type { ObjectNode, InferValue } from "./shape.js";
+import { RootStore } from "./store.js";
 
 /**
  * Create a store for a shape from `form()`: `initialValues` are its values and
@@ -18,9 +18,10 @@ import { isDev } from "./internal.js";
 export function createStore<N extends ObjectNode<any>>(
   shape: N,
   initialValues: InferValue<N>,
-  options: StoreOptions = {}
+  options: StoreOptions = {},
 ): RootStore<N> {
-  const onError = options.onError ?? ((error, info) => console.error(`[form] "${info.behavior}" failed at "${info.scope}"`, error));
+  const onError =
+    options.onError ?? ((error, info) => console.error(`[form] "${info.behavior}" failed at "${info.scope}"`, error));
   const store = new RootStore(shape, initialValues, (root) => new BehaviorRuntime(root, onError));
   if (isDev()) store._probe = new Diagnostics();
   store._batch(() => {

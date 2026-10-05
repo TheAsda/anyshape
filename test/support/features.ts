@@ -31,20 +31,24 @@ export const error = metaKey<string | undefined, Check>(undefined)
 export const validation = () => ({ error });
 
 /** true once the user changed the value; stays true. */
-export const touched = metaKey(false).aggregate((t) => t).behavior((self, key) => ({
-  triggers: [self],
-  writes: [key],
-  origins: ["user"],
-  runOn: { init: false },
-  run: (ctx) => ctx.set(key, true),
-}));
+export const touched = metaKey(false)
+  .aggregate((t) => t)
+  .behavior((self, key) => ({
+    triggers: [self],
+    writes: [key],
+    origins: ["user"],
+    runOn: { init: false },
+    run: (ctx) => ctx.set(key, true),
+  }));
 
 /** true while the value differs (Object.is) from its initial value. */
-export const dirty = metaKey(false).aggregate((d) => d).behavior((self, key) => ({
-  triggers: [self, initialOf(self)],
-  writes: [key],
-  run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.get(initialOf(self)))),
-}));
+export const dirty = metaKey(false)
+  .aggregate((d) => d)
+  .behavior((self, key) => ({
+    triggers: [self, initialOf(self)],
+    writes: [key],
+    run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.get(initialOf(self)))),
+  }));
 
 export const visible = metaKey(true);
 

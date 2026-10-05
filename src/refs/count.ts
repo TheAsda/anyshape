@@ -1,9 +1,9 @@
 // countIn(node, def): nodes in a subtree whose key declared with `def` counts
 // (MetaKeyDef.aggregate), under whatever name. Read-only, on the tally channel.
 
-import { ObjectNode, ArrayNode, type AnyNode } from "../shape.js";
-import type { MetaKeyDef } from "../meta.js";
 import { FIELDS, META_DEFS, countSlotOf } from "../internal.js";
+import type { MetaKeyDef } from "../meta.js";
+import { ObjectNode, ArrayNode, type AnyNode } from "../shape.js";
 import { isAncestorOrSelf } from "../tree.js";
 import { KIND, type RefKind } from "./kind.js";
 
@@ -15,7 +15,11 @@ export class CountRef {
    * @internal `_id` is a counter: a definition has no name of its own.
    * countIn caches one ref per (node, def), so equal refs share it.
    */
-  constructor(readonly node: AnyNode, readonly def: MetaKeyDef<any, any>, readonly _id: string) {}
+  constructor(
+    readonly node: AnyNode,
+    readonly def: MetaKeyDef<any, any>,
+    readonly _id: string,
+  ) {}
   get path(): string {
     return `${this.node.path ?? ""}#count`;
   }
@@ -35,7 +39,9 @@ const countKind: RefKind<CountRef> = {
   },
   subscribe: (store, ref, phase, fn) => store._addTallySub(ref.node, countSlotOf(ref.def), phase, fn),
   affectedBy: (ref, t) =>
-    t.key === undefined ? isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node) : t.def === ref.def && isAncestorOrSelf(ref.node, t.node),
+    t.key === undefined
+      ? isAncestorOrSelf(t.node, ref.node) || isAncestorOrSelf(ref.node, t.node)
+      : t.def === ref.def && isAncestorOrSelf(ref.node, t.node),
   local: false,
   tally: true,
   readOnly: "Counts are read-only",
@@ -50,7 +56,8 @@ let countIds = 0;
  * the template covers them.
  */
 function declaration(node: AnyNode, def: MetaKeyDef<any, any>): string | undefined {
-  for (const [name, d] of Object.entries(node[META_DEFS])) if (d === def) return `key "${name}" on "${node.path || "<root>"}"`;
+  for (const [name, d] of Object.entries(node[META_DEFS]))
+    if (d === def) return `key "${name}" on "${node.path || "<root>"}"`;
   if (node instanceof ObjectNode) {
     for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) {
       const found = declaration(child, def);
@@ -80,7 +87,7 @@ export function countIn(node: AnyNode, def: MetaKeyDef<any, any, any, true>): Co
         : undefined;
     if (problem) {
       throw new Error(
-        `countIn on "${node.path || "<root>"}": ${problem} – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).`
+        `countIn on "${node.path || "<root>"}": ${problem} – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).`,
       );
     }
     byDef.set(def, (ref = new CountRef(node, def, `c:${countIds++}`)));

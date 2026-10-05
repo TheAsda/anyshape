@@ -12,13 +12,14 @@
 // ============================================================
 
 import { useLayoutEffect, useRef, useState } from "react";
-import type { AnyNode, InferValue, ObjectNode } from "../shape.js";
-import type { MetaRef } from "../refs/meta.js";
-import { createStore } from "../create.js";
+
 import type { StoreOptions } from "../behaviors.js";
+import { createStore } from "../create.js";
+import { refLabel, targetOf, isDev } from "../internal.js";
+import type { MetaRef } from "../refs/meta.js";
+import type { AnyNode, InferValue, ObjectNode } from "../shape.js";
 import type { RootStore } from "../store.js";
 import { useStore, resolveStore, type HookOptions } from "./hooks.js";
-import { refLabel, targetOf, isDev } from "../internal.js";
 
 // ============================================================
 // useForm
@@ -38,12 +39,14 @@ export interface UseFormOptions<N extends ObjectNode<any>> extends StoreOptions 
 export function useForm<N extends ObjectNode<any>>(
   shape: N,
   initialValues: InferValue<N>,
-  options: UseFormOptions<N> = {}
+  options: UseFormOptions<N> = {},
 ): RootStore<N> {
   const [store] = useState(() => createStore(shape, options.values ?? initialValues, options));
 
   if (isDev() && store.node !== shape) {
-    console.warn("useForm: `shape` changed after the form was created – the change is ignored. Create shapes outside components.");
+    console.warn(
+      "useForm: `shape` changed after the form was created – the change is ignored. Create shapes outside components.",
+    );
   }
 
   // Load new data objects as the baseline, before paint.
@@ -69,7 +72,11 @@ const warned = new WeakSet<object>();
  * with keepOnReset, or reset() puts them back to their default while `value`
  * is unchanged.
  */
-export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferValue<R>, options: HookOptions = {}): void {
+export function useSync<R extends AnyNode | MetaRef<any>>(
+  ref: R,
+  value: InferValue<R>,
+  options: HookOptions = {},
+): void {
   const start = useStore(options);
   const store = resolveStore(start, ref);
 
@@ -77,7 +84,9 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
     const def = targetOf(ref)?.def;
     if (def && !def.options.keepOnReset) {
       warned.add(ref);
-      console.warn(`useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
+      console.warn(
+        `useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`,
+      );
     }
   }
 

@@ -1,35 +1,43 @@
 import { useEffect } from "react";
 import { test, expect } from "vitest";
-import {
-  form, object, array, field, createStore, countIn, type InferValue,
-  type ItemStore,
-} from "../../src/index";
-import { control, error } from "../support/features";
-import { rule } from "../support/rules";
-import { watchOrigins } from "../support/harness";
+
+import { form, object, array, field, createStore, countIn, type InferValue, type ItemStore } from "../../src/index";
 import { StoreProvider, useStore, useValue, useField, useArray } from "../../src/react/index";
+import { control, error } from "../support/features";
+import { watchOrigins } from "../support/harness";
+import { rule } from "../support/rules";
 import { render, settle, renders } from "../support/test-utils";
 
-const shape = form(object({
-  name: field<string>().meta(control()),
-  agree: field<boolean>().meta(control()),
-  age: field<number>().meta(control()),
-  note: field<string>(),
-  label: field<string>().meta({ hint: "tip" }),
-  discount: field<number>(),
-  shipping: object({ city: field<string>().meta(control()) }),
-  lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
-    create: () => ({ sku: "", qty: 1 }),
+const shape = form(
+  object({
+    name: field<string>().meta(control()),
+    agree: field<boolean>().meta(control()),
+    age: field<number>().meta(control()),
+    note: field<string>(),
+    label: field<string>().meta({ hint: "tip" }),
+    discount: field<number>(),
+    shipping: object({ city: field<string>().meta(control()) }),
+    lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
+      create: () => ({ sku: "", qty: 1 }),
+    }),
   }),
-}));
+);
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 
 function initial(): Values {
   return {
-    name: "Ann", agree: false, age: 30, note: "", label: "L", discount: 0.1,
+    name: "Ann",
+    agree: false,
+    age: 30,
+    note: "",
+    label: "L",
+    discount: 0.1,
     shipping: { city: "Riga" },
-    lines: [{ sku: "A", qty: 1 }, { sku: "B", qty: 2 }],
+    lines: [
+      { sku: "A", qty: 1 },
+      { sku: "B", qty: 2 },
+    ],
   };
 }
 
@@ -66,7 +74,7 @@ test("useValue: values, meta keys and counts; only affected components re-render
       <Name />
       <Age />
       <Errors />
-    </StoreProvider>
+    </StoreProvider>,
   );
   await expect.element(screen.getByTestId("name")).toHaveTextContent("Ann");
   await expect.element(screen.getByTestId("errors")).toHaveTextContent("0:-");
@@ -98,10 +106,13 @@ test("hooks subscribe per reference, not to the whole store", async () => {
   await render(
     <StoreProvider store={s}>
       <C />
-    </StoreProvider>
+    </StoreProvider>,
   );
   expect(calls.length > 0).toBe(true);
-  expect(calls.every((n) => n === 2), "every subscription names a reference").toBe(true);
+  expect(
+    calls.every((n) => n === 2),
+    "every subscription names a reference",
+  ).toBe(true);
 });
 
 test("useValue with a selector re-renders only when the result changes", async () => {
@@ -122,7 +133,7 @@ test("useValue with a selector re-renders only when the result changes", async (
     <StoreProvider store={s}>
       <Count />
       <Skus />
-    </StoreProvider>
+    </StoreProvider>,
   );
   c.reset();
   const lines = s.substore(shape.lines);
@@ -151,7 +162,7 @@ test("row provider: template refs resolve to the row, root refs to the root", as
       <StoreProvider store={row}>
         <Row />
       </StoreProvider>
-    </StoreProvider>
+    </StoreProvider>,
   );
   await expect.element(screen.getByTestId("row")).toHaveTextContent("2/0.1");
   await settle(() => s.set(shape.discount, 0.2));
@@ -172,9 +183,11 @@ test("object substore provider and an explicit store", async () => {
       <StoreProvider store={s.substore(shape.shipping)}>
         <Both />
       </StoreProvider>
-    </StoreProvider>
+    </StoreProvider>,
   );
-  await expect.element(screen.getByTestId("both"), { message: "the explicit store wins over the provider" }).toHaveTextContent("Riga/Ann/B");
+  await expect
+    .element(screen.getByTestId("both"), { message: "the explicit store wins over the provider" })
+    .toHaveTextContent("Riga/Ann/B");
 });
 
 test("resolution errors", async () => {
@@ -193,7 +206,7 @@ test("resolution errors", async () => {
     <StoreProvider store={s}>
       <Read label="row" read={() => useValue(L.qty)} />
       <Read label="other" read={() => useValue(other.x)} />
-    </StoreProvider>
+    </StoreProvider>,
   );
   await render(<Read label="none" read={() => useStore()} />);
   expect(caught.row).toMatch(/inside a row that the provided store cannot reach/);
@@ -215,7 +228,7 @@ test("useField: value, onChange (origin user)", async () => {
   const screen = await render(
     <StoreProvider store={s}>
       <F />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const f = screen.getByTestId("f");
   await expect.element(f).toHaveTextContent("L:tip");
@@ -257,7 +270,7 @@ test("useArray: the list re-renders on structure only; a row edit re-renders tha
   const screen = await render(
     <StoreProvider store={s}>
       <List />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const list = screen.getByTestId("list");
   await expect.element(list).toHaveTextContent("A=1B=2");
@@ -293,7 +306,7 @@ test("useArray inside a row provider resolves nested arrays", async () => {
   const screen = await render(
     <StoreProvider store={group}>
       <Items />
-    </StoreProvider>
+    </StoreProvider>,
   );
   await expect.element(screen.getByTestId("n")).toHaveTextContent("2");
 });
@@ -311,7 +324,7 @@ test("useValue with { store } and a selector reads that store, not the provider'
   const screen = await render(
     <StoreProvider store={provided}>
       <Count />
-    </StoreProvider>
+    </StoreProvider>,
   );
   await expect.element(screen.getByTestId("count")).toHaveTextContent("0");
   c.reset();
@@ -340,7 +353,7 @@ test("useArray: insert and move through the hook; an explicit origin replaces th
   const screen = await render(
     <StoreProvider store={s}>
       <List />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const list = screen.getByTestId("list");
 
@@ -367,7 +380,7 @@ test("useField on a node without meta: onChange writes as the user", async () =>
   const screen = await render(
     <StoreProvider store={s}>
       <Note />
-    </StoreProvider>
+    </StoreProvider>,
   );
   await settle(() => field.onChange("hello"));
   await expect.element(screen.getByTestId("note")).toHaveTextContent("hello");

@@ -1,19 +1,32 @@
 // Async behaviors: a run may return a promise. Cancellation, reruns with
 // cause inheritance, transactional ctx.state, kept work, settle().
 
-import {
-  form, object, array, field, createStore, defineBehavior, when,
-  type InferValue, type StoreOptions, type AnyRef, type AnyNode, type OriginKind,
-} from "../src/index";
 import { afterEach, describe, expect, test, vi } from "vitest";
+
+import {
+  form,
+  object,
+  array,
+  field,
+  createStore,
+  defineBehavior,
+  when,
+  type InferValue,
+  type StoreOptions,
+  type AnyRef,
+  type AnyNode,
+  type OriginKind,
+} from "../src/index";
 import { deferred, flush } from "./support/harness";
 
-const shape = form(object({
-  code: field<string>(),
-  name: field<string>(),
-  region: field<string>(),
-  rows: array(object({ sku: field<string>(), title: field<string>() })),
-}));
+const shape = form(
+  object({
+    code: field<string>(),
+    name: field<string>(),
+    region: field<string>(),
+    rows: array(object({ sku: field<string>(), title: field<string>() })),
+  }),
+);
 type Values = InferValue<typeof shape>;
 const R = shape.rows.item;
 const initial = (): Values => ({ code: "a", name: "", region: "", rows: [{ sku: "x", title: "" }] });
@@ -44,7 +57,7 @@ describe("J · Async runs", () => {
         triggers: [shape.code],
         writes: [shape.name],
         run: async (ctx) => ctx.set(shape.name, await lookup.promise),
-      })
+      }),
     );
     expect(s.get(shape.name)).toBe("");
     lookup.resolve("Alpha");
@@ -65,7 +78,7 @@ describe("J · Async runs", () => {
           seen.push(ctx.get(shape.name));
           ctx.set(shape.name, "last");
         },
-      })
+      }),
     );
     await flush();
     expect(seen).toEqual(["first"]);
@@ -117,7 +130,7 @@ describe("J · Async runs", () => {
           const row = { sku: "y", title: "" };
           ctx.set(shape.rows, [row, row]);
         },
-      })
+      }),
     );
     await flush();
     expect(String(list[0])).toMatch(/same object twice/);
@@ -137,10 +150,13 @@ describe("J · Cancellation", () => {
           calls.push(call);
           ctx.set(shape.name, await call.result.promise);
         },
-      })
+      }),
     );
     s.set(shape.code, "b", { origin: "user" });
-    expect(calls.map((c) => [c.code, c.signal.aborted])).toEqual([["a", true], ["b", false]]);
+    expect(calls.map((c) => [c.code, c.signal.aborted])).toEqual([
+      ["a", true],
+      ["b", false],
+    ]);
 
     calls[1].result.resolve("Beta");
     calls[0].result.resolve("Alpha"); // resolves last, but was cancelled
@@ -169,7 +185,7 @@ describe("J · Cancellation", () => {
           }
           ctx.get(shape.code); // the rejection is ignored too
         },
-      })
+      }),
     );
     s.set(shape.code, "b");
     gate.resolve();
@@ -191,7 +207,7 @@ describe("J · Cancellation", () => {
           ctx.set(shape.name, "stale");
           await gate.promise;
         },
-      })
+      }),
     );
     s.set(shape.code, "b");
     gate.resolve();
@@ -213,10 +229,13 @@ describe("J · Cancellation", () => {
           await call.done.promise;
           ctx.set(shape.rows, [{ sku: call.name, title: "" }]);
         },
-      })
+      }),
     );
     s.set(shape.name, "n1");
-    expect(calls.map((c) => [c.name, c.signal.aborted])).toEqual([["", true], ["n1", false]]);
+    expect(calls.map((c) => [c.name, c.signal.aborted])).toEqual([
+      ["", true],
+      ["n1", false],
+    ]);
 
     calls[1].done.resolve();
     await flush();
@@ -238,7 +257,7 @@ describe("J · Cancellation", () => {
           await call.done.promise;
           ctx.set(shape.name, "looked up");
         },
-      })
+      }),
     );
     s.set(shape.name, "typed", { origin: "user" });
     calls[0].done.resolve();
@@ -262,7 +281,7 @@ describe("J · Cancellation", () => {
           await call.done.promise;
           ctx.set(shape.name, `name of ${call.code}`);
         },
-      })
+      }),
     );
     calls[0].done.resolve();
     await flush();
@@ -270,7 +289,10 @@ describe("J · Cancellation", () => {
     s.set(shape.rows, []);
     calls[1].done.resolve();
     await flush();
-    expect(calls.map((c) => [c.code, c.signal.aborted])).toEqual([["a", false], ["b", true]]);
+    expect(calls.map((c) => [c.code, c.signal.aborted])).toEqual([
+      ["a", false],
+      ["b", true],
+    ]);
     expect(s.get(shape.name)).toBe("name of a");
   });
 
@@ -287,7 +309,7 @@ describe("J · Cancellation", () => {
           await gate.promise;
           ctx.get(R.sku);
         },
-      })
+      }),
     );
     const rows = s.substore(shape.rows);
     rows.remove(rows.itemAt(0));
@@ -310,7 +332,7 @@ describe("J · Cancellation", () => {
           await gate.promise;
           ctx.set(shape.name, "looked up");
         },
-      })
+      }),
     );
     dispose();
     gate.resolve();
@@ -332,7 +354,7 @@ describe("J · Cancellation", () => {
           await gate.promise;
           ctx.set(shape.name, ctx.get(shape.code));
         },
-      })
+      }),
     );
     s.set(shape.code, "b", { origin: "user" });
     s.reset(shape.name); // the name is still "": the reset writes nothing new
@@ -349,7 +371,12 @@ describe("J · Cancellation", () => {
 
 describe("J · Reruns", () => {
   /** An async behavior that records each run's cause and waits for a gate. */
-  function recorder(config: { triggers: AnyRef[]; reads?: AnyRef[]; origins?: OriginKind[]; runOn?: { init?: boolean } }) {
+  function recorder(config: {
+    triggers: AnyRef[];
+    reads?: AnyRef[];
+    origins?: OriginKind[];
+    runOn?: { init?: boolean };
+  }) {
     const runs: { origins: string[]; changed: string[]; signal: AbortSignal }[] = [];
     const gate = deferred<void>();
     const behavior = defineBehavior({
@@ -358,7 +385,9 @@ describe("J · Reruns", () => {
       run: async (ctx) => {
         runs.push({
           origins: [...ctx.origins].map((o) => o.replace(/^behavior:.*/, "behavior")),
-          changed: [...config.triggers, ...(config.reads ?? [])].filter((t) => ctx.changed(t)).map((t) => (t as AnyNode).path),
+          changed: [...config.triggers, ...(config.reads ?? [])]
+            .filter((t) => ctx.changed(t))
+            .map((t) => (t as AnyNode).path),
           signal: ctx.signal,
         });
         await gate.promise;
@@ -372,7 +401,12 @@ describe("J · Reruns", () => {
     const { runs, behavior } = recorder({ triggers: [shape.code, shape.name], runOn: { init: false } });
     s.addBehavior([
       behavior,
-      defineBehavior({ triggers: [shape.region], writes: [shape.name], runOn: { init: false }, run: (ctx) => ctx.set(shape.name, ctx.get(shape.region).toUpperCase()) }),
+      defineBehavior({
+        triggers: [shape.region],
+        writes: [shape.name],
+        runOn: { init: false },
+        run: (ctx) => ctx.set(shape.name, ctx.get(shape.region).toUpperCase()),
+      }),
     ]);
     s.set(shape.code, "b", { origin: "user" });
     s.set(shape.region, "eu");
@@ -397,7 +431,12 @@ describe("J · Reruns", () => {
 
   test("a reads change rerun takes the change's cause, minus what the origins filter ignores", () => {
     const s = createStore(shape, initial());
-    const { runs, behavior } = recorder({ triggers: [shape.code], reads: [shape.name, shape.region], origins: ["user"], runOn: { init: false } });
+    const { runs, behavior } = recorder({
+      triggers: [shape.code],
+      reads: [shape.name, shape.region],
+      origins: ["user"],
+      runOn: { init: false },
+    });
     s.addBehavior(behavior);
     s.set(shape.code, "b", { origin: "user" });
     s.set(shape.name, "n"); // "program": filtered out
@@ -441,7 +480,7 @@ describe("J · Transactional state", () => {
           if (ctx.origins.has("user")) ctx.state.overridden = true; // in place, like calculate
           await Promise.resolve();
         },
-      })
+      }),
     );
     s.set(shape.code, "b", { origin: "user" });
     s.set(shape.name, "typed"); // another origin writes the target: cancelled, no rerun
@@ -509,7 +548,7 @@ describe("J · settle()", () => {
           await new Promise((resolve) => setTimeout(resolve, 1000)); // ignores the signal
           ctx.set(R.title, "looked up");
         },
-      })
+      }),
     );
     let settled = false;
     const done = s.settle().then(() => (settled = true));
@@ -521,7 +560,11 @@ describe("J · settle()", () => {
 
   test("a row behavior triggered by its whole array settles in one round: siblings' writes cancel nothing", async () => {
     vi.useFakeTimers();
-    const rows = [{ sku: "a", title: "" }, { sku: "b", title: "" }, { sku: "c", title: "" }];
+    const rows = [
+      { sku: "a", title: "" },
+      { sku: "b", title: "" },
+      { sku: "c", title: "" },
+    ];
     const s = createStore(shape, { ...initial(), rows });
     const started: string[] = [];
     const aborted: string[] = [];
@@ -539,7 +582,7 @@ describe("J · settle()", () => {
           await sleep(100 * (all.findIndex((r) => r.sku === sku) + 1), ctx.signal);
           ctx.set(R.title, `${sku} of ${all.length}`);
         },
-      })
+      }),
     );
     let settled = false;
     const done = s.settle().then(() => (settled = true));
@@ -589,7 +632,10 @@ describe("J · Kept work", () => {
     const { starts, behavior } = lookup({ code: shape.code, out: shape.region });
     s.addBehavior(behavior);
     s.set(shape.code, "b");
-    expect(starts.map((x) => [x.key, x.signal.aborted])).toEqual([["a", true], ["b", false]]);
+    expect(starts.map((x) => [x.key, x.signal.aborted])).toEqual([
+      ["a", true],
+      ["b", false],
+    ]);
     starts[1].result.resolve("B");
     await s.settle();
     expect(s.get(shape.region)).toBe("B");
@@ -615,7 +661,10 @@ describe("J · Kept work", () => {
     expect(row.starts.map((x) => x.signal.aborted)).toEqual([true]);
 
     s.reset(shape.region); // the init rerun keeps an equal key, but gets new work
-    expect(root.starts.map((x) => [x.key, x.signal.aborted])).toEqual([["a", true], ["a", false]]);
+    expect(root.starts.map((x) => [x.key, x.signal.aborted])).toEqual([
+      ["a", true],
+      ["a", false],
+    ]);
 
     dispose();
     expect(root.starts.map((x) => x.signal.aborted)).toEqual([true, true]);

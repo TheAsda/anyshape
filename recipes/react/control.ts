@@ -8,9 +8,10 @@
 //     (onBlur) or by a submit – and no check is pending.
 // ============================================================
 
-import { useCallback, useRef } from "react";
 import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "anyshape";
 import { useField, useValue, type HookOptions } from "anyshape/react";
+import { useCallback, useRef } from "react";
+
 import { registerFocus, type FocusTarget } from "../focus";
 
 /** A node with the control() keys. */
@@ -56,7 +57,7 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
       unregister.current?.();
       unregister.current = target ? registerFocus(store, node, target) : null;
     },
-    [store, node]
+    [store, node],
   );
 
   const onBlur = useCallback(() => {

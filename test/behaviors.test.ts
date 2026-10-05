@@ -1,46 +1,76 @@
+import { test as base, describe, expect } from "vitest";
+
 import {
-  form, object, array, field, createStore, defineBehavior, when, initialOf, countIn, pendingIn, pendingOf, metaKey, type InferValue, type BehaviorErrorInfo, type StoreOptions, type Origin, type BehaviorContext, type WritableRef,
+  form,
+  object,
+  array,
+  field,
+  createStore,
+  defineBehavior,
+  when,
+  initialOf,
+  countIn,
+  pendingIn,
+  pendingOf,
+  metaKey,
+  type InferValue,
+  type BehaviorErrorInfo,
+  type StoreOptions,
+  type Origin,
+  type BehaviorContext,
+  type WritableRef,
 } from "../src/index";
 import { control, visible, disabled, touched, dirty } from "./support/features";
-import { rule, max } from "./support/rules";
-import { test as base, describe, expect } from "vitest";
 import * as limits from "./support/fixtures/limits";
+import { rule, max } from "./support/rules";
 
-const shape = form(object({
-  country: field<string>(),
-  city: field<string>(),
-  title: field<string>(),
-  slug: field<string>(),
-  start: field<number>(),
-  end: field<number>(),
-  discount: field<number>(),
-  subtotal: field<number>(),
-  tax: field<number>(),
-  total: field<number>(),
-  name: field<string>().meta(control()),
-  type: field<"person" | "company">(),
-  vat: field<string>().meta({ visible, disabled, note: "" }),
-  lines: array(
-    object({
-      price: field<number>(),
-      qty: field<number>().meta(control()),
-      lineTotal: field<number>().meta(control()),
-      sku: field<string>().meta({ disabled, hint: "" }),
-      notes: array(object({ text: field<string>(), len: field<number>() })),
-    }),
-    { create: () => ({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] }) }
-  ),
-  other: array(object({ x: field<number>() })),
-}));
+const shape = form(
+  object({
+    country: field<string>(),
+    city: field<string>(),
+    title: field<string>(),
+    slug: field<string>(),
+    start: field<number>(),
+    end: field<number>(),
+    discount: field<number>(),
+    subtotal: field<number>(),
+    tax: field<number>(),
+    total: field<number>(),
+    name: field<string>().meta(control()),
+    type: field<"person" | "company">(),
+    vat: field<string>().meta({ visible, disabled, note: "" }),
+    lines: array(
+      object({
+        price: field<number>(),
+        qty: field<number>().meta(control()),
+        lineTotal: field<number>().meta(control()),
+        sku: field<string>().meta({ disabled, hint: "" }),
+        notes: array(object({ text: field<string>(), len: field<number>() })),
+      }),
+      { create: () => ({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] }) },
+    ),
+    other: array(object({ x: field<number>() })),
+  }),
+);
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 const N = L.notes.item;
 
 function initial(): Values {
   return {
-    country: "LV", city: "Riga", title: "Hello", slug: "hello",
-    start: 1, end: 3, discount: 0, subtotal: 0, tax: 0, total: 0,
-    name: "Ann", type: "person", vat: "",
+    country: "LV",
+    city: "Riga",
+    title: "Hello",
+    slug: "hello",
+    start: 1,
+    end: 3,
+    discount: 0,
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+    name: "Ann",
+    type: "person",
+    vat: "",
     lines: [
       { price: 10, qty: 1, lineTotal: 0, sku: "A", notes: [{ text: "ab", len: 0 }] },
       { price: 20, qty: 2, lineTotal: 0, sku: "B", notes: [] },
@@ -60,20 +90,43 @@ function pricing(runs: Record<string, number>) {
   const count = (k: string) => (runs[k] = (runs[k] ?? 0) + 1);
   return [
     defineBehavior({
-      name: "total", triggers: [shape.subtotal, shape.tax], writes: [shape.total],
-      run: (ctx) => { count("total"); ctx.set(shape.total, ctx.get(shape.subtotal) + ctx.get(shape.tax)); },
+      name: "total",
+      triggers: [shape.subtotal, shape.tax],
+      writes: [shape.total],
+      run: (ctx) => {
+        count("total");
+        ctx.set(shape.total, ctx.get(shape.subtotal) + ctx.get(shape.tax));
+      },
     }),
     defineBehavior({
-      name: "tax", triggers: [shape.subtotal], writes: [shape.tax],
-      run: (ctx) => { count("tax"); ctx.set(shape.tax, ctx.get(shape.subtotal) * 0.2); },
+      name: "tax",
+      triggers: [shape.subtotal],
+      writes: [shape.tax],
+      run: (ctx) => {
+        count("tax");
+        ctx.set(shape.tax, ctx.get(shape.subtotal) * 0.2);
+      },
     }),
     defineBehavior({
-      name: "subtotal", triggers: [shape.lines], writes: [shape.subtotal],
-      run: (ctx) => { count("subtotal"); ctx.set(shape.subtotal, ctx.get(shape.lines).reduce((s, l) => s + l.lineTotal, 0)); },
+      name: "subtotal",
+      triggers: [shape.lines],
+      writes: [shape.subtotal],
+      run: (ctx) => {
+        count("subtotal");
+        ctx.set(
+          shape.subtotal,
+          ctx.get(shape.lines).reduce((s, l) => s + l.lineTotal, 0),
+        );
+      },
     }),
     defineBehavior({
-      name: "lineTotal", triggers: [L.price, L.qty, shape.discount], writes: [L.lineTotal],
-      run: (ctx) => { count("lineTotal"); ctx.set(L.lineTotal, ctx.get(L.price) * ctx.get(L.qty) * (1 - ctx.get(shape.discount))); },
+      name: "lineTotal",
+      triggers: [L.price, L.qty, shape.discount],
+      writes: [L.lineTotal],
+      run: (ctx) => {
+        count("lineTotal");
+        ctx.set(L.lineTotal, ctx.get(L.price) * ctx.get(L.qty) * (1 - ctx.get(shape.discount)));
+      },
     }),
   ];
 }
@@ -146,7 +199,8 @@ describe("K · Own writes, two-way links, state", () => {
         runOn: { init: false },
         run(ctx) {
           runs++;
-          const s1 = ctx.changed(shape.start), e1 = ctx.changed(shape.end);
+          const s1 = ctx.changed(shape.start),
+            e1 = ctx.changed(shape.end);
           if (s1 && e1) return; // both from outside: assume consistent
           if (s1) ctx.set(shape.end, ctx.get(shape.start) + 2);
           if (e1) ctx.set(shape.start, ctx.get(shape.end) - 2);
@@ -191,14 +245,27 @@ describe("K · Own writes, two-way links, state", () => {
     const f = form(object({ lines: array(object({ price: field<number>(), share: field<number>() })) }));
     const R = f.lines.item;
     const share = defineBehavior({
-      name: "share", triggers: [f.lines], reads: [R.price], writes: [R.share],
+      name: "share",
+      triggers: [f.lines],
+      reads: [R.price],
+      writes: [R.share],
       run: (ctx) => {
         spy(ctx);
         const sum = ctx.get(f.lines).reduce((s, l) => s + l.price, 0);
         ctx.set(R.share, sum ? Math.round((ctx.get(R.price) / sum) * 100) : 0);
       },
     });
-    const s = createStore(f, { lines: [{ price: 10, share: 0 }, { price: 30, share: 0 }, { price: 60, share: 0 }] }, { behaviors: share });
+    const s = createStore(
+      f,
+      {
+        lines: [
+          { price: 10, share: 0 },
+          { price: 30, share: 0 },
+          { price: 60, share: 0 },
+        ],
+      },
+      { behaviors: share },
+    );
     return { R, lines: s.substore(f.lines), values: () => s.get(f.lines).map((l) => l.share) };
   }
 
@@ -231,7 +298,10 @@ describe("L · Origins and guards", () => {
   test("origins: reset the city only when the user changes the country", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehavior({
-        triggers: [shape.country], writes: [shape.city], origins: ["user"], runOn: { init: false },
+        triggers: [shape.country],
+        writes: [shape.city],
+        origins: ["user"],
+        runOn: { init: false },
         run: (ctx) => ctx.set(shape.city, ""),
       }),
     });
@@ -246,7 +316,11 @@ describe("L · Origins and guards", () => {
   test("ctx.origins lists what caused the run", () => {
     const seen: Origin[][] = [];
     const s = createStore(shape, initial(), {
-      behaviors: defineBehavior({ triggers: [shape.title], runOn: { init: false }, run: (ctx) => void seen.push([...ctx.origins]) }),
+      behaviors: defineBehavior({
+        triggers: [shape.title],
+        runOn: { init: false },
+        run: (ctx) => void seen.push([...ctx.origins]),
+      }),
     });
     s.set(shape.title, "x", { origin: "user" });
     expect(seen).toEqual([["user"]]);
@@ -255,7 +329,11 @@ describe("L · Origins and guards", () => {
   test("tallies carry no origins: a run caused only by a count change has none", () => {
     const seen: Origin[][] = [];
     const s = createStore(shape, initial(), {
-      behaviors: defineBehavior({ triggers: [countIn(shape, touched)], runOn: { init: false }, run: (ctx) => void seen.push([...ctx.origins]) }),
+      behaviors: defineBehavior({
+        triggers: [countIn(shape, touched)],
+        runOn: { init: false },
+        run: (ctx) => void seen.push([...ctx.origins]),
+      }),
     });
     s.set(shape.name.touched, true, { origin: "user" });
     expect(seen).toEqual([[]]);
@@ -274,7 +352,7 @@ describe("L · Origins and guards", () => {
     expect(s.get(shape.vat.note), "person: init skipped").toBe("");
     s.set(shape.vat, "LV1");
     expect(s.get(shape.vat.note)).toBe("");
-    s.set(shape.type, "company");          // guard ref is a trigger
+    s.set(shape.type, "company"); // guard ref is a trigger
     expect(s.get(shape.vat.note)).toBe("VAT: LV1");
     s.set(shape.type, "person");
     expect(s.get(shape.vat.note), "writes stay when the guard turns false").toBe("VAT: LV1");
@@ -288,14 +366,20 @@ describe("L · Errors and access", () => {
       onError,
       behaviors: [
         defineBehavior({
-          name: "boom", triggers: [shape.title], writes: [shape.slug, shape.city], runOn: { init: false },
+          name: "boom",
+          triggers: [shape.title],
+          writes: [shape.slug, shape.city],
+          runOn: { init: false },
           run(ctx) {
             ctx.set(shape.slug, "half");
             throw new Error("nope");
           },
         }),
         defineBehavior({
-          name: "fine", triggers: [shape.title], writes: [shape.subtotal], runOn: { init: false },
+          name: "fine",
+          triggers: [shape.title],
+          writes: [shape.subtotal],
+          runOn: { init: false },
           run: (ctx) => ctx.set(shape.subtotal, ctx.get(shape.title).length),
         }),
       ],
@@ -313,8 +397,12 @@ describe("L · Errors and access", () => {
     const s = createStore(shape, initial(), {
       onError,
       behaviors: defineBehavior({
-        name: "rowBoom", triggers: [L.qty], runOn: { init: false },
-        run: () => { throw new Error("x"); },
+        name: "rowBoom",
+        triggers: [L.qty],
+        runOn: { init: false },
+        run: () => {
+          throw new Error("x");
+        },
       }),
     });
     s.substore(shape.lines).itemAt(1).set(L.qty, 9);
@@ -339,36 +427,64 @@ describe("L · Errors and access", () => {
 
 describe("J · Registration checks", () => {
   test("one writer per target", () => {
-    const w = (name: string, target: any) => defineBehavior({ name, triggers: [shape.title], writes: [target], run: () => {} });
-    expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.city), w("b", shape.city)] })).toThrow(/already written by "a"/);
-    expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.lines), w("b", L.qty)] })).toThrow(/already written by "a"/);
-    expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.note)] })).toThrow(/already written/);
+    const w = (name: string, target: any) =>
+      defineBehavior({ name, triggers: [shape.title], writes: [target], run: () => {} });
+    expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.city), w("b", shape.city)] })).toThrow(
+      /already written by "a"/,
+    );
+    expect(() => createStore(shape, initial(), { behaviors: [w("a", shape.lines), w("b", L.qty)] })).toThrow(
+      /already written by "a"/,
+    );
+    expect(() =>
+      createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.note)] }),
+    ).toThrow(/already written/);
     createStore(shape, initial(), { behaviors: [w("a", shape.vat.note), w("b", shape.vat.disabled)] });
   });
 
   test("a key's default behavior is its one writer; a key without one is free for a behavior", () => {
-    const setTrue = (target: any) => defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
-    expect(() => createStore(shape, initial(), { behaviors: setTrue(shape.name.touched) })).toThrow(/"name#touched" is already written by "name#touched"/);
+    const setTrue = (target: any) =>
+      defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
+    expect(() => createStore(shape, initial(), { behaviors: setTrue(shape.name.touched) })).toThrow(
+      /"name#touched" is already written by "name#touched"/,
+    );
     const s = createStore(shape, initial(), { behaviors: setTrue(shape.name.revealed) });
     s.set(shape.title, "changed");
     expect(s.get(shape.name.revealed)).toBe(true);
   });
 
   test("cycles are rejected at registration, nothing is registered", ({ store: s }) => {
-    const a = defineBehavior({ name: "a", triggers: [shape.city], writes: [shape.slug], run: (c) => c.set(shape.slug, c.get(shape.city)) });
-    const b = defineBehavior({ name: "b", triggers: [shape.slug], writes: [shape.city], run: (c) => c.set(shape.city, c.get(shape.slug)) });
+    const a = defineBehavior({
+      name: "a",
+      triggers: [shape.city],
+      writes: [shape.slug],
+      run: (c) => c.set(shape.slug, c.get(shape.city)),
+    });
+    const b = defineBehavior({
+      name: "b",
+      triggers: [shape.slug],
+      writes: [shape.city],
+      run: (c) => c.set(shape.city, c.get(shape.slug)),
+    });
     expect(() => s.addBehavior([a, b])).toThrow(/cycle: "a", "b"/);
     s.set(shape.city, "X");
     expect(s.get(shape.slug), "neither was registered").toBe("hello");
   });
 
   test("scope rules", ({ store: s }) => {
-    expect(() => s.addBehavior(defineBehavior({ triggers: [L.qty], writes: [shape.total], run: () => {} }))).toThrow(/behaviors write only their own scope/);
-    expect(() => s.addBehavior(defineBehavior({ triggers: [L.qty, shape.other.item.x], run: () => {} }))).toThrow(/unrelated row scope/);
+    expect(() => s.addBehavior(defineBehavior({ triggers: [L.qty], writes: [shape.total], run: () => {} }))).toThrow(
+      /behaviors write only their own scope/,
+    );
+    expect(() => s.addBehavior(defineBehavior({ triggers: [L.qty, shape.other.item.x], run: () => {} }))).toThrow(
+      /unrelated row scope/,
+    );
     const row = s.substore(shape.lines).itemAt(0);
-    expect(() => row.addBehavior(defineBehavior({ triggers: [shape.title], writes: [shape.city], run: () => {} }))).toThrow(/add it to an outer store/);
+    expect(() =>
+      row.addBehavior(defineBehavior({ triggers: [shape.title], writes: [shape.city], run: () => {} })),
+    ).toThrow(/add it to an outer store/);
     const address = object({ city: field<string>() });
-    expect(() => s.addBehavior(defineBehavior({ triggers: [address.city], run: () => {} }))).toThrow(/not part of this form/);
+    expect(() => s.addBehavior(defineBehavior({ triggers: [address.city], run: () => {} }))).toThrow(
+      /not part of this form/,
+    );
   });
 });
 
@@ -377,8 +493,14 @@ describe("L · Rows", () => {
     let runs = 0;
     const s = createStore(shape, initial(), {
       behaviors: defineBehavior({
-        name: "sku", triggers: [L.qty], writes: [L.sku], runOn: { init: false },
-        run: (ctx) => { runs++; ctx.set(L.sku, `Q${ctx.get(L.qty)}`); },
+        name: "sku",
+        triggers: [L.qty],
+        writes: [L.sku],
+        runOn: { init: false },
+        run: (ctx) => {
+          runs++;
+          ctx.set(L.sku, `Q${ctx.get(L.qty)}`);
+        },
       }),
     });
     const lines = s.substore(shape.lines);
@@ -391,7 +513,7 @@ describe("L · Rows", () => {
     const snapshot = lines.current().slice();
     lines.remove(a);
     expect(runs, "removal does not run it").toBe(1);
-    s.set(shape.lines, snapshot);                        // undo
+    s.set(shape.lines, snapshot); // undo
     expect(lines.itemAt(0)).toBe(a);
     a.set(L.qty, 6);
     expect(a.get(L.sku), "resumed after restore").toBe("Q6");
@@ -400,7 +522,9 @@ describe("L · Rows", () => {
   test("nested rows", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehavior({
-        triggers: [N.text], writes: [N.len], run: (ctx) => ctx.set(N.len, ctx.get(N.text).length),
+        triggers: [N.text],
+        writes: [N.len],
+        run: (ctx) => ctx.set(N.len, ctx.get(N.text).length),
       }),
     });
     const row = s.substore(shape.lines).itemAt(0);
@@ -416,12 +540,14 @@ describe("L · Runtime registration", () => {
     const [a, b] = s.substore(shape.lines).items();
     const off = a.addBehavior(
       defineBehavior({
-        name: "lockAndTotal", triggers: [L.qty], writes: [L.sku.disabled, L.lineTotal],
+        name: "lockAndTotal",
+        triggers: [L.qty],
+        writes: [L.sku.disabled, L.lineTotal],
         run: (ctx) => {
           ctx.set(L.sku.disabled, ctx.get(L.qty) > 1);
           ctx.set(L.lineTotal, ctx.get(L.qty) * 100);
         },
-      })
+      }),
     );
     a.set(L.qty, 2);
     expect(a.get(L.sku.disabled)).toBe(true);
@@ -449,10 +575,14 @@ describe("L · Runtime registration", () => {
     const [a, b] = s.substore(shape.lines).items();
     const hint = (name: string) => defineBehavior({ name, triggers: [L.qty], writes: [L.sku.hint], run: () => {} });
     const off = s.addBehavior(hint("all"));
-    expect(() => b.addBehavior(hint("rowB"))).toThrow('Behavior "rowB": "lines[].sku#hint" is already written by "all" – one writer per target');
+    expect(() => b.addBehavior(hint("rowB"))).toThrow(
+      'Behavior "rowB": "lines[].sku#hint" is already written by "all" – one writer per target',
+    );
     off();
     b.addBehavior(hint("rowB"));
-    expect(() => s.addBehavior(hint("all"))).toThrow('Behavior "all": "lines[].sku#hint" is already written by "rowB" – one writer per target');
+    expect(() => s.addBehavior(hint("all"))).toThrow(
+      'Behavior "all": "lines[].sku#hint" is already written by "rowB" – one writer per target',
+    );
     a.addBehavior(hint("rowA"));
   });
 
@@ -462,42 +592,54 @@ describe("L · Runtime registration", () => {
     const other = b.substore(L.notes).append({ text: "x", len: 0 });
     const len = (name: string) => defineBehavior({ name, triggers: [N.text], writes: [N.len], run: () => {} });
     const offAll = s.addBehavior(len("all"));
-    expect(() => note.addBehavior(len("note"))).toThrow('Behavior "note": "lines[].notes[].len" is already written by "all" – one writer per target');
+    expect(() => note.addBehavior(len("note"))).toThrow(
+      'Behavior "note": "lines[].notes[].len" is already written by "all" – one writer per target',
+    );
     offAll();
     const off = a.addBehavior(len("line"));
-    expect(() => note.addBehavior(len("note"))).toThrow('Behavior "note": "lines[].notes[].len" is already written by "line" – one writer per target');
+    expect(() => note.addBehavior(len("note"))).toThrow(
+      'Behavior "note": "lines[].notes[].len" is already written by "line" – one writer per target',
+    );
     other.addBehavior(len("otherNote"));
     off();
     note.addBehavior(len("note"));
-    expect(() => a.addBehavior(len("line"))).toThrow('Behavior "line": "lines[].notes[].len" is already written by "note" – one writer per target');
-    expect(() => s.addBehavior(len("all"))).toThrow('Behavior "all": "lines[].notes[].len" is already written by "otherNote" – one writer per target');
+    expect(() => a.addBehavior(len("line"))).toThrow(
+      'Behavior "line": "lines[].notes[].len" is already written by "note" – one writer per target',
+    );
+    expect(() => s.addBehavior(len("all"))).toThrow(
+      'Behavior "all": "lines[].notes[].len" is already written by "otherNote" – one writer per target',
+    );
   });
 
   test("among conflicts in rows, the earliest registration is reported, then its first write", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
-    const w = (name: string, writes: WritableRef[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
+    const w = (name: string, writes: WritableRef[]) =>
+      defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
     b.addBehavior(w("disB", [L.sku.disabled]));
     a.addBehavior(w("hintA", [L.sku.hint]));
     a.addBehavior(w("disA", [L.sku.disabled]));
     expect(() => s.addBehavior(w("all", [L.sku.hint, L.sku.disabled]))).toThrow(
-      'Behavior "all": "lines[].sku#disabled" is already written by "disB" – one writer per target'
+      'Behavior "all": "lines[].sku#disabled" is already written by "disB" – one writer per target',
     );
   });
 
   test("a value write to the list conflicts with value writes in its rows, not with meta writes", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
-    const w = (name: string, writes: WritableRef[]) => defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
+    const w = (name: string, writes: WritableRef[]) =>
+      defineBehavior({ name, triggers: [L.price], writes, run: () => {} });
     a.addBehavior(w("disA", [L.sku.disabled]));
     const row = s.substore(shape.lines).append({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] });
     row.addBehavior(w("qty", [L.qty]));
     b.addBehavior(w("totals", [L.lineTotal, L.qty]));
-    expect(() => s.addBehavior(defineBehavior({ name: "list", triggers: [shape.title], writes: [shape.lines], run: () => {} }))).toThrow(
-      'Behavior "list": "lines" is already written by "qty" (via "lines[].qty") – one writer per target'
-    );
+    expect(() =>
+      s.addBehavior(defineBehavior({ name: "list", triggers: [shape.title], writes: [shape.lines], run: () => {} })),
+    ).toThrow('Behavior "list": "lines" is already written by "qty" (via "lines[].qty") – one writer per target');
   });
 
   test("root registration later: rows present and future", ({ store: s }) => {
-    const off = s.addBehavior(defineBehavior({ triggers: [L.qty], writes: [L.sku.hint], run: (c) => c.set(L.sku.hint, `x${c.get(L.qty)}`) }));
+    const off = s.addBehavior(
+      defineBehavior({ triggers: [L.qty], writes: [L.sku.hint], run: (c) => c.set(L.sku.hint, `x${c.get(L.qty)}`) }),
+    );
     const lines = s.substore(shape.lines);
     expect(lines.itemAt(1).get(L.sku.hint)).toBe("x2");
     expect(lines.append({ qty: 7 }).get(L.sku.hint)).toBe("x7");
@@ -532,7 +674,7 @@ describe("L · Default behaviors: touched, dirty", () => {
     s.set(shape.name, "Ann", { origin: "user" });
     expect(s.get(shape.name.dirty), "changed back").toBe(false);
     s.set(shape.name, "Bob");
-    s.set(shape.name, "Bob", { as: "initial" });           // saved: baseline catches up, value unchanged
+    s.set(shape.name, "Bob", { as: "initial" }); // saved: baseline catches up, value unchanged
     expect(s.get(shape.name.dirty)).toBe(false);
   });
 
@@ -608,7 +750,9 @@ describe("J · Feature default behaviors", () => {
     });
     const f = form(object({ a: field<string>(), b: field<string>().meta(mirror()) }));
     const other: unknown = f.a;
-    expect(() => createStore(f, { a: "", b: "" })).toThrow(/default behaviors may only use their own node \("b"\), got "a"/);
+    expect(() => createStore(f, { a: "", b: "" })).toThrow(
+      /default behaviors may only use their own node \("b"\), got "a"/,
+    );
   });
 });
 
@@ -616,7 +760,9 @@ describe("L · Counts as triggers", () => {
   test("a count as a trigger re-runs when the count changes, including on row removal", () => {
     const dirtyCount = countIn(shape, dirty);
     const mirror = defineBehavior({
-      name: "dirtyCount", triggers: [dirtyCount], writes: [shape.subtotal],
+      name: "dirtyCount",
+      triggers: [dirtyCount],
+      writes: [shape.subtotal],
       run: (ctx) => ctx.set(shape.subtotal, ctx.get(dirtyCount)),
     });
     const s = createStore(shape, initial(), { behaviors: mirror });
@@ -633,8 +779,12 @@ describe("J · More registration checks", () => {
   test("only values and meta keys can be written", () => {
     const writeCount = defineBehavior({ name: "c", writes: [countIn(shape, dirty) as never], run: () => {} });
     const writeInitial = defineBehavior({ name: "i", writes: [initialOf(shape.total) as never], run: () => {} });
-    expect(() => createStore(shape, initial(), { behaviors: writeCount })).toThrow(/only values and meta keys are writable/);
-    expect(() => createStore(shape, initial(), { behaviors: writeInitial })).toThrow(/only values and meta keys are writable/);
+    expect(() => createStore(shape, initial(), { behaviors: writeCount })).toThrow(
+      /only values and meta keys are writable/,
+    );
+    expect(() => createStore(shape, initial(), { behaviors: writeInitial })).toThrow(
+      /only values and meta keys are writable/,
+    );
   });
 
   test("behaviors can't be added to a detached row", ({ lines }) => {
@@ -649,11 +799,18 @@ describe("J · More registration checks", () => {
     ["pendingOf", pendingOf(shape.title)],
   ])("an origins filter on a %s trigger throws at registration", (_, tally) => {
     const config = { name: "filtered", origins: ["user"] as const, run: () => {} };
-    const fails = (behavior: ReturnType<typeof defineBehavior>) => () => createStore(shape, initial(), { behaviors: behavior });
+    const fails = (behavior: ReturnType<typeof defineBehavior>) => () =>
+      createStore(shape, initial(), { behaviors: behavior });
     const message = `Behavior "filtered": "${tally.path}" carries no origins (it is a tally) – drop the origins filter or the reference`;
     expect(fails(defineBehavior({ ...config, triggers: [tally] }))).toThrow(message);
-    expect(fails(defineBehavior({ ...config, when: when([tally], () => true) })), "a guard reference triggers too").toThrow(message);
-    expect(fails(defineBehavior({ ...config, triggers: [shape.title], reads: [tally] })), "reads are fine").not.toThrow();
+    expect(
+      fails(defineBehavior({ ...config, when: when([tally], () => true) })),
+      "a guard reference triggers too",
+    ).toThrow(message);
+    expect(
+      fails(defineBehavior({ ...config, triggers: [shape.title], reads: [tally] })),
+      "reads are fine",
+    ).not.toThrow();
   });
 });
 
@@ -661,12 +818,22 @@ describe("K · Ordering edges", () => {
   test("container edge: a row writer runs before a root behavior reading the whole array", () => {
     const log: string[] = [];
     const perRow = defineBehavior({
-      name: "row", triggers: [L.qty], writes: [L.lineTotal],
+      name: "row",
+      triggers: [L.qty],
+      writes: [L.lineTotal],
       run: (c) => (log.push("row"), c.set(L.lineTotal, c.get(L.qty) * 10)),
     });
     const sum = defineBehavior({
-      name: "sum", triggers: [shape.lines], writes: [shape.subtotal],
-      run: (c) => (log.push("sum"), c.set(shape.subtotal, c.get(shape.lines).reduce((t, l) => t + l.lineTotal, 0))),
+      name: "sum",
+      triggers: [shape.lines],
+      writes: [shape.subtotal],
+      run: (c) => (
+        log.push("sum"),
+        c.set(
+          shape.subtotal,
+          c.get(shape.lines).reduce((t, l) => t + l.lineTotal, 0),
+        )
+      ),
     });
     const s = createStore(shape, initial(), { behaviors: [sum, perRow] }); // registered downstream-first
     expect(s.get(shape.subtotal)).toBe(10 + 20);
@@ -695,7 +862,9 @@ describe("K · Run order across registration changes", () => {
   // A behavior that logs its runs and writes `to` from its first trigger.
   const step = (log: string[], name: string, triggers: NumberField[], to: NumberField) =>
     defineBehavior({
-      name, triggers, writes: [to],
+      name,
+      triggers,
+      writes: [to],
       run: (c) => (log.push(name), c.set(to, c.get(triggers[0]) + 1)),
     });
 
@@ -729,7 +898,9 @@ describe("K · Run order across registration changes", () => {
   test("disposing a link of a dependent's longest chain leaves it after the next longest", () => {
     const log: string[] = [];
     // `a` is registered first: with too low a rank it would run before `s2`.
-    const s = createStore(shape, initial(), { behaviors: step(log, "a", [shape.discount, shape.subtotal, shape.tax], shape.total) });
+    const s = createStore(shape, initial(), {
+      behaviors: step(log, "a", [shape.discount, shape.subtotal, shape.tax], shape.total),
+    });
     s.addBehavior(step(log, "p0", [shape.start], shape.discount));
     s.addBehavior(step(log, "s1", [shape.start], shape.end));
     s.addBehavior(step(log, "s2", [shape.end], shape.subtotal));
@@ -769,7 +940,12 @@ describe("K · Run order across registration changes", () => {
     const log: string[] = [];
     const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => void log.push("owner")) });
     s.addBehavior(
-      defineBehavior({ name: "w", triggers: [shape.title], writes: [shape.country], run: (c) => (log.push("w"), c.set(shape.country, c.get(shape.title))) })
+      defineBehavior({
+        name: "w",
+        triggers: [shape.title],
+        writes: [shape.country],
+        run: (c) => (log.push("w"), c.set(shape.country, c.get(shape.title))),
+      }),
     );
     const dispose = s.addBehavior(rule(shape.name, () => "Not x", { when: when([shape.country], (c) => c !== "x") }));
     log.length = 0;
@@ -798,7 +974,9 @@ describe("K · Run order between scope hosts", () => {
   test("a root writer runs before a row reader", ({ store: s, lines }) => {
     const log: string[] = [];
     const a = lines.itemAt(0);
-    a.addBehavior(logged(log, "row", [L.qty, shape.discount], L.lineTotal, (c) => c.get(L.qty) * (1 - c.get(shape.discount))));
+    a.addBehavior(
+      logged(log, "row", [L.qty, shape.discount], L.lineTotal, (c) => c.get(L.qty) * (1 - c.get(shape.discount))),
+    );
     s.addBehavior(logged(log, "root", [shape.start], shape.discount, (c) => c.get(shape.start) / 10));
     log.length = 0;
     s.batch(() => {
@@ -812,7 +990,11 @@ describe("K · Run order between scope hosts", () => {
   test("a row writer runs before a root reader that reads every row", ({ store: s, lines }) => {
     const log: string[] = [];
     const a = lines.itemAt(0);
-    s.addBehavior(logged(log, "sum", [shape.lines], shape.subtotal, (c) => c.get(shape.lines).reduce((t: number, l: Values["lines"][number]) => t + l.lineTotal, 0)));
+    s.addBehavior(
+      logged(log, "sum", [shape.lines], shape.subtotal, (c) =>
+        c.get(shape.lines).reduce((t: number, l: Values["lines"][number]) => t + l.lineTotal, 0),
+      ),
+    );
     a.addBehavior(logged(log, "row", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
     log.length = 0;
     a.set(L.qty, 3);
@@ -820,11 +1002,22 @@ describe("K · Run order between scope hosts", () => {
     expect(s.get(shape.subtotal), "row 1's lineTotal is 0").toBe(30 + 0);
   });
 
-  test("through nested rows: an enclosing writer runs before a nested reader, a nested writer before an enclosing reader", ({ store: s, lines }) => {
+  test("through nested rows: an enclosing writer runs before a nested reader, a nested writer before an enclosing reader", ({
+    store: s,
+    lines,
+  }) => {
     const log: string[] = [];
     const a = lines.itemAt(0);
     const note = a.substore(L.notes).itemAt(0);
-    note.addBehavior(logged(log, "note", [N.text, L.lineTotal, shape.discount], N.len, (c) => c.get(N.text).length + c.get(L.lineTotal) + c.get(shape.discount)));
+    note.addBehavior(
+      logged(
+        log,
+        "note",
+        [N.text, L.lineTotal, shape.discount],
+        N.len,
+        (c) => c.get(N.text).length + c.get(L.lineTotal) + c.get(shape.discount),
+      ),
+    );
     a.addBehavior(logged(log, "line", [L.qty], L.lineTotal, (c) => c.get(L.qty)));
     s.addBehavior(logged(log, "root", [shape.start], shape.discount, (c) => c.get(shape.start)));
     log.length = 0;
@@ -833,12 +1026,23 @@ describe("K · Run order between scope hosts", () => {
       a.set(L.qty, 4);
       s.set(shape.start, 5);
     });
-    expect(log, "the line, one host up, and the root, two up, in registration order, then the note").toEqual(["line", "root", "note"]);
+    expect(log, "the line, one host up, and the root, two up, in registration order, then the note").toEqual([
+      "line",
+      "root",
+      "note",
+    ]);
     expect(note.get(N.len)).toBe(3 + 4 + 5);
 
     const b = lines.itemAt(1);
     const other = b.substore(L.notes).append({ text: "x", len: 0 });
-    b.addBehavior(logged(log, "lens", [L.notes], L.sku, (c) => c.get(L.notes).map((n) => n.len).join(",")));
+    b.addBehavior(
+      logged(log, "lens", [L.notes], L.sku, (c) =>
+        c
+          .get(L.notes)
+          .map((n) => n.len)
+          .join(","),
+      ),
+    );
     other.addBehavior(logged(log, "len", [N.text], N.len, (c) => c.get(N.text).length));
     log.length = 0;
     other.set(N.text, "hello");
@@ -876,7 +1080,14 @@ describe("K · Run order between scope hosts", () => {
   test("a row reader of the whole list runs after a sibling row's writer", ({ lines }) => {
     const log: string[] = [];
     const [a, b] = lines.items();
-    a.addBehavior(logged(log, "reader", [shape.lines], L.sku, (c) => c.get(shape.lines).map((l) => l.lineTotal).join(",")));
+    a.addBehavior(
+      logged(log, "reader", [shape.lines], L.sku, (c) =>
+        c
+          .get(shape.lines)
+          .map((l) => l.lineTotal)
+          .join(","),
+      ),
+    );
     b.addBehavior(logged(log, "writer", [L.qty], L.lineTotal, (c) => c.get(L.qty) * 10));
     log.length = 0;
     b.set(L.qty, 5);
@@ -887,33 +1098,62 @@ describe("K · Run order between scope hosts", () => {
   test("sibling rows that each write from the whole list form a cycle", ({ lines }) => {
     const [a, b] = lines.items();
     const fromList = (name: string) =>
-      defineBehavior({ name, triggers: [shape.lines], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.lines).length) });
+      defineBehavior({
+        name,
+        triggers: [shape.lines],
+        writes: [L.qty],
+        run: (c) => c.set(L.qty, c.get(shape.lines).length),
+      });
     a.addBehavior(fromList("a"));
     expect(() => b.addBehavior(fromList("b"))).toThrow(
-      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "a", "b" – merge them into one behavior that writes all their targets'
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "a", "b" – merge them into one behavior that writes all their targets',
     );
   });
 
-  test("behaviors on sibling rows that would form a cycle only through their own fields are no cycle: each row runs its own", ({ store: s }) => {
+  test("behaviors on sibling rows that would form a cycle only through their own fields are no cycle: each row runs its own", ({
+    store: s,
+  }) => {
     const [a, b] = s.substore(shape.lines).items();
-    a.addBehavior(defineBehavior({ name: "qtyFromPrice", triggers: [L.price], writes: [L.qty], run: (c) => c.set(L.qty, c.get(L.price)) }));
-    b.addBehavior(defineBehavior({ name: "priceFromQty", triggers: [L.qty], writes: [L.price], run: (c) => c.set(L.price, c.get(L.qty)) }));
+    a.addBehavior(
+      defineBehavior({
+        name: "qtyFromPrice",
+        triggers: [L.price],
+        writes: [L.qty],
+        run: (c) => c.set(L.qty, c.get(L.price)),
+      }),
+    );
+    b.addBehavior(
+      defineBehavior({
+        name: "priceFromQty",
+        triggers: [L.qty],
+        writes: [L.price],
+        run: (c) => c.set(L.price, c.get(L.qty)),
+      }),
+    );
     expect([a.get(L.qty), b.get(L.price)], "init runs").toEqual([10, 2]);
     a.set(L.price, 7);
     b.set(L.qty, 3);
     expect([a.get(L.qty), a.get(L.price), b.get(L.qty), b.get(L.price)]).toEqual([7, 7, 3, 3]);
   });
 
-  test("a cycle through a row and the root is reported with what follows it; nothing is registered", ({ store: s, lines }) => {
+  test("a cycle through a row and the root is reported with what follows it; nothing is registered", ({
+    store: s,
+    lines,
+  }) => {
     const [a, b] = lines.items();
     s.addBehavior(defineBehavior({ name: "sum", triggers: [shape.lines], writes: [shape.discount], run: () => {} }));
     s.addBehavior(defineBehavior({ name: "after", triggers: [shape.discount], writes: [shape.total], run: () => {} }));
     // Meta writes: not part of the list's value, so not read by "sum".
     b.addBehavior(defineBehavior({ name: "hint", triggers: [shape.discount], writes: [L.sku.hint], run: () => {} }));
     b.addBehavior(defineBehavior({ name: "unrelated", triggers: [L.price], writes: [L.sku.disabled], run: () => {} }));
-    const qty = defineBehavior({ name: "qty", triggers: [shape.discount], writes: [L.qty], run: (c) => c.set(L.qty, c.get(shape.discount)) });
+    const qty = defineBehavior({
+      name: "qty",
+      triggers: [shape.discount],
+      writes: [L.qty],
+      run: (c) => c.set(L.qty, c.get(shape.discount)),
+    });
     expect(() => a.addBehavior(qty)).toThrow(
-      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "sum", "after", "hint", "qty" – merge them into one behavior that writes all their targets'
+      'Behaviors form a cycle: "lines[].qty#touched", "lines[].qty#dirty", "sum", "after", "hint", "qty" – merge them into one behavior that writes all their targets',
     );
     s.set(shape.discount, 9);
     expect(a.get(L.qty), "not registered").toBe(1);
@@ -924,7 +1164,9 @@ describe("L · The run context", () => {
   test("ctx.changed is false on the init run and true only for triggers that changed", () => {
     const seen: string[] = [];
     const b = defineBehavior({
-      name: "c", triggers: [shape.start, shape.end], writes: [shape.total],
+      name: "c",
+      triggers: [shape.start, shape.end],
+      writes: [shape.total],
       run: (ctx) => {
         seen.push(`${ctx.changed(shape.start)}:${ctx.changed(shape.end)}`);
         ctx.set(shape.total, 0);
@@ -942,7 +1184,9 @@ describe("L · The run context", () => {
   test("within one run the last ctx.set wins, and ctx.get sees the pending write", () => {
     let readBack: number | undefined;
     const b = defineBehavior({
-      name: "w", triggers: [shape.start], writes: [shape.total],
+      name: "w",
+      triggers: [shape.start],
+      writes: [shape.total],
       run: (ctx) => {
         ctx.set(shape.total, 1);
         readBack = ctx.get(shape.total);
@@ -957,14 +1201,19 @@ describe("L · The run context", () => {
   test("a run reads an initial value through initialOf(node), which it declares", () => {
     const e = errors();
     const undeclared = defineBehavior({
-      name: "undeclared", triggers: [shape.title], writes: [shape.slug],
+      name: "undeclared",
+      triggers: [shape.title],
+      writes: [shape.slug],
       run: (ctx) => ctx.set(shape.slug, ctx.get(initialOf(shape.title))),
     });
     createStore(shape, initial(), { behaviors: undeclared, onError: e.onError });
     expect(String(e.list[0]?.error)).toMatch(/"title#initial" is not declared in triggers, reads, writes or when/);
 
     const declared = defineBehavior({
-      name: "declared", triggers: [shape.start], reads: [initialOf(shape.title)], writes: [shape.slug],
+      name: "declared",
+      triggers: [shape.start],
+      reads: [initialOf(shape.title)],
+      writes: [shape.slug],
       run: (ctx) => ctx.set(shape.slug, ctx.get(initialOf(shape.title)) + "!"),
     });
     const s = createStore(shape, initial(), { behaviors: declared });
@@ -976,13 +1225,22 @@ describe("J · Handles and the default onError", () => {
   test("replaceBehavior rejects a handle of another store and a disposed handle", () => {
     const s1 = createStore(shape, initial());
     const s2 = createStore(shape, initial());
-    const make = () => defineBehavior({ triggers: [shape.title], writes: [shape.slug], run: (c) => c.set(shape.slug, c.get(shape.title)) });
+    const make = () =>
+      defineBehavior({
+        triggers: [shape.title],
+        writes: [shape.slug],
+        run: (c) => c.set(shape.slug, c.get(shape.title)),
+      });
     const h1 = s1.addBehavior(make());
     expect(() => s2.replaceBehavior(h1, make())).toThrow("replace(): not a handle of this store");
     const h2 = s1.replaceBehavior(h1, make());
-    expect(() => s1.replaceBehavior(h1, make()), "replaced").toThrow("replace(): the handle was already disposed or replaced");
+    expect(() => s1.replaceBehavior(h1, make()), "replaced").toThrow(
+      "replace(): the handle was already disposed or replaced",
+    );
     h2();
-    expect(() => s1.replaceBehavior(h2, make()), "disposed").toThrow("replace(): the handle was already disposed or replaced");
+    expect(() => s1.replaceBehavior(h2, make()), "disposed").toThrow(
+      "replace(): the handle was already disposed or replaced",
+    );
   });
 
   test("the default onError logs the behavior name and scope via console.error", () => {
@@ -992,7 +1250,14 @@ describe("J · Handles and the default onError", () => {
     try {
       const boom = new Error("boom");
       createStore(shape, initial(), {
-        behaviors: defineBehavior({ name: "exploding", triggers: [L.qty], writes: [L.lineTotal], run: () => { throw boom; } }),
+        behaviors: defineBehavior({
+          name: "exploding",
+          triggers: [L.qty],
+          writes: [L.lineTotal],
+          run: () => {
+            throw boom;
+          },
+        }),
       });
       expect(logged.map((a) => a[0])).toEqual([
         '[form] "exploding" failed at "lines[0]"',
@@ -1007,8 +1272,7 @@ describe("J · Handles and the default onError", () => {
 
 describe("J · Atomic replacement", () => {
   const { shape, L, initial } = limits;
-  const test = base
-    .extend("store", () => createStore(shape, initial()));
+  const test = base.extend("store", () => createStore(shape, initial()));
 
   // ---------------------------------------------------------------------------
   // Atomic replacement
@@ -1016,13 +1280,21 @@ describe("J · Atomic replacement", () => {
     const h = s.addBehavior(rule(shape.name, () => "A"));
     const seen: (string | undefined)[] = [];
     s.subscribe(shape.name.error, () => seen.push(s.get(shape.name.error)));
-    s.replaceBehavior(h, rule(shape.name, () => "B"));
+    s.replaceBehavior(
+      h,
+      rule(shape.name, () => "B"),
+    );
     expect(seen).toEqual(["B"]);
   });
 
   test("replacing a behavior that writes the same meta: no notification", ({ store: s }) => {
     const lock = (name: string) =>
-      defineBehavior({ name, triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, true) });
+      defineBehavior({
+        name,
+        triggers: [shape.name],
+        writes: [shape.flag.disabled],
+        run: (c) => c.set(shape.flag.disabled, true),
+      });
     const h = s.addBehavior(lock("a"));
     expect(s.get(shape.flag.disabled)).toBe(true);
     let calls = 0;
@@ -1036,11 +1308,28 @@ describe("J · Atomic replacement", () => {
   });
 
   test("a failing replacement keeps the previous registration", ({ store: s }) => {
-    s.addBehavior(defineBehavior({ name: "other", triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, true) }));
-    const h = s.addBehavior(
-      defineBehavior({ name: "mine", triggers: [shape.name], writes: [shape.name.note], run: (c) => c.set(shape.name.note, c.get(shape.name)) })
+    s.addBehavior(
+      defineBehavior({
+        name: "other",
+        triggers: [shape.name],
+        writes: [shape.flag.disabled],
+        run: (c) => c.set(shape.flag.disabled, true),
+      }),
     );
-    const clash = defineBehavior({ name: "next", triggers: [shape.name], writes: [shape.flag.disabled], run: () => {} });
+    const h = s.addBehavior(
+      defineBehavior({
+        name: "mine",
+        triggers: [shape.name],
+        writes: [shape.name.note],
+        run: (c) => c.set(shape.name.note, c.get(shape.name)),
+      }),
+    );
+    const clash = defineBehavior({
+      name: "next",
+      triggers: [shape.name],
+      writes: [shape.flag.disabled],
+      run: () => {},
+    });
     expect(() => s.replaceBehavior(h, clash)).toThrow(/already written by "other"/);
     s.set(shape.name, "Kim");
     expect(s.get(shape.name.note), "previous behavior still runs").toBe("Kim");
@@ -1052,7 +1341,10 @@ describe("J · Atomic replacement", () => {
 
   test("handles: old handle is inert after replace; replacing twice throws", ({ store: s }) => {
     const h = s.addBehavior(rule(shape.name, () => "A"));
-    const h2 = s.replaceBehavior(h, rule(shape.name, () => "B"));
+    const h2 = s.replaceBehavior(
+      h,
+      rule(shape.name, () => "B"),
+    );
     h();
     expect(s.get(shape.name.error), "disposing the old handle does nothing").toBe("B");
     expect(() => s.replaceBehavior(h, [])).toThrow(/already disposed or replaced/);

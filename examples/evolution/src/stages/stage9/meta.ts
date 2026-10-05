@@ -14,4 +14,3 @@ export const meta: StageMeta = {
   notes:
     "An array is a shape whose item is a template. append() needs no arguments thanks to `create`. Per-row rules attach with b.each — required names here, but anything a field supports works inside a row. The kicker: estimatedBudget lists the travelers array as a source, so adding or removing a row recomputes it — same declaration as stage 4.",
 };
-

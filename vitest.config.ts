@@ -1,14 +1,15 @@
-import { defineConfig } from 'vitest/config';
-import { playwright } from '@vitest/browser-playwright';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { playwright } from "@vitest/browser-playwright";
+import { defineConfig } from "vitest/config";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 // Pre-bundled up front: discovering them mid-run makes Vite reload the page
 // and fail the files that were loading (always on a cold cache).
 const optimizeDeps = {
-  include: ['react', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client', 'vitest-browser-react'],
+  include: ["react", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "vitest-browser-react"],
 };
 
 // A fresh object per project: Vitest names the instances in place.
@@ -16,7 +17,7 @@ const browser = () => ({
   enabled: true,
   provider: playwright(),
   headless: true,
-  instances: [{ browser: 'chromium' as const }],
+  instances: [{ browser: "chromium" as const }],
 });
 
 export default defineConfig({
@@ -27,24 +28,24 @@ export default defineConfig({
         // The core: shapes, stores, behaviors, validation. No DOM needed.
         extends: true,
         test: {
-          name: 'unit',
-          environment: 'node',
-          include: ['test/**/*.test.ts'],
-          exclude: ['test/react/**'],
+          name: "unit",
+          environment: "node",
+          include: ["test/**/*.test.ts"],
+          exclude: ["test/react/**"],
           // `npm run bench` selects this project as "unit (bench)".
-          benchmark: { include: ['bench/**/*.bench.ts'] },
+          benchmark: { include: ["bench/**/*.bench.ts"] },
         },
       },
       {
         // Recipes: built only on the core entry, imported as `anyshape`.
         extends: true,
         resolve: {
-          alias: [{ find: /^anyshape$/, replacement: resolve(here, 'src/index.ts') }],
+          alias: [{ find: /^anyshape$/, replacement: resolve(here, "src/index.ts") }],
         },
         test: {
-          name: 'recipes',
-          environment: 'node',
-          include: ['recipes/**/*.test.ts'],
+          name: "recipes",
+          environment: "node",
+          include: ["recipes/**/*.test.ts"],
         },
       },
       {
@@ -52,8 +53,8 @@ export default defineConfig({
         extends: true,
         optimizeDeps,
         test: {
-          name: 'react',
-          include: ['test/react/**/*.test.tsx'],
+          name: "react",
+          include: ["test/react/**/*.test.tsx"],
           browser: browser(),
         },
       },
@@ -64,14 +65,14 @@ export default defineConfig({
         extends: true,
         resolve: {
           alias: [
-            { find: /^anyshape$/, replacement: resolve(here, 'src/index.ts') },
-            { find: /^anyshape\/react$/, replacement: resolve(here, 'src/react/index.ts') },
+            { find: /^anyshape$/, replacement: resolve(here, "src/index.ts") },
+            { find: /^anyshape\/react$/, replacement: resolve(here, "src/react/index.ts") },
           ],
         },
         optimizeDeps,
         test: {
-          name: 'recipes-react',
-          include: ['recipes/react/**/*.test.tsx'],
+          name: "recipes-react",
+          include: ["recipes/react/**/*.test.tsx"],
           browser: browser(),
         },
       },

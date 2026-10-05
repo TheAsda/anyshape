@@ -11,9 +11,9 @@
 // reading the outside world (fetch) is fine.
 // ============================================================
 
-import type { AnyNode, InferValue } from "./shape.js";
-import { MetaRef } from "./refs/meta.js";
 import { isDev } from "./internal.js";
+import { MetaRef } from "./refs/meta.js";
+import type { AnyNode, InferValue } from "./shape.js";
 import type { AnyRef, RefValue, Origin } from "./store.js";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
@@ -30,7 +30,7 @@ export interface Guard {
 /** A condition over declared references. Its references become triggers. */
 export function when<const Rs extends readonly AnyRef[]>(
   refs: Rs,
-  test: (...values: { -readonly [K in keyof Rs]: RefValue<Rs[K]> }) => boolean
+  test: (...values: { -readonly [K in keyof Rs]: RefValue<Rs[K]> }) => boolean,
 ): Guard {
   return { refs, test: test as (...values: any[]) => boolean };
 }
@@ -123,13 +123,14 @@ export class Contribution<P = unknown> {
   constructor(
     readonly target: MetaRef<any, P>,
     readonly payload: P,
-    readonly decl: Declaration
+    readonly decl: Declaration,
   ) {}
 }
 
 /** Contribute `payload` to the owner of a combined key. The payload type comes from the key. */
 export function contribute<P>(target: MetaRef<any, P>, payload: NoInfer<P>, decl: Declaration = {}): Contribution<P> {
-  if (!(target instanceof MetaRef)) throw new Error(`contribute(): the target must be a meta key reference, got ${String(target)}`);
+  if (!(target instanceof MetaRef))
+    throw new Error(`contribute(): the target must be a meta key reference, got ${String(target)}`);
   return new Contribution(target, payload, decl);
 }
 
@@ -146,7 +147,10 @@ export class Behavior {
   /** @internal */ readonly _trace: Error | undefined;
 
   /** @internal */
-  constructor(readonly config: BehaviorConfig, internals: BehaviorInternals = {}) {
+  constructor(
+    readonly config: BehaviorConfig,
+    internals: BehaviorInternals = {},
+  ) {
     this._self = internals.self;
     this._trace = internals.trace;
   }
@@ -160,7 +164,10 @@ export function defineBehavior(config: BehaviorConfig): Behavior {
   let trace: Error | undefined;
   if (isDev()) {
     trace = new Error();
-    (Error as { captureStackTrace?: (target: object, fn: Function) => void }).captureStackTrace?.(trace, defineBehavior);
+    (Error as { captureStackTrace?: (target: object, fn: Function) => void }).captureStackTrace?.(
+      trace,
+      defineBehavior,
+    );
   }
   return new Behavior(config, { trace });
 }

@@ -1,17 +1,31 @@
 // Pending: pendingIn(node, def?) / pendingOf(target), on the tally channel.
 
-import { form, object, array, field, metaKey, createStore, defineBehavior, when, pendingIn, pendingOf } from "../src/index";
 import { describe, expect, test } from "vitest";
+
+import {
+  form,
+  object,
+  array,
+  field,
+  metaKey,
+  createStore,
+  defineBehavior,
+  when,
+  pendingIn,
+  pendingOf,
+} from "../src/index";
 import { deferred, flush } from "./support/harness";
 
 const checked = metaKey(false);
 const flagged = metaKey(false);
 
-const shape = form(object({
-  a: field<string>().meta({ checked }),
-  b: field<string>().meta({ checked, flagged }),
-  rows: array(object({ qty: field<number>().meta({ ok: checked }) })),
-}));
+const shape = form(
+  object({
+    a: field<string>().meta({ checked }),
+    b: field<string>().meta({ checked, flagged }),
+    rows: array(object({ qty: field<number>().meta({ ok: checked }) })),
+  }),
+);
 const R = shape.rows.item;
 const initial = () => ({ a: "", b: "", rows: [{ qty: 1 }, { qty: 2 }] });
 
@@ -38,7 +52,14 @@ describe("Pending", () => {
       defineBehavior({
         name: "check qty",
         triggers: [R.qty],
-        reads: [pendingIn(shape), pendingIn(shape, checked), pendingIn(shape, flagged), pendingIn(R, checked), pendingOf(R.qty.ok), pendingOf(R.qty)],
+        reads: [
+          pendingIn(shape),
+          pendingIn(shape, checked),
+          pendingIn(shape, flagged),
+          pendingIn(R, checked),
+          pendingOf(R.qty.ok),
+          pendingOf(R.qty),
+        ],
         writes: [R.qty.ok],
         run: (ctx) => {
           seen.push([
@@ -50,7 +71,7 @@ describe("Pending", () => {
             ctx.get(pendingOf(R.qty)),
           ]);
         },
-      })
+      }),
     );
     // One instance per row; only the running row is in flight.
     expect(seen).toEqual([
@@ -64,7 +85,9 @@ describe("Pending", () => {
   test("sync runs end within the flush, so pending never notifies", () => {
     const s = createStore(shape, initial());
     const row = s.substore(shape.rows).itemAt(1);
-    s.addBehavior(defineBehavior({ triggers: [R.qty], writes: [R.qty.ok], run: (ctx) => ctx.set(R.qty.ok, ctx.get(R.qty) > 2) }));
+    s.addBehavior(
+      defineBehavior({ triggers: [R.qty], writes: [R.qty.ok], run: (ctx) => ctx.set(R.qty.ok, ctx.get(R.qty) > 2) }),
+    );
 
     const fired: string[] = [];
     s.subscribe(pendingIn(shape, checked), () => fired.push("subscribe pendingIn"));
@@ -76,7 +99,7 @@ describe("Pending", () => {
         when: when([pendingOf(shape.a.checked)], (pending) => !pending),
         runOn: { init: false },
         run: () => void fired.push("behavior"),
-      })
+      }),
     );
 
     row.set(R.qty, 5);
@@ -99,7 +122,7 @@ describe("Pending · async runs", () => {
           await gate.promise;
           ctx.set(shape.a.checked, true);
         },
-      })
+      }),
     );
     return { gates, dispose };
   }
@@ -111,18 +134,30 @@ describe("Pending · async runs", () => {
     s.subscribe(pendingIn(shape, checked), () => seen.push(["in", s.get(pendingIn(shape, checked))]));
 
     const { gates, dispose } = checkA(s);
-    expect(seen.splice(0)).toEqual([["of", true], ["in", 1]]);
+    expect(seen.splice(0)).toEqual([
+      ["of", true],
+      ["in", 1],
+    ]);
 
     gates[0].resolve();
     await flush();
-    expect(seen.splice(0)).toEqual([["of", false], ["in", 0]]);
+    expect(seen.splice(0)).toEqual([
+      ["of", false],
+      ["in", 0],
+    ]);
 
     s.set(shape.a, "x");
     s.set(shape.a, "y"); // cancelled and rerun: still pending
-    expect(seen.splice(0)).toEqual([["of", true], ["in", 1]]);
+    expect(seen.splice(0)).toEqual([
+      ["of", true],
+      ["in", 1],
+    ]);
 
     dispose();
-    expect(seen.splice(0)).toEqual([["of", false], ["in", 0]]);
+    expect(seen.splice(0)).toEqual([
+      ["of", false],
+      ["in", 0],
+    ]);
   });
 
   test("removing a row subtracts its pending targets", async () => {
@@ -136,7 +171,7 @@ describe("Pending · async runs", () => {
         run: async () => {
           await deferred<void>().promise;
         },
-      })
+      }),
     );
     const rows = s.substore(shape.rows);
     rows.remove(rows.itemAt(0));
@@ -158,7 +193,7 @@ describe("Pending · async runs", () => {
           runs.push(ctx.get(pendingOf(shape.a.checked)));
           ctx.set(shape.b.flagged, ctx.get(pendingOf(shape.a.checked)));
         },
-      })
+      }),
     );
     const { gates } = checkA(s);
     expect(s.get(shape.b.flagged)).toBe(true);

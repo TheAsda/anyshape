@@ -14,10 +14,11 @@
 // trip them, in this demo), in addition to the live error.
 // ============================================================
 
-import { useId } from "react";
-import { useValue } from "anyshape/react";
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 import type { AnyNode } from "anyshape";
+import { useValue } from "anyshape/react";
+import { useId } from "react";
+
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 
 // Node types accepted by each component: a ControlNode whose value type
 // matches the input. Passing e.g. a number field to TextField is a type

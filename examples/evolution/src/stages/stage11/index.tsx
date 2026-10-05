@@ -8,16 +8,21 @@
 // both pairs.
 // ------------------------------------------------------------
 
+import { form, object, field, type InferValue, array, defineBehaviors, defineBehavior, type FieldNode } from "anyshape";
+import { StoreProvider, useForm, useArray, useValue } from "anyshape/react";
 import { useState } from "react";
+
 import {
-  form, object, field, type InferValue, array, defineBehaviors, defineBehavior,
-  type FieldNode,
-} from "anyshape";
-import {
-  control, submission, handleSubmit, visible, required, minLength, calculate, visibleWhen,
+  control,
+  submission,
+  handleSubmit,
+  visible,
+  required,
+  minLength,
+  calculate,
+  visibleWhen,
   clearWhen,
 } from "../../../../../recipes";
-import { StoreProvider, useForm, useArray, useValue } from "anyshape/react";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -91,19 +96,18 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   b.add(required(s.destination), minLength(s.destination, 2));
   b.add(required(s.startDate));
   b.add(required(s.endDate));
-  b.add(calculate(s.nights, [s.startDate, s.endDate], (start, end) =>
-    start !== "" && end !== ""
-      ? Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS)
-      : undefined,
-  ));
-  b.add(calculate(
-    s.estimatedBudget,
-    [s.nights, s.nightlyRate, s.travelers],
-    (nights, rate, travelers) =>
+  b.add(
+    calculate(s.nights, [s.startDate, s.endDate], (start, end) =>
+      start !== "" && end !== "" ? Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS) : undefined,
+    ),
+  );
+  b.add(
+    calculate(s.estimatedBudget, [s.nights, s.nightlyRate, s.travelers], (nights, rate, travelers) =>
       nights !== undefined && rate !== undefined && nights >= 0
         ? Math.round(nights * rate * travelers.length * 100) / 100
         : undefined,
-  ));
+    ),
+  );
   b.add(visibleWhen(s.car, [s.rentingCar], (renting) => renting));
   // One writer per field: clearWhen(car, …) would claim the
   // dates too and the store rejects two owners — so the clearing
@@ -113,20 +117,21 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   const hidden = (visible: boolean) => !visible;
   b.add(clearWhen(s.car.license, [s.car.visible], hidden), clearWhen(s.car.licenseExpiry, [s.car.visible], hidden));
   // The car rules apply only while the group is shown.
-  b.when([s.car.visible], (v) => v, (b) => {
-    b.add(required(s.car.license), minLength(s.car.license, 3));
-    b.add(required(s.car.licenseExpiry));
-  });
+  b.when(
+    [s.car.visible],
+    (v) => v,
+    (b) => {
+      b.add(required(s.car.license), minLength(s.car.license, 3));
+      b.add(required(s.car.licenseExpiry));
+    },
+  );
   b.each(s.travelers, (b, t) => {
     b.add(required(t.name));
   });
 
   // One factory, two pairs: the trip suggests a week, the
   // rental suggests a long weekend. The gap is data.
-  b.add(
-    twoDates(s.startDate, s.endDate, 7),
-    twoDates(s.car.pickupOn, s.car.dropoffOn, 3),
-  );
+  b.add(twoDates(s.startDate, s.endDate, 7), twoDates(s.car.pickupOn, s.car.dropoffOn, 3));
 });
 
 function Derived() {
@@ -135,10 +140,7 @@ function Derived() {
   return (
     <div className="field-group">
       <ReadonlyRow label="Nights" value={nights === undefined ? "—" : String(nights)} />
-      <ReadonlyRow
-        label="Estimated budget"
-        value={budget === undefined ? "—" : `€${budget.toFixed(2)}`}
-      />
+      <ReadonlyRow label="Estimated budget" value={budget === undefined ? "—" : `€${budget.toFixed(2)}`} />
     </div>
   );
 }
@@ -189,10 +191,7 @@ export function Stage() {
   const [submitted, setSubmitted] = useState<object | null>(null);
   return (
     <StoreProvider store={form}>
-      <form
-        className="stage-form"
-        onSubmit={handleSubmit(form, (values) => setSubmitted(values))}
-      >
+      <form className="stage-form" onSubmit={handleSubmit(form, (values) => setSubmitted(values))}>
         <TextField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <TextField node={shape.startDate} label="Departure" type="date" />
         <TextField node={shape.endDate} label="Return" type="date" />

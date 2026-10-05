@@ -4,16 +4,36 @@
 // a broken inference fails the typecheck, not the test run.
 // ============================================================
 
+import { test, expect, expectTypeOf } from "vitest";
+
 import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, contribute, defineBehavior, defineBehaviors,
-  type BehaviorContext, type InferValue, type InferMeta, type FieldNode, type AnyNode, type RefValue, type RootStore, MetaRef, type MetaKeyDef, type NoPayload,
+  form,
+  object,
+  array,
+  field,
+  metaKey,
+  createStore,
+  countIn,
+  initialOf,
+  contribute,
+  defineBehavior,
+  defineBehaviors,
+  type BehaviorContext,
+  type InferValue,
+  type InferMeta,
+  type FieldNode,
+  type AnyNode,
+  type RefValue,
+  type RootStore,
+  MetaRef,
+  type MetaKeyDef,
+  type NoPayload,
 } from "../src/index";
 import * as core from "../src/index";
 import { control, visible, disabled, submission, error } from "./support/features";
 import { rule } from "./support/rules";
-import { test, expect, expectTypeOf } from "vitest";
 
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;
 
 const person = object({ name: field<string>(), email: field<string>() });
@@ -35,7 +55,7 @@ const t = form(
     other: field<string>().meta(control(), { disabled }),
     withCreate: array(object({ k: field<string>(), n: field<number>() }), { create: () => ({ k: "", n: 0 }) }),
     noCreate: array(object({ k: field<string>() })),
-  }).meta(submission())
+  }).meta(submission()),
 );
 
 // ---------------------------------------------------------------------------
@@ -98,7 +118,13 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   // @ts-expect-error – .behavior() and .combine() don't make a key countable
   countIn(t, behaviorOnly);
   // Countable whatever step follows .aggregate().
-  countIn(t, metaKey(false).aggregate((v) => v).uses(error).behavior(() => ({ triggers: [], run: () => {} })));
+  countIn(
+    t,
+    metaKey(false)
+      .aggregate((v) => v)
+      .uses(error)
+      .behavior(() => ({ triggers: [], run: () => {} })),
+  );
   // @ts-expect-error – createStore is the one way to build a root store
   void new core.RootStore(t, {} as InferValue<typeof t>, () => ({}) as never);
 
@@ -114,7 +140,10 @@ const total = metaKey<number, { weight: number }>(0).combine((self, key) => ({
   name: `${self.path}#total`,
   writes: [key],
   run(ctx) {
-    ctx.set(key, ctx.parts.reduce((sum, p) => sum + p.payload.weight, 0));
+    ctx.set(
+      key,
+      ctx.parts.reduce((sum, p) => sum + p.payload.weight, 0),
+    );
     // @ts-expect-error – the key's value type is number
     ctx.set(key, "many");
     // @ts-expect-error – the payload type comes from the key
@@ -124,7 +153,11 @@ const total = metaKey<number, { weight: number }>(0).combine((self, key) => ({
 }));
 const reasons = metaKey<readonly string[], string>([]).combine((_self, key) => ({
   writes: [key],
-  run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
+  run: (ctx) =>
+    ctx.set(
+      key,
+      ctx.parts.map((p) => p.payload),
+    ),
 }));
 const ok = metaKey(false);
 const c = form(object({ n: field<number>().meta({ total, reasons, ok, plain: 0 }) }));
@@ -132,7 +165,9 @@ const c = form(object({ n: field<number>().meta({ total, reasons, ok, plain: 0 }
 type _c1 = Expect<Equal<RefValue<typeof c.n.total>, number>>;
 type _c2 = Expect<Equal<typeof c.n.total extends MetaRef<any, infer P> ? P : never, { weight: number }>>;
 type CM = InferMeta<typeof c.n>;
-type _c3 = Expect<Equal<[CM["total"], CM["reasons"], CM["ok"], CM["plain"]], [number, readonly string[], boolean, number]>>;
+type _c3 = Expect<
+  Equal<[CM["total"], CM["reasons"], CM["ok"], CM["plain"]], [number, readonly string[], boolean, number]>
+>;
 
 metaKey<number, { weight: number }>(0).combine((_s, k) => ({
   writes: [k],
@@ -218,7 +253,11 @@ export function removedOptionChecks() {
   // @ts-expect-error – a ref that never starts a run is declared in `reads`
   defineBehavior({ triggers: [t.text], runOn: { change: false }, run() {} });
   defineBehaviors(t, (b) => {
-    const guarded = b.when([t.text], (v) => v === "", () => {});
+    const guarded = b.when(
+      [t.text],
+      (v) => v === "",
+      () => {},
+    );
     // @ts-expect-error – one behavior computes both values of a target
     guarded.otherwise(() => {});
   });
@@ -249,8 +288,18 @@ test("node internals are not part of a node's type", () => {
 test("the type contract compiles (asserted by npm run typecheck)", () => {
   expect(t.a.name).not.toBe(t.b.name);
   const s = createStore(t, {
-    a: { name: "", email: "" }, b: { name: "", email: "" }, grid: [], optional: undefined,
-    text: "", count: 0, plain: 0, hidden: { x: "" }, off: "", other: "", withCreate: [], noCreate: [],
+    a: { name: "", email: "" },
+    b: { name: "", email: "" },
+    grid: [],
+    optional: undefined,
+    text: "",
+    count: 0,
+    plain: 0,
+    hidden: { x: "" },
+    off: "",
+    other: "",
+    withCreate: [],
+    noCreate: [],
   });
   expect(s.get(countIn(t, error))).toBe(0);
 });

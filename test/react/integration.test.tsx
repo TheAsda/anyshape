@@ -4,12 +4,13 @@
 
 import { test, expect } from "vitest";
 import { userEvent } from "vitest/browser";
+
 import { createStore, countIn, type ItemStore } from "../../src/index";
+import { StoreProvider, useArray, useBehaviors, useField, useValue } from "../../src/react/index";
 import { error } from "../support/features";
 import { pattern } from "../support/rules";
-import { StoreProvider, useArray, useBehaviors, useField, useValue } from "../../src/react/index";
-import { trip, T, tripBehaviors, savedBooking, quiet } from "../support/trip";
 import { render, renders } from "../support/test-utils";
+import { trip, T, tripBehaviors, savedBooking, quiet } from "../support/trip";
 
 const c = renders();
 
@@ -17,7 +18,9 @@ function NameField({ who }: { who: string }) {
   const f = useField(T.name);
   c.hit(`name:${who}`);
   const reveal = () => f.store.set(T.name.revealed, true, { origin: "user" });
-  return <input data-testid={`name-${who}`} value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={reveal} />;
+  return (
+    <input data-testid={`name-${who}`} value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={reveal} />
+  );
 }
 function PassportField({ who }: { who: string }) {
   useBehaviors((b) => b.add(pattern(T.passport, /^[A-Z]/, { message: "Starts with a letter" })), []);
@@ -65,7 +68,7 @@ test("INT9 a keystroke in one traveler re-renders only that field, and the count
       <Destination />
       <Travelers />
       <ErrorCounter />
-    </StoreProvider>
+    </StoreProvider>,
   );
   const errors = screen.getByTestId("errors");
   const [, tim] = s.substore(trip.travelers).items();
