@@ -178,7 +178,7 @@ export interface StoreOptions {
 }
 
 // ============================================================
-// Handles
+// Handles – the type addBehavior returns (the table: runtime.ts)
 // ============================================================
 /**
  * Returned by addBehavior: call it to remove the behaviors; pass it to

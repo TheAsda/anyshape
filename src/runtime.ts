@@ -242,7 +242,8 @@ function mergedRefs(counts: RefCounts, delta: OwnerDelta, pick: (d: Declaration)
   return [...next.values()].map((c) => c.ref);
 }
 
-interface Pending {
+/** A run's Cause (see GLOSSARY.md): the origins of its changes and which inputs changed. */
+interface Cause {
   changed: Set<string>;
   origins: Set<Origin>;
 }
@@ -263,7 +264,7 @@ const sameKey = (a: readonly unknown[], b: readonly unknown[]): boolean =>
 interface Flight {
   readonly controller: AbortController;
   /** What the run handles: passed on to its rerun when an input change cancels it. */
-  readonly cause: Pending;
+  readonly cause: Cause;
   /** Its targets are pending until it ends. */
   readonly tally: PendingRun;
   /** Subscriptions that cancel it (see watch()). */
@@ -325,7 +326,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   private readonly regs: Registration[] = [];
   /** Dependency edges and ranks of `regs`. */
   private readonly order = new RunOrder<Registration>();
-  private readonly pending = new Map<Binding, Pending>();
+  private readonly pending = new Map<Binding, Cause>();
   private readonly flights = new Map<Binding, Flight>();
   /** Instances whose kept-work slot holds work. */
   private readonly keeping = new Set<Binding>();
@@ -351,7 +352,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   runNext(): void {
     let min = Infinity;
     for (const b of this.pending.keys()) min = Math.min(min, b.reg.rank);
-    const batch: [Binding, Pending][] = [];
+    const batch: [Binding, Cause][] = [];
     for (const entry of this.pending) if (entry[0].reg.rank === min) batch.push(entry);
     batch.sort((a, b) => a[0].reg.seq - b[0].reg.seq || a[0].id - b[0].id);
     for (const [binding] of batch) this.pending.delete(binding);
@@ -927,7 +928,7 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   /** Ends the leaf's run in flight, if any: unwatches it and aborts its signal. Returns its cause. */
-  private cancel(leaf: Binding): Pending | undefined {
+  private cancel(leaf: Binding): Cause | undefined {
     const flight = this.flights.get(leaf);
     if (!flight) return;
     this.end(leaf, flight, true);
@@ -984,14 +985,14 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   // ---- running ----
-  private run(leaf: Binding, p: Pending): void {
+  private run(leaf: Binding, p: Cause): void {
     if (leaf.reg.disposed || !leaf.host.isAttached()) return;
     const probe = this.store._probe;
     if (!probe) return this.execute(leaf, p);
     timed(probe, leaf, () => this.execute(leaf, p), () => (this.flights.has(leaf) ? "async" : "sync"));
   }
 
-  private execute(leaf: Binding, p: Pending): void {
+  private execute(leaf: Binding, p: Cause): void {
     const reg = leaf.reg;
     const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concretePath(leaf.host, leaf.host.node) });
 

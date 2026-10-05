@@ -31,6 +31,8 @@ export default defineConfig({
           environment: 'node',
           include: ['test/**/*.test.ts'],
           exclude: ['test/react/**'],
+          // `npm run bench` selects this project as "unit (bench)".
+          benchmark: { include: ['bench/**/*.bench.ts'] },
         },
       },
       {
