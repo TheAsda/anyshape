@@ -6,6 +6,7 @@ import {
 import { control, touched, disabled, type FocusTarget, dirty, error } from "./test/features";
 import { rule, max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
+import { watchOrigins } from "./test/harness";
 import * as company from "./test/fixtures/company";
 import * as limits from "./test/fixtures/limits";
 
@@ -16,7 +17,7 @@ describe("G · Origins, baselines and reset", () => {
     .extend("lines", ({ store }) => store.substore(shape.lines));
 
   test("reactions receive the origin of the write", ({ store: s }) => {
-    const seen = originsOf((rec) => s.react(shape.name, (_n, _p, info) => rec(info.origins)));
+    const seen = originsOf((rec) => s._react(shape.name, (_n, _p, info) => rec(info.origins)));
     s.set(shape.name, "U", { origin: "user" });
     s.set(shape.name, "P");
     s.set(shape.name, "I", { as: "initial" });
@@ -26,8 +27,8 @@ describe("G · Origins, baselines and reset", () => {
   test("origins are tracked per target within one batch", ({ store: s }) => {
     const name: Origin[][] = [];
     const email: Origin[][] = [];
-    s.react(shape.name, (_n, _p, i) => name.push([...i.origins]));
-    s.react(shape.email, (_n, _p, i) => email.push([...i.origins]));
+    s._react(shape.name, (_n, _p, i) => name.push([...i.origins]));
+    s._react(shape.email, (_n, _p, i) => email.push([...i.origins]));
     s.batch(() => {
       s.set(shape.name, "U", { origin: "user" });
       s.set(shape.email, "p@x.io");
@@ -40,8 +41,8 @@ describe("G · Origins, baselines and reset", () => {
     const row = lines.itemAt(0);
     const toRoot: Origin[][] = [];
     const toRow: Origin[][] = [];
-    s.react(shape.lines, (_n, _p, i) => toRoot.push([...i.origins]));
-    row.react(L.sku, (_n, _p, i) => toRow.push([...i.origins]));
+    s._react(shape.lines, (_n, _p, i) => toRoot.push([...i.origins]));
+    row._react(L.sku, (_n, _p, i) => toRow.push([...i.origins]));
 
     row.set(L.sku, "Z", { origin: "user" });              // row → enclosing array
     expect(toRoot).toEqual([["user"]]);
@@ -55,14 +56,14 @@ describe("G · Origins, baselines and reset", () => {
   test("a write in one row is not an origin for another row", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
     let bCalls = 0;
-    b.react(L.sku, () => bCalls++);
+    b._react(L.sku, () => bCalls++);
     a.set(L.sku, "Z", { origin: "user" });
     expect(bCalls).toBe(0);
   });
 
   test("meta reactions receive origins", ({ store: s }) => {
     const seen: Origin[][] = [];
-    s.react(shape.name.error, (_n, _p, i) => seen.push([...i.origins]));
+    s._react(shape.name.error, (_n, _p, i) => seen.push([...i.origins]));
     s.set(shape.name.error, "x", { origin: "behavior:required" });
     expect(seen).toEqual([["behavior:required"]]);
   });
@@ -162,10 +163,9 @@ describe("G · Origins, baselines and reset", () => {
   });
 
   // ---------------------------------------------------------------------------
-  test("reset writes with origin \"initial\": reactions see it, touched does not flip", ({ store: s }) => {
+  test("reset writes with origin \"initial\": behaviors see it, touched does not flip", ({ store: s }) => {
     s.set(shape.name, "Bob");
-    const origins: Origin[][] = [];
-    s.react(shape.name, (_n, _p, info) => origins.push([...info.origins]));
+    const origins = watchOrigins(s, shape.name);
     s.reset();
     expect(s.get(shape.name)).toBe("Ann");
     expect(origins).toEqual([["initial"]]);

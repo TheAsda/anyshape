@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { test, expect } from "vitest";
 import {
-  form, object, array, field, createStore, countIn, type InferValue, type Origin,
+  form, object, array, field, createStore, countIn, type InferValue,
   type ItemStore,
 } from "../index";
 import { control, error } from "../test/features";
 import { rule } from "../test/rules";
+import { watchOrigins } from "../test/harness";
 import { StoreProvider, useStore, useValue, useField, useArray } from "./index";
 import { render, settle, renders } from "./test-utils";
 
@@ -204,8 +205,7 @@ test("resolution errors", async () => {
 // useField
 test("useField: value, onChange (origin user)", async () => {
   const s = createStore(shape, initial());
-  const origins: Origin[][] = [];
-  s.react(shape.label, (_n, _p, info) => origins.push([...info.origins]));
+  const origins = watchOrigins(s, shape.label);
   let field!: ReturnType<typeof useField<typeof shape.label>>;
   function F() {
     field = useField(shape.label);
@@ -267,8 +267,7 @@ test("useArray: the list re-renders on structure only; a row edit re-renders tha
   await expect.element(list).toHaveTextContent("A=1B=7");
   expect(c.counts, "only row B re-rendered").toEqual({ "row:B": 1 });
 
-  const origins: Origin[][] = [];
-  s.react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
+  const origins = watchOrigins(s, shape.lines);
   await settle(() => void lines.append({ sku: "C" }));
   await expect.element(list).toHaveTextContent("A=1B=7C=1");
   expect(origins, "helpers write as the user").toEqual([["user"]]);
@@ -337,8 +336,7 @@ test("useArray: insert and move through the hook; an explicit origin replaces th
       </ul>
     );
   }
-  const origins: Origin[][] = [];
-  s.react(shape.lines, (_n, _p, info) => origins.push([...info.origins]));
+  const origins = watchOrigins(s, shape.lines);
   const screen = await render(
     <StoreProvider store={s}>
       <List />
@@ -365,8 +363,7 @@ test("useField on a node without meta: onChange writes as the user", async () =>
     field = useField(shape.note);
     return <span data-testid="note">{field.value}</span>;
   }
-  const origins: Origin[][] = [];
-  s.react(shape.note, (_n, _p, info) => origins.push([...info.origins]));
+  const origins = watchOrigins(s, shape.note);
   const screen = await render(
     <StoreProvider store={s}>
       <Note />

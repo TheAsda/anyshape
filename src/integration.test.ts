@@ -77,7 +77,7 @@ test("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta
   expect(tim.get(T.isAdult)).toBe(false);
   expect(s.get(trip.seats)).toBe(2);
 
-  // A new row is computed before any UI listener sees it.
+  // A new row is computed before any listener sees it.
   const seenAtNotification: boolean[] = [];
   const offItems = travelers.subscribeItems(() => {
     const newest = travelers.items().at(-1)!;

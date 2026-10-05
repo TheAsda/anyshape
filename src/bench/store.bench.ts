@@ -21,7 +21,7 @@ const createProductionStore: typeof createStore = (...args) => {
 };
 
 // ---------------------------------------------------------------------------
-// A flat form: 500 fields on the root, each with a UI listener
+// A flat form: 500 fields on the root, each with a listener
 const FLAT = 500;
 const flat = form(object(Object.fromEntries(Array.from({ length: FLAT }, (_, i) => [`f${i}`, field<string>().meta(control())]))));
 const flatNodes = flat as unknown as Record<string, any>;

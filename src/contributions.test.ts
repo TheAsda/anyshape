@@ -256,7 +256,7 @@ describe("Calls", () => {
   test("behaviors and contributions in one call land in one flush, ranked by their declarations", ({ log }) => {
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "base") });
     const seen: unknown[] = [];
-    s.react(shape.a.tags, (v) => seen.push(v));
+    s._react(shape.a.tags, (v) => seen.push(v));
     log.runs.length = 0;
     s.addBehavior([
       contribute(shape.a.tags, "reads other", { triggers: [shape.other] }),
