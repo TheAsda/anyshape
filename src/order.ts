@@ -16,10 +16,10 @@
 // The one-writer check (runtime.ts) lists the writes through the same index.
 // ============================================================
 
-import type { AnyNode } from "./shape";
-import { refNode, refKey, outerHost, scopeOf, hostAt } from "./internal";
-import type { AnyRef, BaseStore } from "./store";
-import { kindOf, type Target } from "./refs/kind";
+import type { AnyNode } from "./shape.js";
+import { refNode, refKey, outerHost, scopeOf, hostAt } from "./internal.js";
+import type { AnyRef, BaseStore } from "./store.js";
+import { kindOf, type Target } from "./refs/kind.js";
 
 /** What the run order needs from a registration. */
 export interface Ranked {

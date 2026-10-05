@@ -47,19 +47,19 @@
 //   8. Listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
-import type { Meta, MetaKeyDef } from "./meta";
-import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors";
+import type { Meta, MetaKeyDef } from "./meta.js";
+import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors.js";
 import {
   ShapeNode, ObjectNode, ArrayNode,
   type AnyNode, type ContainerNode, type InferValue,
-} from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal";
-import { isAncestorOrSelf } from "./tree";
-import { kindOf } from "./refs/kind";
-import type { MetaRef } from "./refs/meta";
-import type { CountRef } from "./refs/count";
-import type { InitialRef } from "./refs/initial";
-import type { PendingInRef, PendingOfRef } from "./refs/pending";
+} from "./shape.js";
+import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal.js";
+import { isAncestorOrSelf } from "./tree.js";
+import { kindOf } from "./refs/kind.js";
+import type { MetaRef } from "./refs/meta.js";
+import type { CountRef } from "./refs/count.js";
+import type { InitialRef } from "./refs/initial.js";
+import type { PendingInRef, PendingOfRef } from "./refs/pending.js";
 
 export type Listener = () => void;
 export type Unsubscribe = () => void;
@@ -769,6 +769,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this._visitChildren(phase, calls, log);
   }
 
+  /** @internal */
   protected _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     for (const child of this._children.values()) child._visit(phase, calls, log);
   }
@@ -798,6 +799,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this._syncChildren();
   }
 
+  /** @internal */
   protected _syncChildren(): void {
     for (const child of this._children.values()) child._syncVisit();
   }
@@ -832,7 +834,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 // ============================================================
 // Root store – owns the value, the baseline, batching and the flush
 // ============================================================
-export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
+export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> {
   private value: InferValue<N>;
   private initial: InferValue<N>;
   private depth = 0;
@@ -1288,10 +1290,12 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     return rows;
   }
 
+  /** @internal */
   protected override _syncChildren(): void {
     for (const row of this.rowsToWalk("sync", this._sync())) row._syncVisit();
   }
 
+  /** @internal */
   override _refreshInitials(): void {
     for (const row of this._sync()) {
       if (this._baselineHas(row._currentRef as object) && row._initial !== row._currentRef) {
@@ -1302,10 +1306,12 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     }
   }
 
+  /** @internal */
   override _resetAllMeta(): void {
     for (const row of this._sync()) row._resetAllMeta();
   }
 
+  /** @internal */
   protected override _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     for (const store of this.rowsToWalk(phase, this._sync())) store._visit(phase, calls, log);
 
@@ -1351,7 +1357,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
 // Item store – a scope: node lenses inside the item template are
 // resolved against the current item object (and its initial value).
 // ============================================================
-export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> implements ScopeHost {
+export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> {
   /** Stable for the lifetime of the item (survives edits and reordering). Use as React key. */
   readonly stableId: string;
   /** @internal */ _currentRef: unknown;
@@ -1376,6 +1382,7 @@ export class ItemStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   protected override get ownsFocusMeta(): boolean {
     return true;
   }
+  /** @internal */
   override get _countedInParent(): boolean {
     return this._counted;
   }

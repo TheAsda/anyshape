@@ -1,8 +1,8 @@
 // initialOf(node): a node's baseline value. Read-only (written with
 // { as: "initial" }), on the baseline channel.
 
-import type { AnyNode, InferValue } from "../shape";
-import { KIND, type RefKind } from "./kind";
+import type { AnyNode, InferValue } from "../shape.js";
+import { KIND, type RefKind } from "./kind.js";
 
 /** The initial (baseline) value of a node. Changes with { as: "initial" } writes. */
 export class InitialRef<V = unknown> {

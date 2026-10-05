@@ -2,12 +2,12 @@
 // createStore – wires the store and the behavior runtime.
 // ============================================================
 
-import { BehaviorRuntime, defaultBehaviors } from "./runtime";
-import type { StoreOptions } from "./behaviors";
-import { RootStore } from "./store";
-import type { ObjectNode, InferValue } from "./shape";
-import { Diagnostics } from "./diagnostics";
-import { isDev } from "./internal";
+import { BehaviorRuntime, defaultBehaviors } from "./runtime.js";
+import type { StoreOptions } from "./behaviors.js";
+import { RootStore } from "./store.js";
+import type { ObjectNode, InferValue } from "./shape.js";
+import { Diagnostics } from "./diagnostics.js";
+import { isDev } from "./internal.js";
 
 export function createStore<N extends ObjectNode<any>>(
   shape: N,

@@ -16,9 +16,9 @@
 // is not: it is mostly waiting.
 // ============================================================
 
-import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store";
-import type { AnyNode } from "./shape";
-import { locatedAt, pathLabel } from "./internal";
+import type { BaseStore, Probe, ProbedInstance, RunPart, RegistrationChange } from "./store.js";
+import type { AnyNode } from "./shape.js";
+import { locatedAt, pathLabel } from "./internal.js";
 
 /** One frame at 30 fps, in ms. */
 export const FLUSH_BUDGET = 1000 / 30;

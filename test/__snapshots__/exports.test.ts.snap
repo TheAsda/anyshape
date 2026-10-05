@@ -46,7 +46,6 @@ exports[`the core entry's public names 1`] = `
     "MergeMetaRefs",
     "Meta",
     "MetaKeyOptions",
-    "MetaKeySteps",
     "NewItemArgs",
     "NoPayload",
     "Origin",

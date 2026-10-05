@@ -1,8 +1,8 @@
 // A node: its value. Written by set, subscribed on the value channel.
 
-import type { ShapeNode, AnyNode } from "../shape";
-import { isAncestorOrSelf } from "../tree";
-import type { RefKind } from "./kind";
+import type { ShapeNode, AnyNode } from "../shape.js";
+import { isAncestorOrSelf } from "../tree.js";
+import type { RefKind } from "./kind.js";
 
 export const valueKind: RefKind<AnyNode> = {
   node: (node) => node,
