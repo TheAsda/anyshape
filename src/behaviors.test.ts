@@ -337,9 +337,9 @@ describe("J · Registration checks", () => {
   });
 
   test("a key's default behavior is its one writer; a key without one is free for a behavior", () => {
-    const w = (target: any) => defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
-    expect(() => createStore(shape, initial(), { behaviors: w(shape.name.touched) })).toThrow(/"name#touched" is already written by "name#touched"/);
-    const s = createStore(shape, initial(), { behaviors: w(shape.name.revealed) });
+    const setTrue = (target: any) => defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
+    expect(() => createStore(shape, initial(), { behaviors: setTrue(shape.name.touched) })).toThrow(/"name#touched" is already written by "name#touched"/);
+    const s = createStore(shape, initial(), { behaviors: setTrue(shape.name.revealed) });
     s.set(shape.title, "changed");
     expect(s.get(shape.name.revealed)).toBe(true);
   });
