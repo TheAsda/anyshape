@@ -151,6 +151,7 @@ export class FieldNode<T = unknown> extends ShapeNode<T> {
     super();
   }
 
+  /** @internal – use field() */
   static create<T>(): FieldNode<T> {
     return new FieldNode<T>();
   }
@@ -176,6 +177,7 @@ export class ObjectNode<
     Object.assign(this, fields);
   }
 
+  /** @internal – use object() */
   static create<TFields extends Record<string, AnyNode>>(fields: TFields): ObjectNode<TFields> & TFields {
     return new ObjectNode(fields) as any;
   }
@@ -213,6 +215,7 @@ export class ArrayNode<
     (this as any)[CREATE] = create;
   }
 
+  /** @internal – use array() */
   static create<TItem extends ObjectNode<any>>(
     item: TItem,
     create?: () => InferValue<TItem>

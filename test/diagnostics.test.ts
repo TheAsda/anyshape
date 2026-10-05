@@ -515,4 +515,15 @@ describe("T · Production", () => {
     expect(stamp).not.toHaveBeenCalled();
     expect(measure).not.toHaveBeenCalled();
   });
+
+  test("where nothing defines process (an unbundled load), the store builds without diagnostics", () => {
+    vi.stubGlobal("process", undefined);
+    let s: RootStore<typeof shape>;
+    try {
+      s = createStore(shape, initial());
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect((s as any)._probe).toBeUndefined();
+  });
 });

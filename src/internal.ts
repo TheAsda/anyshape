@@ -12,8 +12,10 @@ import { kindOf, type Target } from "./refs/kind";
 /**
  * Dev build? Read as `process.env.NODE_ENV`, which bundlers replace: an app's
  * production build then drops every dev-only branch. Node reads it at runtime.
+ * Where nothing defines `process` (an unbundled load in a browser), it is
+ * false: the form runs without dev diagnostics instead of throwing.
  */
-export const isDev = (): boolean => process.env.NODE_ENV !== "production";
+export const isDev = (): boolean => typeof process !== "undefined" && process.env.NODE_ENV !== "production";
 
 /**
  * An error with `message` whose stack is `trace`'s: a behavior's trace is
