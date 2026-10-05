@@ -164,10 +164,10 @@ describe("N · Reference limits", () => {
   // ---------------------------------------------------------------------------
   // A count as a rule limit
   test("a count as a rule limit: re-checked whenever the count changes", () => {
-    const f = form({
+    const f = form(object({
       wanted: field<number>().meta(control()),
       rows: array(object({ v: field<string>().meta(control()) }), { create: () => ({ v: "" }) }),
-    });
+    }));
     const s = createStore(f, { wanted: 2, rows: [] }, { behaviors: max(f.wanted, countIn(f.rows, dirty)) });
     const rows = s.substore(f.rows);
     expect(s.get(f.wanted.error)).toBe("Must be at most 0");

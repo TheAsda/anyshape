@@ -6,7 +6,7 @@ import { rule, max } from "./test/rules";
 import { test as base, describe, expect } from "vitest";
 import * as limits from "./test/fixtures/limits";
 
-const shape = form({
+const shape = form(object({
   country: field<string>(),
   city: field<string>(),
   title: field<string>(),
@@ -31,7 +31,7 @@ const shape = form({
     { create: () => ({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] }) }
   ),
   other: array(object({ x: field<number>() })),
-});
+}));
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 const N = L.notes.item;
@@ -188,7 +188,7 @@ describe("K · Own writes, two-way links, state", () => {
 
   /** Three lines whose row behavior "share" sets each line's percentage of the total price; `spy` sees every run. */
   function shares(spy: (ctx: BehaviorContext) => void) {
-    const f = form({ lines: array(object({ price: field<number>(), share: field<number>() })) });
+    const f = form(object({ lines: array(object({ price: field<number>(), share: field<number>() })) }));
     const R = f.lines.item;
     const share = defineBehavior({
       name: "share", triggers: [f.lines], reads: [R.price], writes: [R.share],
@@ -550,7 +550,7 @@ describe("L · Default behaviors: touched, dirty", () => {
   });
 
   test("touched and dirty work on their own, without control()", () => {
-    const f = form({ a: field<string>().meta({ touched, dirty }) });
+    const f = form(object({ a: field<string>().meta({ touched, dirty }) }));
     const s = createStore(f, { a: "" });
     s.set(f.a, "x", { origin: "user" });
     expect(s.get(f.a.touched)).toBe(true);
@@ -559,7 +559,7 @@ describe("L · Default behaviors: touched, dirty", () => {
   });
 
   test("a default behavior writes the name its key is declared under", () => {
-    const f = form({ a: field<string>().meta({ wasEdited: touched, changed: dirty, alsoChanged: dirty }) });
+    const f = form(object({ a: field<string>().meta({ wasEdited: touched, changed: dirty, alsoChanged: dirty }) }));
     const s = createStore(f, { a: "" });
     s.set(f.a, "x", { origin: "user" });
     expect(s.get(f.a.wasEdited)).toBe(true);
@@ -602,7 +602,7 @@ describe("J · Feature default behaviors", () => {
         run: () => {},
       })),
     });
-    const f = form({ a: field<string>(), b: field<string>().meta(mirror()) });
+    const f = form(object({ a: field<string>(), b: field<string>().meta(mirror()) }));
     other = f.a;
     expect(() => createStore(f, { a: "", b: "" })).toThrow(/default behaviors may only use their own node \("b"\), got "a"/);
   });

@@ -4,7 +4,7 @@
 import { form, object, array, field, type InferValue } from "form-lib";
 import { control, visible, disabled } from "../../index";
 
-export const shape = form({
+export const shape = form(object({
   type: field<"person" | "company">(),
   name: field<string>().meta(control(), { label: "Full name" }),
   tags: field<string[]>().meta(control()),
@@ -24,7 +24,7 @@ export const shape = form({
   promo: field<string>().meta(control(), { disabled, label: "Promo code" }),
   note: field<string>().meta({ hint: "", disabled }),
   lines: array(object({ qty: field<number>().meta(control()), sku: field<string>().meta(control()) })),
-});
+}));
 export type Values = InferValue<typeof shape>;
 export const L = shape.lines.item;
 

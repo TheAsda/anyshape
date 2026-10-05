@@ -46,7 +46,7 @@ describe("flat form, 500 fields", () => {
 // ---------------------------------------------------------------------------
 // An order: 200 rows, a per-row calculation, a total over the array, a rule per row
 const ROWS = 200;
-const order = form({
+const order = form(object({
   lines: array(
     object({
       sku: field<string>().meta(control()),
@@ -57,7 +57,7 @@ const order = form({
     { create: () => ({ sku: "", price: 1, qty: 1, lineTotal: 1 }) }
   ),
   total: field<number>(),
-});
+}));
 const O = order.lines.item;
 const orderBehaviors = [
   defineBehavior({
@@ -158,7 +158,7 @@ const mounted = metaKey<readonly string[], string>([]).combine((self, key) => ({
     ctx.set(key, ctx.parts.map((p) => p.payload));
   },
 }));
-const grid = form({ rows: array(object({ v: field<string>().meta({ mounted }) })) });
+const grid = form(object({ rows: array(object({ v: field<string>().meta({ mounted }) })) }));
 const G = grid.rows.item;
 
 function mountRowByRow(rows: number): void {
@@ -185,7 +185,7 @@ describe("row-by-row contribution mounts", () => {
 // calculation), as a row component's useBehaviors does. One registration per
 // row, so ranking cost per mount shows here. Few samples: before #6 an 800-row
 // mount took seconds.
-const sheet = form({ rows: array(object({ a: field<number>(), b: field<number>() })) });
+const sheet = form(object({ rows: array(object({ a: field<number>(), b: field<number>() })) }));
 const S = sheet.rows.item;
 const double = () =>
   defineBehavior({ name: "double", triggers: [S.a], writes: [S.b], run: (c) => c.set(S.b, c.get(S.a) * 2) });
@@ -212,7 +212,7 @@ describe("row-by-row behavior mounts", () => {
 // unmounts. Each row's a → b ranks before its own b → c, and sibling rows
 // don't link (#63). Values are already consistent: the init runs write
 // nothing, so only registration and disposal show.
-const chain = form({ rows: array(object({ a: field<number>(), b: field<number>(), c: field<number>() })) });
+const chain = form(object({ rows: array(object({ a: field<number>(), b: field<number>(), c: field<number>() })) }));
 const C = chain.rows.item;
 const chained = () => [
   defineBehavior({ name: "b", triggers: [C.a], writes: [C.b], run: (c) => c.set(C.b, c.get(C.a) * 2) }),

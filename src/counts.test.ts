@@ -51,7 +51,7 @@ describe("H · Counts and collect", () => {
   test("a row write that drops its nested rows moves their counts before the reactions run", () => {
     // No behaviors: the count is the only thing that changes for the reactions.
     const flaggedKey = metaKey(false).aggregate((v) => v);
-    const f = form({ rows: array(object({ notes: array(object({ text: field<string>().meta({ flagged: flaggedKey }) })) })) });
+    const f = form(object({ rows: array(object({ notes: array(object({ text: field<string>().meta({ flagged: flaggedKey }) })) })) }));
     const s = createStore(f, { rows: [{ notes: [{ text: "" }] }, { notes: [] }] });
     const row = s.substore(f.rows).itemAt(0);
     const note = row.substore(f.rows.item.notes).itemAt(0);
@@ -75,12 +75,12 @@ describe("H · Counts and collect", () => {
 
   test("collect(node, def) lists every instance that declares the definition, whatever its value or name", () => {
     const marked = metaKey(false);
-    const f = form({
+    const f = form(object({
       a: field<string>().meta({ marked }),
       b: field<string>().meta({ other: metaKey(false) }),
       rows: array(object({ c: field<string>().meta({ flag: marked }) })),
       d: field<string>().meta({ marked }),
-    });
+    }));
     const s = createStore(f, { a: "", b: "", rows: [{ c: "" }, { c: "" }], d: "" });
     const rows = s.substore(f.rows);
     rows.itemAt(1).set(f.rows.item.c.flag, true);
@@ -140,10 +140,10 @@ describe("H · Counts and collect", () => {
 
   test("a custom counted key written by application code counts like the built-in ones", () => {
     const flaggedKey = metaKey(false).aggregate((v) => v);
-    const f = form({
+    const f = form(object({
       a: field<string>().meta({ flagged: flaggedKey }),
       rows: array(object({ b: field<string>().meta({ flagged: flaggedKey }) })),
-    });
+    }));
     const s = createStore(f, { a: "", rows: [{ b: "" }, { b: "" }] });
     const flagged = countIn(f, flaggedKey);
     s.set(f.a.flagged, true);
@@ -161,11 +161,11 @@ describe("H · Counts by definition", () => {
   test("countIn counts a key definition, whatever name a node declares it under", () => {
     const flagged = metaKey(false).aggregate((v) => v);
     const other = metaKey(false).aggregate((v) => v);
-    const f = form({
+    const f = form(object({
       a: field<string>().meta({ flagged }),
       b: field<string>().meta({ marked: flagged, flagged: other }),
       rows: array(object({ c: field<string>().meta({ flagged }) })),
-    });
+    }));
     const s = createStore(f, { a: "", b: "", rows: [{ c: "" }, { c: "" }] });
     s.set(f.a.flagged, true);
     s.set(f.b.marked, true);

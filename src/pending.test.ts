@@ -7,11 +7,11 @@ import { deferred, flush } from "./test/harness";
 const checked = metaKey(false);
 const flagged = metaKey(false);
 
-const shape = form({
+const shape = form(object({
   a: field<string>().meta({ checked }),
   b: field<string>().meta({ checked, flagged }),
   rows: array(object({ qty: field<number>().meta({ ok: checked }) })),
-});
+}));
 const R = shape.rows.item;
 const initial = () => ({ a: "", b: "", rows: [{ qty: 1 }, { qty: 2 }] });
 
