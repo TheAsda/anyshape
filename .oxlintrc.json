@@ -109,6 +109,7 @@
 
     // Module boundaries (AGENTS.md, "Core and recipes"). A later override replaces an earlier one's patterns.
     // Not caught: a recipe reaching a path outside `recipes/` and `src/` by a relative path.
+    // The regexes have no look-around, so an allowed entry is a `group` with a negated glob.
     {
       "files": ["recipes/**"],
       "rules": {
@@ -131,7 +132,7 @@
           {
             "patterns": [
               {
-                "regex": "^anyshape/(?!react$)",
+                "group": ["anyshape/**", "!anyshape/react"],
                 "message": "A React recipe imports the core entries `anyshape` and `anyshape/react`, not a core module."
               },
               {
@@ -167,7 +168,7 @@
           {
             "patterns": [
               {
-                "regex": "^anyshape/(?!react$)",
+                "group": ["anyshape/**", "!anyshape/react"],
                 "message": "An example imports the core entries `anyshape` and `anyshape/react`, and the recipes, not a core module."
               },
               {
