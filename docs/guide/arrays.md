@@ -1,6 +1,6 @@
 # Arrays and rows
 
-An array node holds rows, and its `item` is the row template: one declaration that every row follows. Each row is its own [scope](../../GLOSSARY.md), with its own store, so behaviors declared on the template run separately in every row, and a change in one row doesn't run the others.
+An array [node](../../GLOSSARY.md) holds rows, and its `item` is the row template: one declaration that every row follows. Each row is its own [scope](../../GLOSSARY.md), with its own [store](../../GLOSSARY.md), so [behaviors](../../GLOSSARY.md) declared on the template run separately in every row, and a change in one row doesn't run the others.
 
 First shown in [stage 9](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage9).
 

@@ -1,6 +1,6 @@
 # Async behaviors
 
-A behavior's `run` may return a promise: a server check, a lookup. Its writes apply together when the promise resolves, unless a newer change cancelled the run first. While it runs, its targets are [pending](../../GLOSSARY.md), which the form can show and wait for.
+A [behavior](../../GLOSSARY.md)'s `run` may return a promise: a server check, a lookup. Its writes apply together when the promise resolves, unless a newer change cancelled the run first. While it runs, its targets are [pending](../../GLOSSARY.md), which the form can show and wait for.
 
 First shown in [stage 12](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage12) (the destination check); pending counts in [stage 13](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage13).
 
@@ -39,11 +39,11 @@ const checkDestination = defineBehavior({
 
 The run is in flight until its promise settles; then its writes apply in one batch. The latest run wins. A run in flight is cancelled when:
 
-- **a trigger or a `reads` reference changes.** The behavior runs again, and the new run's cause includes the cancelled run's, so `ctx.changed` and `ctx.origins` still describe everything since the last completed run;
+- **a trigger or a `reads` reference changes.** The behavior runs again, and the new run's [cause](../../GLOSSARY.md) includes the cancelled run's, so `ctx.changed` and `ctx.origins` still describe everything since the last completed run;
 - **another writer changes one of its targets**, such as the user editing a field the behavior fills in. It isn't rerun;
-- **its guard turns false**, its row is removed, it is removed, or `store.reset()` covers it. It isn't rerun.
+- **its [guard](../../GLOSSARY.md) turns false**, its row is removed, it is removed, or `store.reset()` covers it. It isn't rerun.
 
-On cancellation `ctx.signal` aborts, so pass it to `fetch` and other cancellable work. After that, `ctx.get` and `ctx.set` throw the abort reason, which ends the run quietly: the store never reports it. A run that completes has therefore read only values that are still current.
+On cancellation `ctx.signal` aborts, so pass it to `fetch` and other cancellable work. After that, `ctx.get` and `ctx.set` throw the abort reason, which ends the run quietly: the [store](../../GLOSSARY.md) never reports it. A run that completes has therefore read only values that are still current.
 
 Server checks usually run on edits only: `origins: ["user"]` and `runOn: { init: false }` keep loading a saved form from calling the server for every field.
 
@@ -90,11 +90,11 @@ The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/
 
 ## Pending
 
-The core derives which targets are pending; nothing declares or writes it. Two read-only references report it, and a store method waits for it:
+The [core](../../GLOSSARY.md) derives which targets are pending; nothing declares or writes it. Two read-only references report it, and a store method waits for it:
 
 - `pendingOf(target)` is `true` while a run that writes `target` is in flight.
-- `pendingIn(node)` counts the pending targets under `node`, rows included. `pendingIn(node, definition)` counts only the meta keys declared with that definition.
-- `store.settle(node)` resolves once no run that writes under `node` is in flight. Without a node, it waits for the store's whole subtree.
+- `pendingIn(node)` counts the pending targets under `node`, rows included. `pendingIn(node, definition)` counts only the [meta keys](../../GLOSSARY.md) declared with that definition.
+- `store.settle(node)` resolves once no run that writes under `node` is in flight. Without a [node](../../GLOSSARY.md), it waits for the store's whole subtree.
 
 `pendingIn` pairs with `countIn(node, definition)`, which counts the nodes whose counted key is set ([meta-keys.md](meta-keys.md)): no errors and nothing pending answers "can this form be submitted now?".
 
@@ -112,7 +112,7 @@ async function submit(send: (values: { destination: string; nights: number }) =>
 
 These are references like any other: read them in React with `useValue(pendingIn(shape, error))` to show "Checking…" or disable a submit button ([react.md](react.md)).
 
-Counts and pending tallies change without an origin: no person or program wrote them. So a behavior with an `origins` filter can't use one as a trigger, and registration says so.
+Counts and pending [tallies](../../GLOSSARY.md) change without an [origin](../../GLOSSARY.md): no person or program wrote them. So a behavior with an `origins` filter can't use one as a trigger, and registration says so.
 
 ## Common mistakes
 

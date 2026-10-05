@@ -1,11 +1,11 @@
 # Writing your own recipe
 
-A [recipe](../../GLOSSARY.md) is code you own that gives a meta key one team's meaning: what `disabled` implies, when an error shows, what submitting does. The [recipes folder](https://github.com/TheAsda/anyshape/tree/master/recipes) holds a set to copy, and this page builds one of them, `disabled` with its helper `disableWhen`, from nothing in five steps.
+A [recipe](../../GLOSSARY.md) is code you own that gives a [meta key](../../GLOSSARY.md) one team's meaning: what `disabled` implies, when an error shows, what submitting does. The [recipes folder](https://github.com/TheAsda/anyshape/tree/master/recipes) holds a set to copy, and this page builds one of them, `disabled` with its helper `disableWhen`, from nothing in five steps.
 
 ## The rules a recipe follows
 
-- **It imports only `anyshape`**, plus `anyshape/react` for React parts. Nothing reaches into the core's internals, so a recipe keeps working across versions of the core.
-- **It takes references as parameters.** A helper receives the nodes it acts on, typed with the keys it needs, so passing the wrong node fails to compile. It never finds a key by its name; a helper that sweeps a subtree finds the key by its definition (`store.collect(node, definition)`).
+- **It imports only `anyshape`**, plus `anyshape/react` for React parts. Nothing reaches into the [core](../../GLOSSARY.md)'s internals, so a recipe keeps working across versions of the core.
+- **It takes references as parameters.** A helper receives the [nodes](../../GLOSSARY.md) it acts on, typed with the keys it needs, so passing the wrong node fails to compile. It never finds a key by its name; a helper that sweeps a subtree finds the key by its definition (`store.collect(node, definition)`).
 - **It has no policy options.** A team that wants different behavior edits its copy. An option bag would only move the decision somewhere harder to read.
 - **It is tested through the public interface**, like any other code that uses the library.
 
@@ -19,7 +19,7 @@ import { metaKey } from "anyshape";
 export const disabled = metaKey<boolean, string>(false);
 ```
 
-`disabled` holds a boolean, and its contributions carry a string: the reason the field is disabled. A field can be disabled for several reasons at once (the employer pays, another discount is filled in), and each reason comes from a different place. That makes it a combined key ([contributions.md](contributions.md)): the second type argument is the payload type.
+`disabled` holds a boolean, and its [contributions](../../GLOSSARY.md) carry a string: the reason the field is disabled. A field can be disabled for several reasons at once (the employer pays, another discount is filled in), and each reason comes from a different place. That makes it a combined key ([contributions.md](contributions.md)): the second type argument is the payload type.
 
 The definition is declared once, at module level. Every node that declares it shares it, which is what lets a sweep or a count find all of them.
 
@@ -38,7 +38,7 @@ export const disabled = metaKey<boolean, string>(false).combine((self, key) => (
 }));
 ```
 
-`.combine` adds the owner to the definition from step 1: the one behavior per node that writes the key. Its run sees the reasons that currently apply as `ctx.parts`, and the field is disabled while there is at least one. A reason whose guard fails is absent, so the key turns back to `false` on its own when the last reason goes away. The name built from the node's path makes the owner easy to find in error messages and DevTools.
+`.combine` adds the owner to the definition from step 1: the one [behavior](../../GLOSSARY.md) per node that writes the key. Its run sees the reasons that currently apply as `ctx.parts`, and the field is disabled while there is at least one. A reason whose [guard](../../GLOSSARY.md) fails is absent, so the key turns back to `false` on its own when the last reason goes away. The name built from the node's path makes the owner easy to find in error messages and DevTools.
 ## Step 3: a contribution function
 
 ```ts
@@ -104,7 +104,7 @@ export function testDisableWhen() {
 }
 ```
 
-The test builds a store and drives it with `set` and `get`, the same calls an app makes, and checks the cases the recipe promises: no reason, several reasons, reasons going away, and the value left alone. Run these checks inside your test runner's test function. The two contributions get different names, since a contribution's name is how messages and DevTools tell them apart.
+The test builds a [store](../../GLOSSARY.md) and drives it with `set` and `get`, the same calls an app makes, and checks the cases the recipe promises: no reason, several reasons, reasons going away, and the value left alone. Run these checks inside your test runner's test function. The two contributions get different names, since a contribution's name is how messages and DevTools tell them apart.
 
 ## Step 5: use it
 
@@ -122,12 +122,12 @@ function NightlyRate() {
 }
 ```
 
-A shape declares the key on the nodes that can be disabled, behaviors add reasons, and components read the key. Disabling changes nothing else: the rate stays in the store and is submitted, and its rules still run unless you guard them ([guards.md](guards.md)).
+A [shape](../../GLOSSARY.md) declares the key on the nodes that can be disabled, behaviors add reasons, and components read the key. Disabling changes nothing else: the rate stays in the store and is submitted, and its rules still run unless you guard them ([guards.md](guards.md)).
 
 The same recipe in the evolution example: [stage 6](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage6) disables the nightly rate when the employer pays, and [stage 7](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage7) adds a second reason through `exclusive()`. The finished recipe is in [features.ts](https://github.com/TheAsda/anyshape/blob/master/recipes/features.ts) (the key) and [behaviors.ts](https://github.com/TheAsda/anyshape/blob/master/recipes/behaviors.ts) (`disableWhen`).
 
 ## See also
 
-- [Meta keys](meta-keys.md): key definitions, features, default behaviors.
+- [Meta keys](meta-keys.md): key definitions, [features](../../GLOSSARY.md), default behaviors.
 - [Combined keys](contributions.md): owners and contributions.
 - The [recipes catalog](https://github.com/TheAsda/anyshape/blob/master/recipes/README.md): what each recipe provides and how to copy it.

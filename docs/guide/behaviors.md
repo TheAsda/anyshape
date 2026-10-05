@@ -1,6 +1,6 @@
 # Behaviors
 
-A [behavior](../../GLOSSARY.md) is a declared rule that keeps the form consistent. It runs when one of its triggers changes, reads only the references it declares, and writes only its declared targets. Each target has exactly one writer. Derived values, autofill, validation and every other recipe are behaviors underneath.
+A [behavior](../../GLOSSARY.md) is a declared rule that keeps the form consistent. It runs when one of its triggers changes, reads only the references it declares, and writes only its declared targets. Each target has exactly one writer. Derived values, autofill, validation and every other [recipe](../../GLOSSARY.md) are behaviors underneath.
 
 First shown in [stage 4](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage4) (derived values); written by hand in [stage 10](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage10); turned into a function in [stage 11](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage11).
 
@@ -39,18 +39,18 @@ A behavior's config declares everything it touches:
 
 | Part | Meaning |
 |---|---|
-| `name` | Used in error messages, DevTools and origins. Give every behavior one. |
+| `name` | Used in error messages, DevTools and [origins](../../GLOSSARY.md). Give every behavior one. |
 | `triggers` | A change to any of these runs the behavior. |
 | `reads` | Readable in `run`, but a change to them doesn't run it. |
-| `writes` | The only targets `ctx.set` accepts, values or meta keys. Each target has one writer. Targets are readable too. |
-| `when` | Guards: the behavior runs only while they pass ([guards.md](guards.md)). |
+| `writes` | The only targets `ctx.set` accepts, values or [meta keys](../../GLOSSARY.md). Each target has one writer. Targets are readable too. |
+| `when` | [Guards](../../GLOSSARY.md): the behavior runs only while they pass ([guards.md](guards.md)). |
 | `runOn` | `{ init: false }` skips the run when the behavior is created. |
 | `origins` | Run on a change only when it came from one of these kinds: `"user"`, `"program"`, `"initial"`, `"behavior"`. |
 | `run(ctx)` | The rule. It may return a promise ([async.md](async.md)). |
 
 `suggestReturn` runs only on the user's edits, so loading a half-filled form from the server never fills in the return, and it never runs at creation.
 
-`defineBehaviors(shape, (b, s) => { ... })` builds the list a store takes. `b.add(...)` adds behaviors (arrays are flattened), `b.when(...)` adds guarded ones ([guards.md](guards.md)) and `b.each(...)` adds per-row ones ([arrays.md](arrays.md)). It returns a plain array: pass it to `createStore(shape, values, { behaviors })` or to `useForm`.
+`defineBehaviors(shape, (b, s) => { ... })` builds the list a [store](../../GLOSSARY.md) takes. `b.add(...)` adds behaviors (arrays are flattened), `b.when(...)` adds guarded ones ([guards.md](guards.md)) and `b.each(...)` adds per-row ones ([arrays.md](arrays.md)). It returns a plain array: pass it to `createStore(shape, values, { behaviors })` or to `useForm`.
 
 ## The run context
 
@@ -93,7 +93,7 @@ A synchronous behavior has finished by the time `store.set` returns. If it throw
 
 ## Reuse is a plain function
 
-When a second pair of dates needs the same rule, the nodes are the only thing that differs. Turn the behavior into a function that takes them:
+When a second pair of dates needs the same rule, the [nodes](../../GLOSSARY.md) are the only thing that differs. Turn the behavior into a function that takes them:
 
 ```ts
 function suggestEnd(start: FieldNode<string>, end: FieldNode<string>, days: number) {
@@ -169,7 +169,7 @@ const endFromStart = defineBehavior({
 
 The fix is one behavior that triggers on both and writes both, using `ctx.changed` to tell which side moved.
 
-- **A row behavior writing outside its row**, and an origins filter on a count or pending reference, are rejected too ([arrays.md](arrays.md), [async.md](async.md)).
+- **A row behavior writing outside its row**, and an origins filter on a count or [pending](../../GLOSSARY.md) reference, are rejected too ([arrays.md](arrays.md), [async.md](async.md)).
 
 ## See also
 

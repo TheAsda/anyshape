@@ -1,6 +1,6 @@
 # Combined keys
 
-Sometimes several declarations need a say in one meta key: several reasons to disable a field, several rules behind one error message. Each target has one writer, so they can't all write it. Instead, the key is written by one owner behavior, and the others [contribute](../../GLOSSARY.md) inputs to it. The key decides how its contributions combine.
+Sometimes several declarations need a say in one [meta key](../../GLOSSARY.md): several reasons to disable a field, several rules behind one error message. Each target has one writer, so they can't all write it. Instead, the key is written by one owner [behavior](../../GLOSSARY.md), and the others [contribute](../../GLOSSARY.md) inputs to it. The key decides how its contributions combine.
 
 First shown in [stage 3](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage3) (rules feeding `error`); [stage 7](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage7) (several reasons to disable).
 
@@ -24,13 +24,13 @@ const shape = form(
 );
 ```
 
-`metaKey<V, P>(default).combine((self, key, uses) => config)` declares a combined key. `V` is the key's value and `P` the payload each contribution carries. Every node that declares the key gets one owner: a behavior built from the returned config, which writes the key. Its run reads `ctx.parts`, the contributions that currently apply, in the order they were registered. Each part has:
+`metaKey<V, P>(default).combine((self, key, uses) => config)` declares a combined key. `V` is the key's value and `P` the payload each contribution carries. Every [node](../../GLOSSARY.md) that declares the key gets one owner: a behavior built from the returned config, which writes the key. Its run reads `ctx.parts`, the contributions that currently apply, in the order they were registered. Each part has:
 
 - `payload`: what the contribution passed, typed `P`;
 - `name` and a stable `id`;
 - `inputs`: the references the contribution declared, which the owner may read with `ctx.get`.
 
-The owner's config is an ordinary behavior config. The store adds every contribution's triggers, reads and guard references to it, so the owner reruns when any of them changes.
+The owner's config is an ordinary behavior config. The [store](../../GLOSSARY.md) adds every contribution's triggers, reads and [guard](../../GLOSSARY.md) references to it, so the owner reruns when any of them changes.
 
 ## Contributing
 
@@ -99,7 +99,7 @@ const datesStore = createStore(dates, { startDate: "2026-05-01", endDate: "" }, 
 
 ## How the validation recipe uses it
 
-The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts) is built this way. Its `error` key is combined, and `rule(node, check)` and `asyncRule(node, check)` are contributions to it. The owner runs a field's sync rules in order until one fails, then its async rules if they all pass, and writes the first message. `validation()` is the feature that declares `error` on a node. Because validation is a recipe on top of combined keys, the core reserves no error slot; the [design record](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0001-validation-is-a-recipe-on-key-contributions.md) explains the choice.
+The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts) is built this way. Its `error` key is combined, and `rule(node, check)` and `asyncRule(node, check)` are contributions to it. The owner runs a field's sync rules in order until one fails, then its async rules if they all pass, and writes the first message. `validation()` is the [feature](../../GLOSSARY.md) that declares `error` on a node. Because validation is a [recipe](../../GLOSSARY.md) on top of combined keys, the [core](../../GLOSSARY.md) reserves no error slot; the [design record](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0001-validation-is-a-recipe-on-key-contributions.md) explains the choice.
 
 ## Common mistakes
 

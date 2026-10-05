@@ -28,7 +28,7 @@ function useShownError(node: CheckedNode): string | undefined {
 }
 ```
 
-The recipes' `useControl` hook makes this decision in one line, `showError`, which your copy can change: show errors once the value changed, or right away, or never while a check runs ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/react/control.ts)). The library has no error display of its own to configure.
+The [recipes](../../GLOSSARY.md)' `useControl` hook makes this decision in one line, `showError`, which your copy can change: show errors once the value changed, or right away, or never while a check runs ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/react/control.ts)). The library has no error display of its own to configure.
 
 ## Rendering hidden and disabled fields
 
@@ -38,7 +38,7 @@ A hidden or disabled field keeps its value, and the form submits it ([guards.md]
 - rendered read-only, so the user sees the value they can't change;
 - rendered normally with a note, when "disabled" means "computed for you".
 
-If a hidden value must not be submitted, add a behavior that clears it; if a rule must not apply to a hidden field, guard the rule. Both are declarations you can read in the form's behaviors.
+If a hidden value must not be submitted, add a [behavior](../../GLOSSARY.md) that clears it; if a rule must not apply to a hidden field, [guard](../../GLOSSARY.md) the rule. Both are declarations you can read in the form's behaviors.
 
 ## Parsing and formatting
 
@@ -85,7 +85,7 @@ const parseRate = defineBehavior({
 
 ## Server errors
 
-A server reports errors by path, such as `"travelers[1].name"`. `store.resolvePath(path)` turns a path into the node and the store that addresses it (a row's store for a path inside a row), or `undefined` when the path doesn't exist. The error key is then found by its definition, never by its name:
+A server reports errors by path, such as `"travelers[1].name"`. `store.resolvePath(path)` turns a path into the [node](../../GLOSSARY.md) and the [store](../../GLOSSARY.md) that addresses it (a row's store for a path inside a row), or `undefined` when the path doesn't exist. The error key is then found by its definition, never by its name:
 
 ```ts
 import { array } from "anyshape";
@@ -133,5 +133,5 @@ Focusing that first error needs the DOM elements, which aren't form state: the f
 
 - [Guards](guards.md): hidden and disabled values stay.
 - [React](react.md): controlled inputs and components.
-- [Async behaviors](async.md): `settle()` and pending checks.
+- [Async behaviors](async.md): `settle()` and [pending](../../GLOSSARY.md) checks.
 - [Why anyshape works this way](../principles.md).

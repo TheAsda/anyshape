@@ -1,6 +1,6 @@
 # Meta keys
 
-A [meta key](../../GLOSSARY.md) is named state that a node declares beside its value, with a default: an error message, whether the field was touched, whether a section is shown. The [core](../../GLOSSARY.md) gives no key a meaning. `error`, `touched` and `visible` are all declared by you, or by a [recipe](../../GLOSSARY.md) you copied.
+A [meta key](../../GLOSSARY.md) is named state that a [node](../../GLOSSARY.md) declares beside its value, with a default: an error message, whether the field was touched, whether a section is shown. The [core](../../GLOSSARY.md) gives no key a meaning. `error`, `touched` and `visible` are all declared by you, or by a [recipe](../../GLOSSARY.md) you copied.
 
 First shown in [stage 2](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage2); counting in [stage 13](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage13).
 
@@ -38,9 +38,9 @@ A definition's steps add capabilities, and each step returns a new definition:
 | Step | What it adds |
 |---|---|
 | `.aggregate(isCounted)` | The key can be counted per subtree with `countIn`. |
-| `.uses(...definitions)` | The default behavior or owner gets references to other keys of the same node. |
+| `.uses(...definitions)` | The default [behavior](../../GLOSSARY.md) or owner gets references to other keys of the same node. |
 | `.behavior(factory)` | A default behavior, registered on every node that declares the key. |
-| `.combine(factory)` | The key is written by one owner that combines contributions ([contributions.md](contributions.md)). |
+| `.combine(factory)` | The key is written by one owner that combines [contributions](../../GLOSSARY.md) ([contributions.md](contributions.md)). |
 
 ## Features
 
@@ -82,7 +82,7 @@ const markTouched = metaKey(false).behavior((self, key) => ({
 }));
 ```
 
-A default behavior is confined to its own node: its value, its meta keys and `initialOf(self)`. Registration rejects anything else. A key is defined before any node exists, and a reusable piece of shape can appear in several places, so its own node is the only thing it can name. The confinement also means a key never acts on a distant part of the form.
+A default behavior is confined to its own node: its value, its meta keys and `initialOf(self)`. Registration rejects anything else. A key is defined before any node exists, and a reusable piece of [shape](../../GLOSSARY.md) can appear in several places, so its own node is the only thing it can name. The confinement also means a key never acts on a distant part of the form.
 
 `.uses(...definitions)` hands the default behavior the node's references to other keys, matched by definition. The node must declare them too; registration says so if it doesn't. `.uses` grants no access by itself: list the references in `triggers`, `reads` or `writes` as usual.
 
@@ -119,7 +119,7 @@ tripStore.get(countIn(trip, error)); // 1
 
 A count is a reference like any other: read it with `get` or `useValue`, subscribe to it, or use it as a behavior's trigger. `countIn` returns the same reference for the same node and definition.
 
-`store.collect(node, definition)` sweeps the subtree instead of counting: one entry per node that declares the key, whatever its value, in shape order with rows expanded. Each entry has the node's `path` with row indexes (`"travelers[0].name"`), its reference `ref`, and the `store` that addresses it (the root, or the row's store).
+`store.collect(node, definition)` sweeps the subtree instead of counting: one entry per node that declares the key, whatever its value, in shape order with rows expanded. Each entry has the node's `path` with row indexes (`"travelers[0].name"`), its reference `ref`, and the `store` that addresses it (the root, or the row's [store](../../GLOSSARY.md)).
 
 ```ts
 const messages = tripStore
