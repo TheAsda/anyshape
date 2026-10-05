@@ -9,6 +9,12 @@ import type { ObjectNode, InferValue } from "./shape.js";
 import { Diagnostics } from "./diagnostics.js";
 import { isDev } from "./internal.js";
 
+/**
+ * Create a store for a shape from `form()`: `initialValues` are its values and
+ * its baseline; `options.behaviors` run once now, then on every change they
+ * declare.
+ * @see {@link https://github.com/TheAsda/anyshape/blob/master/docs/guide/store.md | The store} in the guide.
+ */
 export function createStore<N extends ObjectNode<any>>(
   shape: N,
   initialValues: InferValue<N>,

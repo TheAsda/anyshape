@@ -280,7 +280,10 @@ export function array(item: any, options?: ArrayOptions<any>): any {
   return ArrayNode.create(item, options?.create);
 }
 
-/** Root entry point: instantiates the form's object node (ids, paths, lenses). */
+/**
+ * Root entry point: instantiates the form's object node (ids, paths, lenses).
+ * @see {@link https://github.com/TheAsda/anyshape/blob/master/docs/guide/shape.md | Shapes and nodes} in the guide.
+ */
 export function form<N extends ObjectNode<any>>(root: N): N {
   if (!(root instanceof ObjectNode)) throw new Error("form() takes an object node – wrap the fields, e.g. form(object({ ... }))");
   let counter = 0;

@@ -1,7 +1,8 @@
 // ============================================================
 // The package check (NF1), on the tarball `npm pack` makes from the current
 // build. Run `bun run build` first. It checks:
-//   • the tarball holds the entries, their declarations and the shipped docs,
+//   • the tarball holds the entries, their declarations and the shipped docs
+//     (every page in docs/guide/),
 //     and no source, tests or recipes;
 //   • the core internals are defined once in dist/, and the core entry
 //     reaches no `react` import;
@@ -30,9 +31,10 @@ const bin = (name: string) => join(root, "node_modules", ".bin", name);
 const REQUIRED = [
   "package.json", "LICENSE",
   "dist/index.js", "dist/index.d.ts", "dist/react/index.js", "dist/react/index.d.ts",
-  // The docs agents read at node_modules/anyshape/…: docs/principles.md and
-  // docs/guide/ join this list when they're written (#84, #86).
-  "GLOSSARY.md",
+  // The docs agents read at node_modules/anyshape/…: every guide page in
+  // the source tree, so a new page needs no edit here.
+  "GLOSSARY.md", "docs/principles.md",
+  ...readdirSync(join(root, "docs/guide")).filter((f) => f.endsWith(".md")).map((page) => `docs/guide/${page}`),
 ];
 /** Path prefixes the tarball must not hold. */
 const FORBIDDEN = ["src/", "test/", "bench/", "recipes/", "examples/", "scripts/", ".changeset/"];

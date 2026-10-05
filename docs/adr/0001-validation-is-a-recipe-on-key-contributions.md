@@ -18,11 +18,20 @@ Confirmed by a prototype ([#23](https://github.com/TheAsda/anyshape/issues/23), 
   - rules declared on the key can't reference other fields
   - multiple writers merged by a reducer lose "sync before async" and "a guarded rule is absent"
 - **Reconfigurable handles** (`addRule(store, …)` / `useRules`). Rejected: they push an imperative registry onto consumers. Rules must stay declarative: plain lists built before React.
-- **A fold over part slots**, reviewed on 2026-10-02 ([research](https://github.com/TheAsda/anyshape/blob/research/lazy-fold/docs/research/lazy-fold.md)). Each rule is its own behavior writing a private slot, and the key's definition folds the slots into the key's value. A plain fold only sees results, so every rule runs and async requests start after a sync rule has failed. There are two lazy versions:
+- **A fold over part slots**, reviewed on 2026-10-02 ([#26](https://github.com/TheAsda/anyshape/issues/26), [#45](https://github.com/TheAsda/anyshape/issues/45)). Each rule is its own behavior writing a private slot, and the key's definition folds the slots into the key's value. A plain fold only sees results, so every rule runs and async requests start after a sync rule has failed. There are two lazy versions:
   - **gated slots:** each rule reads the prefix of the slots before it;
   - **demand-scheduled slots:** the runtime parks the writers the fold didn't reach.
 
   Both stop at the first error and rerun less than `combine`. But they lose the shared debounce, turn forcing into a token nobody resets, need incremental ranking, and add more core than they remove. Every version that keeps the policies spanning several rules (one debounce, one force flag, a start decision from the run's cause) needs one evaluator per instance with a `ctx`, which is the owner, so it turns back into `combine`. A fold suits order-free keys like `disabled`, but that isn't worth a second mechanism. Rejected.
+
+## Prior art
+
+Form libraries commonly reserve errors in their core: validation writes a built-in error slot that the rest of the library reads, such as React Hook Form's [`formState.errors`](https://react-hook-form.com/docs/useform/formstate) or Formik's [`errors`](https://formik.org/docs/guides/validation). anyshape departs from that on purpose: its core names no meta key, so validation has to be built from the same parts as any other recipe.
+
+The combining model has precedents outside form state, where a mechanism is kept separate from the policy built on it:
+
+- **CodeMirror 6 facets** ([reference](https://codemirror.net/docs/ref/#state.Facet)). A facet is an extension point: any number of extensions provide inputs, and the facet's `combine` function turns them into one output. The facet object is the typed identity that inputs are attached to. A key definition plays the facet's part here, and `contribute()` plays `facet.of()`. One difference is deliberate: CodeMirror orders inputs by precedence, while anyshape has no precedence between contributions and throws on ambiguity ([#25](https://github.com/TheAsda/anyshape/issues/25)).
+- **Angular Signal Forms' metadata keys** ([guide](https://angular.dev/guide/forms/signals/field-metadata)). Schema rules contribute values to a metadata key, and the key's reducer combines them. Constraint validators such as `required()` are built on this generic system. Errors themselves still travel on a dedicated channel there, so the precedent covers the mechanism, not the step of moving errors out of the core.
 
 ## Consequences
 
