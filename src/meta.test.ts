@@ -2,7 +2,7 @@ import {
   form, object, array, field, MetaRef, createStore, type InferValue, type InferMeta,
 } from "./index";
 import { control, validation, touched, visible, disabled, submission } from "./test/features";
-import { META, META_DEFS, CREATE, PLAIN, defOf } from "./internal";
+import { META, META_DEFS, CREATE, defOf } from "./internal";
 import { test, describe, expect } from "vitest";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -69,7 +69,6 @@ describe("C · Declarations", () => {
     const defs = shape.name[META_DEFS];
     expect(defs.error._steps.aggregate!("x")).toBe(true);
     expect(defs.error._steps.aggregate!(undefined)).toBe(false);
-    expect(defs.label[PLAIN]).toBe(true);
   });
 
   test("variadic and chained .meta() merge", () => {
@@ -77,16 +76,16 @@ describe("C · Declarations", () => {
     expect(Object.keys(a[META_DEFS]).sort()).toEqual(["error", "hint", "touched"]);
   });
 
-  test("plain values can be overridden by plain values", () => {
-    const f = field<string>().meta({ hint: "a" }).meta({ hint: "b" });
-    expect(f[META]).toEqual({ hint: "b" });
-  });
-
-  test("key definitions cannot be declared twice", () => {
-    expect(() => field<string>().meta(validation()).meta(validation())).toThrow(/already declared/);
-    expect(() => field<string>().meta(control(), { touched })).toThrow(/already declared/);
-    expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(/already declared/);
-    expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(/already declared/);
+  test("a node declares each key once: a second declaration throws, plain value or key definition", () => {
+    const alreadyDeclared = (key: string, kind: string) => `Meta key "${key}" is already declared on this ${kind} – a node declares each key once`;
+    expect(() => field<string>().meta({ hint: "a" }).meta({ hint: 1 })).toThrow(alreadyDeclared("hint", "field"));
+    expect(() => field<string>().meta({ hint: "a" }, { hint: "b" })).toThrow(alreadyDeclared("hint", "field"));
+    expect(() => field<string>().meta(validation()).meta(validation())).toThrow(alreadyDeclared("error", "field"));
+    expect(() => field<string>().meta(control(), { touched })).toThrow(alreadyDeclared("touched", "field"));
+    expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(alreadyDeclared("error", "field"));
+    expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(alreadyDeclared("error", "field"));
+    expect(() => object({ a: field<string>() }).meta({ hint: "" }).meta({ hint: "" })).toThrow(alreadyDeclared("hint", "object"));
+    expect(() => array(object({ a: field<string>() })).meta({ hint: "" }).meta({ hint: "" })).toThrow(alreadyDeclared("hint", "array"));
   });
 
   test("reserved meta keys are rejected", () => {
