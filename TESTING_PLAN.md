@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 452 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 451 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -20,7 +20,7 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 |---|---|---|---|
 | `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
 | `src/lens.test.ts` | B | lens unit tests | 8 |
-| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 21 |
+| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 18 |
 | `src/store.test.ts` | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers | 32 |
 | `src/notifications.test.ts` | F | the notification rules, flush | 33 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
@@ -102,7 +102,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - a changed write copies only the path to the leaf (siblings keep their references).
 
 ### C. Meta declarations & references (`meta.ts`, `shape.ts`)
-**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
+**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, each key declared once on a node (a second declaration throws, #95), reserved keys, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
 
 - [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
 - [x] **C2 · P2** A meta write with `{ as: "initial" }` throws "applies to values only". → `origins.test.ts`

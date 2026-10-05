@@ -20,7 +20,7 @@ import {
   MetaKeyDef,
   type Meta, type MergeMetaRefs,
 } from "./meta";
-import { FIELDS, META_DEFS, META, CREATE, PLAIN } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE } from "./internal";
 import { KIND, type RefKind } from "./refs/kind";
 import { valueKind } from "./refs/value";
 import { metaKind } from "./refs/meta";
@@ -119,8 +119,8 @@ export abstract class ShapeNode<T = unknown> {
    *   field<string>().meta(control(), { label: "Name" })
    * Returns a new node; the original stays reusable.
    *
-   * A key declared by a key definition (metaKey / feature) cannot be declared
-   * again. Plain values may be overridden by plain values.
+   * A node declares each key once: declaring it again throws, whether as a
+   * plain value or a key definition (metaKey / feature).
    */
   meta<Is extends readonly Meta[]>(
     ...inputs: Is
@@ -141,12 +141,12 @@ export abstract class ShapeNode<T = unknown> {
         if (this instanceof ObjectNode && Object.prototype.hasOwnProperty.call(this[FIELDS], key)) {
           throw new Error(`"${key}" is a field of "${this.path || "<root>"}" and cannot also be a meta key`);
         }
-        const def = raw instanceof MetaKeyDef ? raw : new MetaKeyDef(raw, {}, true);
-        const prev = defs[key];
-        if (prev && (!prev[PLAIN] || !def[PLAIN])) {
-          throw new Error(`Meta key "${key}" is already declared by a key definition and cannot be declared again`);
+        if (Object.prototype.hasOwnProperty.call(defs, key)) {
+          // No path before form(): the node is named by its kind.
+          const kind = this instanceof ObjectNode ? "object" : this instanceof ArrayNode ? "array" : "field";
+          throw new Error(`Meta key "${key}" is already declared on this ${kind} – a node declares each key once`);
         }
-        defs[key] = def;
+        defs[key] = raw instanceof MetaKeyDef ? raw : new MetaKeyDef(raw);
       }
     }
 
