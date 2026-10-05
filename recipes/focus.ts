@@ -27,9 +27,11 @@ const targets = new WeakMap<BaseStore<any>, Map<AnyNode, FocusTarget>>();
 /**
  * Register where focus() and focusFirst() move the cursor for `node`; a
  * later registration for the node replaces it. The returned function
- * unregisters the target, unless another one has replaced it since.
+ * unregisters the target, unless another one has replaced it since. Throws
+ * when `store` does not address `node` (a row node needs the row's store).
  */
 export function registerFocus(store: BaseStore<any>, node: AnyNode, target: FocusTarget): () => void {
+  store.assertInScope(node);
   let byNode = targets.get(store.scopeStore);
   if (!byNode) targets.set(store.scopeStore, (byNode = new Map()));
   byNode.set(node, target);
@@ -54,7 +56,11 @@ export function domOrder(a: FocusTarget, b: FocusTarget): number {
   return 0;
 }
 
-/** The target registered for the node; none for a removed row. */
+/**
+ * The target registered for the node; none for a removed row. No scope
+ * check: focusFirst()'s entries come from collect() or validate(), whose
+ * stores address their nodes.
+ */
 function targetOf(store: BaseStore<any>, node: AnyNode): FocusTarget | undefined {
   if (!store.isAttached()) return undefined;
   return targets.get(store.scopeStore)?.get(node);
@@ -65,8 +71,12 @@ function moveTo(target: FocusTarget): void {
   target.scrollIntoView?.();
 }
 
-/** Focus the node's registered target. Returns false when there is none. */
+/**
+ * Focus the node's registered target. Returns false when there is none;
+ * throws when `store` does not address `node`.
+ */
 export function focus(store: BaseStore<any>, node: AnyNode): boolean {
+  store.assertInScope(node);
   const target = targetOf(store, node);
   if (!target) return false;
   moveTo(target);

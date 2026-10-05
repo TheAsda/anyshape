@@ -199,6 +199,17 @@ describe("D · Foreign nodes and duplicate rows", () => {
     expect(() => s.get(address.city)).toThrow(/is not part of the store/);
   });
 
+  test("assertInScope rejects a node the store does not address, with the messages get() uses", ({ store: s }) => {
+    const other = form(object({ name: field<string>() }));
+    const line = s.substore(userShape.items).itemAt(0);
+    expect(() => s.assertInScope(other.name)).toThrow(/is not part of the store/);
+    expect(() => s.assertInScope(userShape.items.item.sku)).toThrow(/inside an array item – use the item's store/);
+    expect(() => s.substore(userShape.shipping).assertInScope(userShape.name), "outside the substore").toThrow(/is not part of the store/);
+    s.assertInScope(userShape.shipping.city);
+    s.assertInScope(userShape.items);
+    line.assertInScope(userShape.items.item.sku);
+  });
+
   test("a row write that would put the same object in the array twice is rejected", ({ store: s }) => {
     const [a, b] = s.substore(userShape.items).items();
     const aValue = a.get(userShape.items.item);
