@@ -1,14 +1,22 @@
 # Testing
 
-How the tests are organised, the conventions they follow, and the mechanisms that need a mutation check when you change them. The rules for writing a test (through the public interface, red first) are in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+How to set up and run the checks, how the tests are organised, the conventions they follow, and the mechanisms that need a mutation check when you change them. The rules for writing a test (through the public interface, red first) are in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-## Commands
+## Setup and commands
 
-- `bun run test` runs all four Vitest projects. Each also runs alone: `test:unit`, `test:recipes`, `test:react`, `test:recipes-react`.
-- `bun run typecheck` checks the source, the recipes and the type-level tests. The type-level tests run only here, never under Vitest, so CI runs both.
-- `bun run bench` runs the benchmarks, and `bun run test:memory` the memory checks (see [Benchmarks and memory](#benchmarks-and-memory)).
-- `bun run build && bun run check:package` checks the packed tarball: its contents, one copy of the core, and consumers with and without React.
-- The first run on a machine needs a browser for the React projects: `bunx playwright install chromium`.
+Install the dependencies with `bun install`. The React projects run in a real browser, which each machine installs once: `bunx playwright install chromium`.
+
+Before you open a pull request, run:
+
+- `bun run test`: all four Vitest projects. Each also runs alone: `test:unit`, `test:recipes`, `test:react`, `test:recipes-react`.
+- `bun run typecheck`: `tsc` on the source, the recipes and the type-level tests, then `kiira check` on the code samples in `README.md`, `docs/guide/` and `docs/principles.md`. The type-level tests and the samples are checked only here, never under Vitest, so CI runs both commands.
+
+CI also runs these, which you can run by hand:
+
+- `bun run build && bun run check:package` checks the packed tarball: its contents (the shipped docs included), one copy of the core, and consumers with and without React.
+- `bun install && bun run build` in `examples/basic` and in `examples/evolution` builds each example against the library's source.
+
+`bun run bench` runs the benchmarks, and `bun run test:memory` the memory checks (see [Benchmarks and memory](#benchmarks-and-memory)).
 
 ## Projects
 
@@ -47,7 +55,7 @@ Each layer has an ID. A `describe` block is named after the layer it tests (`"F 
 | `test/types.test.ts` | S | the public type contract (asserted by `tsc`) |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe |
-| `test/exports.test.ts` | — | each entry's public names, as a snapshot |
+| `test/exports.test.ts` | — | each entry's public names, as a snapshot; the API tables in `docs/guide/agents.md` list exactly those names |
 | `test/integration.test.ts` | INT | trip-booking scenarios across all layers |
 | `test/react/react.test.tsx` | P | provider, resolution, `useValue`, `useField`, `useArray` |
 | `test/react/form.test.tsx` | Q | `useForm`, `useSync` |
@@ -66,7 +74,7 @@ Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) a
   - Repeated setup comes from `test.extend` fixtures, such as `store`, `lines` and `recorder` in `test/notifications.test.ts`: `test("…", ({ store: s, lines }) => …)`.
   - Use a fixture only where it removes repetition without hiding the setup the test is about. A test with its own store options creates its store explicitly.
   - A `describe` that uses another file's fixture binds it at the top (`const { shape, L, initial } = company;`) and defines its own `test`.
-  - Fixtures and examples keep declarations and key access in plain view: no helper hides which keys a node declares or how a key is reached.
+  - Fixtures and examples keep declarations and key access in plain view: no helper hides which keys a node declares or how a key is reached. Showing that is what an example is for.
 - **React tests** (`test/react/*.test.tsx` and `recipes/react/*.test.tsx`, each side with its own copy of `test-utils.tsx`). The core React tests use only the core hooks; a field binding there is `useField` with inline handlers.
   - Render with `render()` from `vitest-browser-react`. It's async, and the tree is cleaned up before each test.
   - Drive inputs through locators and `userEvent` (`fill`, `click`, `keyboard`). These are real browser events, so focus moves and blur fires as they would for a user.
