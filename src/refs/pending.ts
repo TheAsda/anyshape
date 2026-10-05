@@ -57,7 +57,7 @@ const pendingInKind: RefKind<PendingInRef> = {
   read: (store, ref) => {
     countAll();
     store.root._syncWalk();
-    return store._host._countOf(ref.node, slotOf(ref));
+    return store.scopeStore._countOf(ref.node, slotOf(ref));
   },
   subscribe: (store, ref, phase, fn) => {
     countAll();
@@ -78,7 +78,7 @@ const pendingOfKind: RefKind<PendingOfRef> = {
   label: (ref) => ref.path,
   read: (store, ref) => {
     countAll();
-    return inFlight.get(store._host)?.has(ref.target) ?? false;
+    return inFlight.get(store.scopeStore)?.has(ref.target) ?? false;
   },
   subscribe: (store, ref, phase, fn) => {
     countAll();

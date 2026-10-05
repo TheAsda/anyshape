@@ -156,6 +156,18 @@ describe("E · Arrays", () => {
     expect(s.substore(userShape.items).itemAt(1)).toBe(line);
   });
 
+  test("scopeStore: the root or the row, whichever view asks", ({ store: s }) => {
+    const items = s.substore(userShape.items);
+    const line = items.itemAt(0);
+    const notes = line.substore(userShape.items.item.notes);
+    expect(s.scopeStore).toBe(s);
+    expect(s.substore(userShape.shipping).scopeStore).toBe(s);
+    expect(items.scopeStore, "an array store is a view in its parent's scope").toBe(s);
+    expect(line.scopeStore).toBe(line);
+    expect(notes.scopeStore).toBe(line);
+    expect(notes.itemAt(0).scopeStore).toBe(notes.itemAt(0));
+  });
+
   test("structural validation", ({ store: s }) => {
     const r = s.get(userShape).items[0];
     expect(() => s.set(userShape.items, [r, r])).toThrow(/same object twice/);

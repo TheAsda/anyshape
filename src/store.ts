@@ -22,8 +22,6 @@
 //     initialOf, pendingIn and pendingOf. Each kind is one module in
 //     src/refs/ and answers through RefKind (src/refs/kind.ts); the store
 //     keeps only the change channels.
-//   • Non-reactive keys (`reactive: false`) are stored in place: no flush, no
-//     notification, allowed on detached stores, kept by reset().
 //
 // Writes carry an origin: "user" | "program" (default) | "initial" |
 // "behavior:<id>". { as: "initial" } writes the value and its baseline.
@@ -55,7 +53,7 @@ import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue,
 } from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf, concretePath } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal";
 import { isAncestorOrSelf } from "./tree";
 import { kindOf } from "./refs/kind";
 import type { CountRef } from "./refs/count";
@@ -92,7 +90,7 @@ export interface CollectEntry<V = unknown> {
   path: string;
   /** The node's reference to the key (template node for rows: the node is `ref.node`). */
   ref: MetaRef<V>;
-  /** A store that can address `ref` (root or item store). */
+  /** The scope store that addresses `ref` (root or item store). */
   store: BaseStore<any>;
 }
 
@@ -269,7 +267,7 @@ function locOf(host: BaseStore<any>, node: AnyNode): Loc {
   let h = host;
   while (h instanceof ItemStore) {
     const arr = h.arrayStore;
-    const parentHost = arr._host;
+    const parentHost = arr.scopeStore;
     out.unshift({ host: parentHost, node: arr.node });
     h = parentHost;
   }
@@ -322,8 +320,12 @@ export abstract class BaseStore<N extends ContainerNode> {
   protected get scope(): ScopeHost {
     return this.parentStore!.scope;
   }
-  /** @internal the scope host as a store */
-  get _host(): BaseStore<any> {
+  /**
+   * The store of this store's scope: the root store, or the item store of
+   * the row it is in. Object and array substores are views on it; collect()
+   * entries carry it.
+   */
+  get scopeStore(): BaseStore<any> {
     return this.scope as unknown as BaseStore<any>;
   }
   protected get ownsFocusMeta(): boolean {
@@ -372,7 +374,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.root._batch(() => {
       this.assertAttached();
       validateValue(node, value);
-      this.root._log({ loc: locOf(this._host, node), origin });
+      this.root._log({ loc: locOf(this.scopeStore, node), origin });
       this._write(node, value);
       if (asInitial) this._writeInitial(node, value);
     });
@@ -383,13 +385,13 @@ export abstract class BaseStore<N extends ContainerNode> {
     return node.lens.get(this.scope.getScopeInitial());
   }
 
-  /** Restore values to their initial state and meta to defaults (non-reactive keys are kept). */
+  /** Restore values to their initial state and meta to defaults (keepOnReset keys are kept). */
   reset(node: AnyNode = this.node): void {
     this.assertInScope(node);
     this.root._batch(() => {
       this.assertAttached();
       const initial = this._readInitial(node);
-      this.root._log({ loc: locOf(this._host, node), origin: "initial" });
+      this.root._log({ loc: locOf(this.scopeStore, node), origin: "initial" });
       this._write(node, initial);
       this._resetMeta(node);
       // Behavior-written meta (errors, disabled flags, ...) was reset to its
@@ -415,7 +417,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   private _writeInitial(node: AnyNode, value: unknown): void {
     const scope = this.scope;
     scope.setScopeInitial(node.lens.set(scope.getScopeInitial(), value));
-    this.root._markInitial(this._host);
+    this.root._markInitial(this.scopeStore);
     if (node instanceof ObjectNode || node instanceof ArrayNode) {
       (this.substore(node as any) as BaseStore<any>)._refreshInitials();
     }
@@ -436,12 +438,6 @@ export abstract class BaseStore<N extends ContainerNode> {
     if (options.as) throw new Error('`as: "initial"` applies to values only');
     const owner = this._ownerOf(node);
 
-    // Non-reactive keys: stored in place, never notify, allowed when detached.
-    if (defOf(ref).options.reactive === false) {
-      owner._metaOf(node)[key] = value;
-      return;
-    }
-
     const origin: Origin = options.origin ?? "program";
     this.root._batch(() => {
       this.root._assertWritable();
@@ -454,7 +450,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** @internal replace a node's meta object: counts, dirty marks, log */
   _commitMeta(node: AnyNode, current: Meta, next: Meta, origin: Origin): void {
-    const host = this._host;
+    const host = this.scopeStore;
     const changed: string[] = [];
     for (const key of Object.keys(next)) {
       if (Object.is(current[key], next[key])) continue;
@@ -511,13 +507,13 @@ export abstract class BaseStore<N extends ContainerNode> {
     for (const child of this._children.values()) child._resetAllMeta();
   }
 
-  /** @internal back to static defaults, keeping non-reactive keys */
+  /** @internal back to static defaults, keeping keepOnReset keys */
   _resetEntry(node: AnyNode): void {
     const current = this._metaMap.get(node);
     if (!current) return;
     const next: Meta = { ...node[META] };
     for (const [key, def] of Object.entries(node[META_DEFS])) {
-      if (def.options.reactive === false || def.options.keepOnReset) next[key] = current[key];
+      if (def.options.keepOnReset) next[key] = current[key];
     }
     this._commitMeta(node, current, next, "initial");
   }
@@ -547,7 +543,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.assertInScope(node);
     this.root._syncWalk();
     const out: CollectEntry<V>[] = [];
-    this._host._collectIn(node, def, out);
+    this.scopeStore._collectIn(node, def, out);
     return out;
   }
 
@@ -572,7 +568,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * nested in it). Returns a function that removes them again.
    */
   addBehavior(behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
-    return this.root._runtime.add(this._host, behaviors);
+    return this.root._runtime.add(this.scopeStore, behaviors);
   }
 
   /**
@@ -671,7 +667,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   _addValueSub(node: AnyNode, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(node);
     const owner = this._ownerOf(node);
-    const loc = locOf(owner._host, node);
+    const loc = locOf(owner.scopeStore, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
       read: () => owner._read(node),
@@ -687,7 +683,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.assertInScope(ref.node);
     const { node, key } = ref;
     const owner = this._ownerOf(node);
-    const host = owner._host;
+    const host = owner.scopeStore;
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
       read: () => this._readMetaRef(ref),
@@ -701,7 +697,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   /** @internal baseline channel: marked by { as: "initial" } writes on this scope */
   _addInitialSub(node: AnyNode, phase: Phase, fn: SubFn): Unsubscribe {
     this.assertInScope(node);
-    const host = this._host;
+    const host = this.scopeStore;
     const loc = locOf(host, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
@@ -726,7 +722,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   _addTallySub(node: AnyNode, slot: Slot, phase: Phase, fn: SubFn, read?: (host: BaseStore<any>) => unknown): Unsubscribe {
     this.assertInScope(node);
     this.root._syncWalk();
-    const host = this._host;
+    const host = this.scopeStore;
     const loc = locOf(host, node);
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
@@ -943,7 +939,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
       }
       if (!(h instanceof ItemStore) || !h._countedInParent) break;
       from = h.arrayStore.node;
-      h = h.arrayStore._host;
+      h = h.arrayStore.scopeStore;
     }
   }
 
@@ -1259,7 +1255,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const totals = row._counts.get(row.node);
     if (!totals) return;
     for (const [slot, count] of totals) {
-      this.root._applyCountDelta(this._host, this.node, slot, attach ? count : -count);
+      this.root._applyCountDelta(this.scopeStore, this.node, slot, attach ? count : -count);
     }
   }
 

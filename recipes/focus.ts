@@ -1,13 +1,19 @@
 // ============================================================
 // Focus – where focusing an error moves the cursor.
 // ------------------------------------------------------------
-//   • focusable() declares `focusTarget`, registered by the bindings
-//     (useControl) and never notifying.
+// The pattern for state kept beside the form: a focus target (a DOM
+// element, or any { focus() }) is not form state, so the store never holds
+// it. The recipe keeps its own registry, keyed by the node's scope store
+// (the root or a row) and the node; reset() leaves it alone, and a removed
+// row's targets are skipped through store.isAttached().
+//   • registerFocus(store, node, target) registers a target, called by the
+//     bindings (useControl's focusRef); it returns the unregister function.
+//   • focus(store, node) focuses the node's target.
 //   • focusFirst(entries) focuses the first entry (e.g. a validation
 //     result's errors) whose node has a target, in document order by default.
 // ============================================================
 
-import { metaKey, type AnyNode, type BaseStore, type CollectEntry } from "form-lib";
+import type { AnyNode, BaseStore, CollectEntry } from "form-lib";
 
 /** Anything that can receive focus – an input, or a custom component's handle. */
 export interface FocusTarget {
@@ -15,10 +21,22 @@ export interface FocusTarget {
   scrollIntoView?(): void;
 }
 
-/** Where focusFirst / focus() move the cursor. One definition, found with collect(node, focusTarget). */
-export const focusTarget = metaKey<FocusTarget | undefined>(undefined, { reactive: false });
+/** Registered targets by scope store, then node. A removed row's store takes its targets with it. */
+const targets = new WeakMap<BaseStore<any>, Map<AnyNode, FocusTarget>>();
 
-export const focusable = () => ({ focusTarget });
+/**
+ * Register where focus() and focusFirst() move the cursor for `node`; a
+ * later registration for the node replaces it. The returned function
+ * unregisters the target, unless another one has replaced it since.
+ */
+export function registerFocus(store: BaseStore<any>, node: AnyNode, target: FocusTarget): () => void {
+  let byNode = targets.get(store.scopeStore);
+  if (!byNode) targets.set(store.scopeStore, (byNode = new Map()));
+  byNode.set(node, target);
+  return () => {
+    if (byNode.get(node) === target) byNode.delete(node);
+  };
+}
 
 /** An entry to focus, as collect() and validate() return them: a node (ref.node) and its scope store. */
 export type FocusEntry = Pick<CollectEntry, "ref" | "store">;
@@ -36,25 +54,10 @@ export function domOrder(a: FocusTarget, b: FocusTarget): number {
   return 0;
 }
 
-/** The target registered on the node; none for a removed row. */
+/** The target registered for the node; none for a removed row. */
 function targetOf(store: BaseStore<any>, node: AnyNode): FocusTarget | undefined {
   if (!store.isAttached()) return undefined;
-  // The sweep starts at the node, so its own instance is the one entry for it.
-  const own = store.collect(node, focusTarget).find((e) => e.ref.node === node);
-  return own && own.store.get(own.ref);
-}
-
-/** Every registered target in the form, by scope store and node: one sweep for a whole list of entries. */
-function targetsIn(store: BaseStore<any>): Map<BaseStore<any>, Map<AnyNode, FocusTarget>> {
-  const out = new Map<BaseStore<any>, Map<AnyNode, FocusTarget>>();
-  for (const e of store.root.collect(store.root.node, focusTarget)) {
-    const target = e.store.get(e.ref);
-    if (!target) continue;
-    let byNode = out.get(e.store);
-    if (!byNode) out.set(e.store, (byNode = new Map()));
-    byNode.set(e.ref.node, target);
-  }
-  return out;
+  return targets.get(store.scopeStore)?.get(node);
 }
 
 function moveTo(target: FocusTarget): void {
@@ -76,10 +79,8 @@ export function focus(store: BaseStore<any>, node: AnyNode): boolean {
  * Returns the focused entry.
  */
 export function focusFirst<E extends FocusEntry>(entries: readonly E[], compare = domOrder): E | undefined {
-  if (!entries.length) return undefined;
-  const targets = targetsIn(entries[0].store);
   const first = entries
-    .map((entry, index) => ({ entry, index, target: targets.get(entry.store)?.get(entry.ref.node) }))
+    .map((entry, index) => ({ entry, index, target: targetOf(entry.store, entry.ref.node) }))
     .filter((c): c is { entry: E; index: number; target: FocusTarget } => c.target !== undefined)
     .sort((a, b) => compare(a.target, b.target) || a.index - b.index)[0];
   if (!first) return undefined;

@@ -57,7 +57,7 @@ export function resolveStore(start: BaseStore<any>, ref: AnyRef): BaseStore<any>
     throw new Error(`"${refLabel(ref)}" is not part of this form`);
   }
   const scope = scopeOf(node);
-  for (let host = start._host; ; host = host.arrayStore._host) {
+  for (let host = start.scopeStore; ; host = host.arrayStore.scopeStore) {
     if (host.node === scope) return host;
     if (!(host instanceof ItemStore)) break;
   }

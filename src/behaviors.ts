@@ -857,12 +857,12 @@ export class BehaviorRuntime implements RuntimeHooks {
 
   // ---- reset ----
   reinit(store: BaseStore<any>, node: AnyNode): void {
-    const resetHost = store._host;
+    const resetHost = store.scopeStore;
     const inside = (leafHost: BaseStore<any>): boolean => {
       if (storeWithin(resetHost, leafHost)) return true; // the reset store's scope, or an enclosing one
       // A row below the reset store: its array must be inside `node`.
-      for (let h: BaseStore<any> = leafHost; h instanceof ItemStore; h = h.arrayStore._host) {
-        if (h.arrayStore._host === resetHost) return isAncestorOrSelf(node, h.arrayStore.node);
+      for (let h: BaseStore<any> = leafHost; h instanceof ItemStore; h = h.arrayStore.scopeStore) {
+        if (h.arrayStore.scopeStore === resetHost) return isAncestorOrSelf(node, h.arrayStore.node);
       }
       return false;
     };

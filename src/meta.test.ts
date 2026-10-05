@@ -60,8 +60,8 @@ describe("C · Declarations", () => {
   test("defaults from plain values and key definitions", () => {
     const s = createStore(shape, values());
     const n = shape.name;
-    expect([s.get(n.error), s.get(n.touched), s.get(n.dirty), s.get(n.revealed), s.get(n.focusTarget), s.get(n.label)])
-      .toEqual([undefined, false, false, false, undefined, "Name"]);
+    expect([s.get(n.error), s.get(n.touched), s.get(n.dirty), s.get(n.revealed), s.get(n.label)])
+      .toEqual([undefined, false, false, false, "Name"]);
     expect(s.get(shape.submitting)).toBe(false);
   });
 
@@ -69,7 +69,6 @@ describe("C · Declarations", () => {
     const defs = shape.name[META_DEFS];
     expect(defs.error._steps.aggregate!("x")).toBe(true);
     expect(defs.error._steps.aggregate!(undefined)).toBe(false);
-    expect(defs.focusTarget.options.reactive).toBe(false);
     expect(defs.label[PLAIN]).toBe(true);
   });
 
