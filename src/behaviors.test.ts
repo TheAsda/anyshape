@@ -412,12 +412,15 @@ describe("L · Rows", () => {
 });
 
 describe("L · Runtime registration", () => {
-  test("addBehavior on a row applies to that row only; dispose cleans up", ({ store: s }) => {
+  test("addBehavior on a row applies to that row only; dispose resets its meta, its values stay", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
     const off = a.addBehavior(
       defineBehavior({
-        name: "lock", triggers: [L.qty], writes: [L.sku.disabled],
-        run: (ctx) => ctx.set(L.sku.disabled, ctx.get(L.qty) > 1),
+        name: "lock", triggers: [L.qty], writes: [L.sku.disabled, L.lineTotal],
+        run: (ctx) => {
+          ctx.set(L.sku.disabled, ctx.get(L.qty) > 1);
+          ctx.set(L.lineTotal, ctx.get(L.qty) * 100);
+        },
       })
     );
     a.set(L.qty, 2);
@@ -427,8 +430,10 @@ describe("L · Runtime registration", () => {
 
     off();
     expect(a.get(L.sku.disabled), "meta reset to default on dispose").toBe(false);
+    expect(a.get(L.lineTotal), "values stay").toBe(200);
     a.set(L.qty, 3);
     expect(a.get(L.sku.disabled), "no longer runs").toBe(false);
+    expect(a.get(L.lineTotal)).toBe(200);
   });
 
   test("row-level writers: separate rows are fine, a template writer conflicts", ({ store: s }) => {

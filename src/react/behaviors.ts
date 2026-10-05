@@ -9,7 +9,10 @@
 //
 //   • Same builder as defineBehaviors. Registered on the provided store's
 //     scope: under a row provider, for that row only.
-//   • Registered in a layout effect (before paint), removed on unmount.
+//   • Registered in a layout effect (before paint), removed on unmount: the
+//     meta keys its behaviors wrote go back to their defaults, the values
+//     they wrote stay. A guard turning false removes nothing: earlier writes
+//     stand.
 //   • deps change → the registration is replaced atomically (no flicker).
 //   • Latest props: run and guard functions and contribution payloads
 //     always come from the most recent build, without re-registering. Only
@@ -108,6 +111,8 @@ function withHint(error: unknown): unknown {
 /**
  * Register behaviors and contributions from a component. `build` uses the same
  * builder as defineBehaviors; `deps` re-register (atomically) when they change.
+ * On unmount they are removed, like a disposed addBehavior handle: the meta
+ * keys they wrote go back to their defaults, the values they wrote stay.
  */
 export function useBehaviors(build: (b: BehaviorBuilder) => void, deps: readonly unknown[], options: UseBehaviorsOptions = {}): void {
   const host = useStore(options).scopeStore;
