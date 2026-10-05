@@ -94,8 +94,9 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   s.set(countIn(t, error), 1);
   // @ts-expect-error – countIn takes only a key declared with .aggregate()
   countIn(t, metaKey(false));
+  const behaviorOnly = metaKey(false).behavior(() => ({ triggers: [], run: () => {} }));
   // @ts-expect-error – .behavior() and .combine() don't make a key countable
-  countIn(t, metaKey(false).behavior(() => ({ triggers: [], run: () => {} })));
+  countIn(t, behaviorOnly);
   // Countable whatever step follows .aggregate().
   countIn(t, metaKey(false).aggregate((v) => v).uses(error).behavior(() => ({ triggers: [], run: () => {} })));
   // @ts-expect-error – createStore is the one way to build a root store
@@ -133,8 +134,11 @@ type _c2 = Expect<Equal<typeof c.n.total extends MetaRef<any, infer P> ? P : nev
 type CM = InferMeta<typeof c.n>;
 type _c3 = Expect<Equal<[CM["total"], CM["reasons"], CM["ok"], CM["plain"]], [number, readonly string[], boolean, number]>>;
 
-// @ts-expect-error – `combine` must return a config whose run takes this key's parts
-metaKey<number, { weight: number }>(0).combine((_s, k) => ({ writes: [k], run: (_ctx: { parts: readonly { payload: string }[] }) => {} }));
+metaKey<number, { weight: number }>(0).combine((_s, k) => ({
+  writes: [k],
+  // @ts-expect-error – `combine` must return a config whose run takes this key's parts
+  run: (_ctx: { parts: readonly { payload: string }[] }) => {},
+}));
 
 // `uses`: the node's refs to other keys arrive typed and in order, with <V, P> spelled out.
 const forcedFlag = metaKey(false);
@@ -214,8 +218,9 @@ export function removedOptionChecks() {
   // @ts-expect-error – a ref that never starts a run is declared in `reads`
   defineBehavior({ triggers: [t.text], runOn: { change: false }, run() {} });
   defineBehaviors(t, (b) => {
+    const guarded = b.when([t.text], (v) => v === "", () => {});
     // @ts-expect-error – one behavior computes both values of a target
-    b.when([t.text], (v) => v === "", () => {}).otherwise(() => {});
+    guarded.otherwise(() => {});
   });
 }
 
