@@ -23,8 +23,6 @@ export type NoPayload = { readonly [NoPayloadBrand]: true };
 export interface MetaKeyOptions<V> {
   /** Kept by reset(): for keys fed from outside the form (e.g. useSync), not user input. */
   keepOnReset?: boolean;
-  /** false: stored and readable, but writing it never notifies, triggers or counts. */
-  reactive?: boolean;
 }
 
 type AnyMetaKeyDef = MetaKeyDef<any, any, any>;

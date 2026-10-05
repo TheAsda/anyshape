@@ -22,8 +22,6 @@
 //     initialOf, pendingIn and pendingOf. Each kind is one module in
 //     src/refs/ and answers through RefKind (src/refs/kind.ts); the store
 //     keeps only the change channels.
-//   • Non-reactive keys (`reactive: false`) are stored in place: no flush, no
-//     notification, allowed on detached stores, kept by reset().
 //
 // Writes carry an origin: "user" | "program" (default) | "initial" |
 // "behavior:<id>". { as: "initial" } writes the value and its baseline.
@@ -55,7 +53,7 @@ import {
   ShapeNode, ObjectNode, ArrayNode, MetaRef,
   type AnyNode, type ContainerNode, type InferValue,
 } from "./shape";
-import { FIELDS, META_DEFS, META, CREATE, defOf, metaRefOf, countSlotOf, concretePath } from "./internal";
+import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal";
 import { isAncestorOrSelf } from "./tree";
 import { kindOf } from "./refs/kind";
 import type { CountRef } from "./refs/count";
@@ -383,7 +381,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     return node.lens.get(this.scope.getScopeInitial());
   }
 
-  /** Restore values to their initial state and meta to defaults (non-reactive keys are kept). */
+  /** Restore values to their initial state and meta to defaults (keepOnReset keys are kept). */
   reset(node: AnyNode = this.node): void {
     this.assertInScope(node);
     this.root._batch(() => {
@@ -435,12 +433,6 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.assertInScope(node);
     if (options.as) throw new Error('`as: "initial"` applies to values only');
     const owner = this._ownerOf(node);
-
-    // Non-reactive keys: stored in place, never notify, allowed when detached.
-    if (defOf(ref).options.reactive === false) {
-      owner._metaOf(node)[key] = value;
-      return;
-    }
 
     const origin: Origin = options.origin ?? "program";
     this.root._batch(() => {
@@ -511,13 +503,13 @@ export abstract class BaseStore<N extends ContainerNode> {
     for (const child of this._children.values()) child._resetAllMeta();
   }
 
-  /** @internal back to static defaults, keeping non-reactive keys */
+  /** @internal back to static defaults, keeping keepOnReset keys */
   _resetEntry(node: AnyNode): void {
     const current = this._metaMap.get(node);
     if (!current) return;
     const next: Meta = { ...node[META] };
     for (const [key, def] of Object.entries(node[META_DEFS])) {
-      if (def.options.reactive === false || def.options.keepOnReset) next[key] = current[key];
+      if (def.options.keepOnReset) next[key] = current[key];
     }
     this._commitMeta(node, current, next, "initial");
   }
