@@ -153,7 +153,7 @@ anyshape is in development mode unless `process.env.NODE_ENV` is `"production"`,
 - A change that takes longer than one frame at 30 fps logs a warning naming the behaviors that took the most time, and the work shows on a performance track in the browser's DevTools.
 - Likely mistakes in the React bindings log a warning: `useSync` on a key without `keepOnReset`, `useForm` given a different shape, and `useBehaviors` whose declarations changed while its `deps` stayed the same.
 
-In production none of this is measured or logged. One warning is not a development check and is logged in both modes: `countIn` given a key without `aggregate`, or one no node under it declares, warns that the count is always 0.
+In production none of this is measured or logged.
 
 ## Common mistakes
 
