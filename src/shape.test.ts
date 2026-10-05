@@ -35,7 +35,7 @@ describe("A · Nodes", () => {
   });
 
   test("form() takes only an object node", () => {
-    const message = "form() takes an object node, e.g. form(object({ ... }))";
+    const message = "form() takes an object node – wrap the fields, e.g. form(object({ ... }))";
     expect(() => form({ a: field<string>() } as never)).toThrow(message);
     expect(() => form(field<string>() as never)).toThrow(message);
     expect(() => form(array(object({ a: field<string>() })) as never)).toThrow(message);
