@@ -901,6 +901,13 @@ export class BehaviorRuntime implements RuntimeHooks {
       }
     }
 
+    // An origins filter needs triggers that carry origins.
+    if (config.origins) {
+      for (const ref of triggers) {
+        if (!kindOf(ref).origins) fail(`"${refLabel(ref)}" carries no origins (it is a tally) – drop the origins filter or the reference`);
+      }
+    }
+
     // Writes: nodes and meta keys only; a combined key only by its owner.
     const targets = writes.map((w) => {
       const target = targetOf(w as AnyRef);

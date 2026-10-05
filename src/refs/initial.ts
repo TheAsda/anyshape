@@ -28,6 +28,7 @@ const initialKind: RefKind<InitialRef<any>> = {
   subscribe: (store, ref, phase, fn) => store._addInitialSub(ref.node, phase, fn),
   affectedBy: () => false,
   local: true,
+  origins: true,
   readOnly: 'Initial values are written with { as: "initial" }',
 };
 
