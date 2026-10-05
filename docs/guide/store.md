@@ -1,6 +1,6 @@
 # The store
 
-A [store](../../GLOSSARY.md) is a live form: the values for one shape, the meta keys of every node, and the behaviors that keep them consistent. It is read, written and watched through references only: a node for its value, `node.key` for a meta key, and a few read-only references that the core derives.
+A [store](../../GLOSSARY.md) is a live form: the values for one [shape](../../GLOSSARY.md), the [meta keys](../../GLOSSARY.md) of every [node](../../GLOSSARY.md), and the [behaviors](../../GLOSSARY.md) that keep them consistent. It is read, written and watched through references only: a node for its value, `node.key` for a meta key, and a few read-only references that the [core](../../GLOSSARY.md) derives.
 
 First shown in [stage 1](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage1); `resolvePath` in [stage 12](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage12).
 
@@ -165,5 +165,5 @@ In production none of this is measured or logged. One warning is not a developme
 
 - [Behaviors](behaviors.md): what runs when the store changes.
 - [Arrays and rows](arrays.md): array stores and row stores.
-- [Async behaviors](async.md): `settle()` and pending state.
+- [Async behaviors](async.md): `settle()` and [pending](../../GLOSSARY.md) state.
 - [React](react.md): the store in components.

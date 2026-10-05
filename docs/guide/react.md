@@ -1,6 +1,6 @@
 # React
 
-`anyshape/react` connects a store to components. The hooks take the same references as the store, re-render a component only for what it reads, and leave the logic in declared behaviors. React 19 is required for this entry only; the core doesn't use React.
+`anyshape/react` connects a [store](../../GLOSSARY.md) to components. The hooks take the same references as the store, re-render a component only for what it reads, and leave the logic in declared [behaviors](../../GLOSSARY.md). React 19 is required for this entry only; the [core](../../GLOSSARY.md) doesn't use React.
 
 Every stage of the [evolution example](https://github.com/TheAsda/anyshape/tree/master/examples/evolution) uses it. `useSync` and `useBehaviors` appear in no stage; this page is where they're shown.
 
@@ -73,7 +73,7 @@ export function TripForm({ saved }: { saved?: Trip }) {
 }
 ```
 
-- `useForm(shape, initialValues, options)` creates the store once per mount. Its options are `createStore`'s (`behaviors`, `onError`) plus `values`: data to load. Each new `values` object is written as the [baseline](../../GLOSSARY.md), so `reset()` returns to it; while it is `undefined` (still loading), the form shows `initialValues`. Re-rendering with the same object does nothing, so the user's edits survive. Declare the shape outside components.
+- `useForm(shape, initialValues, options)` creates the store once per mount. Its options are `createStore`'s (`behaviors`, `onError`) plus `values`: data to load. Each new `values` object is written as the [baseline](../../GLOSSARY.md), so `reset()` returns to it; while it is `undefined` (still loading), the form shows `initialValues`. Re-rendering with the same object does nothing, so the user's edits survive. Declare the [shape](../../GLOSSARY.md) outside components.
 - `<StoreProvider store={store}>` provides a store to the hooks below it: the form, a substore, or a row's store.
 - `useStore()` returns the provided store. Every hook also takes `{ store }` to use another one.
 
@@ -87,7 +87,7 @@ function Summary() {
 }
 ```
 
-`useValue(ref)` reads any reference (a node, a meta key, `initialOf`, `countIn`, `pendingIn`, `pendingOf`) and re-renders when its value changes. `useValue(ref, select)` re-renders only when the selected result changes; pass `{ equals }` when the result is a new object each time.
+`useValue(ref)` reads any reference (a [node](../../GLOSSARY.md), a [meta key](../../GLOSSARY.md), `initialOf`, `countIn`, `pendingIn`, `pendingOf`) and re-renders when its value changes. `useValue(ref, select)` re-renders only when the selected result changes; pass `{ equals }` when the result is a new object each time.
 
 ## Inputs are controlled
 
@@ -107,9 +107,9 @@ function TextField({ node, label }: { node: TextNode; label: string }) {
 }
 ```
 
-`useField(node)` returns `{ value, onChange, store }`. `onChange` is stable and writes with the origin `"user"`. Meta keys are read with `useValue(node.key)`, so a field re-renders only for the keys it shows. There is no `register()`: every input is controlled, and its value lives in the store.
+`useField(node)` returns `{ value, onChange, store }`. `onChange` is stable and writes with the [origin](../../GLOSSARY.md) `"user"`. Meta keys are read with `useValue(node.key)`, so a field re-renders only for the keys it shows. There is no `register()`: every input is controlled, and its value lives in the store.
 
-When an error appears is up to you. This field shows it as soon as it is set; the recipes' `useControl` hook waits until the field was left or the form submitted, and that decision is one line in your copy of it ([your-side.md](your-side.md)).
+When an error appears is up to you. This field shows it as soon as it is set; the [recipes](../../GLOSSARY.md)' `useControl` hook waits until the field was left or the form submitted, and that decision is one line in your copy of it ([your-side.md](your-side.md)).
 
 ## Components take their node
 
@@ -213,7 +213,7 @@ function CarToast({ notify }: { notify: (message: string) => void }) {
 
 ## State beside the form
 
-A DOM element, a component handle or any other outside reference is not form state: it can't be submitted, compared or reset. Keep it in your own registry beside the form, keyed by the store and the node. The [focus recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/focus.ts) is the pattern: `registerFocus(store, node, target)` stores a focus target in a `WeakMap` keyed by the node's scope store and the node, and returns the function that unregisters it. `reset()` leaves the registry alone, and the targets of removed rows are skipped by checking `store.isAttached()`.
+A DOM element, a component handle or any other outside reference is not form state: it can't be submitted, compared or reset. Keep it in your own registry beside the form, keyed by the store and the node. The [focus recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/focus.ts) is the pattern: `registerFocus(store, node, target)` stores a focus target in a `WeakMap` keyed by the node's [scope](../../GLOSSARY.md) store and the node, and returns the function that unregisters it. `reset()` leaves the registry alone, and the targets of removed rows are skipped by checking `store.isAttached()`.
 
 ## Common mistakes
 

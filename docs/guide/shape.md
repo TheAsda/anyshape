@@ -1,6 +1,6 @@
 # Shapes and nodes
 
-A [shape](../../GLOSSARY.md) declares a form's values: objects, fields, arrays of rows, and the meta keys each of them carries. Every type in anyshape is inferred from it. `form()` turns the declaration into [nodes](../../GLOSSARY.md), and each node is both the address of a value and the way to reach that value's meta keys.
+A [shape](../../GLOSSARY.md) declares a form's values: objects, fields, arrays of rows, and the [meta keys](../../GLOSSARY.md) each of them carries. Every type in anyshape is inferred from it. `form()` turns the declaration into [nodes](../../GLOSSARY.md), and each node is both the address of a value and the way to reach that value's meta keys.
 
 First shown in [stage 1](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage1).
 
@@ -44,7 +44,7 @@ A few names belong to the node itself (`id`, `path`, `parent`, `lens`, `meta`) a
 
 ## A node is a typed reference
 
-`shape.car.license` is a `FieldNode<string>`, and `shape.car` is an object node whose value is `{ license: string }`. The store, behaviors and React hooks all take nodes, and their types follow:
+`shape.car.license` is a `FieldNode<string>`, and `shape.car` is an object node whose value is `{ license: string }`. The [store](../../GLOSSARY.md), [behaviors](../../GLOSSARY.md) and React hooks all take nodes, and their types follow:
 
 ```ts
 const store = createStore(shape, initialValues);
@@ -60,7 +60,7 @@ A node's `path` is meant for messages and debugging. Code that needs a node is h
 
 ## Declaring meta on a node
 
-`.meta({ ... })` declares [meta keys](../../GLOSSARY.md): state that lives beside a node's value, with a default. Each key becomes a reference on the node, next to its children:
+`.meta({ ... })` declares meta keys: state that lives beside a node's value, with a default. Each key becomes a reference on the node, next to its children:
 
 ```ts
 import { metaKey, type InferMeta } from "anyshape";
@@ -83,7 +83,7 @@ type EmailMeta = InferMeta<typeof booking.email>; // { error: string | undefined
 
 - A plain value (`label: "Email"`, `visible: true`) declares a key with that default.
 - A key definition made with `metaKey` (`error`) carries a default and can add capabilities: counting, a default behavior, combining several inputs ([meta-keys.md](meta-keys.md)).
-- A feature is a function that returns several key definitions; spread it into `.meta()` with the rest: `field<string>().meta(control(), { label: "Email" })`.
+- A [feature](../../GLOSSARY.md) is a function that returns several key definitions; spread it into `.meta()` with the rest: `field<string>().meta(control(), { label: "Email" })`.
 - `.meta()` is called before `form()`, and it returns a new node: the one it was called on is unchanged. For meta on the root, call it on the root object: `form(object({ ... }).meta({ ... }))`.
 - A node declares each key once, and a key can't share its name with a child.
 

@@ -4,16 +4,16 @@ Read this page before writing anyshape code. It ships inside the package, so it 
 
 ## Rules
 
-- **Reach everything through references.** A value is `shape.trip.return`, a meta key on it is `shape.trip.return.error`. Reads, writes, subscriptions and behaviors take these references, never string paths. The one exception is `store.resolvePath(path)`, for paths that come from a server ([your-side.md](your-side.md)).
-- **No code finds a meta key by its name.** Code that needs a key is handed the node's reference (`node.error`) or, to sweep a subtree, the key's definition (`store.collect(node, error)`). Don't index a node with a string or list its keys.
-- **The core declares no meta key.** There is no built-in `error`, `touched`, `visible` or `disabled`. Declare the keys a form needs ([meta-keys.md](meta-keys.md)), or copy a recipe from the [recipes folder](https://github.com/TheAsda/anyshape/tree/master/recipes). Recipes are not in the package: `anyshape/recipes` doesn't exist.
+- **Reach everything through references.** A value is `shape.trip.return`, a [meta key](../../GLOSSARY.md) on it is `shape.trip.return.error`. Reads, writes, subscriptions and [behaviors](../../GLOSSARY.md) take these references, never string paths. The one exception is `store.resolvePath(path)`, for paths that come from a server ([your-side.md](your-side.md)).
+- **No code finds a meta key by its name.** Code that needs a key is handed the [node](../../GLOSSARY.md)'s reference (`node.error`) or, to sweep a subtree, the key's definition (`store.collect(node, error)`). Don't index a node with a string or list its keys.
+- **The [core](../../GLOSSARY.md) declares no meta key.** There is no built-in `error`, `touched`, `visible` or `disabled`. Declare the keys a form needs ([meta-keys.md](meta-keys.md)), or copy a [recipe](../../GLOSSARY.md) from the [recipes folder](https://github.com/TheAsda/anyshape/tree/master/recipes). Recipes are not in the package: `anyshape/recipes` doesn't exist.
 - **Build a form from an object node:** `form(object({ ... }))`.
-- **A behavior declares every reference it touches** in `triggers`, `reads`, `writes` or a guard. `ctx.get` or `ctx.set` on anything else throws ([behaviors.md](behaviors.md)).
+- **A behavior declares every reference it touches** in `triggers`, `reads`, `writes` or a [guard](../../GLOSSARY.md). `ctx.get` or `ctx.set` on anything else throws ([behaviors.md](behaviors.md)).
 - **Each target has one writer.** A second behavior writing the same value or meta key is rejected when it is registered. When several declarations need a say in one key, make it a combined key and `contribute` to it ([contributions.md](contributions.md)).
 - **Nothing happens implicitly.** Hidden or disabled fields keep their values and are submitted. Clearing a value, skipping a rule or disabling a group's children is a behavior or a guard you write ([guards.md](guards.md)).
-- **Every write runs the behaviors it affects.** The origin (`"user"`, `"program"`, `"initial"`) tells writes apart; it never skips behaviors. A behavior that should ignore some writes filters by origin.
+- **Every write runs the behaviors it affects.** The [origin](../../GLOSSARY.md) (`"user"`, `"program"`, `"initial"`) tells writes apart; it never skips behaviors. A behavior that should ignore some writes filters by origin.
 - **A guard switches a declaration on and off; it doesn't compute a value.** A behavior whose guard turns false keeps what it wrote. A value that follows a condition both ways is one behavior that computes both ([guards.md](guards.md)).
-- **The store is read and watched through references only:** `store.get(ref)`, `store.set(ref, value)`, `store.subscribe(ref, listener)`. The whole form is `store.get(shape)`.
+- **The [store](../../GLOSSARY.md) is read and watched through references only:** `store.get(ref)`, `store.set(ref, value)`, `store.subscribe(ref, listener)`. The whole form is `store.get(shape)`.
 - **Derived values are behaviors; side effects are subscriptions.** A behavior writes only the form. Work outside the form (a toast, loading options into React state) subscribes, or uses `useValue` with `useEffect` in React ([react.md](react.md)).
 - **In React, logic goes in `defineBehaviors`.** React data enters the form through `useSync`. `useBehaviors` is only for logic that comes from the component itself.
 - **Inputs are controlled** through `useField`. There is no `register()`.
@@ -28,7 +28,7 @@ Every public name, with the page that explains it. A test checks these tables ag
 
 | Name | What it is | Page |
 |---|---|---|
-| `form` | Instantiates a shape: `form(object({ ... }))`. Every node gets its identity and path. | [shape.md](shape.md) |
+| `form` | Instantiates a [shape](../../GLOSSARY.md): `form(object({ ... }))`. Every node gets its identity and path. | [shape.md](shape.md) |
 | `object`, `field`, `array` | Declare a shape: an object of children, a typed value slot, an array of object rows. | [shape.md](shape.md) |
 | `ShapeNode`, `FieldNode`, `ObjectNode`, `ArrayNode` | The node classes. `.meta(...)` declares meta keys on a node. | [shape.md](shape.md) |
 | `AnyNode`, `ContainerNode` | Any node; an object or array node. | [shape.md](shape.md) |
@@ -40,7 +40,7 @@ Every public name, with the page that explains it. A test checks these tables ag
 | `MetaKeyOptions` | `metaKey`'s options: `keepOnReset`. | [meta-keys.md](meta-keys.md) |
 | `Meta`, `MergeMetaRefs`, `UsedRefs`, `NoPayload` | The types behind `.meta()` and `.uses()`; the payload type of a key without `combine`. | [meta-keys.md](meta-keys.md) |
 | `countIn`, `CountRef` | How many nodes in a subtree have a counted key set. | [meta-keys.md](meta-keys.md) |
-| `initialOf`, `InitialRef` | A node's baseline value. | [store.md](store.md) |
+| `initialOf`, `InitialRef` | A node's [baseline](../../GLOSSARY.md) value. | [store.md](store.md) |
 | `pendingIn`, `PendingInRef` | How many targets in a subtree a running async behavior is writing. | [async.md](async.md) |
 | `pendingOf`, `PendingOfRef` | Whether a running async behavior is writing one target. | [async.md](async.md) |
 | `AnyRef`, `RefValue` | Any reference; the type `get` returns for it. | [store.md](store.md) |
@@ -54,7 +54,7 @@ Every public name, with the page that explains it. A test checks these tables ag
 | `defineBehavior`, `Behavior`, `BehaviorConfig` | Declares one behavior: its triggers, reads, writes and run. | [behaviors.md](behaviors.md) |
 | `defineBehaviors`, `BehaviorBuilder` | Builds a form's list of behaviors: `b.add`, `b.when`, `b.each`. | [behaviors.md](behaviors.md) |
 | `BehaviorContext` | A run's `ctx`: `get`, `set`, `changed`, `origins`, `state`, `signal`, `keep`. | [behaviors.md](behaviors.md) |
-| `OriginKind`, `WritableRef`, `Declaration`, `AnyBehavior` | An origins filter's kinds; a reference a behavior may write; what behaviors and contributions share; either of them. | [behaviors.md](behaviors.md) |
+| `OriginKind`, `WritableRef`, `Declaration`, `AnyBehavior` | An origins filter's kinds; a reference a behavior may write; what behaviors and [contributions](../../GLOSSARY.md) share; either of them. | [behaviors.md](behaviors.md) |
 | `BehaviorHandle` | What `store.addBehavior` returns: call it to remove the behaviors. | [behaviors.md](behaviors.md) |
 | `when`, `Guard` | A guard: a test over declared references. | [guards.md](guards.md) |
 | `contribute`, `Contribution` | Feeds a payload to a combined key's owner. | [contributions.md](contributions.md) |

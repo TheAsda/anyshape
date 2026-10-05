@@ -1,6 +1,6 @@
 # The anyshape guide
 
-anyshape is a form library whose core reserves no error slot. It holds a form's values and the metadata beside them, and keeps them consistent through behaviors you declare; what `error`, `touched` or `disabled` mean is up to you.
+anyshape is a form library whose [core](../../GLOSSARY.md) reserves no error slot. It holds a form's values and the metadata beside them, and keeps them consistent through [behaviors](../../GLOSSARY.md) you declare; what `error`, `touched` or `disabled` mean is up to you.
 
 This guide covers the package: the core (`anyshape`) and the React bindings (`anyshape/react`). It doesn't cover the [recipes](https://github.com/TheAsda/anyshape/tree/master/recipes) (validation, input state, submitting and others), which are code you copy into your project rather than part of the package; the guide links them where they show a concept at work, and its last page shows how to write your own.
 
@@ -10,14 +10,14 @@ Every page stands on its own: it introduces what it needs, links the [glossary](
 
 ## The model
 
-1. [Shapes and nodes](shape.md): declaring a form; every node is a typed reference.
+1. [Shapes and nodes](shape.md): declaring a form; every [node](../../GLOSSARY.md) is a typed reference.
 2. [The store](store.md): reading, writing, loading, resetting and subscribing.
-3. [Meta keys](meta-keys.md): state beside values; features; counting and sweeping.
+3. [Meta keys](meta-keys.md): state beside values; [features](../../GLOSSARY.md); counting and sweeping.
 4. [Behaviors](behaviors.md): declared rules that keep the form consistent.
 5. [Guards](guards.md): switching rules on and off, and when to compute a value both ways instead.
-6. [Arrays and rows](arrays.md): rows as scopes, and behaviors per row.
-7. [Combined keys](contributions.md): one owner, many contributions.
-8. [Async behaviors](async.md): cancellation, kept work and pending state.
+6. [Arrays and rows](arrays.md): rows as [scopes](../../GLOSSARY.md), and behaviors per row.
+7. [Combined keys](contributions.md): one owner, many [contributions](../../GLOSSARY.md).
+8. [Async behaviors](async.md): cancellation, [kept work](../../GLOSSARY.md) and [pending](../../GLOSSARY.md) state.
 
 ## In an app
 

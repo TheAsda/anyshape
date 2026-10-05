@@ -1,6 +1,6 @@
 # Guards
 
-A [guard](../../GLOSSARY.md) switches behaviors and contributions on and off: a test over declared references that must pass for the declaration to apply. A behavior whose guard fails stops running and keeps what it wrote. So a guard turns a rule on and off; it is not a way to compute a value that goes both ways.
+A [guard](../../GLOSSARY.md) switches [behaviors](../../GLOSSARY.md) and [contributions](../../GLOSSARY.md) on and off: a test over declared references that must pass for the declaration to apply. A behavior whose guard fails stops running and keeps what it wrote. So a guard turns a rule on and off; it is not a way to compute a value that goes both ways.
 
 First shown in [stage 5](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage5) (visibility); [stage 6](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage6) (disabled); [stage 8](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage8) (rules under a guard).
 
@@ -83,7 +83,7 @@ const showCar = defineBehavior({
 });
 ```
 
-The same holds for any target that takes one value under a condition and another value otherwise: one behavior, one `ctx.set` of the computed value. The recipes' `visibleWhen` is this behavior as a function ([source](https://github.com/TheAsda/anyshape/blob/master/recipes/behaviors.ts)).
+The same holds for any target that takes one value under a condition and another value otherwise: one behavior, one `ctx.set` of the computed value. The [recipes](../../GLOSSARY.md)' `visibleWhen` is this behavior as a function ([source](https://github.com/TheAsda/anyshape/blob/master/recipes/behaviors.ts)).
 
 Use a guard when the rule itself comes and goes: a requirement that applies only to long stays, rules that apply only while a section is shown. Use a computed value when the rule always applies and only its result changes.
 
@@ -93,7 +93,7 @@ Hiding the car section changes `car.visible` and nothing else:
 
 - the license keeps what the user typed, and the form submits it;
 - its rules still run, unless you guard them on `car.visible` as above;
-- the meta keys of the nodes inside the section don't change.
+- the [meta keys](../../GLOSSARY.md) of the [nodes](../../GLOSSARY.md) inside the section don't change.
 
 Disabling works the same way. Each consequence you want is a declaration you add. To clear the section while it is hidden, write the behavior that clears it:
 
