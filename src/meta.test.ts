@@ -1,5 +1,5 @@
 import {
-  form, object, array, field, metaKey, MetaRef, createStore, type InferValue, type InferMeta,
+  form, object, array, field, MetaRef, createStore, type InferValue, type InferMeta,
 } from "./index";
 import { control, validation, touched, visible, disabled, submission } from "./test/features";
 import { META, META_DEFS, CREATE, PLAIN, defOf } from "./internal";
@@ -52,8 +52,6 @@ type _9 = Expect<Equal<InferMeta<typeof shape.note>, {}>>;
 export function typeOnlyChecks() {
   // @ts-expect-error – `note` declares no meta
   shape.note.error;
-  // @ts-expect-error – inherit is only for boolean keys
-  metaKey(0, { inherit: "any" });
   // @ts-expect-error – `create` must return a complete item
   array(object({ a: field<string>() }), { create: () => ({}) });
 }
@@ -73,8 +71,6 @@ describe("C · Declarations", () => {
     expect(defs.error._steps.aggregate!(undefined)).toBe(false);
     expect(defs.focusTarget.options.reactive).toBe(false);
     expect(defs.label[PLAIN]).toBe(true);
-    expect(shape.company[META_DEFS].visible.options.inherit).toBe("all");
-    expect(shape.company[META_DEFS].disabled.options.inherit).toBe("any");
   });
 
   test("variadic and chained .meta() merge", () => {
@@ -99,10 +95,6 @@ describe("C · Declarations", () => {
     expect(() => field<string>().meta({ id: 1 })).toThrow(/reserved/);
     expect(() => field<string>().meta({ item: 1 })).toThrow(/reserved/);
     expect(() => field<string>().meta({ _type: 1 })).toThrow(/reserved/);
-  });
-
-  test("inherit on a non-boolean key throws at runtime too", () => {
-    expect(() => metaKey(0, { inherit: "any" } as any)).toThrow(/boolean/);
   });
 });
 
