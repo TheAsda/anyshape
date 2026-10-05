@@ -41,8 +41,8 @@ Comments describe the code as it is now, not how it got there. Drop notes like "
 
 The changelog and version numbers come from [Changesets](https://github.com/changesets/changesets). CI doesn't enforce this policy; reviews do.
 
-- A pull request that changes the published output adds a changeset with `bun run changeset`. The published output is `src/`, and the package's `exports`, types and peer dependencies.
-- Docs, tests, recipes, examples and CI need no changeset.
+- A pull request that changes the published output adds a changeset with `bun run changeset`. The published output is `src/`, the package's `exports`, types and peer dependencies, and the docs the package ships (the `files` in `package.json`: `docs/guide/`, `docs/principles.md` and `GLOSSARY.md`). Coding agents read those docs from `node_modules/anyshape/`, so a fix to them reaches its readers only through a release.
+- Other docs (the README, this file, `docs/testing.md`, the ADRs), tests, recipes, examples and CI need no changeset.
 - While the version is 0.x:
   - a breaking change is a `minor` changeset. Its text starts with **Breaking:** and shows the change as code;
   - features and fixes are `patch`;
