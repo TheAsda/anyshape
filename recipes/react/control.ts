@@ -4,49 +4,14 @@
 //   Built on useField: the value, a user onChange and the node's own
 //   control() keys, read and written through the node's refs.
 //   • `pending` while a check of the field runs (pendingOf(node.error)).
-//   • When a control's error is shown is a display policy (showError), set
-//     once with <ErrorDisplayProvider policy={...}> and inherited by nested
-//     providers, or per field with useControl(node, { errorDisplay }). The
-//     default shows an error once the field is revealed – on blur (onBlur)
-//     or by a submit – and no check is pending.
+//   • showError: an error is shown once the field is revealed – on blur
+//     (onBlur) or by a submit – and no check is pending.
 // ============================================================
 
-import { createContext, createElement, useCallback, useContext, useRef, type ReactNode } from "react";
+import { useCallback, useRef } from "react";
 import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "form-lib";
 import { useField, useValue, type HookOptions } from "form-lib/react";
 import { registerFocus, type FocusTarget } from "../focus";
-
-/** What an error display policy decides on: a control's current state. */
-export interface ErrorDisplayState {
-  error: string | undefined;
-  touched: boolean;
-  dirty: boolean;
-  revealed: boolean;
-  /** A check of the field is running: `error` is the last completed result. */
-  pending: boolean;
-}
-
-/** Decides whether a control shows its error (useControl's showError). */
-export type ErrorDisplayPolicy = (state: ErrorDisplayState) => boolean;
-
-/**
- * Show an error once the field is revealed (blurred, or covered by a submit)
- * and no check is pending; then it stays live.
- */
-export const defaultErrorDisplay: ErrorDisplayPolicy = (s) => s.error !== undefined && s.revealed && !s.pending;
-
-const ErrorDisplayContext = createContext<ErrorDisplayPolicy>(defaultErrorDisplay);
-
-export interface ErrorDisplayProviderProps {
-  /** Error display policy for the controls below. */
-  policy: ErrorDisplayPolicy;
-  children?: ReactNode;
-}
-
-/** Set the error display policy for the controls below; the nearest provider wins. */
-export function ErrorDisplayProvider(props: ErrorDisplayProviderProps): ReactNode {
-  return createElement(ErrorDisplayContext.Provider, { value: props.policy }, props.children);
-}
 
 /** A node with the control() keys. */
 export type ControlNode = AnyNode & {
@@ -67,7 +32,7 @@ export interface ControlBinding<N extends ControlNode> {
   pending: boolean;
   /** Set on blur (onBlur) and by submit; cleared by reset. */
   revealed: boolean;
-  /** Whether to show the error now, per the provided display policy. */
+  /** Whether to show the error now: revealed, with an error and no check pending. */
   showError: boolean;
   /** Stable; marks the field revealed. Pass it to the input's onBlur. */
   onBlur: () => void;
@@ -76,13 +41,8 @@ export interface ControlBinding<N extends ControlNode> {
   store: BaseStore<any>;
 }
 
-export interface UseControlOptions extends HookOptions {
-  /** This field's error display policy, in place of the provided one. */
-  errorDisplay?: ErrorDisplayPolicy;
-}
-
 /** A node with control(): value, onChange and the control state. */
-export function useControl<N extends ControlNode>(node: N, options?: UseControlOptions): ControlBinding<N> {
+export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
   const { value, onChange, store } = useField(node, options);
   const error = useValue(node.error, { store });
   const touched = useValue(node.touched, { store });
@@ -104,9 +64,6 @@ export function useControl<N extends ControlNode>(node: N, options?: UseControlO
     if (store.isAttached()) store.set(node.revealed, true, { origin: "user" });
   }, [store, node]);
 
-  const provided = useContext(ErrorDisplayContext);
-  const policy = options?.errorDisplay ?? provided;
-
   return {
     value,
     onChange,
@@ -115,7 +72,8 @@ export function useControl<N extends ControlNode>(node: N, options?: UseControlO
     dirty,
     pending,
     revealed,
-    showError: policy({ error, touched, dirty, revealed, pending }),
+    // Edit to show errors at another moment, e.g. `error !== undefined && touched`.
+    showError: error !== undefined && revealed && !pending,
     onBlur,
     focusRef,
     store,

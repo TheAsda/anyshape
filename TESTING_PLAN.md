@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 449 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 447 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -30,13 +30,13 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
-| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 34 |
-| `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, `when` | 10 |
-| `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 15 |
+| `recipes/validation.test.ts` | M | rules, queues, async, `validate()` | 36 |
+| `recipes/rules.test.ts` | N | ready-made rules, messages, reference limits, guarded by a builder block | 10 |
+| `recipes/behaviors.test.ts` | N | ready-made behaviors, `exclusive`, builder | 17 |
 | `recipes/features.test.ts` | N | the default behaviors of `touched` and `dirty` | 1 |
 | `src/paths.test.ts` | O | `resolvePath`, server errors | 4 |
 | `recipes/submit.test.ts` | O | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition | 10 |
-| `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips, `focus(store, node)` | 8 |
+| `recipes/focus.test.ts` | O | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips | 8 |
 | `src/types.test.ts` | S | the public type contract (asserted by `tsc`) | 1 |
 | `recipes/types.test.ts` | S | the recipes' type contract (asserted by `tsc`) | 1 |
 | `recipes/imports.test.ts` | — | recipes import only the core entries; the core imports no recipe | 2 |
@@ -45,8 +45,8 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/react/form.test.tsx` | Q | `useForm`, `useSync` | 10 |
 | `src/react/behaviors.test.tsx` | R | `useBehaviors` | 13 |
 | `src/react/integration.test.tsx` | INT | the trip booking rendered | 1 |
-| `recipes/react/control.test.tsx` | P | `useControl`, error display policy, `focusRef`, adapters | 7 |
-| `recipes/react/submit.test.tsx` | O | DOM focus order, `handleSubmit` on a real `<form>`, `domOrder` | 3 |
+| `recipes/react/control.test.tsx` | P | `useControl`, `showError`, `focusRef`, adapters | 7 |
+| `recipes/react/submit.test.tsx` | O | DOM focus order, `handleSubmit` on a real `<form>`, DOM elements beside custom focus handles | 3 |
 
 Shared fixtures live in `src/test/fixtures/` (`user`, `limits`, `company`, `account`) and `src/test/trip.ts`. The core tests declare their meta keys with the test-local features in `src/test/features.ts` and rules in `src/test/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`.
 
@@ -203,25 +203,25 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **M5 · P3** `validate()` while a debounced check is pending on a row that is then removed resolves (doesn't hang) and doesn't list the row. → `validation.test.ts`
 
 ### N. Ready-made rules, behaviors & builder
-**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (+`stopOnUserEdit`, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen`, `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
+**Covered:** `isEmpty`, `labelOf`, `required` (switchable through a guard on a `required` key), format rules on empty values, `calculate` (a user edit is overwritten, rows), `link`, `visibleWhen`/`disableWhen`, `clearWhen` (to the initial value, edits reset while the test holds), `exclusive` (incl. several filled, required, omitted values), builder `when/otherwise`, shared targets, nested guards, `each`, fragments, output to `addBehavior`.
 
 - [x] **N1 · P2** Messages as functions (`message: (v) => …`), and `exclusive`'s custom `message.tooMany` / `message.missing`; `exclusive`'s default text uses `labelOf` (the last path segment). → `recipes/rules.test.ts`
 - [x] **N2 · P2** `exclusive([one])` throws "needs at least two fields"; `clearWhen` takes its condition as explicit refs (`[s.car.visible]`). → `recipes/behaviors.test.ts`
 - [x] **N3 · P2** `link`: when both sides change in the same batch (loading data), nothing is written. → `recipes/behaviors.test.ts`
-- [x] **N4 · P2** The `when` option on rules and behaviors (`calculate(…, { when })`, `required(…, { when })`) works like a builder block. → `recipes/rules.test.ts`
+- [x] **N4 · P2** A builder block guards a rule and a behavior (`b.when([...], test, (b) => b.add(required(…), calculate(…)))`): absent while false, run when it turns true. → `recipes/rules.test.ts`
 - [x] **N5 · P3** Type-level: `pattern`/`email` reject non-string nodes, `min`/`max` reject non-number nodes, `minLength` accepts arrays. → see §S
 
 ### O. Submit, focus, paths
-**Covered:** `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors. The recipes: `handleSubmit` (`preventDefault`, no event, `formData` is the store's value, `submitting` and its reset when `fn` throws, reveal scope, focus on invalid, the per-store guard, independent submittable nodes, a non-submittable store rejected), `registerFocus` (found from any store in the scope, kept by reset, per row, unregistering only its own target), `focusFirst` order and `compare`, skipped entries, `focus(store, node)`, DOM order in a real browser.
+**Covered:** `resolvePath` (fields, rows, nested, meta, unknown, from a row store), server errors. The recipes: `handleSubmit` (`preventDefault`, no event, `formData` is the store's value, `submitting` and its reset when `fn` throws, reveal scope, focus on invalid, the per-store guard, independent submittable nodes, a non-submittable store rejected), `registerFocus` (found from any store in the scope, kept by reset, per row, unregistering only its own target), `focusFirst` order (DOM order, ties in the entries' order), skipped entries, `focus()` then `scrollIntoView()`, DOM order in a real browser.
 
-- [x] **O1 · P2** `focus(store, node)` returns `false` without a target, and calls `focus()` then `scrollIntoView()` when present. → `recipes/focus.test.ts`
+- [x] **O1 · P2** `focusFirst` returns `undefined` without a target, and calls `focus()` then `scrollIntoView()` when present. → `recipes/focus.test.ts`
 - [x] **O2 · P2** `focusFirst` skips entries whose row store is detached. → `recipes/focus.test.ts`
 - [x] **O3 · P2** `handleSubmit` rejects a store whose own node doesn't declare `submission()`, at compile time and at run time. → `recipes/submit.test.ts`
 - [x] **O4 · P3** `handleSubmit(store, fn)()` called without an event. → `recipes/submit.test.ts`
-- [x] **O5 · P2** `registerFocus` and `focus` throw for a node the store does not address: a row node through the root store, a node of another form. → `recipes/focus.test.ts`
+- [x] **O5 · P2** `registerFocus` throws for a node the store does not address: a row node through the root store, a node of another form. → `recipes/focus.test.ts`
 
 ### P. React bindings (`react/hooks.ts`, `recipes/react/`)
-**Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useArray` (re-render on structure only, nested arrays). In the recipes: `useControl` (state, user writes, `onBlur` reveal, default policy and `ErrorDisplayProvider`), `focusRef`, adapters (real events, caching).
+**Covered:** `useValue` (values, meta, counts; re-render isolation; selector), per-reference subscriptions, row/object/explicit-store resolution, resolution errors, `useField`, `useArray` (re-render on structure only, nested arrays). In the recipes: `useControl` (state, user writes, `onBlur` reveal, `showError` once revealed and not pending), `focusRef`, adapters (real events, caching).
 
 - [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `recipes/react/control.test.tsx`
 - [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `recipes/react/control.test.tsx`
@@ -230,9 +230,9 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.tsx`
 
 ### Q. Lifetime & outside data (`react/form.ts`)
-**Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, `resetOnUnmount`, StrictMode). (DOM focus order and `handleSubmit` on a real form moved to `recipes/react/submit.test.tsx`.)
+**Covered:** `useForm` once, behaviors passed, shape warning, `values` as baseline (same object keeps edits, a new object reloads, first-render values), `useSync` (limit from React, survives reset, writes on change only, warning, kept after unmount, StrictMode). (DOM focus order and `handleSubmit` on a real form moved to `recipes/react/submit.test.tsx`.)
 
-- [x] **Q1 · P2** `useSync` on a **value node** with `resetOnUnmount` restores the node's *initial value* (not a meta default). → `react/form.test.tsx`
+- [x] **Q1 · P2** `useSync` on a **value node** writes it, and the value stays after unmount. → `react/form.test.tsx`
 - [x] **Q2 · P2** `useSync` under a row provider writes that row's key; after the row is removed, it neither writes nor throws. → `react/form.test.tsx`
 - [x] **Q3 · P3** Pin the documented caveat: a new `values` object with identical data replaces the user's edits. → `react/form.test.tsx`
 
