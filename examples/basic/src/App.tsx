@@ -92,9 +92,6 @@ export function App() {
 function RequisitionWizard() {
   const form = useStore<RootStore<typeof shape>>();
   const step = useValue(shape.step) ?? 0;
-  // Read inside submit handlers without rebinding them each render.
-  const stepRef = useRef(step);
-  stepRef.current = step;
   const [result, setResult] = useState<Submitted | undefined>();
 
   const goTo = (n: number) => form.set(shape.step, n);
@@ -110,9 +107,11 @@ function RequisitionWizard() {
 
   const onSubmit = handleSubmit(form, async (values) => {
     // Enter in any input submits the form element; on early steps
-    // that should behave like Continue, not like a save attempt.
-    if (stepRef.current < 2) {
-      continueStep(stepRef.current);
+    // that should behave like Continue, not like a save attempt. The
+    // step is read from the store: it's current when the handler runs.
+    const current = form.get(shape.step) ?? 0;
+    if (current < 2) {
+      continueStep(current);
       return;
     }
     try {
@@ -228,7 +227,7 @@ function RequesterSection() {
  */
 function DepartmentField() {
   const form = useStore<RootStore<typeof shape>>();
-  const c = useControl(shape.requester.department);
+  const { focusRef, ...c } = useControl(shape.requester.department);
   const budget = useValue(shape.requester.budget);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -262,7 +261,7 @@ function DepartmentField() {
       </label>
       <input
         id="dep"
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         value={c.value}
         placeholder="DEP-1100"

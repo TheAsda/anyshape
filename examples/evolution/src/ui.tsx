@@ -71,7 +71,7 @@ export function TextField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const c = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -80,7 +80,7 @@ export function TextField({
         {label}
       </label>
       <input
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         id={id}
         type={type}
@@ -116,7 +116,7 @@ export function NumberField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const c = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -125,7 +125,7 @@ export function NumberField({
         {label}
       </label>
       <input
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         id={id}
         type="number"
@@ -157,12 +157,12 @@ export function CheckboxField({
   node: BooleanNode;
   label: string;
 }) {
-  const c = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   return (
     <div className="field field--checkbox">
       <label className="field__label">
         <input
-          ref={c.focusRef}
+          ref={focusRef}
           type="checkbox"
           checked={c.value}
           onChange={fromCheckbox(c.onChange)}
