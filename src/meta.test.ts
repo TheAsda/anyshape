@@ -77,15 +77,15 @@ describe("C · Declarations", () => {
   });
 
   test("a node declares each key once: a second declaration throws, plain value or key definition", () => {
-    const twice = (key: string, kind: string) => `Meta key "${key}" is already declared on this ${kind} – a node declares each key once`;
-    expect(() => field<string>().meta({ hint: "a" }).meta({ hint: 1 })).toThrow(twice("hint", "field"));
-    expect(() => field<string>().meta({ hint: "a" }, { hint: "b" })).toThrow(twice("hint", "field"));
-    expect(() => field<string>().meta(validation()).meta(validation())).toThrow(twice("error", "field"));
-    expect(() => field<string>().meta(control(), { touched })).toThrow(twice("touched", "field"));
-    expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(twice("error", "field"));
-    expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(twice("error", "field"));
-    expect(() => object({ a: field<string>() }).meta({ hint: "" }).meta({ hint: "" })).toThrow(twice("hint", "object"));
-    expect(() => array(object({ a: field<string>() })).meta({ hint: "" }).meta({ hint: "" })).toThrow(twice("hint", "array"));
+    const alreadyDeclared = (key: string, kind: string) => `Meta key "${key}" is already declared on this ${kind} – a node declares each key once`;
+    expect(() => field<string>().meta({ hint: "a" }).meta({ hint: 1 })).toThrow(alreadyDeclared("hint", "field"));
+    expect(() => field<string>().meta({ hint: "a" }, { hint: "b" })).toThrow(alreadyDeclared("hint", "field"));
+    expect(() => field<string>().meta(validation()).meta(validation())).toThrow(alreadyDeclared("error", "field"));
+    expect(() => field<string>().meta(control(), { touched })).toThrow(alreadyDeclared("touched", "field"));
+    expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(alreadyDeclared("error", "field"));
+    expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(alreadyDeclared("error", "field"));
+    expect(() => object({ a: field<string>() }).meta({ hint: "" }).meta({ hint: "" })).toThrow(alreadyDeclared("hint", "object"));
+    expect(() => array(object({ a: field<string>() })).meta({ hint: "" }).meta({ hint: "" })).toThrow(alreadyDeclared("hint", "array"));
   });
 
   test("reserved meta keys are rejected", () => {

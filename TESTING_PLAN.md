@@ -102,7 +102,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - a changed write copies only the path to the leaf (siblings keep their references).
 
 ### C. Meta declarations & references (`meta.ts`, `shape.ts`)
-**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, each key declared once on a node (a second declaration throws, #95), reserved keys, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
+**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, each key declared once on a node (a second declaration throws, #95), reserved keys, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
 
 - [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
 - [x] **C2 · P2** A meta write with `{ as: "initial" }` throws "applies to values only". → `origins.test.ts`
