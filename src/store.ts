@@ -38,14 +38,15 @@
 //   4. When an item store's attachment changes, all its subscribers fire.
 //   5. Every write is a batch of one; batch(fn) groups writes; notifications
 //      run when the outermost batch ends.
-//   6. The flush is synchronous: its sync behavior runs settle inside it. Async behavior runs may still be in flight after it, so the
-//      form is not final; code that needs that awaits store.settle().
+//   6. The flush is synchronous: its sync behavior runs settle inside it.
+//      Async behavior runs may still be in flight after it, so the form is
+//      not final; code that needs that awaits store.settle().
 //   7. The behavior phase runs first (repeating until settled, max
-//      MAX_BEHAVIOR_ROUNDS), then UI listeners once; writing during the UI
-//      phase throws. Behaviors are triggered through the internal reaction
-//      channel (_react): derived writes are behaviors, side effects are UI
-//      listeners (subscribe).
-//   8. UI listeners are () => void; reactions get (next, prev, info).
+//      MAX_BEHAVIOR_ROUNDS), then the listener phase once; writing during
+//      the listener phase throws. Behaviors are triggered through the
+//      internal reaction channel (_react): derived writes are behaviors,
+//      side effects are listeners (subscribe).
+//   8. Listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
 import type { Meta, MetaKeyDef } from "./meta";
@@ -118,7 +119,7 @@ export interface RuntimeHooks {
  */
 export interface Probe {
   flushStart(at: number): void;
-  /** The behaviors settled: the UI listeners are next. */
+  /** The behaviors settled: the listeners are next. */
   behaviorsEnd(at: number): void;
   flushEnd(at: number): void;
   /** A synchronous part of a run on `instance` starts. Parts never nest. */
@@ -178,8 +179,8 @@ export type RunPart = "sync" | "async" | "apply";
 // Internals: phases, subscriptions, write log
 // ============================================================
 /** @internal */
-export type Phase = "behavior" | "ui";
-const PHASES: readonly Phase[] = ["behavior", "ui"];
+export type Phase = "behavior" | "listener";
+const PHASES: readonly Phase[] = ["behavior", "listener"];
 const NO_ORIGINS: ReadonlySet<Origin> = new Set();
 
 interface Sub<V = any> {
@@ -651,9 +652,9 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   // Subscriptions
   // ==========================================================
-  /** UI phase: called after the flush when the reference's value changed. */
+  /** Listener phase: called after the flush when the reference's value changed. */
   subscribe(ref: AnyRef, listener: Listener): Unsubscribe {
-    return this._addRefSub(ref, "ui", () => listener());
+    return this._addRefSub(ref, "listener", () => listener());
   }
 
   /** @internal behavior phase, for the behavior runtime: may write; receives next, prev and the origins of the change. */
@@ -750,7 +751,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   // ==========================================================
   /** @internal */
   _initSeen(focus: unknown = this._read(this.node), attached: boolean = this.isAttached()): void {
-    this._seen = { behavior: { focus, attached }, ui: { focus, attached } };
+    this._seen = { behavior: { focus, attached }, listener: { focus, attached } };
     this._syncSeen = focus;
   }
 
@@ -772,10 +773,10 @@ export abstract class BaseStore<N extends ContainerNode> {
       for (const sub of subs) if (sub.phase === phase) check(sub, calls, log);
     }
 
-    // Rule 4: attachment changed → meta key subscribers re-check (UI: always fire).
+    // Rule 4: attachment changed → meta key subscribers re-check (listeners: always fire).
     if (attachChanged) {
       for (const subs of this._keySubs.values()) {
-        for (const sub of subs) if (sub.phase === phase) check(sub, calls, log, phase === "ui");
+        for (const sub of subs) if (sub.phase === phase) check(sub, calls, log, phase === "listener");
       }
     }
 
@@ -848,9 +849,9 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
   private writeLog: WriteEntry[] = [];
   /** @internal */ readonly _runtime: RuntimeHooks;
   /** @internal */ _probe: Probe | undefined;
-  private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { behavior: new Set(), ui: new Set() };
-  private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { behavior: new Map(), ui: new Map() };
-  private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { behavior: new Map(), ui: new Map() };
+  private readonly dirtyInitial: Record<Phase, Set<BaseStore<any>>> = { behavior: new Set(), listener: new Set() };
+  private readonly dirtyMeta: Record<Phase, Map<BaseStore<any>, Set<AnyNode>>> = { behavior: new Map(), listener: new Map() };
+  private readonly dirtyCounts: Record<Phase, Map<BaseStore<any>, Map<AnyNode, Set<Slot>>>> = { behavior: new Map(), listener: new Map() };
 
   /** @internal – use createStore() */
   constructor(shape: N, initialValues: InferValue<N>, createRuntime: (root: RootStore<N>) => RuntimeHooks) {
@@ -905,8 +906,8 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
 
   /** @internal */
   _assertWritable(): void {
-    if (this.phase === "ui") {
-      throw new Error("Cannot write while UI listeners are notified – write derived values with a behavior");
+    if (this.phase === "listener") {
+      throw new Error("Cannot write while listeners are notified – write derived values with a behavior");
     }
   }
 
@@ -1014,10 +1015,10 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> implement
       probe?.behaviorsEnd(performance.now());
 
       this._syncWalk();
-      this.phase = "ui";
+      this.phase = "listener";
       const calls: Calls = [];
-      this.drain("ui", calls, undefined);
-      this._visit("ui", calls, undefined);
+      this.drain("listener", calls, undefined);
+      this._visit("listener", calls, undefined);
 
       let failed = false;
       let error: unknown;
@@ -1076,10 +1077,10 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   private members = new Set<object>();
   private baseline: { array: readonly object[]; set: Set<object> } | undefined;
   private readonly itemsSubs = new Set<Sub<readonly ItemStore<ItemOf<N>>[]>>();
-  private createdSince: Record<Phase, ItemStore<any>[]> = { behavior: [], ui: [] };
+  private createdSince: Record<Phase, ItemStore<any>[]> = { behavior: [], listener: [] };
   /** Per walk: the sequence it last walked, and the rows whose object changed since. */
-  private walked: Record<Walk, readonly ItemStore<any>[]> = { sync: EMPTY, behavior: EMPTY, ui: EMPTY };
-  private readonly rewritten: Record<Walk, Set<ItemStore<any>>> = { sync: new Set(), behavior: new Set(), ui: new Set() };
+  private walked: Record<Walk, readonly ItemStore<any>[]> = { sync: EMPTY, behavior: EMPTY, listener: EMPTY };
+  private readonly rewritten: Record<Walk, Set<ItemStore<any>>> = { sync: new Set(), behavior: new Set(), listener: new Set() };
 
   /** @internal – use store.substore(node) */
   constructor(node: N, parent: BaseStore<any>) {
@@ -1097,7 +1098,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   /** Fires only when the sequence of item stores changes (rule 3). */
   readonly subscribeItems = (listener: Listener): Unsubscribe => {
     const sub: Sub<readonly ItemStore<ItemOf<N>>[]> = {
-      phase: "ui",
+      phase: "listener",
       active: true,
       last: this.items(),
       read: () => this._sync(),
@@ -1316,7 +1317,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   protected override _visitChildren(phase: Phase, calls: Calls, log: readonly WriteEntry[] | undefined): void {
     for (const store of this.rowsToWalk(phase, this._sync())) store._visit(phase, calls, log);
 
-    if (phase === "ui") {
+    if (phase === "listener") {
       for (const sub of this.itemsSubs) check(sub, calls, undefined);
     }
   }

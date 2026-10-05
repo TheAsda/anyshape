@@ -211,7 +211,7 @@ describe("T · Flush budget", () => {
     warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  test("a flush over budget warns once: its total, reactions and UI listeners, and the three slowest behaviors over their instances", () => {
+  test("a flush over budget warns once: its total, reactions and listeners, and the three slowest behaviors over their instances", () => {
     const s = createStore(order, orderValues(), {
       behaviors: [
         slow("total", 10, [O.qty], O.total),
@@ -226,7 +226,7 @@ describe("T · Flush budget", () => {
     s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
-      "[form] A flush took 42.5 ms, over the 33.3 ms budget: 38.5 ms in behaviors, 4.0 ms in UI listeners. " +
+      "[form] A flush took 42.5 ms, over the 33.3 ms budget: 38.5 ms in behaviors, 4.0 ms in listeners. " +
         'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run), "note" 1.0 ms (1 run).'
     );
   });
@@ -241,7 +241,7 @@ describe("T · Flush budget", () => {
     });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
-      "[form] A flush took 35.0 ms, over the 33.3 ms budget: 35.0 ms in behaviors, 0.0 ms in UI listeners. " +
+      "[form] A flush took 35.0 ms, over the 33.3 ms budget: 35.0 ms in behaviors, 0.0 ms in listeners. " +
         'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run).'
     );
   });
@@ -285,14 +285,14 @@ describe("T · Flush budget", () => {
     s.set(order.note, "go");
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
-      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in behaviors, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms (1 run).'
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in behaviors, 0.0 ms in listeners. Slowest behaviors: "load" 40.0 ms (1 run).'
     );
     t += 1000;
     reply.resolve();
     await flush();
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[1][0]).toBe(
-      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms applying async writes, 0.0 ms in behaviors, 0.0 ms in UI listeners. Slowest behaviors: "load" 40.0 ms.'
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms applying async writes, 0.0 ms in behaviors, 0.0 ms in listeners. Slowest behaviors: "load" 40.0 ms.'
     );
   });
 });
@@ -332,7 +332,7 @@ describe("T · DevTools tracks", () => {
     expect(stamp.mock.calls).toEqual([
       ["title @rows[2]", 10, 14, "behaviors", "form-lib", "primary"],
       ["behavior runs", 10, 14, "flush", "form-lib", "tertiary-light"],
-      ["UI listeners", 14, 15, "flush", "form-lib", "tertiary-light"],
+      ["listeners", 14, 15, "flush", "form-lib", "tertiary-light"],
       ["flush", 10, 15, "flush", "form-lib", "tertiary"],
     ]);
   });
@@ -346,7 +346,7 @@ describe("T · DevTools tracks", () => {
     measure.mockClear();
     t = 10;
     s.set(shape.rows, s.get(shape.rows).map((r) => ({ ...r, sku: r.sku + "!" })));
-    expect(stamp.mock.calls.filter((c) => c[3] === "flush").map((c) => c[0])).toEqual(["behavior runs", "UI listeners"]);
+    expect(stamp.mock.calls.filter((c) => c[3] === "flush").map((c) => c[0])).toEqual(["behavior runs", "listeners"]);
     expect(measured()).toEqual([
       {
         name: "flush over budget", start: 10, end: 51,
@@ -354,7 +354,7 @@ describe("T · DevTools tracks", () => {
         tooltipText: "A flush took 41.0 ms, over the 33.3 ms budget",
         properties: [
           ["Behaviors", "40.0 ms"],
-          ["UI listeners", "1.0 ms"],
+          ["listeners", "1.0 ms"],
           ["1. title", "40.0 ms (2 runs)"],
         ],
       },

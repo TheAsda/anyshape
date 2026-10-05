@@ -109,7 +109,7 @@ describe("K · Ordering and init", () => {
     expect(s.get(shape.subtotal)).toBe(25);
   });
 
-  test("UI listeners fire once, on the settled state", () => {
+  test("listeners fire once, on the settled state", () => {
     const s = createStore(shape, initial(), { behaviors: pricing({}) });
     const seen: number[] = [];
     s.subscribe(shape.total, () => seen.push(s.get(shape.total)));
