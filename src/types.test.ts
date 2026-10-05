@@ -213,6 +213,13 @@ export function removedOptionChecks() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// form() instantiates an object node: there is one way to make an object.
+export function formChecks() {
+  // @ts-expect-error – a plain record of fields is not an object node
+  form({ a: field<string>() });
+}
+
 test("a loose node declares no known meta keys", () => {
   expectTypeOf<InferMeta<AnyNode>>().toEqualTypeOf<{}>();
 });
@@ -223,7 +230,7 @@ test("node internals are not part of a node's type", () => {
   expectTypeOf(t.a).not.toHaveProperty("_fields");
   expectTypeOf(t.withCreate).not.toHaveProperty("_create");
 
-  const f = form({ _meta: field<number>(), _fields: field<string>() });
+  const f = form(object({ _meta: field<number>(), _fields: field<string>() }));
   expectTypeOf(f._meta).toEqualTypeOf<FieldNode<number>>();
   expectTypeOf(f._fields).toEqualTypeOf<FieldNode<string>>();
 });

@@ -17,7 +17,7 @@ const tags = metaKey<readonly string[], string>([]).combine((self, key) => ({
   run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
 }));
 
-const shape = form({
+const shape = form(object({
   tagged: field<string>().meta({ tags }),
   type: field<"person" | "company">(),
   name: field<string>().meta(control(), { hint: "" }),
@@ -25,7 +25,7 @@ const shape = form({
   vat: field<string>().meta(control()),
   note: field<string>().meta({ disabled }),
   lines: array(object({ qty: field<number>().meta(control(), { hint: "" }) })),
-});
+}));
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 const initial = (): Values => ({

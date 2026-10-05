@@ -34,6 +34,13 @@ describe("A · Nodes", () => {
     expect(() => array(field<string>())).toThrow(/object shapes/);
   });
 
+  test("form() takes only an object node", () => {
+    const message = "form() takes an object node – wrap the fields, e.g. form(object({ ... }))";
+    expect(() => form({ a: field<string>() } as never)).toThrow(message);
+    expect(() => form(field<string>() as never)).toThrow(message);
+    expect(() => form(array(object({ a: field<string>() })) as never)).toThrow(message);
+  });
+
   test(".meta() after form() rejected", () => {
     expect(() => userShape.name.meta({ x: 1 })).toThrow(/before form/);
   });
@@ -42,7 +49,7 @@ describe("A · Nodes", () => {
 describe("A · Reused shapes containing arrays", () => {
   test("a reused shape containing an array: separate templates, ids and paths per use", () => {
     const block = object({ items: array(object({ x: field<string>() })) });
-    const f = form({ a: block, b: block });
+    const f = form(object({ a: block, b: block }));
     expect(f.a.items.item).not.toBe(f.b.items.item);
     expect(f.a.items.item.x.path).toBe("a.items[].x");
     expect(f.b.items.item.x.path).toBe("b.items[].x");

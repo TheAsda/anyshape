@@ -305,13 +305,11 @@ export function array(item: any, options?: ArrayOptions<any>): any {
   return ArrayNode.create(item, options?.create);
 }
 
-/** Root entry point: builds (if needed) and instantiates the form shape. */
-export function form<N extends ObjectNode<any>>(root: N): N;
-export function form<TFields extends Record<string, AnyNode>>(fields: TFields): ObjectNode<TFields> & TFields;
-export function form(input: any): any {
-  const structural: ObjectNode<any> = input instanceof ObjectNode ? input : object(input);
+/** Root entry point: instantiates the form's object node (ids, paths, lenses). */
+export function form<N extends ObjectNode<any>>(root: N): N {
+  if (!(root instanceof ObjectNode)) throw new Error("form() takes an object node – wrap the fields, e.g. form(object({ ... }))");
   let counter = 0;
-  return instantiate(structural, {
+  return instantiate(root, {
     path: "",
     lens: identityLens,
     parent: undefined,

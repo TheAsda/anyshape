@@ -12,7 +12,7 @@ import { rule } from "../test/rules";
 
 const gc = (globalThis as { gc?: () => void }).gc;
 
-const shape = form({
+const shape = form(object({
   lines: array(
     object({
       sku: field<string>().meta(control()),
@@ -22,7 +22,7 @@ const shape = form({
     }),
     { create: () => ({ sku: "", qty: 1, lineTotal: 0, lookup: "" }) }
   ),
-});
+}));
 const L = shape.lines.item;
 
 async function collectGarbage() {
@@ -113,7 +113,7 @@ it.skipIf(!gc)("a removed row whose own behaviors were disposed is collectable",
 // The run order's indexes (order.ts) by scope host: a disposed registration
 // leaves no entry under its own host, the hosts enclosing it or the host it
 // reads on, and no edge in the registrations that stay (#63).
-const nested = form({
+const nested = form(object({
   lines: array(
     object({
       qty: field<number>(),
@@ -124,7 +124,7 @@ const nested = form({
     { create: () => ({ qty: 1, total: 0, sku: "", notes: [] }) }
   ),
   sum: field<number>(),
-});
+}));
 const NL = nested.lines.item;
 const NN = NL.notes.item;
 const lineTotal = () => defineBehavior({ triggers: [NL.qty], writes: [NL.total], run: (c) => c.set(NL.total, c.get(NL.qty) * 2) });

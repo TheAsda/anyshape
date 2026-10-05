@@ -138,9 +138,9 @@ describe("C · Meta references", () => {
   });
 
   test("paths through nested arrays, for nodes and meta refs", () => {
-    const f = form({
+    const f = form(object({
       outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
-    });
+    }));
     expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
     expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
     expect(f.outer.item.inner.path).toBe("outer[].inner");
@@ -196,9 +196,9 @@ describe("C · Reserved names, table-driven", () => {
   });
 
   test("_fields, _meta and _metaDefs are ordinary meta keys", () => {
-    const f = form({
+    const f = form(object({
       group: object({ x: field<string>() }).meta({ _fields: 1, _meta: "m", _metaDefs: false }),
-    });
+    }));
     const s = createStore(f, { group: { x: "a" } });
     s.set(f.group._meta, "n");
     expect([s.get(f.group._fields), s.get(f.group._meta), s.get(f.group._metaDefs)]).toEqual([1, "n", false]);
