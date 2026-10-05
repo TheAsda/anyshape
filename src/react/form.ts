@@ -18,6 +18,7 @@ import type { StoreOptions } from "../behaviors";
 import type { RootStore, WriteOptions } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
 import { refLabel, targetOf, isDev } from "../internal";
+import { initialOf } from "../refs/initial";
 
 // ============================================================
 // useForm
@@ -48,7 +49,7 @@ export function useForm<N extends ObjectNode<any>>(
     const values = options.values;
     if (values === undefined || values === applied.current) return;
     applied.current = values;
-    store.setValues(values, { as: "initial" });
+    store.set(store.node, values, { as: "initial" });
   }, [store, options.values]);
 
   return store;
@@ -93,7 +94,7 @@ export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferVa
     if (!resetOnUnmount) return;
     return () => {
       if (!store.isAttached()) return;
-      const reset = def ? def.defaultValue : store.getInitial(ref as AnyNode);
+      const reset = def ? def.defaultValue : store.get(initialOf(ref as AnyNode));
       store.set(ref as never, reset as never, { origin });
     };
   }, [store, ref, resetOnUnmount, origin]);

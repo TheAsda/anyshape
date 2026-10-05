@@ -47,7 +47,7 @@ describe("G · Origins, baselines and reset", () => {
     expect(toRoot).toEqual([["user"]]);
     expect(toRow).toEqual([["user"]]);
 
-    const current = s.getValues().lines;
+    const current = s.get(shape).lines;
     s.set(shape.lines, [current[1]]);                      // array write detaches the row
     expect(toRow.at(-1)).toEqual(["program"]);
   });
@@ -69,35 +69,35 @@ describe("G · Origins, baselines and reset", () => {
 
   // ---------------------------------------------------------------------------
   // Initial values
-  test("getInitial and { as: 'initial' }", ({ store: s }) => {
+  test("initialOf and { as: 'initial' }", ({ store: s }) => {
     s.set(shape.name, "Bob");
-    expect(s.getInitial(shape.name)).toBe("Ann");
+    expect(s.get(initialOf(shape.name))).toBe("Ann");
     s.set(shape.name, "Cid", { as: "initial" });
-    expect(s.getInitial(shape.name)).toBe("Cid");
+    expect(s.get(initialOf(shape.name))).toBe("Cid");
     expect(s.get(shape.name)).toBe("Cid");
   });
 
   test("rows keep their own initial value through edits and reordering", ({ store: s, lines }) => {
     const [a, b] = lines.items();
     a.set(L.qty, 9);
-    expect(a.getInitial(L.qty)).toBe(1);
+    expect(a.get(initialOf(L.qty))).toBe(1);
     lines.move(a, 1);
     expect(lines.itemAt(1)).toBe(a);
-    expect(a.getInitial(L.qty)).toBe(1);
-    expect(b.getInitial(L.sku)).toBe("B");
+    expect(a.get(initialOf(L.qty))).toBe(1);
+    expect(b.get(initialOf(L.sku))).toBe("B");
   });
 
   test("new rows start from {}", ({ store: s }) => {
     const row = s.substore(shape.lines).append();
-    expect(row.getInitial(L.sku)).toBe(undefined);
+    expect(row.get(initialOf(L.sku))).toBe(undefined);
     expect(row.get(L.qty)).toBe(1);
   });
 
   test("a baseline write on the array makes current rows initial", ({ store: s, lines }) => {
     const row = lines.append({ sku: "N" });
-    expect(row.getInitial(L.sku)).toBe(undefined);
+    expect(row.get(initialOf(L.sku))).toBe(undefined);
     s.set(shape.lines, lines.current().slice(), { as: "initial" });
-    expect(row.getInitial(L.sku)).toBe("N");
+    expect(row.get(initialOf(L.sku))).toBe("N");
   });
 
   test("reset restores values and meta, keeps rows and focus targets", ({ store: s, lines }) => {
@@ -149,7 +149,7 @@ describe("G · Origins, baselines and reset", () => {
     expect(a.get(L.sku.dirty)).toBe(true);
     expect(added.get(L.sku.dirty)).toBe(true);
 
-    s.setValues(s.getValues(), { as: "initial" });
+    s.set(shape, s.get(shape), { as: "initial" });
     expect(a.get(L.sku.dirty)).toBe(false);
     expect(added.get(L.sku.dirty), "the added row is part of the new baseline").toBe(false);
     expect(s.get(countIn(shape, dirty))).toBe(0);

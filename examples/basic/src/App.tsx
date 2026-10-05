@@ -140,7 +140,7 @@ function RequisitionWizard() {
 
   const loadSample = () => {
     setResult(undefined);
-    form.setValues(sample);
+    form.set(shape, sample);
   };
 
   return (

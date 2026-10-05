@@ -12,7 +12,7 @@ import { test, expect } from "vitest";
 // INT1
 test("INT1 loading a saved booking: clean, sync errors present", () => {
   const s = createStore(trip, emptyTrip(), { behaviors: tripBehaviors(), ...quiet });
-  s.setValues(savedBooking(), { as: "initial" });
+  s.set(s.node, savedBooking(), { as: "initial" });
   const [, tim] = s.substore(trip.travelers).items();
 
   expect(s.get(countIn(trip, dirty)), "loaded data is the baseline").toBe(0);

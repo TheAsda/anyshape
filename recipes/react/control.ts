@@ -2,7 +2,7 @@
 // useControl – an input's binding for a node with control().
 // ------------------------------------------------------------
 //   Built on useField: the value, a user onChange and the node's own
-//   control() keys, written through the node's refs.
+//   control() keys, read and written through the node's refs.
 //   • `pending` while a check of the field runs (pendingOf(node.error)).
 //   • When a control's error is shown is a display policy (showError), set
 //     once with <ErrorDisplayProvider policy={...}> and inherited by nested
@@ -17,10 +17,14 @@ import { useField, useValue, type HookOptions } from "form-lib/react";
 import type { FocusTarget } from "../focus";
 
 /** What an error display policy decides on: a control's current state. */
-export type ErrorDisplayState = Omit<ControlMeta, "focusTarget"> & {
+export interface ErrorDisplayState {
+  error: string | undefined;
+  touched: boolean;
+  dirty: boolean;
+  revealed: boolean;
   /** A check of the field is running: `error` is the last completed result. */
   pending: boolean;
-};
+}
 
 /** Decides whether a control shows its error (useControl's showError). */
 export type ErrorDisplayPolicy = (state: ErrorDisplayState) => boolean;
@@ -44,17 +48,14 @@ export function ErrorDisplayProvider(props: ErrorDisplayProviderProps): ReactNod
   return createElement(ErrorDisplayContext.Provider, { value: props.policy }, props.children);
 }
 
-/** The control() keys and their values. */
-interface ControlMeta {
-  error: string | undefined;
-  touched: boolean;
-  dirty: boolean;
-  revealed: boolean;
-  focusTarget: FocusTarget | undefined;
-}
-
 /** A node with the control() keys. */
-export type ControlNode = AnyNode & { readonly [K in keyof ControlMeta]: MetaRef<ControlMeta[K]> };
+export type ControlNode = AnyNode & {
+  readonly error: MetaRef<string | undefined>;
+  readonly touched: MetaRef<boolean>;
+  readonly dirty: MetaRef<boolean>;
+  readonly revealed: MetaRef<boolean>;
+  readonly focusTarget: MetaRef<FocusTarget | undefined>;
+};
 
 export interface ControlBinding<N extends ControlNode> {
   value: InferValue<N>;
@@ -83,8 +84,11 @@ export interface UseControlOptions extends HookOptions {
 
 /** A node with control(): value, onChange and the control state. */
 export function useControl<N extends ControlNode>(node: N, options?: UseControlOptions): ControlBinding<N> {
-  const { value, onChange, meta, store } = useField(node, options);
-  const own = meta as unknown as ControlMeta;
+  const { value, onChange, store } = useField(node, options);
+  const error = useValue(node.error, { store });
+  const touched = useValue(node.touched, { store });
+  const dirty = useValue(node.dirty, { store });
+  const revealed = useValue(node.revealed, { store });
   const pending = useValue(pendingOf(node.error), { store });
 
   const registered = useRef<FocusTarget | null>(null);
@@ -115,12 +119,12 @@ export function useControl<N extends ControlNode>(node: N, options?: UseControlO
   return {
     value,
     onChange,
-    error: own.error,
-    touched: own.touched,
-    dirty: own.dirty,
+    error,
+    touched,
+    dirty,
     pending,
-    revealed: own.revealed,
-    showError: policy({ error: own.error, touched: own.touched, dirty: own.dirty, revealed: own.revealed, pending }),
+    revealed,
+    showError: policy({ error, touched, dirty, revealed, pending }),
     onBlur,
     focusRef,
     store,

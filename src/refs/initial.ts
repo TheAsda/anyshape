@@ -24,7 +24,7 @@ const initialKind: RefKind<InitialRef<any>> = {
   node: (ref) => ref.node,
   id: (ref) => `i:${ref.node.id}`,
   label: (ref) => ref.path,
-  read: (store, ref) => store.getInitial(ref.node),
+  read: (store, ref) => store._readInitial(ref.node),
   subscribe: (store, ref, phase, fn) => store._addInitialSub(ref.node, phase, fn),
   affectedBy: () => false,
   local: true,

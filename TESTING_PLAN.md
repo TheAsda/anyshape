@@ -109,7 +109,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 ### D. Store structure & scopes (`store.ts`)
 **Covered:** get/set through root, structural sharing, same-value no-op, cached substores, focus checks, root can't reach rows, meta owner seeding, object substore inside an item.
 
-- [x] **D1 · P2** Meta delegation: `root.getMeta(deep)` and `root.substore(section).getMeta(deep)` return the *same object*; a write through one is visible through the other. → `store.test.ts`
+- [x] **D1 · P2** Meta delegation: a deep node's key read through `root` and through `root.substore(section)` is one value; a write through one is visible through the other. → `store.test.ts`
 - [x] **D2 · P2** `substore(fieldNode)` throws "needs an object or array node". → `store.test.ts`
 - [x] **D3 · P3** A node from another form, or an uninstantiated description, is rejected by `get`/`set`/`substore` with "is not part of the store". → `store.test.ts`
 
@@ -128,20 +128,20 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **E2 · P1** Regression: `append()`/`insert()` return the right row store **when a behavior edits the new row in the same flush** (e.g. a row-scoped `calculate` with `runOn.init`). → `behaviors.test.ts`
 - [x] **E3 · P3** A write through a row store that would make the array contain the same object twice is rejected by `_replaceItem`. → `store.test.ts`
 
-### F. Notifications & flush (the 9 rules)
+### F. Notifications & flush (the 8 rules)
 **Covered:** every rule has at least one test; cycles hit the 100-round limit; UI can't write; unsubscribe mid-flush.
 
 - [x] **F1 · P1** A **UI listener that throws**: the other listeners of the same flush are still called, the first error is rethrown from the write, and the next flush is consistent. → `notifications.test.ts`
 - [x] **F2 · P1** A **reaction that throws**: the error propagates out of `set()`, UI listeners are not called for that flush, and the next write delivers the UI notification with the settled state (subscriptions caught up). → `notifications.test.ts`
-- [x] **F3 · P2** Rule 5 on views: `substore(section).subscribe(l)` fires for a nested row's meta change inside the section, and not for changes outside it. → `notifications.test.ts`
+- ~~**F3 · P2** Store-wide `subscribe(l)` on views~~: the store-wide subscription was removed (#93); code that wants every value change subscribes to the root node.
 - [x] **F4 · P3** `subscribeItems` fires when the array is replaced from outside with the *same length but new objects*. → `notifications.test.ts`
 - [x] **F5 · P3** Flat-form constraint: with 300 fields on the root, one write calls only the changed field's listener (pin the "no extra listener calls" guarantee; cost is covered in §4). → `notifications.test.ts`
 
 ### G. Origins, baselines & reset
-**Covered:** origins in reactions, per target, across scopes, per row; `getInitial` and `{ as: "initial" }`; per-row baselines, new rows `{}`, a baseline write on the array; reset of root and of one row; `keepOnReset`; reset re-validation and recompute.
+**Covered:** origins in reactions, per target, across scopes, per row; `initialOf` and `{ as: "initial" }`; per-row baselines, new rows `{}`, a baseline write on the array; reset of root and of one row; `keepOnReset`; reset re-validation and recompute.
 
 - [x] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `origins.test.ts`
-- [x] **G2 · P2** `setValues(values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `origins.test.ts`
+- [x] **G2 · P2** `set(root, values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `origins.test.ts`
 - [x] **G3 · P3** Reset uses origin `"initial"`: a reaction receives `{"initial"}`, and `touched` does not flip. → `origins.test.ts`
 
 ### H. Counts & collect
