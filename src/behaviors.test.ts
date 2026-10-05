@@ -649,27 +649,6 @@ describe("K · Ordering edges", () => {
     expect(s.get(shape.subtotal)).toBe(30 + 20);
   });
 
-  test("inherited-meta edge: writing an ancestor's `visible` is ranked before an owner guarded on it", () => {
-    const f = form({
-      kind: field<string>(),
-      section: object({ code: field<string>().meta(control()) }).meta({ visible }),
-    });
-    const show = defineBehavior({
-      name: "show", triggers: [f.kind], writes: [f.section.visible],
-      run: (c) => c.set(f.section.visible, c.get(f.kind) === "x"),
-    });
-    const req = rule(f.section.code, (v) => (v ? undefined : "Required"), { when: when([f.section.visible], (v) => v) });
-    const s = createStore(f, { kind: "y", section: { code: "" } }, { behaviors: [req, show] });
-    // Internal check: the owner is registered by the runtime, so compare ranks.
-    const regs = (s as any)._runtime.regs as { name: string; rank: number }[];
-    const rank = (name: string) => regs.find((r) => r.name === name)!.rank;
-    expect(rank("section.code#error")).toBeGreaterThan(rank("show"));
-
-    expect(s.get(f.section.code.error), "hidden: the rule is absent").toBe(undefined);
-    s.set(f.kind, "x");
-    expect(s.get(f.section.code.error), "shown: validated in the same flush").toBe("Required");
-  });
-
   test("disposing a middle behavior keeps the remaining chain in order", () => {
     const runs: Record<string, number> = {};
     const [total, tax, subtotal, lineTotal] = pricing(runs);

@@ -25,12 +25,6 @@ export interface MetaKeyOptions<V> {
   keepOnReset?: boolean;
   /** false: stored and readable, but writing it never notifies, triggers or counts. */
   reactive?: boolean;
-  /**
-   * Inherited down the tree (boolean keys only):
-   *   "all" – true only if this node and every ancestor declaring the key are true (visible)
-   *   "any" – true if this node or any ancestor declaring the key is true (disabled)
-   */
-  inherit?: [V] extends [boolean] ? "all" | "any" : never;
 }
 
 type AnyMetaKeyDef = MetaKeyDef<any, any, any>;
@@ -74,9 +68,6 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
 
   constructor(defaultValue: V, options: MetaKeyOptions<V> = {}, plain = false, steps: MetaKeySteps<V, P, U> = {}) {
     if (steps.combine && steps.behavior) throw new Error("`combine` and `behavior` are mutually exclusive");
-    if (options.inherit !== undefined && typeof defaultValue !== "boolean") {
-      throw new Error("`inherit` is only supported for boolean meta keys");
-    }
     if (steps.aggregate && steps.aggregate(defaultValue)) {
       // Subtree counts start at zero, so untouched nodes never need to be visited.
       throw new Error("`aggregate` must return false for the key's default value");

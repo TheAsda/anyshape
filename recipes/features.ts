@@ -27,15 +27,19 @@ export const dirty = metaKey(false).aggregate((d) => d).behavior((self, key) => 
   run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.initial(self))),
 }));
 
-/** Hidden if this node or any ancestor with `visible` is hidden. */
-export const visible = metaKey(true, { inherit: "all" });
+/**
+ * Whether the node is shown. Only the node's own value: a hidden group says
+ * nothing about the keys of the nodes inside it.
+ */
+export const visible = metaKey(true);
 
 /**
- * Disabled if this node or any ancestor with `disabled` is disabled. A
- * combined key: true while any contribution (a reason, e.g. disableWhen,
- * exclusive) is present. Application code may still write it.
+ * Whether the node is disabled. A combined key: true while any contribution
+ * (a reason, e.g. disableWhen, exclusive) is present. Application code may
+ * still write it. Only the node's own value: a disabled group says nothing
+ * about the keys of the nodes inside it.
  */
-export const disabled = metaKey<boolean, string>(false, { inherit: "any" }).combine((self, key) => ({
+export const disabled = metaKey<boolean, string>(false).combine((self, key) => ({
   name: `${self.path || "<root>"}#disabled`,
   writes: [key],
   run: (ctx) => ctx.set(key, ctx.parts.length > 0),

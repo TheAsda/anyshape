@@ -20,13 +20,12 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 |---|---|---|---|
 | `src/shape.test.ts` | A | node instantiation, identity, parents, templates, structural checks | 7 |
 | `src/lens.test.ts` | B | lens unit tests | 8 |
-| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 22 |
-| `src/store.test.ts` | D, E | stores, scopes, reference API, row identity, array helpers | 29 |
+| `src/meta.test.ts` | C | `.meta()`, key definitions, meta refs, closed meta | 21 |
+| `src/store.test.ts` | D, E, I | stores, scopes, reference API, own-node meta keys, row identity, array helpers | 30 |
 | `src/notifications.test.ts` | F | the notification rules, flush, non-reactive keys | 34 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
-| `src/inheritance.test.ts` | I | inherited `visible` / `disabled`, `get` vs `getOwn` | 4 |
-| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 67 |
+| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 66 |
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
@@ -101,7 +100,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
   - a changed write copies only the path to the leaf (siblings keep their references).
 
 ### C. Meta declarations & references (`meta.ts`, `shape.ts`)
-**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, `inherit` on non-boolean throws, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
+**Covered:** defaults, capabilities kept, variadic and chained `.meta()`, `MetaBuilder`, override rules, reserved keys, refs on instantiated / reused / row / container / root nodes, child field wins, only declared keys have refs.
 
 - [x] **C1 · P2** `MetaBuilder.custom(key, value)`: types and `build()` output; chaining several builder calls. → `meta.test.ts`
 - [x] **C2 · P2** A meta write with `{ as: "initial" }` throws "applies to values only". → `origins.test.ts`
@@ -152,12 +151,10 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **H2 · P3** `collect` called on a row store (paths still from the root, only that row's entries); nested rows `a[1].b[0].c`. → `counts.test.ts`
 - [x] **H3 · P3** A custom counted key (`metaKey(…, { aggregate })`) written by application code updates counts like built-in keys. → `counts.test.ts`
 
-### I. Inheritance (hidden & disabled)
-**Covered:** `visible` via ancestors, `disabled` from the root into rows, subscriptions fire on ancestor changes, hidden/disabled skipped by validation, `validateHidden`.
+### I. Own-node meta keys
+**Covered:** a key belongs to the node that declares it; the core computes no value from ancestors (#90). A hidden or disabled group is handled explicitly: rules guarded on its ref, `<fieldset disabled>`, or a behavior that writes the child's key.
 
-- [x] **I1 · P1** A disabled ancestor stops validating the fields below it, whether they declare `disabled` or not. (Submitted values are the store's value as it is: nothing is omitted, #22.) → `validation.test.ts`
-- [x] **I2 · P2** `validation({ validateDisabled: true })` keeps validating a disabled field. → `validation.test.ts`
-- [x] **I3 · P2** `getOwn` vs `get` for `inherit: "any"` across a row boundary (ancestor disabled, own false → `get` true, `getOwn` false). → `inheritance.test.ts`
+- [x] **I1 · P2** A meta key that an ancestor also declares (`visible`, `disabled`) reads and notifies on its own node only: an ancestor's write changes neither its value nor its subscribers, across a row boundary too. → `store.test.ts`
 
 ### J. Behavior registration checks
 **Covered:** undeclared reads and writes, async reported, one writer (a default behavior included; a key without one is free for a behavior), cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
@@ -171,7 +168,6 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 **Covered:** dependency order on init and on change, an enclosing-scope trigger re-runs every row, own writes don't re-trigger (`link`), nor do siblings' writes of the same behavior, one writer, opposite `when/otherwise` branches may share a target.
 
 - [x] **K1 · P2** **Container edge:** a row behavior writing a row field runs before a root behavior that triggers on the whole array (assert run order with a log, not only final values). → `behaviors.test.ts`
-- [x] **K2 · P2** **Inherited-meta edge:** a behavior writing an ancestor's `visible` runs before a field's validation queue that triggers on its effective visibility. → `behaviors.test.ts`
 - [x] **K3 · P2** Ranks are recomputed after dispose: removing a middle behavior of a chain keeps the remaining order correct. → `behaviors.test.ts`
 - [x] **K4 · P3** A row behavior triggered by its whole array runs once per row: siblings' writes don't re-trigger it (sync) or cancel its runs in flight (async, one `settle()` round), and a change that mixes them with another origin still runs it (#3). → `behaviors.test.ts`, `async.test.ts`
 - [x] **K5 · P3** Sibling rows don't order each other through their own scopes (#63): two component behaviors on different rows that would form a cycle only through each row's own fields both register, each row running its own, and the same for nested rows. A row's read of an enclosing scope (the whole list) is still ordered after a sibling row's writer, and sibling rows that each write from the whole list form a cycle; a row and the hosts enclosing or inside it are ordered both ways, through nested rows, and a cycle through them is rejected with the same message. → `behaviors.test.ts`
@@ -317,7 +313,6 @@ When touching any of these, break it deliberately and confirm that at least one 
 | Index and edge removal on dispose | `HostIndex.delete`, `RunOrder.plan`'s commit (`order.ts`) | NF4 collectability (`test:memory`) |
 | Buffered writes dropped on error | `BehaviorRuntime.execute` | throwing behavior test |
 | Row totals shifted on detach | `ArrayStore.shiftTotals` | count removal tests |
-| Inherited-key subscriptions on all sources | `_addKeySub` / `_metaSources` | ancestor-change subscription test |
 | Reset re-runs init | `BehaviorRuntime.reinit` | reset recompute tests |
 | Async result reuse and generations | `ValidationLayer.evaluate` / `startAsync` | reuse and late-result tests |
 | Latest-props slots | `react/behaviors.ts` effect 3 | latest-props tests |
@@ -326,7 +321,7 @@ When touching any of these, break it deliberately and confirm that at least one 
 
 ## 6. Suggested order of work
 
-1. **P1 unit gaps:** B1, E1, E2, F1, F2, I1, J1, M1, P1. These are small, local, and protect core guarantees.
+1. **P1 unit gaps:** B1, E1, E2, F1, F2, J1, M1, P1. These are small, local, and protect core guarantees.
 2. **Type contract:** S1, S2 in `src/types.test.ts`, and add CI (NF2) so type tests actually gate merges.
 3. **Integration suite:** INT1–INT5 first, then INT6–INT9.
 4. **Packaging:** fix the build and add NF1, since a release depends on it.
