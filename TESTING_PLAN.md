@@ -142,7 +142,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 
 - [x] **G1 · P2** `reset(sectionNode)` on an object subtree (not root, not row): only that subtree's values and meta are reset; `reinit` re-runs only instances that write inside it; a behavior writing outside the section is not re-run. → `origins.test.ts`
 - [x] **G2 · P2** `set(root, values, { as: "initial" })` while rows exist: rows whose objects are in the new baseline take them as their initial value; rows added before that and not present keep `{}`. → `origins.test.ts`
-- [x] **G3 · P3** Reset uses origin `"initial"`: a reaction receives `{"initial"}`, and `touched` does not flip. → `origins.test.ts`
+- [x] **G3 · P3** Reset uses origin `"initial"`: a behavior sees `{"initial"}`, and `touched` does not flip. → `origins.test.ts`
 
 ### H. Counts & collect
 **Covered:** counts across fields/objects/rows, rows removed and restored, count subscriptions, `collect` with row indexes, warning for non-countable keys, `aggregate(default)` must be false, stable `countIn` refs.
@@ -222,7 +222,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **P1 · P1** `useControl().onBlur` fired **after its row was removed** (blur during unmount) doesn't throw and writes nothing. → `recipes/react/control.test.tsx`
 - [x] **P2 · P2** Two inputs registered through `focusRef` for the same field: unmounting one does not clear the other's registration. → `recipes/react/control.test.tsx`
 - [x] **P3 · P2** `useValue(ref, select, { equals })` with a custom `equals`; `useValue` with `{ store }` plus a selector. → `react/react.test.tsx`
-- [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a reaction's origins) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.tsx`
+- [x] **P4 · P2** `useArray` helpers write with origin `"user"` by default (assert via a behavior's `ctx.origins`) and respect an explicit `{ origin }`; `insert` and `move` through the hook. → `react/react.test.tsx`
 - [x] **P5 · P3** `useField` on a node with no meta: `meta` is `{}`, `onChange` writes as the user. → `react/react.test.tsx`
 
 ### Q. Lifetime & outside data (`react/form.ts`)
@@ -262,8 +262,8 @@ Type assertions are spread across the files today. Collect the public-API type c
 Time comes from a stubbed `performance.now` that the test's reactions, listeners and behaviors advance; `console.timeStamp` and `performance.measure` are stubbed. **`src/diagnostics.test.ts`**.
 
 - [x] **T1 · P2** The probe reports the flush phases, each synchronous run part (sync, async until `run()` returns, applying an async run's writes), the end of each run in flight (completed or cancelled), and each registration change before the flush that runs it, with the owners it changed; disposing a handle that registered nothing is none.
-- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, reactions vs UI listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
-- [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its reactions and UI listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
+- [x] **T2 · P2** A flush over `1000 / 30` ms warns once: total, behaviors vs UI listeners, the three slowest behaviors over their instances, added up by name (a behavior registered row by row counts once), each with an error located where it was defined. An async run counts its synchronous part and applying its writes, not its time in flight.
+- [x] **T3 · P2** DevTools tracks in the `form-lib` group: `flush` (each flush, its behavior runs and UI listeners nested in it), `behaviors`, `async` (cancelled runs marked; `settle()` while it waits), `registration` (owner listing, at most 20 contributions). An over-budget flush is an `error` entry. Without either API nothing breaks.
 - [x] **T4 · P2** In production nothing is measured: no clock reads, no warning, no entries. Checked once by hand, not in CI: `cd examples/basic && bunx vite build`, then the bundle contains none of `diagnostics.ts` (no `track-entry`, `over budget` or `A flush took`), only the `_probe == null` call sites.
 
 ---
@@ -306,7 +306,7 @@ When touching any of these, break it deliberately and confirm that at least one 
 | New row object re-mapped to the same store | `ArrayStore._replaceItem` | identity through row writes |
 | Older row version re-attaches | `ArrayStore._sync` | undo / both-versions tests |
 | Rule 4: attachment change notifies | `BaseStore._visit` (`attachChanged`) | rule 4 tests |
-| Per-phase "last seen" | `_seen[phase]` | reactions-then-UI tests |
+| Per-phase "last seen" | `_seen[phase]` | behaviors-then-UI tests |
 | Own-origin filter | `BehaviorRuntime.onTrigger` | `link` tests |
 | Rank ordering | `RunOrder.plan` (`order.ts`) / `runNext` | dependency order, K1–K3, K6 |
 | Host filter of the run order | `HostIndex.near` / `readerOf` (`order.ts`) | K5, "Run order between scope hosts", one writer between rows |

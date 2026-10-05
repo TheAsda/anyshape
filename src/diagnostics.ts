@@ -4,9 +4,9 @@
 // createStore installs a probe on the root in dev (isDev); a production build
 // installs none, so nothing is measured. The probe feeds two consumers:
 //   • the flush budget: a flush over FLUSH_BUDGET logs one console.warn with
-//     its time applying async writes (if any), in reactions and in UI
-//     listeners, and the three behaviors that
-//     took the most time across their instances;
+//     its time applying async writes (if any), in behaviors and in UI
+//     listeners, and the three behaviors that took the most time across their
+//     instances;
 //   • the DevTools performance tracks (track group "form-lib"): frequent
 //     entries through the extended console.timeStamp, rare detailed ones
 //     through performance.measure with detail.devtools. Both are
@@ -41,7 +41,7 @@ interface FlushReport {
   readonly total: number;
   /** Applying async runs' writes, in the batch that started the flush. */
   readonly applying: number;
-  readonly reactions: number;
+  readonly behaviors: number;
   readonly ui: number;
   /** At most three, slowest first. */
   readonly slowest: readonly Spent[];
@@ -54,8 +54,8 @@ interface FlushReport {
  */
 class FlushBudget {
   private start = 0;
-  private reactionsAt = 0;
-  private reactionsDone = false;
+  private behaviorsAt = 0;
+  private behaviorsDone = false;
   private open = false;
   /** Run parts before the flush (applying async writes): they count towards it. */
   private carry = 0;
@@ -65,13 +65,13 @@ class FlushBudget {
 
   flushStart(at: number): void {
     this.start = at;
-    this.reactionsDone = false;
+    this.behaviorsDone = false;
     this.open = true;
   }
 
-  reactionsEnd(at: number): void {
-    this.reactionsAt = at;
-    this.reactionsDone = true;
+  behaviorsEnd(at: number): void {
+    this.behaviorsAt = at;
+    this.behaviorsDone = true;
   }
 
   /** The flush's report when it is over budget. */
@@ -80,7 +80,7 @@ class FlushBudget {
     const total = at - this.start + this.carry;
     let report: FlushReport | undefined;
     if (total > FLUSH_BUDGET) {
-      const reactionsAt = this.reactionsDone ? this.reactionsAt : at;
+      const behaviorsAt = this.behaviorsDone ? this.behaviorsAt : at;
       const byName = new Map<string, Spent>();
       for (const { name, time, runs, trace } of this.listed) {
         const spent = byName.get(name);
@@ -91,7 +91,7 @@ class FlushBudget {
         } else byName.set(name, { name, time, runs, trace });
       }
       const slowest = [...byName.values()].sort((a, b) => b.time - a.time).slice(0, 3);
-      report = { total, applying: this.carry, reactions: reactionsAt - this.start, ui: at - reactionsAt, slowest };
+      report = { total, applying: this.carry, behaviors: behaviorsAt - this.start, ui: at - behaviorsAt, slowest };
     }
     for (const tally of this.listed) {
       tally.time = 0;
@@ -131,7 +131,7 @@ function overBudget(report: FlushReport): string {
   return (
     `[form] A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget: ` +
     (report.applying ? `${ms(report.applying)} applying async writes, ` : "") +
-    `${ms(report.reactions)} in reactions, ${ms(report.ui)} in UI listeners.` +
+    `${ms(report.behaviors)} in behaviors, ${ms(report.ui)} in UI listeners.` +
     (slowest ? ` Slowest behaviors: ${slowest}.` : "")
   );
 }
@@ -150,8 +150,8 @@ const labelOf = (instance: ProbedInstance) => `${instance.reg.name} @${pathLabel
 
 class Tracks {
   private flushAt = 0;
-  /** End of the flush's reactions; undefined when they threw. */
-  private reactionsAt: number | undefined;
+  /** End of the flush's behaviors; undefined when they threw. */
+  private behaviorsAt: number | undefined;
   private runAt = 0;
   private registrationAt = 0;
   /** Runs in flight: their start and label. */
@@ -171,23 +171,23 @@ class Tracks {
 
   flushStart(at: number): void {
     this.flushAt = at;
-    this.reactionsAt = undefined;
+    this.behaviorsAt = undefined;
   }
 
-  reactionsEnd(at: number): void {
-    this.reactionsAt = at;
+  behaviorsEnd(at: number): void {
+    this.behaviorsAt = at;
   }
 
   /**
    * The flush, with its phases nested in it. Over budget, the flush is a
    * detailed entry. The phases come first: Chrome coarsens times (100 µs
-   * without cross-origin isolation), so a flush and its reactions often span
+   * without cross-origin isolation), so a flush and its behaviors often span
    * the same times, and DevTools then puts the entry made last on top.
    */
   flushEnd(at: number, report: FlushReport | undefined): void {
-    const reactionsAt = this.reactionsAt ?? at;
-    this.stamp?.("reactions", this.flushAt, reactionsAt, "flush", GROUP, "tertiary-light");
-    if (this.reactionsAt !== undefined) this.stamp?.("UI listeners", reactionsAt, at, "flush", GROUP, "tertiary-light");
+    const behaviorsAt = this.behaviorsAt ?? at;
+    this.stamp?.("behavior runs", this.flushAt, behaviorsAt, "flush", GROUP, "tertiary-light");
+    if (this.behaviorsAt !== undefined) this.stamp?.("UI listeners", behaviorsAt, at, "flush", GROUP, "tertiary-light");
     if (!report) this.stamp?.("flush", this.flushAt, at, "flush", GROUP, "tertiary");
     else this.overBudget(at, report);
   }
@@ -197,7 +197,7 @@ class Tracks {
       tooltipText: `A flush took ${ms(report.total)}, over the ${ms(FLUSH_BUDGET)} budget`,
       properties: [
         ...(report.applying ? [["Applying async writes", ms(report.applying)] as [string, string]] : []),
-        ["Reactions", ms(report.reactions)],
+        ["Behaviors", ms(report.behaviors)],
         ["UI listeners", ms(report.ui)],
         ...report.slowest.map((t, i): [string, string] => [`${i + 1}. ${t.name}`, spentLabel(t)]),
       ],
@@ -270,9 +270,9 @@ export class Diagnostics implements Probe {
     this.budget.flushStart(at);
     this.tracks?.flushStart(at);
   }
-  reactionsEnd(at: number): void {
-    this.budget.reactionsEnd(at);
-    this.tracks?.reactionsEnd(at);
+  behaviorsEnd(at: number): void {
+    this.budget.behaviorsEnd(at);
+    this.tracks?.behaviorsEnd(at);
   }
   flushEnd(at: number): void {
     const report = this.budget.flushEnd(at);

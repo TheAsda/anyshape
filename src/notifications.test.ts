@@ -305,7 +305,7 @@ function withTotal() {
   return { s, lines: s.substore(shape.lines) };
 }
 
-describe("F · Rule 7 – reactions, then UI", () => {
+describe("F · Rule 7 – behaviors, then UI", () => {
   test("rule 7: derived writes settle before UI; UI sees the final state once", () => {
     const { s, lines } = withTotal();
     const seen: number[] = [];

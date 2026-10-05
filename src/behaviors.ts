@@ -55,8 +55,8 @@
 //
 // The cause of an async run covers everything since the last completed run:
 // an init run replaced in flight has isInit together with the user's origins.
-// Reactions and server checks should use runOn.init: false rather than an
-// isInit check.
+// Behaviors that respond to a change, and server checks, should use
+// runOn.init: false rather than an isInit check.
 //
 // Kept work (ctx.keep(key, start)): async work a rerun can continue instead of
 // restarting, one slot per instance. It must depend only on its key; it gets
