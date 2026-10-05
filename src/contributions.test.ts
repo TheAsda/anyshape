@@ -28,14 +28,12 @@ const tags = metaKey<readonly string[], string>([]).combine((self, key) => {
   };
 });
 
-const owned = metaKey(0, { owner: "feature" });
-
 const shape = form(
   object({
     mode: field<string>(),
     other: field<string>(),
     a: field<string>().meta({ tags }),
-    b: field<string>().meta({ note: "" }, { owned }),
+    b: field<string>().meta({ note: "" }),
     rows: array(object({ x: field<number>().meta({ tags }) }), { create: () => ({ x: 0 }) }),
   })
 );
@@ -47,7 +45,6 @@ const test = base.extend("log", (): Log => (log = { runs: [], combined: [] }));
 describe("Registration", () => {
   test("contributing to a key without `combine` throws at registration", () => {
     const s = createStore(shape, initial());
-    expect(() => s.addBehavior(contribute(shape.b.owned as any, "x"))).toThrow(/has no `combine`/);
     expect(() => s.addBehavior(contribute(shape.b.note as any, "x"))).toThrow(/has no `combine`/);
   });
 

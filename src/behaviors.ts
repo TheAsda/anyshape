@@ -26,11 +26,10 @@
 //               the run's writes are dropped and the form keeps running.
 //               In dev, the error is located where defineBehavior was
 //               called, with the thrown value as its cause.
-//   • Writers – one behavior per target (value, or meta key). Keys owned by a
-//               feature can only be written by that feature's behaviors; a
-//               combined key (`combine`) only by its owner.
+//   • Writers – one behavior per target (value, or meta key); a combined key
+//               (`combine`) only by its owner.
 //   • Access  – ctx.get / ctx.set only accept declared references.
-//   • Defaults– a key definition's .behavior() registers a feature behavior
+//   • Defaults– a key definition's .behavior() registers a default behavior
 //               per node that declares the key, limited to that node.
 //   • Runtime registration – store.addBehavior(...) runs every check above and
 //               returns a dispose function; disposing resets the meta keys
@@ -214,7 +213,7 @@ export interface Branch {
 
 /** @internal What the core attaches to a behavior besides its config. */
 export interface BehaviorInternals {
-  /** Set for feature (default) behaviors: the node the behavior is limited to. */
+  /** Set for default behaviors: the node the behavior is limited to. */
   self?: AnyNode;
   /** When / otherwise splits the behavior is inside of (builder). */
   branches?: readonly Branch[];
@@ -303,7 +302,6 @@ export interface Registration {
   name: string;
   behavior: Behavior;
   config: BehaviorConfig;
-  feature: boolean;
   /** Store the behavior was registered on (a scope host). */
   host: BaseStore<any>;
   /** Origin of every instance's writes: they never trigger the registration's own instances. */
@@ -544,8 +542,8 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const [binding, p] of batch) this.run(binding, p);
   }
 
-  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[], feature = false): BehaviorHandle {
-    return this.swap(host, undefined, behaviors, feature);
+  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+    return this.swap(host, undefined, behaviors);
   }
 
   /**
@@ -557,22 +555,17 @@ export class BehaviorRuntime implements RuntimeHooks {
     const entry = handles.get(previous);
     if (!entry || entry.runtime !== this) throw new Error("replace(): not a handle of this store");
     if (entry.disposed) throw new Error("replace(): the handle was already disposed or replaced");
-    return this.swap(entry.host, entry, behaviors, false);
+    return this.swap(entry.host, entry, behaviors);
   }
 
-  private swap(host: BaseStore<any>, previous: HandleEntry | undefined, behaviors: AnyBehavior | readonly AnyBehavior[], feature: boolean): BehaviorHandle {
+  private swap(host: BaseStore<any>, previous: HandleEntry | undefined, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
     const list = (Array.isArray(behaviors) ? behaviors : [behaviors]) as readonly AnyBehavior[];
     if (!host.isAttached()) throw new Error("Cannot add behaviors to a detached row");
     const contributions = list.filter((b): b is Contribution => b instanceof Contribution);
     const plain = list.filter((b): b is Behavior => !(b instanceof Contribution));
     const seq = previous?.seq ?? callCounter++;
     const owners = this.ownerChange(host, contributions, previous?.entries ?? [], seq);
-    const regs = this.apply(
-      host,
-      plain.map((b) => ({ behavior: b, feature: feature || b._self !== undefined })),
-      previous?.regs ?? [],
-      owners.change
-    );
+    const regs = this.apply(host, plain, previous?.regs ?? [], owners.change);
     if (previous) previous.disposed = true;
 
     const entries = owners.added;
@@ -593,17 +586,17 @@ export class BehaviorRuntime implements RuntimeHooks {
    */
   private apply(
     host: BaseStore<any>,
-    items: { behavior: Behavior; feature: boolean }[],
+    behaviors: readonly Behavior[],
     removing: readonly Registration[],
     owners: OwnerChange = []
   ): Registration[] {
     const probe = this.store._probe;
     probe?.registrationStart(performance.now());
-    const regs = items.map((i) => this.prepare(host, i.behavior, i.feature));
+    const regs = behaviors.map((b) => this.prepare(host, b));
     // A fresh registration per changed owner, used for every check; an owner
     // already registered then takes over its declarations in place.
     const live = owners.filter((o) => o.size);
-    const ownerRegs = live.map((delta) => this.prepare(this.store, this.ownerBehavior(delta), true, delta.owner));
+    const ownerRegs = live.map((delta) => this.prepare(this.store, this.ownerBehavior(delta), delta.owner));
     const removed = new Set([
       ...removing,
       ...owners.flatMap((o) => (o.owner.reg ? [o.owner.reg] : [])),
@@ -619,14 +612,14 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     this.store._batch(() => {
       commitOrder();
-      for (const reg of removing) this.unregister(reg, true);
+      for (const reg of removing) this.unregister(reg);
       for (const reg of regs) this.register(reg, host);
       for (const delta of owners) {
         const owner = delta.owner;
         this.commitOwner(delta);
         if (owner.size || !owner.reg) continue;
         // The last contribution is gone: the key returns to its default.
-        this.unregister(owner.reg, true);
+        this.unregister(owner.reg);
         owner.reg = undefined;
         this.owners.delete(refKey(owner.ref));
       }
@@ -885,11 +878,11 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   // ---- registration ----
-  private prepare(host: BaseStore<any>, behavior: Behavior, feature: boolean, owner?: Owner): Registration {
+  private prepare(host: BaseStore<any>, behavior: Behavior, owner?: Owner): Registration {
     if (!(behavior instanceof Behavior)) throw new Error("Expected a behavior created with defineBehavior()");
     const config = behavior.config;
     const seq = owner?.reg?.seq ?? regCounter++; // an owner refreshed in place keeps its run order and origin
-    const name = config.name ?? (behavior._self ? `feature` : `b${seq}`);
+    const name = config.name ?? `b${seq}`;
     const guards = guardsOf(config);
     const triggers = [...(config.triggers ?? []), ...guards.flatMap((g) => g.refs)];
     const reads = [...(config.reads ?? [])];
@@ -908,20 +901,17 @@ export class BehaviorRuntime implements RuntimeHooks {
       }
     }
 
-    // Writes: nodes and meta keys only, never feature-owned keys (unless feature).
+    // Writes: nodes and meta keys only; a combined key only by its owner.
     const targets = writes.map((w) => {
       const target = targetOf(w as AnyRef);
       if (!target) return fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
       if (target.def?._steps.combine && (!owner || refKey(owner.ref) !== refKey(w as AnyRef))) {
         fail(`"${refLabel(w)}" is written only by the owner of its key – contribute() to it instead`);
       }
-      if (target.def?.options.owner === "feature" && !feature) {
-        fail(`"${refLabel(w)}" is owned by its feature and cannot be written by other behaviors`);
-      }
       return target;
     });
 
-    // Feature (default) behaviors are limited to their own node.
+    // Default behaviors are limited to their own node.
     if (behavior._self) {
       const self = behavior._self;
       for (const ref of all) {
@@ -949,7 +939,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     const triggerKeys = new Set(triggers.map(refKey));
     return {
-      seq, name, behavior, config, feature, host, origin: `behavior:${name}@${seq}`, scope, chain,
+      seq, name, behavior, config, host, origin: `behavior:${name}@${seq}`, scope, chain,
       triggers, reads: reads.filter((r) => !triggerKeys.has(refKey(r))),
       inputs: [...triggers, ...reads], inputKeys: new Set([...triggers, ...reads].map(refKey)),
       writes, targets, guards,
@@ -1310,20 +1300,20 @@ export class BehaviorRuntime implements RuntimeHooks {
   }
 
   // ---- disposal ----
-  private unregister(reg: Registration, resetMeta: boolean): void {
+  private unregister(reg: Registration): void {
     if (reg.disposed) return;
     reg.disposed = true;
     this.regs.splice(this.regs.indexOf(reg), 1);
     for (const leaf of this.pending.keys()) if (leaf.reg === reg) this.pending.delete(leaf);
     for (const leaf of this.busy(reg)) this.drop(leaf);
-    if (reg.root) this.unbind(reg, reg.root, resetMeta);
+    if (reg.root) this.unbind(reg, reg.root);
   }
 
-  private unbind(reg: Registration, binding: Binding, resetMeta: boolean): void {
+  private unbind(reg: Registration, binding: Binding): void {
     for (const off of binding.triggerOffs) off();
     for (const off of binding.offs) off();
     if (binding.isLeaf) {
-      if (!resetMeta || !binding.host.isAttached()) return;
+      if (!binding.host.isAttached()) return;
       // Meta the behavior wrote goes back to its default.
       reg.writes.forEach((w, i) => {
         const def = reg.targets[i].def;
@@ -1333,7 +1323,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     }
     for (const row of binding.arrStore!.items()) {
       const child = binding.rows.get(row);
-      if (child) this.unbind(reg, child, resetMeta);
+      if (child) this.unbind(reg, child);
     }
   }
 }
@@ -1342,7 +1332,7 @@ export class BehaviorRuntime implements RuntimeHooks {
 // Default behaviors from key definitions
 // ============================================================
 /**
- * @internal Feature behaviors declared by key definitions, one per node.
+ * @internal Default behaviors declared by key definitions, one per node.
  * Checks every key's uses on the way, combined keys included: their owners
  * are created later, with the first contribution.
  */

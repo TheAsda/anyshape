@@ -16,7 +16,7 @@ export interface FocusTarget {
 }
 
 /** Where focusFirst / focus() move the cursor. One definition, found with collect(node, focusTarget). */
-export const focusTarget = metaKey<FocusTarget | undefined>(undefined, { owner: "feature", reactive: false });
+export const focusTarget = metaKey<FocusTarget | undefined>(undefined, { reactive: false });
 
 export const focusable = () => ({ focusTarget });
 
