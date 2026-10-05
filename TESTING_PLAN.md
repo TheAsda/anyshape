@@ -2,7 +2,7 @@
 
 A plan to cover every behavior the library promises, organised by layer, bottom-up (shape → store → logic → React), plus integration, type-level and non-functional tests.
 
-- **Current state:** 447 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
+- **Current state:** 452 tests in 29 files, all passing (`npm test`), and a clean typecheck (`npm run typecheck`). The P1 unit, type and integration cases are done (ticked below); `src/lens.test.ts`, `src/types.test.ts` and `src/integration.test.ts` were added for them.
 - **This document:** what is already covered, what is missing (a checklist of concrete cases with priorities), and how to write the new tests.
 
 **Priorities**
@@ -25,8 +25,8 @@ Each case says what to set up, what to assert, and the target test file. IDs (`E
 | `src/notifications.test.ts` | F | the notification rules, flush | 33 |
 | `src/origins.test.ts` | G | origins, baselines, reset (incl. recompute and `keepOnReset`) | 21 |
 | `src/counts.test.ts` | H | `countIn`, `collect` by definition, aggregate keys | 10 |
-| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 66 |
-| `src/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 42 |
+| `src/behaviors.test.ts` | J–L | behavior runtime, scopes, ordering, ownership, replacement, touched/dirty | 70 |
+| `src/contributions.test.ts` | L′ | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and dedup | 43 |
 | `src/async.test.ts` | J | async runs: cancellation, reruns with cause, transactional `ctx.state`, kept work, `settle()`, definition traces | 26 |
 | `src/pending.test.ts` | H | `pendingIn` / `pendingOf` for sync and async runs | 6 |
 | `src/diagnostics.test.ts` | T | dev diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production | 19 |
@@ -160,7 +160,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **I1 · P2** A meta key that an ancestor also declares (`visible`, `disabled`) reads and notifies on its own node only: an ancestor's write changes neither its value nor its subscribers, across a row boundary too. → `store.test.ts`
 
 ### J. Behavior registration checks
-**Covered:** undeclared reads and writes, async reported, one writer (a default behavior included; a key without one is free for a behavior), cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form".
+**Covered:** undeclared reads and writes, async reported, one writer (a default behavior included; a key without one is free for a behavior), cycles (nothing registered), scope rules, template vs row writers, root registration applies to future rows, "not part of this form", an origins filter on a tally trigger (`countIn`, `pendingIn`, `pendingOf`, guards included; reads are fine) (#94).
 
 - [x] **J1 · P1** A custom feature whose default `behavior` references another node is rejected: "default behaviors may only use their own node". → `behaviors.test.ts`
 - [x] **J2 · P2** Writing a `CountRef` or `InitialRef` is rejected: "only values and meta keys are writable". → `behaviors.test.ts`
@@ -177,7 +177,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **K6 · P2** Ranks follow each registration change, reranking only what it reaches (#6): a behavior added upstream raises the whole chain; disposing one lowers its dependents, to their next longest chain; a replacement is checked for cycles without the registration it replaces, and a rejected one keeps the previous place; a contribution's trigger moves its owner after the trigger's writer, and its removal moves it back. → `behaviors.test.ts`
 
 ### L. Runtime lifecycle
-**Covered:** init runs, `runOn.init`, `ctx.state`, `ctx.origins`, `when` skip, throwing behaviors isolated (writes dropped, concrete scope), row instances pause/resume, nested rows, row-level `addBehavior`/dispose.
+**Covered:** init runs, `runOn.init`, `ctx.state`, `ctx.origins` (empty for a run caused only by a tally), `when` skip, throwing behaviors isolated (writes dropped, concrete scope), row instances pause/resume, nested rows, row-level `addBehavior`/dispose.
 
 - [x] **L1 · P2** `ctx.changed(ref)` is `false` on the init run and `true` only for triggers that changed since the last run. → `behaviors.test.ts`
 - [x] **L2 · P2** Within one run: two `ctx.set` calls to the same target → the last one wins; `ctx.get` sees the pending write. → `behaviors.test.ts`
@@ -185,7 +185,7 @@ Each area lists what's covered (briefly, so you know where to look) and the case
 - [x] **L4 · P3** The default `onError` logs `[form] "<name>" failed at "<scope>"` via `console.error` (spy). → `behaviors.test.ts`
 
 ### L′. Key contributions (`combine`, `contribute`)
-**Covered** in `contributions.test.ts` on test-local keys: registration checks (no `combine`, `combine`/`behavior` exclusive, owner-only writes even before an owner exists, refs in the target's scope chain, same form, target inside the store), `combine` once per node, parts (order, absent when the guard fails, triggers vs reads, `inputs`), in-place update (keeps `ctx.state`, rewires triggers, the last removal resets the key), atomic calls (a failing check changes nothing, one flush, `replaceBehavior` in one update), rows (row-local contributions, the default without running the owner, new rows get merged declarations), order by call and position (#25), dedup in both orders, builder guards, and async (rerun with the cancelled run's cause, kept work survives the update). Types in `types.test.ts`; `useBehaviors` in `react/behaviors.test.tsx` (R1).
+**Covered** in `contributions.test.ts` on test-local keys: registration checks (no `combine`, `combine`/`behavior` exclusive, owner-only writes even before an owner exists, a contribution's tally trigger under the owner's origins filter (#94), refs in the target's scope chain, same form, target inside the store), `combine` once per node, parts (order, absent when the guard fails, triggers vs reads, `inputs`), in-place update (keeps `ctx.state`, rewires triggers, the last removal resets the key), atomic calls (a failing check changes nothing, one flush, `replaceBehavior` in one update), rows (row-local contributions, the default without running the owner, new rows get merged declarations), order by call and position (#25), dedup in both orders, builder guards, and async (rerun with the cancelled run's cause, kept work survives the update). Types in `types.test.ts`; `useBehaviors` in `react/behaviors.test.tsx` (R1).
 
 ### M. Validation
 **Covered:** queue order, feature required, guards, cross-field, rows, whole-array reads, runs after computing behaviors, hidden/disabled, row-scoped rules, removing the last rule, async (user start, unchecked, not while sync fails, debounce, abort, removed row, hidden abort, `origins: "any"`, throwing, result reuse), `validate()` errors.

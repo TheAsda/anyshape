@@ -261,19 +261,6 @@ describe("L · Origins and guards", () => {
     expect(seen).toEqual([[]]);
   });
 
-  test.each([
-    ["countIn", countIn(shape, touched)],
-    ["pendingIn", pendingIn(shape)],
-    ["pendingOf", pendingOf(shape.title)],
-  ])("an origins filter on a %s trigger throws at registration", (_, tally) => {
-    const config = { name: "filtered", origins: ["user"] as const, run: () => {} };
-    const fails = (behavior: ReturnType<typeof defineBehavior>) => () => createStore(shape, initial(), { behaviors: behavior });
-    const message = `Behavior "filtered": "${tally.path}" carries no origins (it is a tally) – drop the origins filter or the reference`;
-    expect(fails(defineBehavior({ ...config, triggers: [tally] }))).toThrow(message);
-    expect(fails(defineBehavior({ ...config, when: when([tally], () => true) })), "a guard reference triggers too").toThrow(message);
-    expect(fails(defineBehavior({ ...config, triggers: [shape.title], reads: [tally] })), "reads are fine").not.toThrow();
-  });
-
   test("when: skipped while false, guard references trigger", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehavior({
@@ -650,6 +637,19 @@ describe("J · More registration checks", () => {
     const row = lines.itemAt(0);
     lines.remove(row);
     expect(() => row.addBehavior(defineBehavior({ triggers: [L.qty], run: () => {} }))).toThrow(/detached row/);
+  });
+
+  test.each([
+    ["countIn", countIn(shape, touched)],
+    ["pendingIn", pendingIn(shape)],
+    ["pendingOf", pendingOf(shape.title)],
+  ])("an origins filter on a %s trigger throws at registration", (_, tally) => {
+    const config = { name: "filtered", origins: ["user"] as const, run: () => {} };
+    const fails = (behavior: ReturnType<typeof defineBehavior>) => () => createStore(shape, initial(), { behaviors: behavior });
+    const message = `Behavior "filtered": "${tally.path}" carries no origins (it is a tally) – drop the origins filter or the reference`;
+    expect(fails(defineBehavior({ ...config, triggers: [tally] }))).toThrow(message);
+    expect(fails(defineBehavior({ ...config, when: when([tally], () => true) })), "a guard reference triggers too").toThrow(message);
+    expect(fails(defineBehavior({ ...config, triggers: [shape.title], reads: [tally] })), "reads are fine").not.toThrow();
   });
 });
 

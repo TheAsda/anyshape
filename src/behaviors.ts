@@ -151,7 +151,11 @@ export interface BehaviorConfig extends Declaration {
   writes?: readonly WritableRef[];
   /** Default: both true. */
   runOn?: { init?: boolean; change?: boolean };
-  /** Run on changes only when at least one origin is of these kinds. Default: any. */
+  /**
+   * Run on changes only when at least one origin is of these kinds. Default:
+   * any. Tallies (countIn, pendingIn, pendingOf) carry no origins: registration
+   * throws when one is a trigger.
+   */
   origins?: readonly OriginKind[];
   /** May return a promise: its writes apply when it resolves, unless the run was cancelled. */
   run(ctx: BehaviorContext): void | Promise<void>;
@@ -904,7 +908,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     // An origins filter needs triggers that carry origins.
     if (config.origins) {
       for (const ref of triggers) {
-        if (!kindOf(ref).origins) fail(`"${refLabel(ref)}" carries no origins (it is a tally) – drop the origins filter or the reference`);
+        if (kindOf(ref).tally) fail(`"${refLabel(ref)}" carries no origins (it is a tally) – drop the origins filter or the reference`);
       }
     }
 
