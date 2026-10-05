@@ -81,9 +81,8 @@ export interface SelectOptions<T> extends HookOptions {
 }
 
 /**
- * Read any reference: a node (its slice of the form), a meta key (effective
- * value for inherited keys), a count or an initial value. Re-renders only
- * when that value changes.
+ * Read any reference: a node (its slice of the form), a meta key, a count or
+ * an initial value. Re-renders only when that value changes.
  */
 export function useValue<R extends AnyRef>(ref: R, options?: HookOptions): RefValue<R>;
 /** Read a derived value; re-renders only when the selected result changes. */
@@ -142,7 +141,7 @@ export interface FieldBinding<N extends AnyNode> {
   value: InferValue<N>;
   /** Stable; writes with origin "user". */
   onChange: (value: InferValue<N>) => void;
-  /** The node's own meta (inherited keys: use useValue(node.key) for the effective value). */
+  /** The node's meta. */
   meta: Readonly<InferMeta<N>>;
   /** The store the field was resolved to. */
   store: BaseStore<any>;

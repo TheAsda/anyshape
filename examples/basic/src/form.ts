@@ -45,9 +45,9 @@ export const lookingUp = metaKey<string | undefined>(undefined).aggregate(
 // ------------------------------------------------------------
 // control()    = validation + touched + dirty + a focus target:
 //                everything an input needs.
-// { visible }  = adds `visible` (inherited down the subtree). Hidden
-//                nodes are still validated: their rules are guarded
-//                on it (b.when below).
+// { visible }  = adds `visible` to the group itself; its fields
+//                don't carry it. Hidden groups are still validated:
+//                their rules are guarded on it (b.when below).
 // submission() = adds `submitting`: the node can be submitted with
 //                handleSubmit(store, fn).
 //
@@ -111,7 +111,7 @@ export const shape = form(
         approver: field<string>().meta(control()),
         justification: field<string>().meta(control()),
       }).meta({ visible }),
-    }).meta({ visible }, submission()),
+    }).meta(submission()),
   }).meta(submission()),
 );
 
