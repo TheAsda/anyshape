@@ -141,7 +141,7 @@ export interface Declaration {
 export interface BehaviorConfig extends Declaration {
   /** The only targets ctx.set accepts. One writer per target. */
   writes?: readonly WritableRef[];
-  /** Default: both true. */
+  /** Run when the instance is created. Default: true. */
   runOn?: { init?: boolean };
   /**
    * Run on changes only when at least one origin is of these kinds. Default:
