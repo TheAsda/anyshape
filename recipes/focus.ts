@@ -8,9 +8,8 @@
 // row's targets are skipped through store.isAttached().
 //   • registerFocus(store, node, target) registers a target, called by the
 //     bindings (useControl's focusRef); it returns the unregister function.
-//   • focus(store, node) focuses the node's target.
 //   • focusFirst(entries) focuses the first entry (e.g. a validation
-//     result's errors) whose node has a target, in document order by default.
+//     result's errors) whose node has a target, in document order.
 // ============================================================
 
 import type { AnyNode, BaseStore, CollectEntry } from "form-lib";
@@ -25,7 +24,7 @@ export interface FocusTarget {
 const targets = new WeakMap<BaseStore<any>, Map<AnyNode, FocusTarget>>();
 
 /**
- * Register where focus() and focusFirst() move the cursor for `node`; a
+ * Register where focusFirst() moves the cursor for `node`; a
  * later registration for the node replaces it. The returned function
  * unregisters the target, unless another one has replaced it since. Throws
  * when `store` does not address `node` (a row node needs the row's store).
@@ -48,7 +47,7 @@ export type FocusEntry = Pick<CollectEntry, "ref" | "store">;
  * not DOM nodes (custom focus handles) compare equal, so they keep their
  * shape order relative to each other.
  */
-export function domOrder(a: FocusTarget, b: FocusTarget): number {
+function domOrder(a: FocusTarget, b: FocusTarget): number {
   if (typeof Node === "undefined" || !(a instanceof Node) || !(b instanceof Node) || a === b) return 0;
   const position = a.compareDocumentPosition(b);
   if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
@@ -66,34 +65,18 @@ function targetOf(store: BaseStore<any>, node: AnyNode): FocusTarget | undefined
   return targets.get(store.scopeStore)?.get(node);
 }
 
-function moveTo(target: FocusTarget): void {
-  target.focus();
-  target.scrollIntoView?.();
-}
-
 /**
- * Focus the node's registered target. Returns false when there is none;
- * throws when `store` does not address `node`.
- */
-export function focus(store: BaseStore<any>, node: AnyNode): boolean {
-  store.assertInScope(node);
-  const target = targetOf(store, node);
-  if (!target) return false;
-  moveTo(target);
-  return true;
-}
-
-/**
- * Focus the first entry whose node has a focus target, ordered by `compare`
+ * Focus the first entry whose node has a focus target, in document order
  * (ties keep the entries' order). Entries of removed rows are skipped.
  * Returns the focused entry.
  */
-export function focusFirst<E extends FocusEntry>(entries: readonly E[], compare = domOrder): E | undefined {
+export function focusFirst<E extends FocusEntry>(entries: readonly E[]): E | undefined {
   const first = entries
     .map((entry, index) => ({ entry, index, target: targetOf(entry.store, entry.ref.node) }))
     .filter((c): c is { entry: E; index: number; target: FocusTarget } => c.target !== undefined)
-    .sort((a, b) => compare(a.target, b.target) || a.index - b.index)[0];
+    .sort((a, b) => domOrder(a.target, b.target) || a.index - b.index)[0];
   if (!first) return undefined;
-  moveTo(first.target);
+  first.target.focus();
+  first.target.scrollIntoView?.();
   return first.entry;
 }

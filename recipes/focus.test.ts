@@ -1,25 +1,27 @@
-// Focus recipe: registerFocus(store, node, target), focus(store, node), focusFirst(entries, compare).
+// Focus recipe: registerFocus(store, node, target), focusFirst(entries).
 
-import { form, object, field, createStore } from "form-lib";
+import { form, object, field, createStore, type MetaRef, type BaseStore } from "form-lib";
 import { control } from "./features";
 import { rule, validate } from "./validation";
 import { test as base, describe, expect } from "vitest";
-import { focus, focusFirst, registerFocus, type FocusTarget } from "./focus";
+import { focusFirst, registerFocus, type FocusTarget } from "./focus";
 import * as limits from "./test/fixtures/limits";
 
+/** Focus one node through focusFirst, as a validation result's single error would. */
+const focusOn = (store: BaseStore<any>, ref: MetaRef<any>) => focusFirst([{ ref, store }]) !== undefined;
+
 describe("Focus", () => {
-  const { shape, L, initial, targets } = limits;
+  const { shape, L, initial } = limits;
   const test = base.extend("store", () => createStore(shape, initial()));
 
-  test("focusFirst: shape order by default, compare to reorder", ({ store: s }) => {
+  test("focusFirst: targets that are not DOM nodes keep the entries' order", ({ store: s }) => {
     const focused: string[] = [];
-    const compare = targets(s, { name: 2, code: 1 }, focused);
-    const entries = [
-      { path: "name", ref: shape.name.error, store: s },
-      { path: "code", ref: shape.code.error, store: s },
-    ];
-    expect(focusFirst(entries)?.path).toBe("name");
-    expect(focusFirst(entries, compare)?.path).toBe("code");
+    registerFocus(s, shape.name, { focus: () => focused.push("name") });
+    registerFocus(s, shape.code, { focus: () => focused.push("code") });
+    const name = { path: "name", ref: shape.name.error, store: s };
+    const code = { path: "code", ref: shape.code.error, store: s };
+    expect(focusFirst([name, code])?.path).toBe("name");
+    expect(focusFirst([code, name])?.path).toBe("code");
     expect(focused).toEqual(["name", "code"]);
   });
 
@@ -49,22 +51,22 @@ describe("Focus", () => {
     expect(focused).toEqual(["b"]);
   });
 
-  test("focus(store, node): false without a target; focus() then scrollIntoView() with one", ({ store: s }) => {
-    expect(focus(s, shape.name)).toBe(false);
+  test("focusFirst: undefined without a target; focus() then scrollIntoView() with one", ({ store: s }) => {
+    expect(focusOn(s, shape.name.error)).toBe(false);
     const calls: string[] = [];
     registerFocus(s, shape.name, { focus: () => calls.push("focus"), scrollIntoView: () => calls.push("scroll") });
-    expect(focus(s, shape.name)).toBe(true);
+    expect(focusOn(s, shape.name.error)).toBe(true);
     expect(calls).toEqual(["focus", "scroll"]);
   });
 
   test("a target registered through a section's store is found from any store in its scope", () => {
-    const f = form({ step: object({ x: field<string>(), y: field<string>() }) });
+    const f = form({ step: object({ x: field<string>().meta(control()), y: field<string>().meta(control()) }) });
     const s = createStore(f, { step: { x: "", y: "" } });
     const calls: string[] = [];
     registerFocus(s, f.step.x, { focus: () => calls.push("x") });
     registerFocus(s.substore(f.step), f.step.y, { focus: () => calls.push("y") });
-    expect(focus(s.substore(f.step), f.step.x)).toBe(true);
-    expect(focus(s, f.step.y)).toBe(true);
+    expect(focusOn(s.substore(f.step), f.step.x.error)).toBe(true);
+    expect(focusOn(s, f.step.y.error)).toBe(true);
     expect(calls).toEqual(["x", "y"]);
   });
 
@@ -72,22 +74,20 @@ describe("Focus", () => {
     const calls: string[] = [];
     const unregisterA = registerFocus(s, shape.name, { focus: () => calls.push("a") });
     s.reset();
-    expect(focus(s, shape.name), "kept by reset").toBe(true);
+    expect(focusOn(s, shape.name.error), "kept by reset").toBe(true);
     const unregisterB = registerFocus(s, shape.name, { focus: () => calls.push("b") });
     unregisterA();
-    expect(focus(s, shape.name), "a later registration replaced it").toBe(true);
+    expect(focusOn(s, shape.name.error), "a later registration replaced it").toBe(true);
     unregisterB();
-    expect(focus(s, shape.name)).toBe(false);
+    expect(focusOn(s, shape.name.error)).toBe(false);
     expect(calls).toEqual(["a", "b"]);
   });
 
-  test("registerFocus and focus reject a node the store does not address", ({ store: s }) => {
+  test("registerFocus rejects a node the store does not address", ({ store: s }) => {
     const other = form({ name: field<string>() });
     const target: FocusTarget = { focus: () => {} };
     expect(() => registerFocus(s, L.qty, target), "a row node through the root store").toThrow(/inside an array item – use the item's store/);
-    expect(() => focus(s, L.qty), "a row node through the root store").toThrow(/inside an array item – use the item's store/);
     expect(() => registerFocus(s, other.name, target), "a node of another form").toThrow(/is not part of the store/);
-    expect(() => focus(s, other.name), "a node of another form").toThrow(/is not part of the store/);
   });
 
   test("a row's target is its own, and is skipped once the row is removed", ({ store: s }) => {
@@ -95,12 +95,12 @@ describe("Focus", () => {
     const [a, b] = lines.items();
     const calls: string[] = [];
     registerFocus(a, L.qty, { focus: () => calls.push("a") });
-    expect(focus(b, L.qty), "another row").toBe(false);
+    expect(focusOn(b, L.qty.error), "another row").toBe(false);
     const unregister = registerFocus(b, L.qty, { focus: () => calls.push("b") });
     lines.remove(b);
-    expect(focus(b, L.qty), "removed row").toBe(false);
+    expect(focusOn(b, L.qty.error), "removed row").toBe(false);
     unregister(); // an input unmounting after its row was removed
-    expect(focus(a, L.qty)).toBe(true);
+    expect(focusOn(a, L.qty.error)).toBe(true);
     expect(calls).toEqual(["a"]);
   });
 });

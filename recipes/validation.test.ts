@@ -1,6 +1,6 @@
 // The validation recipe (recipes/validation.ts): rules contribute to `error`,
 // whose owner is the queue; validate(store, node) forces and collects.
-import { form, object, array, field, createStore, defineBehavior, when, countIn, pendingOf, pendingIn } from "form-lib";
+import { form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn, pendingOf, pendingIn } from "form-lib";
 import { rule, asyncRule, validate, error, control, validation, visible } from "./index";
 import { flush, sleep } from "./test/harness";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
@@ -38,7 +38,9 @@ describe("M · Sync queue", () => {
 
   test("guards: conditional rules, guard refs trigger", () => {
     const s = createStore(shape, initial(), {
-      behaviors: rule(shape.taxId, (v) => (v ? undefined : "Required"), { when: when([shape.type], (t) => t === "company") }),
+      behaviors: defineBehaviors(shape, (b) =>
+        b.when([shape.type], (t) => t === "company", (b) => b.add(rule(shape.taxId, (v) => (v ? undefined : "Required"))))
+      ),
     });
     expect(s.get(shape.taxId.error)).toBe(undefined);
     s.set(shape.type, "company");
@@ -143,8 +145,10 @@ describe("M · Hidden / disabled are guards (#21)", () => {
   });
 
   test("rules guarded on visibility: absent while hidden, back when shown", () => {
-    const shown = when([shape.company.visible], (v) => v);
-    const s = createStore(shape, initial(), { behaviors: rule(shape.company.vat, (v) => (v ? undefined : "Required"), { when: shown }) });
+    const behaviors = defineBehaviors(shape, (b) =>
+      b.when([shape.company.visible], (v) => v, (b) => b.add(rule(shape.company.vat, (v) => (v ? undefined : "Required"))))
+    );
+    const s = createStore(shape, initial(), { behaviors });
     expect(s.get(shape.company.vat.error)).toBe("Required");
     s.set(shape.company.visible, false);
     expect(s.get(shape.company.vat.error)).toBe(undefined);
@@ -216,8 +220,8 @@ describe("M · Async", () => {
   });
 
   test("a guard turning false clears the error and cancels the check in flight; turning true writes the remembered result back", async ({ lookup: { calls, check } }) => {
-    const person = when([shape.type], (t) => t === "person");
-    const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { when: person }) });
+    const behaviors = defineBehaviors(shape, (b) => b.when([shape.type], (t) => t === "person", (b) => b.add(asyncRule(shape.email, check))));
+    const s = createStore(shape, initial(), { behaviors });
     s.set(shape.email, "a@x.io", { origin: "user" });
     calls[0].d.resolve("Taken");
     await flush();
