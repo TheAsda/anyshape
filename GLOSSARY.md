@@ -1,4 +1,4 @@
-# form-lib
+# anyshape
 
 A form state library: a typed shape, a store holding values and metadata, and behaviors that keep them consistent.
 
