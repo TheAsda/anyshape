@@ -9,24 +9,18 @@
 //       b.when([s.x.required], (r) => r, (b) => b.add(required(s.x)))
 // ============================================================
 
-import { type AnyNode, type InferValue, type Ref, type ShapeNode, type Guard, type CountRef, type Contribution } from "form-lib";
+import { type AnyNode, type InferValue, type Ref, type ShapeNode, type CountRef, type Contribution } from "form-lib";
 import { rule, type RulePart, type Validatable } from "./validation";
 
 export type Message<V = any> = string | ((value: V) => string);
 
 export interface RuleRecipeOptions<V = any> {
   message?: Message<V>;
-  /** Skip the rule while the guard is false. */
-  when?: Guard | readonly Guard[];
   name?: string;
 }
 
 function message<V>(m: Message<V> | undefined, fallback: string, value: V): string {
   return m === undefined ? fallback : typeof m === "function" ? m(value) : m;
-}
-
-function guards(when: Guard | readonly Guard[] | undefined): Guard[] {
-  return when === undefined ? [] : Array.isArray(when) ? [...when] : [when as Guard];
 }
 
 /** undefined, null, whitespace-only strings and empty arrays are empty. */
@@ -46,7 +40,6 @@ export function labelOf(node: AnyNode): string {
 export function required<N extends Validatable>(node: N, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
   return rule(node, (v) => (isEmpty(v) ? message(options.message, "Required", v) : undefined), {
     name: options.name ?? `required(${node.path})`,
-    when: options.when,
   });
 }
 
@@ -71,7 +64,6 @@ function limitRule<N extends Validatable>(
     },
     {
       name: options.name ?? `${label}(${node.path}, ${ref === undefined ? limit : ref.path})`,
-      when: options.when,
       triggers: ref === undefined ? [] : [ref],
     }
   );
@@ -102,7 +94,6 @@ type Textual = Validatable & ShapeNode<string | null | undefined>;
 export function pattern<N extends Textual>(node: N, regex: RegExp, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
   return rule(node, (v) => (isEmpty(v) || regex.test(v as string) ? undefined : message(options.message, "Invalid format", v)), {
     name: options.name ?? `pattern(${node.path})`,
-    when: options.when,
   });
 }
 

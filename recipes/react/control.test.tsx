@@ -1,16 +1,16 @@
 // ============================================================
-// React recipes in a real browser: useControl, the error display policy,
-// the native adapters. The core is reached only through its entries.
+// React recipes in a real browser: useControl, its showError, the native
+// adapters. The core is reached only through its entries.
 // ============================================================
 
 import { test, expect } from "vitest";
-import { form, object, array, field, createStore, type InferValue } from "form-lib";
+import { form, object, array, field, createStore, type BaseStore, type InferValue } from "form-lib";
 import { StoreProvider } from "form-lib/react";
 import { control } from "../features";
 import { rule, asyncRule } from "../validation";
 import { handleSubmit, submission } from "../submit";
-import { focus } from "../focus";
-import { useControl, ErrorDisplayProvider, fromInput, fromCheckbox } from "./index";
+import { focusFirst } from "../focus";
+import { useControl, fromInput, fromCheckbox } from "./index";
 import { render, settle } from "./test-utils";
 
 const shape = form(
@@ -26,6 +26,9 @@ const shape = form(
 );
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
+
+/** Focus `name`'s registered target, as focusFirst does for a single error. */
+const focusName = (store: BaseStore<any>) => focusFirst([{ ref: shape.name.error, store }]) !== undefined;
 
 function initial(): Values {
   return { name: "Ann", agree: false, age: 30, note: "", lines: [{ sku: "A", qty: 1 }, { sku: "B", qty: 2 }] };
@@ -66,7 +69,7 @@ test("useControl: state, user writes set touched/dirty, errors", async () => {
   await expect.element(state).toHaveTextContent("Ann|-|false|false");
 });
 
-test("useControl: onBlur reveals, showError follows the default policy", async () => {
+test("useControl: onBlur reveals, showError once revealed", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")) });
   let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
@@ -98,7 +101,7 @@ function gate() {
   return { check, resolve: (error: string | undefined) => resolve(error) };
 }
 
-test("useControl: pending while a check runs; by default the error shows when revealed and not pending", async () => {
+test("useControl: pending while a check runs; the error shows when revealed and not pending", async () => {
   const lookup = gate();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.name, lookup.check) });
   let c!: ReturnType<typeof useControl<typeof shape.name>>;
@@ -119,23 +122,6 @@ test("useControl: pending while a check runs; by default the error shows when re
   await expect.element(state).toHaveTextContent("false|Taken|true");
   await settle(() => c.onChange("Bobby"));
   await expect.element(state, { message: "the last result is hidden while a new check runs" }).toHaveTextContent("true|Taken|false");
-});
-
-test("useControl: a per-field errorDisplay overrides the policy", async () => {
-  const lookup = gate();
-  const s = createStore(shape, initial(), { behaviors: [rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")), asyncRule(shape.name, lookup.check)] });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
-  function C() {
-    c = useControl(shape.name, { errorDisplay: (st) => st.error !== undefined });
-    return <span data-testid="c">{`${c.error ?? "-"}|${c.showError}`}</span>;
-  }
-  const screen = await render(
-    <StoreProvider store={s}>
-      <C />
-    </StoreProvider>
-  );
-  await settle(() => c.onChange("Al"));
-  await expect.element(screen.getByTestId("c"), { message: "shown without a reveal" }).toHaveTextContent("Too short|true");
 });
 
 test("useControl: onBlur after its row was removed does nothing", async () => {
@@ -159,26 +145,7 @@ test("useControl: onBlur after its row was removed does nothing", async () => {
   expect(row.get(L.sku.revealed), "nothing was written").toBe(false);
 });
 
-test("ErrorDisplayProvider: a custom policy, inherited by nested row providers", async () => {
-  const s = createStore(shape, initial(), { behaviors: rule(L.sku, () => "bad") });
-  const row = s.substore(shape.lines).items()[0];
-  function Sku() {
-    const c = useControl(L.sku);
-    return <span data-testid="sku">{String(c.showError)}</span>;
-  }
-  const screen = await render(
-    <StoreProvider store={s}>
-      <ErrorDisplayProvider policy={(st) => st.error !== undefined}>
-        <StoreProvider store={row}>
-          <Sku />
-        </StoreProvider>
-      </ErrorDisplayProvider>
-    </StoreProvider>
-  );
-  await expect.element(screen.getByTestId("sku"), { message: "not revealed, shown by the custom policy" }).toHaveTextContent("true");
-});
-
-test("focusRef registers the element, focus() and submit use it, unmount clears it", async () => {
+test("focusRef registers the element, submit focuses it, unmount clears it", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
   function Input() {
     const c = useControl(shape.name);
@@ -192,11 +159,8 @@ test("focusRef registers the element, focus() and submit use it, unmount clears 
   const input = screen.getByTestId("in");
   await settle(() => handleSubmit(s, async () => {})());
   await expect.element(input, { message: "submit focused the first error" }).toHaveFocus();
-  (input.element() as HTMLElement).blur();
-  expect(focus(s, shape.name)).toBe(true);
-  await expect.element(input).toHaveFocus();
   await screen.unmount();
-  expect(focus(s, shape.name), "cleared on unmount").toBe(false);
+  expect(focusName(s), "cleared on unmount").toBe(false);
 });
 
 test("focusRef: unmounting one of two inputs keeps the other's registration", async () => {
@@ -220,14 +184,14 @@ test("focusRef: unmounting one of two inputs keeps the other's registration", as
   );
   const screen = await render(app(true));
   const b = screen.getByTestId("b");
-  expect(focus(s, shape.name)).toBe(true);
+  expect(focusName(s)).toBe(true);
   await expect.element(b, { message: "the last one mounted wins" }).toHaveFocus();
   (b.element() as HTMLElement).blur();
   await screen.rerender(app(false));
-  expect(focus(s, shape.name)).toBe(true);
+  expect(focusName(s)).toBe(true);
   await expect.element(b).toHaveFocus();
   await screen.unmount();
-  expect(focus(s, shape.name)).toBe(false);
+  expect(focusName(s)).toBe(false);
 });
 
 test("fromInput / fromCheckbox with real events; handlers are cached", async () => {

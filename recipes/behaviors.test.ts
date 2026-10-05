@@ -1,10 +1,10 @@
 // The ready-made behaviors (recipes/behaviors.ts) and the builder with them.
 import {
-  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn, when,
+  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
   type BehaviorBuilder,
 } from "form-lib";
 import {
-  required, maxLength, min, isEmpty, calculate, link, visibleWhen,
+  required, maxLength, min, calculate, link, visibleWhen,
   disableWhen, clearWhen, exclusive, error,
 } from "./index";
 import { test as base, describe, expect } from "vitest";
@@ -25,18 +25,15 @@ const test = base
   .extend("store", () => createStore(shape, initial()));
 
 describe("N · Behaviors", () => {
-  test("calculate, including stopOnUserEdit and reset", () => {
+  test("calculate: recalculated on every source change, a user edit included", () => {
     const s = createStore(shape, initial(), {
-      behaviors: calculate(shape.slug, [shape.title], (t) => t.toLowerCase().replace(/\s+/g, "-"), { stopOnUserEdit: true }),
+      behaviors: calculate(shape.slug, [shape.title], (t) => t.toLowerCase().replace(/\s+/g, "-")),
     });
     s.set(shape.title, "Big News", { origin: "user" });
     expect(s.get(shape.slug)).toBe("big-news");
     s.set(shape.slug, "mine", { origin: "user" });
     s.set(shape.title, "Other", { origin: "user" });
-    expect(s.get(shape.slug), "stopped after the user edit").toBe("mine");
-    s.reset();
-    s.set(shape.title, "Again", { origin: "user" });
-    expect(s.get(shape.slug), "reset resumes it").toBe("again");
+    expect(s.get(shape.slug), "the next source change overwrites the edit").toBe("other");
   });
 
   test("calculate in rows with an enclosing source", () => {
@@ -69,13 +66,12 @@ describe("N · Behaviors", () => {
   });
 
   test("visibleWhen and disableWhen; a hidden section's rules are guarded on its visibility", () => {
-    const s = createStore(shape, initial(), {
-      behaviors: [
-        visibleWhen(shape.company, [shape.type], (t) => t === "company"),
-        disableWhen(shape.note, [shape.name], (n) => n === ""),
-        required(shape.company.vat, { when: when([shape.company.visible], (v) => v) }),
-      ],
+    const behaviors = defineBehaviors(shape, (b) => {
+      b.add(visibleWhen(shape.company, [shape.type], (t) => t === "company"));
+      b.add(disableWhen(shape.note, [shape.name], (n) => n === ""));
+      b.when([shape.company.visible], (v) => v, (b) => b.add(required(shape.company.vat)));
     });
+    const s = createStore(shape, initial(), { behaviors });
     expect(s.get(shape.company.visible)).toBe(false);
     expect(s.get(shape.company.vat.error), "hidden: the rule is absent").toBe(undefined);
     s.set(shape.type, "company");
@@ -84,32 +80,29 @@ describe("N · Behaviors", () => {
     expect(s.get(shape.note.disabled)).toBe(true);
   });
 
-  test("clearWhen: back to the initial value, or to a given value", () => {
+  test("clearWhen: back to the initial value while the test holds", () => {
     const start = { ...initial(), type: "company" as const, company: { vat: "LV1", phone: "123" } };
-    const hidden = (visible: boolean) => !visible;
     const s = createStore(shape, start, {
       behaviors: [
         visibleWhen(shape.company, [shape.type], (t) => t === "company"),
-        clearWhen(shape.company.vat, [shape.company.visible], hidden, { to: "" }),
-        clearWhen(shape.company.phone, [shape.company.visible], hidden),
+        clearWhen(shape.company.phone, [shape.company.visible], (visible) => !visible),
       ],
     });
-    s.set(shape.company.vat, "LV2");
     s.set(shape.company.phone, "999");
     s.set(shape.type, "person");
-    expect(s.get(shape.company.vat)).toBe("");
     expect(s.get(shape.company.phone)).toBe("123");
+    s.set(shape.company.phone, "555");
+    expect(s.get(shape.company.phone), "an edit is reset too while hidden").toBe("123");
     s.set(shape.type, "company");
-    expect(s.get(shape.company.vat), "not restored when shown again").toBe("");
+    expect(s.get(shape.company.phone), "not restored when shown again").toBe("123");
+    s.set(shape.company.phone, "777");
+    expect(s.get(shape.company.phone), "shown: edits stay").toBe("777");
   });
 });
 
 function exclusiveStore(values: Partial<Values> = {}, required = false) {
   return createStore(shape, { ...initial(), ...values }, {
-    behaviors: exclusive([shape.price, shape.discount, shape.promo], {
-      required,
-      isFilled: (v, f) => (f === shape.discount ? (v as number | undefined) !== undefined && (v as number) > 0 : !isEmpty(v)),
-    }),
+    behaviors: exclusive([shape.price, shape.discount, shape.promo], { required }),
   });
 }
 const disabledOf = (s: ReturnType<typeof exclusiveStore>) => [shape.price, shape.discount, shape.promo].map((f) => s.get(f.disabled));
@@ -123,8 +116,6 @@ describe("N · exclusive", () => {
     expect(disabledOf(s)).toEqual([true, true, false]);
     s.set(shape.promo, "", { origin: "user" });
     expect(disabledOf(s)).toEqual([false, false, false]);
-    s.set(shape.discount, 0);
-    expect(disabledOf(s), "custom isFilled: discount 0 is empty").toEqual([false, false, false]);
   });
 
   test("exclusive: several filled (loaded data) → all enabled, errors on the filled ones", () => {

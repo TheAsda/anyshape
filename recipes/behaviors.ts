@@ -8,7 +8,7 @@
 
 import {
   defineBehavior, contribute, when, initialOf,
-  type AnyNode, type InferValue, type MetaRef, type AnyBehavior, type Behavior, type Guard,
+  type AnyNode, type InferValue, type MetaRef, type AnyBehavior, type Behavior,
   type AnyRef, type RefValue, type Contribution,
 } from "form-lib";
 import { isEmpty, labelOf } from "./rules";
@@ -19,37 +19,18 @@ type WithKey<K extends string, V, P = unknown> = AnyNode & { readonly [P2 in K]:
 /** A node with the `disabled` feature: its reasons (contributions) are strings. */
 type Disableable = WithKey<"disabled", boolean, string>;
 
-export interface CalculateOptions {
-  name?: string;
-  /**
-   * Stop calculating once the user edits the target ("derived until edited",
-   * e.g. a slug). A reset (origin "initial") resumes it.
-   */
-  stopOnUserEdit?: boolean;
-  when?: Guard | readonly Guard[];
-}
-
 /** target = fn(...sources), recalculated when a source changes. */
 export function calculate<N extends AnyNode, const Rs extends readonly AnyRef[]>(
   target: N,
   sources: Rs,
   fn: (...values: Values<Rs>) => InferValue<N>,
-  options: CalculateOptions = {}
+  options: { name?: string } = {}
 ): Behavior {
-  const stop = options.stopOnUserEdit === true;
   return defineBehavior({
     name: options.name ?? `calculate(${target.path})`,
-    triggers: stop ? [...sources, target] : sources,
+    triggers: sources,
     writes: [target],
-    when: options.when,
-    run(ctx) {
-      if (stop && ctx.changed(target)) {
-        if (ctx.origins.has("user")) ctx.state.overridden = true;
-        else if (ctx.origins.has("initial")) ctx.state.overridden = false;
-      }
-      if (ctx.state.overridden) return;
-      ctx.set(target, fn(...(sources.map((r) => ctx.get(r)) as Values<Rs>)));
-    },
+    run: (ctx) => ctx.set(target, fn(...(sources.map((r) => ctx.get(r)) as Values<Rs>))),
   });
 }
 
@@ -109,17 +90,16 @@ export function disableWhen<const Rs extends readonly AnyRef[]>(
 }
 
 /**
- * While test(...refs) holds, the target is reset: to its initial value, or to
- * `to` when given. Edits are reset too, for as long as the test holds, e.g.
+ * While test(...refs) holds, the target is reset to its initial value. Edits
+ * are reset too, for as long as the test holds, e.g.
  *   clearWhen(s.car, [s.car.visible], (visible) => !visible)
  */
 export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>(
   target: N,
   refs: Rs,
   test: (...values: Values<Rs>) => boolean,
-  options: { to?: InferValue<N>; name?: string } = {}
+  options: { name?: string } = {}
 ): Behavior {
-  const hasTo = "to" in options;
   const initial = initialOf(target);
   return defineBehavior({
     name: options.name ?? `clearWhen(${target.path})`,
@@ -128,8 +108,8 @@ export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>
     writes: [target],
     run(ctx) {
       if (!test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))) return;
-      const next = hasTo ? options.to : ctx.get(initial);
-      if (!Object.is(ctx.get(target), next)) ctx.set(target, next as InferValue<N>);
+      const next = ctx.get(initial);
+      if (!Object.is(ctx.get(target), next)) ctx.set(target, next);
     },
   });
 }
@@ -137,8 +117,6 @@ export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>
 export interface ExclusiveOptions {
   /** Exactly one must be filled. Default false (at most one). */
   required?: boolean;
-  /** What counts as filled. Default: !isEmpty(value). */
-  isFilled?: (value: unknown, field: AnyNode) => boolean;
   message?: { tooMany?: string; missing?: string };
   name?: string;
 }
@@ -156,7 +134,6 @@ type ExclusiveField = Validatable & Disableable;
 export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveOptions = {}): AnyBehavior[] {
   if (fields.length < 2) throw new Error("exclusive() needs at least two fields");
   const name = options.name ?? `exclusive(${fields.map((f) => f.path).join(", ")})`;
-  const filled = (field: AnyNode, value: unknown) => (options.isFilled ? options.isFilled(value, field) : !isEmpty(value));
   const labels = fields.map(labelOf).join(", ");
   const tooMany = options.message?.tooMany ?? `Only one of ${labels} can be set`;
   const missing = options.message?.missing ?? `One of ${labels} is required`;
@@ -165,8 +142,8 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
     contribute(field.disabled, name, {
       name: `${name}:${field.path}`,
       when: when(fields, (...values: unknown[]) => {
-        const isFilled = fields.map((f, j) => filled(f, values[j]));
-        return isFilled.filter(Boolean).length === 1 && !isFilled[i];
+        const filled = values.map((v) => !isEmpty(v));
+        return filled.filter(Boolean).length === 1 && !filled[i];
       }),
     })
   );
@@ -175,8 +152,8 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
     rule(
       field,
       (value, ctx) => {
-        const count = fields.filter((f) => filled(f, f === field ? value : ctx.get(f))).length;
-        if (count > 1 && filled(field, value)) return tooMany;
+        const count = fields.filter((f) => !isEmpty(f === field ? value : ctx.get(f))).length;
+        if (count > 1 && !isEmpty(value)) return tooMany;
         if (options.required && count === 0) return missing;
         return undefined;
       },

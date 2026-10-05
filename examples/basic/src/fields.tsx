@@ -4,10 +4,10 @@
 // dirty, pending), a focusRef that registers the element
 // for submit-time error focusing, and onBlur / showError.
 //
-// showError follows the nearest ErrorDisplayProvider's policy: by
-// default an error shows once the field was left (onBlur) or
+// showError: an error shows once the field was left (onBlur) or
 // covered by a submit and no check is pending, and then stays live
-// while it's fixed.
+// while it's fixed. To change when, edit the expression in
+// useControl (recipes/react/control.ts).
 //
 // Every field also takes an optional `hint`: static helper text
 // that tells the user up front what the rules are (and how to

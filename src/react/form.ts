@@ -7,18 +7,17 @@
 //     as the new baseline ({ as: "initial" }), and reset() returns to it.
 //     Re-rendering with the same object does nothing, so edits survive.
 //   • useSync(ref, value) writes React data (query results, props, context)
-//     into the form when it changes. The written value stays after unmount
-//     unless { resetOnUnmount: true }.
+//     into the form when it changes (origin "program"). The written value
+//     stays after unmount.
 // ============================================================
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { AnyNode, InferValue, MetaRef, ObjectNode } from "../shape";
 import { createStore } from "../create";
 import type { StoreOptions } from "../behaviors";
-import type { RootStore, WriteOptions } from "../store";
+import type { RootStore } from "../store";
 import { useStore, resolveStore, type HookOptions } from "./hooks";
 import { refLabel, targetOf, isDev } from "../internal";
-import { initialOf } from "../refs/initial";
 
 // ============================================================
 // useForm
@@ -58,13 +57,6 @@ export function useForm<N extends ObjectNode<any>>(
 // ============================================================
 // useSync
 // ============================================================
-export interface SyncOptions extends HookOptions {
-  /** Default origin "program". */
-  origin?: WriteOptions["origin"];
-  /** Write the key's default (meta) or the initial value (node) when the component unmounts. */
-  resetOnUnmount?: boolean;
-}
-
 const warned = new WeakSet<object>();
 
 /**
@@ -73,29 +65,20 @@ const warned = new WeakSet<object>();
  * with keepOnReset, or reset() puts them back to their default while `value`
  * is unchanged.
  */
-export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferValue<R>, options: SyncOptions = {}): void {
+export function useSync<R extends AnyNode | MetaRef<any>>(ref: R, value: InferValue<R>, options: HookOptions = {}): void {
   const start = useStore(options);
   const store = resolveStore(start, ref);
 
-  const def = targetOf(ref)?.def;
-  if (isDev() && def && !def.options.keepOnReset && !warned.has(ref)) {
-    warned.add(ref);
-    console.warn(`useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
+  if (isDev() && !warned.has(ref)) {
+    const def = targetOf(ref)?.def;
+    if (def && !def.options.keepOnReset) {
+      warned.add(ref);
+      console.warn(`useSync: "${refLabel(ref)}" is not declared with keepOnReset – reset() will clear it until the synced value changes.`);
+    }
   }
 
-  const origin = options.origin ?? "program";
   useLayoutEffect(() => {
     if (!store.isAttached()) return;
-    if (!Object.is(store.get(ref as never), value)) store.set(ref as never, value as never, { origin });
-  }, [store, ref, value, origin]);
-
-  const resetOnUnmount = options.resetOnUnmount === true;
-  useLayoutEffect(() => {
-    if (!resetOnUnmount) return;
-    return () => {
-      if (!store.isAttached()) return;
-      const reset = def ? def.defaultValue : store.get(initialOf(ref as AnyNode));
-      store.set(ref as never, reset as never, { origin });
-    };
-  }, [store, ref, resetOnUnmount, origin]);
+    if (!Object.is(store.get(ref as never), value)) store.set(ref as never, value as never, { origin: "program" });
+  }, [store, ref, value]);
 }

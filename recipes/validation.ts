@@ -6,7 +6,7 @@
 //     queue – runs the node's rules in registration order: the sync rules
 //     until the first error, then, if they pass, the async rules.
 //   • Nothing is skipped implicitly: a rule that applies only while a field
-//     is shown or enabled is guarded (when / b.when). A false guard makes
+//     is shown or enabled is guarded (b.when). A false guard makes
 //     the rule absent; with no rule present the error is undefined.
 //   • Async rules start on a user edit (start: "user"), on any change
 //     ("any") or also on creation ("always"). Otherwise the value stays
@@ -33,7 +33,7 @@
 
 import {
   metaKey, contribute, pendingOf, MetaRef,
-  type AnyNode, type AnyRef, type RefValue, type Contribution, type Guard, type Origin, type Part,
+  type AnyNode, type AnyRef, type RefValue, type Contribution, type Origin, type Part,
   type BaseStore, type CollectEntry,
 } from "form-lib";
 
@@ -193,8 +193,6 @@ export interface RuleOptions {
   triggers?: readonly AnyRef[];
   /** References the rule reads without being triggered by them. */
   reads?: readonly AnyRef[];
-  /** The rule is absent while a guard is false. Guard refs are triggers. */
-  when?: Guard | readonly Guard[];
 }
 
 /** A synchronous rule: return an error message, or undefined when valid. */

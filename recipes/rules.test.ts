@@ -1,7 +1,6 @@
-// The ready-made rules (recipes/rules.ts): messages, reference limits, the `when` option.
+// The ready-made rules (recipes/rules.ts): messages, reference limits, guarded by a builder block.
 import {
-  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn, when,
-  type AnyBehavior,
+  form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn,
 } from "form-lib";
 import {
   control, required, minLength, maxLength, min, max, pattern, email, isEmpty, labelOf, calculate,
@@ -132,7 +131,7 @@ describe("N · Messages", () => {
 });
 
 describe("N · Reference limits", () => {
-  const { shape, L, initial, targets } = limits;
+  const { shape, L, initial } = limits;
 
   // ---------------------------------------------------------------------------
   // Reference limits
@@ -179,42 +178,32 @@ describe("N · Reference limits", () => {
     expect(s.get(f.wanted.error), "the message uses the current limit").toBe("Must be at most 1");
   });
 });
-describe("N · The `when` option", () => {
-  test("the `when` option on rules and behaviors works like a builder block", () => {
-    const isCompany = when([shape.type], (t) => t === "company");
-    const viaOption: AnyBehavior[] = [
-      required(shape.personalId, { when: isCompany }),
-      calculate(shape.slug, [shape.title], (t) => t.toLowerCase(), { when: isCompany }),
-    ];
-    const viaBlock = defineBehaviors(shape, (b) =>
+describe("N · Guarded recipes", () => {
+  test("a builder block guards a rule and a behavior: absent while false, run when it turns true", () => {
+    const behaviors = defineBehaviors(shape, (b) =>
       b.when([shape.type], (t) => t === "company", (b) =>
         b.add(required(shape.personalId), calculate(shape.slug, [shape.title], (t) => t.toLowerCase()))
       )
     );
-    const trace = (behaviors: readonly AnyBehavior[]) => {
-      const s = createStore(shape, initial(), { behaviors });
-      const seen: unknown[] = [];
-      const snap = () => seen.push([s.get(shape.personalId.error), s.get(shape.slug)]);
-      snap();
-      s.set(shape.title, "ONE");
-      snap();
-      s.set(shape.type, "company");
-      snap();
-      s.set(shape.title, "TWO");
-      snap();
-      s.set(shape.type, "person");
-      snap();
-      return seen;
-    };
-    const expected = [
+    const s = createStore(shape, initial(), { behaviors });
+    const seen: unknown[] = [];
+    const snap = () => seen.push([s.get(shape.personalId.error), s.get(shape.slug)]);
+    snap();
+    s.set(shape.title, "ONE");
+    snap();
+    s.set(shape.type, "company");
+    snap();
+    s.set(shape.title, "TWO");
+    snap();
+    s.set(shape.type, "person");
+    snap();
+    expect(seen).toEqual([
       [undefined, "hello"],
       [undefined, "hello"],
       ["Required", "one"],
       ["Required", "two"],
       [undefined, "two"],
-    ];
-    expect(trace(viaOption)).toEqual(expected);
-    expect(trace(viaBlock)).toEqual(expected);
+    ]);
   });
 });
 

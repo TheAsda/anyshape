@@ -168,26 +168,25 @@ test("useSync feeds a limit from React; survives reset; writes only on change", 
   await expect.element(line).toHaveTextContent("ok");
 });
 
-test("useSync warns for meta keys without keepOnReset; resetOnUnmount", async () => {
+test("useSync warns for meta keys without keepOnReset", async () => {
   const { warnings, restore } = captureWarnings();
   let f!: RootStore<typeof shape>;
-  let show!: (b: boolean) => void;
   function App() {
-    const [visible, set] = useState(true);
-    show = set;
     f = useForm(shape, empty());
-    return <StoreProvider store={f}>{visible ? <Hint /> : null}</StoreProvider>;
+    return (
+      <StoreProvider store={f}>
+        <Hint />
+      </StoreProvider>
+    );
   }
   function Hint() {
-    useSync(shape.note.hint, "from component", { resetOnUnmount: true });
+    useSync(shape.note.hint, "from component");
     return null;
   }
   await render(<App />);
   restore();
   expect(f.get(shape.note.hint)).toBe("from component");
   expect(warnings.some((w) => /keepOnReset/.test(w))).toBe(true);
-  await settle(() => show(false));
-  expect(f.get(shape.note.hint), "reset on unmount").toBe("");
 });
 
 test("useSync under StrictMode ends with the synced value", async () => {
@@ -201,7 +200,7 @@ test("useSync under StrictMode ends with the synced value", async () => {
     );
   }
   function Hint() {
-    useSync(shape.name, "synced", { resetOnUnmount: true });
+    useSync(shape.name, "synced");
     return null;
   }
   const { restore } = captureWarnings();
@@ -216,10 +215,10 @@ test("useSync under StrictMode ends with the synced value", async () => {
 
 // ---------------------------------------------------------------------------
 // useSync on a value node, and under a row provider
-test("useSync on a value node with resetOnUnmount restores the node's initial value", async () => {
+test("useSync on a value node writes it; the value stays after unmount", async () => {
   const s = createStore(shape, { ...empty(), note: "from the server" });
   function Sync({ value }: { value: string }) {
-    useSync(shape.note, value, { resetOnUnmount: true });
+    useSync(shape.note, value);
     return null;
   }
   const screen = await render(
@@ -229,7 +228,7 @@ test("useSync on a value node with resetOnUnmount restores the node's initial va
   );
   expect(s.get(shape.note)).toBe("synced");
   await screen.unmount();
-  expect(s.get(shape.note), "the initial value, not a meta default").toBe("from the server");
+  expect(s.get(shape.note), "kept after unmount").toBe("synced");
 });
 
 test("useSync under a row provider writes that row; after the row is removed it neither writes nor throws", async () => {
