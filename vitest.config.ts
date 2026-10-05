@@ -29,8 +29,8 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['src/**/*.test.ts'],
-          exclude: ['src/react/**'],
+          include: ['test/**/*.test.ts'],
+          exclude: ['test/react/**'],
         },
       },
       {
@@ -51,7 +51,7 @@ export default defineConfig({
         optimizeDeps,
         test: {
           name: 'react',
-          include: ['src/react/**/*.test.tsx'],
+          include: ['test/react/**/*.test.tsx'],
           browser: browser(),
         },
       },

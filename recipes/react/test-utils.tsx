@@ -1,6 +1,6 @@
 // ============================================================
 // Helpers for the React recipe suites (Vitest browser mode +
-// vitest-browser-react). A copy of src/react/test-utils.tsx: recipes never
+// vitest-browser-react). A copy of test/support/test-utils.tsx: recipes never
 // import the core's test helpers.
 //
 //   • render / rerender / unmount come from vitest-browser-react; mounted
