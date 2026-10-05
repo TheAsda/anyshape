@@ -18,7 +18,7 @@ Confirmed by a prototype ([#23](https://github.com/TheAsda/anyshape/issues/23), 
   - rules declared on the key can't reference other fields
   - multiple writers merged by a reducer lose "sync before async" and "a guarded rule is absent"
 - **Reconfigurable handles** (`addRule(store, …)` / `useRules`). Rejected: they push an imperative registry onto consumers. Rules must stay declarative: plain lists built before React.
-- **A fold over part slots**, reviewed on 2026-10-02 ([research](https://github.com/TheAsda/anyshape/blob/research/lazy-fold/docs/research/lazy-fold.md)). Each rule is its own behavior writing a private slot, and the key's definition folds the slots into the key's value. A plain fold only sees results, so every rule runs and async requests start after a sync rule has failed. There are two lazy versions:
+- **A fold over part slots**, reviewed on 2026-10-02 ([#26](https://github.com/TheAsda/anyshape/issues/26), [#45](https://github.com/TheAsda/anyshape/issues/45)). Each rule is its own behavior writing a private slot, and the key's definition folds the slots into the key's value. A plain fold only sees results, so every rule runs and async requests start after a sync rule has failed. There are two lazy versions:
   - **gated slots:** each rule reads the prefix of the slots before it;
   - **demand-scheduled slots:** the runtime parks the writers the fold didn't reach.
 
