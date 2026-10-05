@@ -44,7 +44,7 @@ A definition's steps add capabilities, and each step returns a new definition:
 
 ## Features
 
-A feature is a function that returns several key definitions, spread into `.meta()`:
+A [feature](../../GLOSSARY.md) is a function that returns several key definitions, spread into `.meta()`:
 
 ```ts
 const touched = metaKey(false);
