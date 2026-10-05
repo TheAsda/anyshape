@@ -512,9 +512,9 @@ export abstract class BaseStore<N extends ContainerNode> {
     return (this.substore(node.parent as any) as BaseStore<any>)._ownerOf(node);
   }
 
-  /** @internal one key of a node's live meta */
+  /** @internal one key of a node's live meta; no scope check (get() and subscribe check it) */
   _readMetaRef(ref: MetaRef<any>): any {
-    return (this.getMeta(ref.node) as Meta)[ref.key];
+    return (this._ownerOf(ref.node)._metaOf(ref.node) as Meta)[ref.key];
   }
 
   private _resetMeta(node: AnyNode): void {
@@ -749,7 +749,7 @@ export abstract class BaseStore<N extends ContainerNode> {
     const host = owner._host;
     const sub: Sub = {
       phase, fn, active: true, last: undefined,
-      read: () => (owner._metaOf(node) as Meta)[key],
+      read: () => this._readMetaRef(ref),
       equals: Object.is,
       origins: (log) => originsWhere(log, (e) => e.key === key && lastOf(e.loc).host === host && lastOf(e.loc).node === node),
     };
