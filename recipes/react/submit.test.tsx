@@ -1,11 +1,11 @@
 // Submit and focus in a real DOM: document order, and handleSubmit on a <form>.
 
 import { test, expect } from "vitest";
-import { form, object, field, type InferValue, type RootStore } from "form-lib";
+import { form, object, field, createStore, type InferValue, type RootStore } from "form-lib";
 import { StoreProvider, useForm } from "form-lib/react";
 import { control } from "../features";
 import { rule } from "../validation";
-import { domOrder } from "../focus";
+import { focusFirst, registerFocus } from "../focus";
 import { handleSubmit, submission } from "../submit";
 import { useControl } from "./index";
 import { render, settle } from "./test-utils";
@@ -67,13 +67,18 @@ test("handleSubmit on a real <form>: default prevented, fn gets the values", asy
   expect(defaultPrevented).toBe(true);
 });
 
-test("domOrder: nodes by document position, other targets equal", async () => {
-  const a = document.createElement("i");
-  const b = document.createElement("b");
-  document.body.append(a, b);
-  expect(domOrder(a, b)).toBe(-1);
-  expect(domOrder(b, a)).toBe(1);
-  expect(domOrder(a, { focus() {} })).toBe(0);
-  a.remove();
-  b.remove();
+test("focusFirst: a DOM element and a custom focus handle keep the entries' order", async () => {
+  const s = createStore(shape, empty());
+  const input = document.createElement("input");
+  document.body.append(input);
+  const focused: string[] = [];
+  registerFocus(s, shape.name, { focus: () => focused.push("handle") });
+  registerFocus(s, shape.code, input);
+  const name = { path: "name", ref: shape.name.error, store: s };
+  const code = { path: "code", ref: shape.code.error, store: s };
+  expect(focusFirst([name, code])?.path).toBe("name");
+  expect(focusFirst([code, name])?.path).toBe("code");
+  expect(document.activeElement).toBe(input);
+  expect(focused).toEqual(["handle"]);
+  input.remove();
 });
