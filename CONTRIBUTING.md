@@ -6,7 +6,7 @@ anyshape is pre-release. Any public interface, name or behavior may still change
 
 ## Setup and checks
 
-How to set up a machine, the checks to run before you open a pull request, and what CI runs besides are in [`docs/testing.md`](docs/testing.md#setup-and-commands), with the test layout and conventions.
+How to set up a machine, the checks to run before you open a pull request (tests, types, lint and format), and what CI runs besides are in [`docs/testing.md`](docs/testing.md#setup-and-commands), with the test layout and conventions.
 
 ## Tests
 

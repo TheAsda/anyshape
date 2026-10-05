@@ -10,6 +10,8 @@ Before you open a pull request, run:
 
 - `bun run test`: all four Vitest projects. Each also runs alone: `test:unit`, `test:recipes`, `test:react`, `test:recipes-react`.
 - `bun run typecheck`: `tsc` on the source, the recipes and the type-level tests, then `kiira check` on the code samples in `README.md`, `docs/guide/` and `docs/principles.md`. The type-level tests and the samples are checked only here, never under Vitest, so CI runs both commands.
+- `bun run lint`: oxlint, configured in `.oxlintrc.json`. Its boundary rules check that recipes and examples import only the entries `anyshape` and `anyshape/react` (and the recipes), and that the core, its tests and benches import no recipe. `bun run lint:fix` applies the fixes oxlint can make.
+- `bun run format:check`: oxfmt, configured in `.oxfmtrc.json`, on the code, JSON, YAML and Markdown. `bun run format` rewrites the files.
 
 CI also runs these, which you can run by hand:
 
