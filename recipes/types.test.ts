@@ -40,7 +40,7 @@ test("recipes state the keys they need through ref properties", () => {
   type VisibleTarget = Parameters<typeof visibleWhen>[0];
   type DisableTarget = Parameters<typeof disableWhen>[0];
   type ControlTarget = Parameters<typeof useControl>[0];
-  const named = form({ group: object({ visible: field<boolean>() }) });
+  const named = form(object({ group: object({ visible: field<boolean>() }) }));
 
   expectTypeOf(t.hidden).toExtend<VisibleTarget>();
   expectTypeOf(t.text).not.toExtend<VisibleTarget>();

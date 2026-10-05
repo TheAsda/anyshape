@@ -10,7 +10,7 @@ import { watchOrigins } from "../test/harness";
 import { StoreProvider, useStore, useValue, useField, useArray } from "./index";
 import { render, settle, renders } from "./test-utils";
 
-const shape = form({
+const shape = form(object({
   name: field<string>().meta(control()),
   agree: field<boolean>().meta(control()),
   age: field<number>().meta(control()),
@@ -21,7 +21,7 @@ const shape = form({
   lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
     create: () => ({ sku: "", qty: 1 }),
   }),
-});
+}));
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 
@@ -179,7 +179,7 @@ test("object substore provider and an explicit store", async () => {
 
 test("resolution errors", async () => {
   const s = createStore(shape, initial());
-  const other = form({ x: field<string>() });
+  const other = form(object({ x: field<string>() }));
   const caught: Record<string, string> = {};
   function Read({ label, read }: { label: string; read: () => unknown }) {
     try {
@@ -283,7 +283,7 @@ test("useArray: the list re-renders on structure only; a row edit re-renders tha
 });
 
 test("useArray inside a row provider resolves nested arrays", async () => {
-  const f = form({ groups: array(object({ items: array(object({ v: field<string>() })) })) });
+  const f = form(object({ groups: array(object({ items: array(object({ v: field<string>() })) })) }));
   const s = createStore(f, { groups: [{ items: [{ v: "a" }, { v: "b" }] }] });
   const group = s.substore(f.groups).itemAt(0);
   function Items() {

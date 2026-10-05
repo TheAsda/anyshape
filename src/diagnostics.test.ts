@@ -10,21 +10,21 @@ import { deferred, flush } from "./test/harness";
 import { validation } from "./test/features";
 import { required, rule } from "./test/rules";
 
-const shape = form({
+const shape = form(object({
   code: field<string>(),
   name: field<string>(),
   rows: array(object({ sku: field<string>(), title: field<string>() })),
-});
+}));
 type Values = InferValue<typeof shape>;
 const R = shape.rows.item;
 const initial = (): Values => ({ code: "a", name: "", rows: [{ sku: "x", title: "" }, { sku: "y", title: "" }] });
 
 /** Combined `error` keys, on the root and in rows. */
-const signup = form({
+const signup = form(object({
   email: field<string>().meta(validation()),
   copy: field<string>(),
   lines: array(object({ email: field<string>().meta(validation()) })),
-});
+}));
 const L = signup.lines.item;
 const signupValues = () => ({ email: "", copy: "", lines: [{ email: "" }, { email: "" }] });
 
@@ -188,12 +188,12 @@ describe("T · Probe", () => {
 });
 
 describe("T · Flush budget", () => {
-  const order = form({
+  const order = form(object({
     lines: array(object({ qty: field<number>(), total: field<number>() })),
     sum: field<number>(),
     note: field<string>(),
     profile: object({ size: field<number>() }),
-  });
+  }));
   const O = order.lines.item;
   const orderValues = () => ({ lines: [{ qty: 1, total: 0 }, { qty: 2, total: 0 }, { qty: 3, total: 0 }], sum: 0, note: "", profile: { size: 0 } });
   /** A behavior that takes `ms` per run and changes `write`, if any. */

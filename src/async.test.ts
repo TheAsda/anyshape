@@ -8,12 +8,12 @@ import {
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { deferred, flush } from "./test/harness";
 
-const shape = form({
+const shape = form(object({
   code: field<string>(),
   name: field<string>(),
   region: field<string>(),
   rows: array(object({ sku: field<string>(), title: field<string>() })),
-});
+}));
 type Values = InferValue<typeof shape>;
 const R = shape.rows.item;
 const initial = (): Values => ({ code: "a", name: "", region: "", rows: [{ sku: "x", title: "" }] });

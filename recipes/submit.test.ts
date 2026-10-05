@@ -172,19 +172,19 @@ describe("Submit: submittable nodes", () => {
   });
 
   test("a store whose own node does not declare submission() is rejected", ({ store: s }) => {
-    const plain = createStore(form({ name: field<string>().meta(control()) }), { name: "" });
+    const plain = createStore(form(object({ name: field<string>().meta(control()) })), { name: "" });
     // @ts-expect-error – the root has no submission()
     expect(() => handleSubmit(plain, async () => {})).toThrow(/submission\(\)/);
     // @ts-expect-error – still rejected on a second call: nothing is cached
     expect(() => handleSubmit(plain, async () => {}), "a second call").toThrow(/submission\(\)/);
-    const section = form({ step: object({ x: field<string>() }) });
+    const section = form(object({ step: object({ x: field<string>() }) }));
     // @ts-expect-error – a section is submittable only if it declares submission() itself
     expect(() => handleSubmit(createStore(section, { step: { x: "" } }).substore(section.step), async () => {})).toThrow(/"step"/);
     expect(() => handleSubmit(s.substore(shape.rows).itemAt(0), async () => {})).not.toThrow();
   });
 
   test("a section that declares submission() is submittable through its own store", async () => {
-    const wizard = form({ step: object({ x: field<string>().meta(control()) }).meta(submission()) });
+    const wizard = form(object({ step: object({ x: field<string>().meta(control()) }).meta(submission()) }));
     const s = createStore(wizard, { step: { x: "a" } });
     const got: unknown[] = [];
     await handleSubmit(s.substore(wizard.step), (formData) => void got.push(formData))();
