@@ -55,7 +55,7 @@ store.set(shape.loyaltyNumber, "");
 store.get(shape.promoCode.disabled); // false
 ```
 
-`contribute(ref, payload, declaration)` takes the node's reference to the key, a payload of the key's payload type, and the parts of a declaration: `name`, `triggers`, `reads` and `when`. A payload of another type doesn't compile, and neither does contributing to a key declared without `combine`. Contributions are registered like behaviors: `b.add`, `createStore`'s `behaviors`, `store.addBehavior`.
+`contribute(ref, payload, declaration)` takes the node's reference to the key, a payload of the key's payload type, and the parts of a declaration: `name`, `triggers`, `reads` and `when`. A payload of another type doesn't compile, and neither does contributing to a key declared without `combine`. Contributions are registered like behaviors: `b.add`, `createStore`'s `behaviors`, `store.addBehavior`. A key's default can also be a contribution: every node that declares the key adds it ([meta-keys.md](meta-keys.md#a-keys-default-behavior)).
 
 A contribution whose guard fails is absent: the owner recomputes without it. Removing a contribution has the same effect, and when the last one goes, the key returns to whatever the owner computes from none.
 
@@ -103,7 +103,7 @@ const datesStore = createStore(
 
 ## How the validation recipe uses it
 
-The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts) is built this way. Its `error` key is combined, and `rule(node, check)` and `asyncRule(node, check)` are contributions to it. The owner runs a field's sync rules in order until one fails, then its async rules if they all pass, and writes the first message. `validation()` is the [feature](../../GLOSSARY.md) that declares `error` on a node. Because validation is a [recipe](../../GLOSSARY.md) on top of combined keys, the [core](../../GLOSSARY.md) reserves no error slot; the [design record](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0001-validation-is-a-recipe-on-key-contributions.md) explains the choice.
+The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts) is built this way. Its `error` key is combined, and `rule(node, check)` and `asyncRule(node, check)` are contributions to it. The owner runs a field's sync rules in order until one fails, then its async rules if they all pass, and writes the first message. The recipe's `defined` key contributes a backstop that runs between the two: when the sync rules pass and the value is `undefined`, the message is "Required" and the async rules don't start. The key's default is that contribution, so a field that declares `defined` can't be left empty even when no rule says so. `validation()` is the [feature](../../GLOSSARY.md) that declares `error` on a node. Because validation is a [recipe](../../GLOSSARY.md) on top of combined keys, the [core](../../GLOSSARY.md) reserves no error slot; the [design record](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0001-validation-is-a-recipe-on-key-contributions.md) explains the choice.
 
 ## Common mistakes
 
