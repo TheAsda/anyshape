@@ -145,6 +145,75 @@ describe("Registration", () => {
   });
 });
 
+describe("Default contributions", () => {
+  /** Lists the names of its parts, to observe a default contribution's name. */
+  const names = metaKey<readonly string[], string>([]).combine((self, key) => ({
+    triggers: [self],
+    writes: [key],
+    run: (ctx) =>
+      ctx.set(
+        key,
+        ctx.parts.map((p) => p.name),
+      ),
+  }));
+  const marked = metaKey(true)
+    .uses(tags)
+    .behavior((_self, _key, [t]) => contribute(t, "marked"));
+  const named = metaKey(true)
+    .uses(names)
+    .behavior((_self, _key, [n]) => contribute(n, ""));
+
+  test("a key whose default is a contribution feeds the combined key on every node that declares it, rows added later included", () => {
+    const sh = form(
+      object({
+        a: field<string>().meta({ tags, mark: marked }),
+        b: field<string>().meta({ tags }),
+        rows: array(object({ x: field<number>().meta({ tags, mark: marked }) }), { create: () => ({ x: 0 }) }),
+      }),
+    );
+    const X = sh.rows.item.x;
+    const s = createStore(sh, { a: "", b: "", rows: [{ x: 0 }] });
+    expect([s.get(sh.a.tags), s.get(sh.b.tags)]).toEqual([["marked"], []]);
+    const rows = s.substore(sh.rows);
+    rows.append();
+    expect(rows.items().map((r) => r.get(X.tags))).toEqual([["marked"], ["marked"]]);
+  });
+
+  test("a default contribution is named <path>#<key>", () => {
+    const sh = form(object({ a: field<string>().meta({ names, named }) }));
+    const s = createStore(sh, { a: "" });
+    expect(s.get(sh.a.names)).toEqual(["a#named"]);
+  });
+
+  test("a default contribution may only use its own node", () => {
+    let other: unknown;
+    const locked = metaKey(true).behavior(() => contribute(other as typeof shape.a.tags, "locked"));
+    const sh = form(object({ x: field<string>().meta({ locked }), y: field<string>().meta({ tags }) }));
+    other = sh.y.tags;
+    expect(() => createStore(sh, { x: "", y: "" })).toThrow(
+      'Contribution "x#locked": default contributions may only use their own node ("x"), got "y#tags"',
+    );
+
+    const watching = metaKey(true)
+      .uses(tags)
+      .behavior((_self, _key, [t]) => contribute(t, "w", { triggers: [other as typeof shape.mode] }));
+    const sh2 = form(object({ x: field<string>().meta({ tags, watching }), y: field<string>() }));
+    other = sh2.y;
+    expect(() => createStore(sh2, { x: "", y: "" })).toThrow(
+      'Contribution "x#watching": default contributions may only use their own node ("x"), got "y"',
+    );
+  });
+
+  test("a default contribution to a key without `combine` is rejected", () => {
+    const note = metaKey("");
+    const noting = metaKey(true)
+      .uses(note)
+      .behavior((_self, _key, [n]) => contribute(n as any, "x"));
+    const sh = form(object({ x: field<string>().meta({ note, noting }) }));
+    expect(() => createStore(sh, { x: "" })).toThrow(/"x#note" has no `combine`/);
+  });
+});
+
 describe("Uses", () => {
   /** Set to force a recheck; the owner clears it. */
   const forced = metaKey(false);

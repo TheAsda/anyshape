@@ -71,3 +71,11 @@ _Avoid_: loading, validating, busy
 **Tally**:
 A read-only value the core derives over the tree: a count of a key over a subtree (`countIn`), the pending targets in a subtree (`pendingIn`), or whether one target is pending (`pendingOf`). Its changes carry no origins, so a behavior with an origins filter can't trigger on one.
 _Avoid_: aggregate (that is the step a key declares to be counted)
+
+**Stored type**:
+What a node's value can be while the form is being edited, including the empty part a field starts with or is cleared to. Reads return it.
+_Avoid_: input type, raw type
+
+**Checked type**:
+What a node's value is once its checks pass: the stored type without the empty part a check rules out. The submit boundary hands it over.
+_Avoid_: output type, valid type, parsed type

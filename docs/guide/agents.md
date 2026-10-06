@@ -166,6 +166,25 @@ const checkedStore = createStore(checked, { code: "" }, { behaviors: checks });
 
 **The same `useBehaviors` in a component rendered twice.** Each copy registers the behavior again, so its target has two writers and the second registration throws. Declare such behaviors once, in `defineBehaviors` or a common parent.
 
+**Typing a field that starts empty as its filled type.** A choice the user hasn't made yet is `undefined`. Typing the field as its filled type and forcing the empty start compiles, but every read then claims a value that isn't there, and the lie comes back on going back a step, on `reset()` and on a loaded draft.
+
+```ts
+type DeliveryType = "Electronic" | "Printed";
+
+const forced = form(object({ deliveryType: field<DeliveryType>().meta({ error }) }));
+const forcedStore = createStore(forced, { deliveryType: undefined as never });
+forcedStore.get(forced.deliveryType).toLowerCase(); // compiles, throws at run time
+```
+
+Fix: type what the field holds while it is edited, `field<DeliveryType | undefined>()`, and narrow with `=== undefined` where a value is needed. To require it, declare the validation recipe's `defined` key, `.meta(control(), { defined })`: its `error` says "Required" while the value is `undefined`, and the submit recipe's `handleSubmit` hands its `fn` the value without `undefined` ([your-side.md](your-side.md#forms-in-steps)).
+
+```ts
+const honest = form(object({ deliveryType: field<DeliveryType | undefined>().meta({ error }) }));
+const honestStore = createStore(honest, { deliveryType: undefined });
+const chosen = honestStore.get(honest.deliveryType);
+if (chosen !== undefined) chosen.toLowerCase();
+```
+
 **Type errors.** These fail to compile:
 
 - reading or writing a meta key the node doesn't declare, such as `store.get(shape.price.error)` here;

@@ -1,6 +1,6 @@
 # What your app owns
 
-anyshape computes the form's state and gives you the tools to act on it. How the form looks and how it talks to a server are yours: when an error shows, how hidden and disabled fields render, how text becomes a number, how a server's errors land on fields, and what submitting does. Each section below shows the usual way to do it. The [principles](../principles.md) explain why the library stops here.
+anyshape computes the form's state and gives you the tools to act on it. How the form looks and how it talks to a server are yours: when an error shows, how hidden and disabled fields render, how text becomes a number, how a server's errors land on fields, what submitting does, and how a form in steps moves on. Each section below shows the usual way to do it. The [principles](../principles.md) explain why the library stops here.
 
 Server errors are first shown in [stage 12](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage12).
 
@@ -9,7 +9,18 @@ Server errors are first shown in [stage 12](https://github.com/TheAsda/anyshape/
 An error usually shouldn't appear while the user is still typing their first character. When it does appear is a decision over a few keys: the error itself, whether the field was left or the form submitted, and whether a check is still running.
 
 ```tsx
-import { form, object, field, metaKey, createStore, countIn, pendingOf, type FieldNode, type MetaRef } from "anyshape";
+import {
+  form,
+  object,
+  field,
+  metaKey,
+  createStore,
+  countIn,
+  pendingIn,
+  pendingOf,
+  type FieldNode,
+  type MetaRef,
+} from "anyshape";
 import { useField, useValue } from "anyshape/react";
 
 const error = metaKey<string | undefined>(undefined).aggregate((message) => message !== undefined);
@@ -125,9 +136,39 @@ async function submit(send: (values: { startDate: string; travelers: { name: str
 }
 ```
 
-The submit recipe's `handleSubmit(store, fn)` is one complete version: it reveals every error, validates, waits for async checks, calls `fn` with the form's value when valid, and otherwise focuses the first error ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/submit.ts)). Copy it and change what your forms need.
+The submit recipe's `handleSubmit(store, fn)` is one complete version: it reveals every error, validates, waits for async checks, calls `fn` with the form's value when valid, and otherwise focuses the first error ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/submit.ts)). `fn` receives the [checked type](../../GLOSSARY.md): the value without `undefined` in the fields that declare the validation recipe's `defined` key, since validating proved they hold a value. Copy it and change what your forms need.
 
 Focusing that first error needs the DOM elements, which aren't form state: the focus recipe keeps them in its own registry beside the form ([react.md](react.md#state-beside-the-form)).
+
+## Forms in steps
+
+A form in steps asks for a delivery type first, then offers the products for that type. The type starts empty: the user hasn't chosen yet, and comes back to an empty field after `reset()` or when an earlier step is cleared. Its type says so.
+
+- **A field that starts empty** is `field<DeliveryType | undefined>().meta(control(), { defined })`. Its [stored type](../../GLOSSARY.md) keeps `undefined`. The validation recipe's `defined` key adds "Required" to its `error` while the value is `undefined`, after the author's own rules, so the message of a `required` rule you add wins ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts)).
+- **A step is a section with `submission()`**, and its Next button is `handleSubmit(store.substore(step), fn)`. It reveals and validates that step only, and `fn` receives the step's checked type: `{ deliveryType: DeliveryType; email: string }`.
+- **Reads keep the stored type.** Step 2 reads `deliveryType` as `DeliveryType | undefined`, in a component and in a behavior, and narrows with `=== undefined`. The value can still be empty there: the user can go back and clear it.
+- **A whole-step gate** reads the step's error count and pending checks. Read both before combining them: a hook call skipped by `&&` breaks React's hook order.
+
+```tsx
+type DeliveryType = "Electronic" | "Printed";
+
+const order = form(
+  object({
+    delivery: object({ deliveryType: field<DeliveryType | undefined>().meta({ error }) }),
+    items: object({ sku: field<string | undefined>().meta({ error }) }),
+  }),
+);
+
+function ProductStep() {
+  const errors = useValue(countIn(order.delivery, error));
+  const checking = useValue(pendingIn(order.delivery, error));
+  const deliveryType = useValue(order.delivery.deliveryType); // DeliveryType | undefined
+  if (errors > 0 || checking > 0 || deliveryType === undefined) return <p>Choose a delivery type first</p>;
+  return <p>Products for {deliveryType.toLowerCase()} delivery</p>;
+}
+```
+
+Forcing the filled type instead, as `field<DeliveryType>()` with `undefined as never` or `"" as DeliveryType` for the start, compiles once and then lies: going back and clearing the field, `reset()` and a loaded draft all put the empty value back where the type says there is none.
 
 ## See also
 

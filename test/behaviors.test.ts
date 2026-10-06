@@ -13,6 +13,7 @@ import {
   pendingIn,
   pendingOf,
   metaKey,
+  contribute,
   type InferValue,
   type BehaviorErrorInfo,
   type StoreOptions,
@@ -20,7 +21,7 @@ import {
   type BehaviorContext,
   type WritableRef,
 } from "../src/index";
-import { control, visible, disabled, touched, dirty } from "./support/features";
+import { control, visible, disabled, touched, dirty, error } from "./support/features";
 import * as limits from "./support/fixtures/limits";
 import { rule, max } from "./support/rules";
 
@@ -445,11 +446,35 @@ describe("J · Registration checks", () => {
     const setTrue = (target: any) =>
       defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
     expect(() => createStore(shape, initial(), { behaviors: setTrue(shape.name.touched) })).toThrow(
-      /"name#touched" is already written by "name#touched"/,
+      'Behavior "w": "name#touched" is written only by its key\'s default behavior',
     );
     const s = createStore(shape, initial(), { behaviors: setTrue(shape.name.revealed) });
     s.set(shape.title, "changed");
     expect(s.get(shape.name.revealed)).toBe(true);
+    s.set(shape.name, "Bo", { origin: "user" });
+    expect(s.get(shape.name.touched), "its own default behavior still writes it").toBe(true);
+  });
+
+  test("a key whose default is a contribution has no writer: a behavior writing it is rejected", () => {
+    const required = metaKey(true)
+      .uses(error)
+      .behavior((_self, _key, [e]) => contribute(e, (v) => (v === "" ? "Required" : undefined)));
+    const sh = form(object({ f: field<string>().meta({ error, required }), g: field<string>() }));
+    const w = defineBehavior({ name: "w", triggers: [sh.g], writes: [sh.f.required], run: () => {} });
+    expect(() => createStore(sh, { f: "", g: "" }, { behaviors: w })).toThrow(
+      'Behavior "w": "f#required" is written only by its key\'s default behavior',
+    );
+    expect(createStore(sh, { f: "", g: "" }).get(sh.f.error)).toBe("Required");
+  });
+
+  test("another key's default behavior may not write a key with a default behavior", () => {
+    const touchedToo = metaKey(false)
+      .uses(touched)
+      .behavior((self, _key, [t]) => ({ triggers: [self], writes: [t], run: (ctx) => ctx.set(t, true) }));
+    const sh = form(object({ f: field<string>().meta({ touched, touchedToo }) }));
+    expect(() => createStore(sh, { f: "" })).toThrow(
+      'Behavior "f#touchedToo": "f#touched" is written only by its key\'s default behavior',
+    );
   });
 
   test("cycles are rejected at registration, nothing is registered", ({ store: s }) => {

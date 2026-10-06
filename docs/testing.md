@@ -33,37 +33,37 @@ The projects are defined in `vitest.config.ts`:
 
 Each layer has an ID. A `describe` block is named after the layer it tests (`"F · Rule 3 – array structure channel"`), so keep the IDs when you add a section.
 
-| File                              | Layer   | Area                                                                                                                                   |
-| --------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `test/shape.test.ts`              | A       | node instantiation, identity, parents, templates, structural checks                                                                    |
-| `test/lens.test.ts`               | B       | lens unit tests                                                                                                                        |
-| `test/meta.test.ts`               | C       | `.meta()`, key definitions, meta refs, closed meta                                                                                     |
-| `test/store.test.ts`              | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers                          |
-| `test/notifications.test.ts`      | F       | the notification rules, flush                                                                                                          |
-| `test/origins.test.ts`            | G       | origins, baselines, reset (recompute and `keepOnReset` included)                                                                       |
-| `test/counts.test.ts`             | H       | `countIn`, `collect` by definition, aggregate keys                                                                                     |
-| `test/behaviors.test.ts`          | J–L     | behavior runtime, scopes, ordering, writers, replacement, `touched` / `dirty`                                                          |
-| `test/contributions.test.ts`      | L′      | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and duplicates                                         |
-| `test/async.test.ts`              | J       | async runs: cancellation, reruns with their cause, transactional `ctx.state`, kept work, `settle()`, definition traces                 |
-| `test/pending.test.ts`            | H       | `pendingIn` / `pendingOf` for sync and async runs                                                                                      |
-| `test/diagnostics.test.ts`        | T       | development diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production or without `process` |
-| `recipes/validation.test.ts`      | M       | rules, queues, async, `validate()`                                                                                                     |
-| `recipes/rules.test.ts`           | N       | ready-made rules, messages, reference limits, guarded by a builder block                                                               |
-| `recipes/behaviors.test.ts`       | N       | ready-made behaviors, `exclusive`, builder                                                                                             |
-| `recipes/features.test.ts`        | N       | the default behaviors of `touched` and `dirty`                                                                                         |
-| `test/paths.test.ts`              | O       | `resolvePath`, server errors                                                                                                           |
-| `recipes/submit.test.ts`          | O       | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition                                |
-| `recipes/focus.test.ts`           | O       | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips                |
-| `test/types.test.ts`              | S       | the public type contract (asserted by `tsc`)                                                                                           |
-| `recipes/types.test.ts`           | S       | the recipes' type contract (asserted by `tsc`)                                                                                         |
-| `test/exports.test.ts`            | —       | each entry's public names, as a snapshot; the API tables in `docs/guide/agents.md` list exactly those names                            |
-| `test/integration.test.ts`        | INT     | trip-booking scenarios across all layers                                                                                               |
-| `test/react/react.test.tsx`       | P       | provider, resolution, `useValue`, `useField`, `useArray`                                                                               |
-| `test/react/form.test.tsx`        | Q       | `useForm`, `useSync`                                                                                                                   |
-| `test/react/behaviors.test.tsx`   | R       | `useBehaviors`                                                                                                                         |
-| `test/react/integration.test.tsx` | INT     | the trip booking rendered                                                                                                              |
-| `recipes/react/control.test.tsx`  | P       | `useControl`, `showError`, `focusRef`, adapters                                                                                        |
-| `recipes/react/submit.test.tsx`   | O       | DOM focus order, `handleSubmit` on a real `<form>`, DOM elements beside custom focus handles                                           |
+| File                              | Layer   | Area                                                                                                                                             |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `test/shape.test.ts`              | A       | node instantiation, identity, parents, templates, structural checks                                                                              |
+| `test/lens.test.ts`               | B       | lens unit tests                                                                                                                                  |
+| `test/meta.test.ts`               | C       | `.meta()`, key definitions, meta refs, closed meta                                                                                               |
+| `test/store.test.ts`              | D, E, I | stores, scopes, `scopeStore`, `assertInScope`, reference API, own-node meta keys, row identity, array helpers                                    |
+| `test/notifications.test.ts`      | F       | the notification rules, flush                                                                                                                    |
+| `test/origins.test.ts`            | G       | origins, baselines, reset (recompute and `keepOnReset` included)                                                                                 |
+| `test/counts.test.ts`             | H       | `countIn`, `collect` by definition, aggregate keys                                                                                               |
+| `test/behaviors.test.ts`          | J–L     | behavior runtime, scopes, ordering, writers, replacement, `touched` / `dirty`                                                                    |
+| `test/contributions.test.ts`      | L′      | key contributions: `combine`, `contribute`, parts, in-place update, rows, order and duplicates, default contributions                            |
+| `test/async.test.ts`              | J       | async runs: cancellation, reruns with their cause, transactional `ctx.state`, kept work, `settle()`, definition traces                           |
+| `test/pending.test.ts`            | H       | `pendingIn` / `pendingOf` for sync and async runs                                                                                                |
+| `test/diagnostics.test.ts`        | T       | development diagnostics: the probe's events, the flush budget warning, the DevTools tracks, nothing in production or without `process`           |
+| `recipes/validation.test.ts`      | M       | rules, queues, async, `validate()`, the `defined` backstop                                                                                       |
+| `recipes/rules.test.ts`           | N       | ready-made rules, messages, reference limits, guarded by a builder block                                                                         |
+| `recipes/behaviors.test.ts`       | N       | ready-made behaviors, `exclusive`, builder                                                                                                       |
+| `recipes/features.test.ts`        | N       | the default behaviors of `touched` and `dirty`                                                                                                   |
+| `test/paths.test.ts`              | O       | `resolvePath`, server errors                                                                                                                     |
+| `recipes/submit.test.ts`          | O       | the submit recipe: `handleSubmit`, guard, `submitting`, reveal, submittable nodes matched by definition, a step's substore and its checked value |
+| `recipes/focus.test.ts`           | O       | the focus recipe: `registerFocus` (scope, reset, unregister), out-of-scope nodes rejected, `focusFirst` order and skips                          |
+| `test/types.test.ts`              | S       | the public type contract (asserted by `tsc`)                                                                                                     |
+| `recipes/types.test.ts`           | S       | the recipes' type contract (asserted by `tsc`)                                                                                                   |
+| `test/exports.test.ts`            | —       | each entry's public names, as a snapshot; the API tables in `docs/guide/agents.md` list exactly those names                                      |
+| `test/integration.test.ts`        | INT     | trip-booking scenarios across all layers                                                                                                         |
+| `test/react/react.test.tsx`       | P       | provider, resolution, `useValue`, `useField`, `useArray`                                                                                         |
+| `test/react/form.test.tsx`        | Q       | `useForm`, `useSync`                                                                                                                             |
+| `test/react/behaviors.test.tsx`   | R       | `useBehaviors`                                                                                                                                   |
+| `test/react/integration.test.tsx` | INT     | the trip booking rendered                                                                                                                        |
+| `recipes/react/control.test.tsx`  | P       | `useControl`, `showError`, `focusRef`, adapters                                                                                                  |
+| `recipes/react/submit.test.tsx`   | O       | DOM focus order, `handleSubmit` on a real `<form>`, DOM elements beside custom focus handles, a form in steps                                    |
 
 Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) and `test/support/trip.ts`. The core tests declare their meta keys with the test-local features in `test/support/features.ts` and rules in `test/support/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`. The tests don't share code across that boundary, and the lint's boundary rules keep the core's tests from importing `recipes/`, so the copies are deliberate.
 
@@ -93,22 +93,24 @@ Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) a
 
 When you touch any of these, break it on purpose and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), to registration and disposal (`runtime.ts`) or to the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows up only as a leak.
 
-| Mechanism                                  | Where                                                                                | Expected to fail                                             |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| Unchanged lens write returns the source    | `lens.ts` `propLens` / `composeLens`                                                 | structural sharing, no-op write                              |
-| New row object re-mapped to the same store | `ArrayStore._replaceItem`                                                            | identity through row writes                                  |
-| Older row version re-attaches              | `ArrayStore._sync`                                                                   | undo, both-versions tests                                    |
-| Rule 4: an attachment change notifies      | `BaseStore._visit` (`attachChanged`)                                                 | rule 4 tests                                                 |
-| Per-phase "last seen"                      | `_seen[phase]`                                                                       | behaviors-then-listeners tests                               |
-| Own-origin filter                          | `BehaviorRuntime.onTrigger`                                                          | two-way link tests                                           |
-| Rank ordering                              | `RunOrder.plan` (`order.ts`) / `runNext`                                             | dependency order, K1–K3, K6                                  |
-| Host filter of the run order               | `HostIndex.near` / `readerOf` (`order.ts`)                                           | K5, "Run order between scope hosts", one writer between rows |
-| Index and edge removal on dispose          | `HostIndex.delete`, the commit of `RunOrder.plan` (`order.ts`)                       | collectability (`test:memory`)                               |
-| Buffered writes dropped on error           | `BehaviorRuntime.execute`                                                            | throwing behavior test                                       |
-| Row totals shifted on detach               | `ArrayStore.shiftTotals`                                                             | count removal tests                                          |
-| Reset re-runs init                         | `BehaviorRuntime.reinit`                                                             | reset recompute tests                                        |
-| Reuse of a checked async result            | the `error` key's owner in `recipes/validation.ts` (`ctx.state.checked`, `ctx.keep`) | reuse and late-result tests                                  |
-| Latest-props slots                         | `delegate` in `react/behaviors.ts`                                                   | latest-props tests                                           |
+| Mechanism                                            | Where                                                                                | Expected to fail                                             |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Unchanged lens write returns the source              | `lens.ts` `propLens` / `composeLens`                                                 | structural sharing, no-op write                              |
+| New row object re-mapped to the same store           | `ArrayStore._replaceItem`                                                            | identity through row writes                                  |
+| Older row version re-attaches                        | `ArrayStore._sync`                                                                   | undo, both-versions tests                                    |
+| Rule 4: an attachment change notifies                | `BaseStore._visit` (`attachChanged`)                                                 | rule 4 tests                                                 |
+| Per-phase "last seen"                                | `_seen[phase]`                                                                       | behaviors-then-listeners tests                               |
+| Own-origin filter                                    | `BehaviorRuntime.onTrigger`                                                          | two-way link tests                                           |
+| Rank ordering                                        | `RunOrder.plan` (`order.ts`) / `runNext`                                             | dependency order, K1–K3, K6                                  |
+| Host filter of the run order                         | `HostIndex.near` / `readerOf` (`order.ts`)                                           | K5, "Run order between scope hosts", one writer between rows |
+| Index and edge removal on dispose                    | `HostIndex.delete`, the commit of `RunOrder.plan` (`order.ts`)                       | collectability (`test:memory`)                               |
+| Buffered writes dropped on error                     | `BehaviorRuntime.execute`                                                            | throwing behavior test                                       |
+| Row totals shifted on detach                         | `ArrayStore.shiftTotals`                                                             | count removal tests                                          |
+| Reset re-runs init                                   | `BehaviorRuntime.reinit`                                                             | reset recompute tests                                        |
+| Reuse of a checked async result                      | the `error` key's owner in `recipes/validation.ts` (`ctx.state.checked`, `ctx.keep`) | reuse and late-result tests                                  |
+| Default contribution registered                      | `defaultBehaviors` (`runtime.ts`)                                                    | the `defined` backstop tests                                 |
+| A key with `.behavior()` written only by its default | the write check (`runtime.ts`)                                                       | the writer tests                                             |
+| Latest-props slots                                   | `delegate` in `react/behaviors.ts`                                                   | latest-props tests                                           |
 
 ## Benchmarks and memory
 

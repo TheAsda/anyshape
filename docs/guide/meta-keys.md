@@ -84,6 +84,8 @@ const markTouched = metaKey(false).behavior((self, key) => ({
 }));
 ```
 
+A key with `.behavior()` is written only by its own default behavior. Registration rejects any other behavior that lists it in `writes`, the default behavior of another key included.
+
 A default behavior is confined to its own node: its value, its meta keys and `initialOf(self)`. Registration rejects anything else. A key is defined before any node exists, and a reusable piece of [shape](../../GLOSSARY.md) can appear in several places, so its own node is the only thing it can name. The confinement also means a key never acts on a distant part of the form.
 
 `.uses(...definitions)` hands the default behavior the node's references to other keys, matched by definition. The node must declare them too; registration says so if it doesn't. `.uses` grants no access by itself: list the references in `triggers`, `reads` or `writes` as usual.
@@ -99,6 +101,26 @@ const showError = metaKey(false)
 
 const contact = form(object({ phone: field<string>().meta({ error, touched: markTouched, showError }) }));
 ```
+
+The factory may return one [contribution](../../GLOSSARY.md) instead of a config, to a combined key it uses ([contributions.md](contributions.md)). Every node that declares the key adds that contribution, named `<path>#<key>` unless it has a name, with the same confinement to its own node. The key itself then has no writer: it is a mark whose value nothing reads. Here every `locked` field carries a reason in its `disabled`:
+
+```ts
+import { contribute } from "anyshape";
+
+const lockReasons = metaKey<boolean, string>(false).combine((self, key) => ({
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts.length > 0),
+}));
+const locked = metaKey(true)
+  .uses(lockReasons)
+  .behavior((self, key, [disabled]) => contribute(disabled, "Set by your administrator"));
+
+const account = form(object({ plan: field<string>().meta({ disabled: lockReasons, locked }) }));
+const accountStore = createStore(account, { plan: "basic" });
+accountStore.get(account.plan.disabled); // true
+```
+
+The factory returns one contribution, never a list. A key that needs more is a combined key itself, or the reasons go into one payload.
 
 ## Counting and sweeping
 
@@ -137,6 +159,7 @@ const messages = tripStore
 - **`isCounted` true for the default.** `.aggregate()` throws: untouched nodes must count as zero.
 - **Counting a key no node under the counted node declares.** `countIn` throws. Count from a node whose subtree declares the key.
 - **Writing a combined key from a behavior.** Registration rejects it; contribute to the key instead ([contributions.md](contributions.md)).
+- **Writing a key that has `.behavior()` from another behavior.** Registration rejects it: `Behavior "b": "x#dirty" is written only by its key's default behavior`. Declare another key for the other writer, or change the default behavior.
 
 ## See also
 
