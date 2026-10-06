@@ -72,7 +72,7 @@ export function TextField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const { focusRef, ...c } = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -117,7 +117,7 @@ export function NumberField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const { focusRef, ...c } = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -152,7 +152,7 @@ export function NumberField({
 }
 
 export function CheckboxField({ node, label }: { node: BooleanNode; label: string }) {
-  const { focusRef, ...c } = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   return (
     <div className="field field--checkbox">
       <label className="field__label">

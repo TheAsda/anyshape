@@ -221,7 +221,7 @@ function RequesterSection() {
  */
 function DepartmentField() {
   const form = useStore<RootStore<typeof shape>>();
-  const { focusRef, ...c } = useControl(shape.requester.department);
+  const { control: c, focusRef } = useControl(shape.requester.department);
   const budget = useValue(shape.requester.budget);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
