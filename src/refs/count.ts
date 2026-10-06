@@ -1,7 +1,7 @@
 // countIn(node, def): nodes in a subtree whose key declared with `def` counts
 // (MetaKeyDef.aggregate), under whatever name. Read-only, on the tally channel.
 
-import { FIELDS, META_DEFS, countSlotOf } from "../internal.js";
+import { FIELDS, META_DEFS, countSlotOf, keyAt } from "../internal.js";
 import type { Countable, MetaKeyDef } from "../meta.js";
 import { ObjectNode, ArrayNode, type AnyNode } from "../shape.js";
 import { isAncestorOrSelf } from "../tree.js";
@@ -51,13 +51,12 @@ const countRefs = new WeakMap<AnyNode, Map<MetaKeyDef<any, any>, CountRef>>();
 let countIds = 0;
 
 /**
- * Where the subtree first declares `def` (`key "name" on "path"`), or
+ * Where the subtree first declares `def`: the node and the name, or
  * undefined. Rows share the array item template's declarations, so walking
  * the template covers them.
  */
-function declaration(node: AnyNode, def: MetaKeyDef<any, any>): string | undefined {
-  for (const [name, d] of Object.entries(node[META_DEFS]))
-    if (d === def) return `key "${name}" on "${node.path || "<root>"}"`;
+function declaration(node: AnyNode, def: MetaKeyDef<any, any>): { node: AnyNode; name: string } | undefined {
+  for (const [name, d] of Object.entries(node[META_DEFS])) if (d === def) return { node, name };
   if (node instanceof ObjectNode) {
     for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) {
       const found = declaration(child, def);
@@ -81,7 +80,7 @@ export function countIn(node: AnyNode, def: MetaKeyDef<any, any, any> & Countabl
   if (!ref) {
     const declared = declaration(node, def);
     const problem = !def._steps.aggregate
-      ? `${declared ?? "the key"} has no aggregate`
+      ? `${declared ? `key ${keyAt(declared.node, declared.name)}` : "the key"} has no aggregate`
       : !declared
         ? "no node in the subtree declares the key"
         : undefined;
