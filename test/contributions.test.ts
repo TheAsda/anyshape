@@ -93,11 +93,13 @@ describe("Registration", () => {
 
   test("`combine` and `behavior` are mutually exclusive, in either order", () => {
     expect(() =>
+      // @ts-expect-error – the runtime check is what this test pins
       metaKey(0)
         .behavior(() => ({ run() {} }))
         .combine(() => ({ run() {} })),
     ).toThrow(/mutually exclusive/);
     expect(() =>
+      // @ts-expect-error – the runtime check is what this test pins
       metaKey(0)
         .combine(() => ({ run() {} }))
         .behavior(() => ({ run() {} })),
@@ -208,11 +210,13 @@ describe("Uses", () => {
 
   test(".uses() comes before .combine() and .behavior(): the refs they receive are fixed then", () => {
     expect(() =>
+      // @ts-expect-error – the runtime check is what this test pins
       metaKey(0)
         .combine(() => ({ run() {} }))
         .uses(forced),
     ).toThrow(/call .uses\(\) before .combine\(\) or .behavior\(\)/);
     expect(() =>
+      // @ts-expect-error – the runtime check is what this test pins
       metaKey(0)
         .behavior(() => ({ run() {} }))
         .uses(forced),
