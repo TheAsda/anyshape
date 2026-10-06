@@ -37,6 +37,8 @@ import {
   pendingOf,
   MetaRef,
   type AnyNode,
+  type ArrayNode,
+  type InferValue,
   type AnyRef,
   type RefValue,
   type Contribution,
@@ -64,8 +66,11 @@ type AsyncPart = {
   debounce: number;
 };
 
+/** PROTOTYPE(#128): the backstop the `defined` key contributes. */
+type DefinedPart = { kind: "defined" };
+
 /** What a rule contributes to `error`. */
-export type RulePart = SyncPart | AsyncPart;
+export type RulePart = SyncPart | AsyncPart | DefinedPart;
 
 /**
  * Which runs may start an async rule's check: "user" – a user edit (the
@@ -155,6 +160,8 @@ export const error = metaKey<string | undefined, RulePart>(undefined)
         }
         if (found !== undefined) return result(found);
       }
+      // PROTOTYPE(#128): the backstop runs after the author's sync rules, before the async ones.
+      if (value === undefined && ctx.parts.some((p) => p.payload.kind === "defined")) return result("Required");
 
       const asyncParts = ctx.parts.filter((p): p is Part<AsyncPart> => p.payload.kind === "async");
       if (!asyncParts.length) return result(undefined);
@@ -187,6 +194,47 @@ export const error = metaKey<string | undefined, RulePart>(undefined)
         }, failed);
     },
   }));
+
+// ---- PROTOTYPE(#128): the `defined` key and the checked type ----------
+
+declare const DefinedBrand: unique symbol;
+/** The value type of `defined`: the mark InferChecked looks for. Nothing else has it. */
+export type Defined = true & { readonly [DefinedBrand]: true };
+
+/**
+ * The field's value is not undefined: a fixed "Required" backstop in its
+ * `error`, after its sync rules. InferChecked drops undefined from the field.
+ */
+export const defined = metaKey<Defined>(true as Defined)
+  .uses(error)
+  .behavior((self, _key, [err]) => contribute(err, { kind: "defined" }, { name: `${self.path || "<root>"}#defined` }));
+
+/** True when some property of N, under any name, is a ref to a `Defined` key. */
+type HasDefined<N> = true extends {
+  [K in keyof N]-?: 0 extends 1 & N[K]
+    ? false
+    : N[K] extends MetaRef<infer V, any>
+      ? V extends Defined
+        ? true
+        : false
+      : false;
+}[keyof N]
+  ? true
+  : false;
+
+/** An object node: every key of its value is a child of the node. */
+type IsObjectNode<N> =
+  InferValue<N> extends object ? ([Exclude<keyof InferValue<N>, keyof N>] extends [never] ? true : false) : false;
+
+type Walk<N> =
+  N extends ArrayNode<infer I, any>
+    ? InferChecked<I>[]
+    : IsObjectNode<N> extends true
+      ? { [K in keyof InferValue<N>]: K extends keyof N ? InferChecked<N[K]> : never }
+      : InferValue<N>;
+
+/** What the node holds once its checks pass: its stored type, without undefined where `defined` is declared. */
+export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, undefined> : Walk<N>;
 
 /** `error`, written by the field's rules, and `forced` for validate(). */
 export const validation = () => ({ error, forced });

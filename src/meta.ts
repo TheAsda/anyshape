@@ -7,7 +7,7 @@
 // Features are plain objects of key definitions (see recipes/features.ts).
 // ============================================================
 
-import type { BehaviorConfig, OwnerConfig } from "./behaviors.js";
+import type { BehaviorConfig, Contribution, OwnerConfig } from "./behaviors.js";
 import type { MetaRef } from "./refs/meta.js";
 import type { ShapeNode } from "./shape.js";
 
@@ -56,7 +56,8 @@ export type UsedRefs<U extends readonly AnyMetaKeyDef[]> = {
 export interface MetaKeySteps<V, P, U extends readonly AnyMetaKeyDef[]> {
   aggregate?(value: V): boolean;
   uses?: U;
-  behavior?(self: any, key: MetaRef<V, P>, uses: UsedRefs<U>): BehaviorConfig;
+  // PROTOTYPE(#128): a default behavior may be one contribution to a used key.
+  behavior?(self: any, key: MetaRef<V, P>, uses: UsedRefs<U>): BehaviorConfig | Contribution<any>;
   combine?(self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>): OwnerConfig<P>;
 }
 
@@ -134,7 +135,7 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    */
   behavior<S extends MetaKeyDef<V, P, U>>(
     this: S & Not<S, Owned, "`combine` and `behavior` are mutually exclusive">,
-    factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig,
+    factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig | Contribution<any>,
   ): S & Owned {
     return new MetaKeyDef<V, P, U>(this.defaultValue, this.options, { ...this._steps, behavior: factory }) as S & Owned;
   }

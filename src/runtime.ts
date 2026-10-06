@@ -1255,14 +1255,20 @@ export class BehaviorRuntime implements RuntimeHooks {
  * Checks every key's uses on the way, combined keys included: their owners
  * are created later, with the first contribution.
  */
-export function defaultBehaviors(root: AnyNode): Behavior[] {
-  const out: Behavior[] = [];
+export function defaultBehaviors(root: AnyNode): (Behavior | Contribution)[] {
+  const out: (Behavior | Contribution)[] = [];
   const visit = (node: AnyNode) => {
     for (const [name, def] of Object.entries(node[META_DEFS])) {
       const uses = usedRefs(node, name, def);
       const factory = def._steps.behavior;
       if (!factory) continue;
-      const config = factory(node, metaRefOf(node, name), uses) as BehaviorConfig;
+      const made = factory(node, metaRefOf(node, name), uses);
+      // PROTOTYPE(#128): registered like any contribution, per node and per row.
+      if (made instanceof Contribution) {
+        out.push(made);
+        continue;
+      }
+      const config = made as BehaviorConfig;
       out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, { self: node }));
     }
     if (node instanceof ObjectNode)
