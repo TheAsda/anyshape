@@ -72,6 +72,11 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
   return (node as any)[key];
 }
 
+/** Names a key where a node declares it, for error messages: `"name" on "path"`. */
+export function keyAt(node: AnyNode, name: string): string {
+  return `"${name}" on "${node.path || "<root>"}"`;
+}
+
 /**
  * The node's refs to the keys `def` uses, matched by definition, in the order
  * of .uses(). The node declares `def` as `name`.
@@ -79,7 +84,7 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
 export function usedRefs(node: AnyNode, name: string, def: MetaKeyDef<any, any>): MetaRef<any, any>[] {
   return (def._steps.uses ?? []).map((used, i) => {
     const names = Object.keys(node[META_DEFS]).filter((n) => node[META_DEFS][n] === used);
-    const at = `Key "${name}" on "${node.path || "<root>"}" uses a key the node`;
+    const at = `Key ${keyAt(node, name)} uses a key the node`;
     const which = `(uses[${i}], default ${String(used.defaultValue)})`;
     if (!names.length) throw new Error(`${at} doesn't declare ${which} – declare it in .meta()`);
     if (names.length > 1)
