@@ -41,7 +41,6 @@
     "check:package": "bun scripts/check-package.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && oxfmt --write",
-    "release": "bun run build && bun run check:package && changeset publish",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:react": "vitest run --project react",
