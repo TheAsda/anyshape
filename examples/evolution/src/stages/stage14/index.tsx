@@ -134,6 +134,12 @@ async function checkDestination(value: string): Promise<string | undefined> {
   return RESTRICTED.has(value.trim().toLowerCase()) ? "We don't book trips to there (yet)" : undefined;
 }
 
+/** Pretend to hold the room while the user fills in the extras: it needs a RoomType, not undefined. */
+async function holdRoom(room: RoomType, from: string, to: string): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  console.info(`Holding a ${room} room from ${from} to ${to}`);
+}
+
 /** A server-side rejection: field errors addressed by path, as the server sees them. */
 class ServerRejection extends Error {
   constructor(readonly fieldErrors: Record<string, string>) {
@@ -281,9 +287,12 @@ export function Stage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [submitted, setSubmitted] = useState<object | null>(null);
 
-  // Next submits step 1 alone. Its fn gets the trip's CHECKED type
-  // (roomType: RoomType, no undefined); all it does is advance.
-  const next = handleSubmit(form.substore(shape.trip), () => setStep(2));
+  // Next submits step 1 alone. `trip` is its CHECKED type: roomType is
+  // a RoomType here, so holdRoom takes it with no undefined check.
+  const next = handleSubmit(form.substore(shape.trip), async (trip) => {
+    await holdRoom(trip.roomType, trip.startDate, trip.endDate);
+    setStep(2);
+  });
 
   // Book submits the whole form, step 1 included.
   const submitAll = handleSubmit(form, async (values) => {
