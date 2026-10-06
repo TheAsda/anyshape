@@ -1268,8 +1268,9 @@ export class BehaviorRuntime implements RuntimeHooks {
 // ============================================================
 /**
  * @internal Default behaviors and contributions declared by key
- * definitions, one per node and key. Checks every key's uses on the way, combined keys included: their owners
- * are created later, with the first contribution.
+ * definitions, one per node and key. Checks every key's uses on the way,
+ * combined keys included: their owners are created later, with the first
+ * contribution.
  */
 export function defaultBehaviors(root: AnyNode): (Behavior | Contribution)[] {
   const out: (Behavior | Contribution)[] = [];
