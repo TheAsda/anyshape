@@ -305,7 +305,7 @@ interface Flight {
   /** What the run handles: passed on to its rerun when an input change cancels it. */
   readonly cause: Cause;
   /** Its targets are pending until it ends. */
-  readonly tally: PendingRun;
+  readonly pendingRun: PendingRun;
   /** Subscriptions that cancel it (see watch()). */
   readonly offs: Unsubscribe[];
 }
@@ -1057,7 +1057,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     this.flights.delete(leaf);
     this.store._probe?.flightEnd(leaf, performance.now(), cancelled);
     for (const off of flight.offs) off();
-    flight.tally.end();
+    flight.pendingRun.end();
     const gate = this.settledGate;
     this.settledGate = undefined;
     gate?.resolve();
@@ -1190,7 +1190,7 @@ export class BehaviorRuntime implements RuntimeHooks {
         return;
       }
       pendingRun.hold();
-      const flight: Flight = { controller, cause: p, tally: pendingRun, offs: [] };
+      const flight: Flight = { controller, cause: p, pendingRun, offs: [] };
       this.flights.set(leaf, flight);
       this.watch(leaf, flight);
       (result as PromiseLike<unknown>).then(
