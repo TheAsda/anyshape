@@ -7,7 +7,7 @@
 // Features are plain objects of key definitions (see recipes/features.ts).
 // ============================================================
 
-import type { BehaviorConfig, OwnerConfig } from "./behaviors.js";
+import type { BehaviorConfig, Contribution, OwnerConfig } from "./behaviors.js";
 import type { MetaRef } from "./refs/meta.js";
 import type { ShapeNode } from "./shape.js";
 
@@ -33,7 +33,7 @@ declare const OwnedBrand: unique symbol;
 export interface Countable {
   readonly [CountableBrand]: true;
 }
-/** Marks a definition whose writer .behavior() or .combine() declared. */
+/** Marks a definition whose `.behavior()` or `.combine()` is its only writer. */
 export interface Owned {
   readonly [OwnedBrand]: true;
 }
@@ -56,7 +56,7 @@ export type UsedRefs<U extends readonly AnyMetaKeyDef[]> = {
 export interface MetaKeySteps<V, P, U extends readonly AnyMetaKeyDef[]> {
   aggregate?(value: V): boolean;
   uses?: U;
-  behavior?(self: any, key: MetaRef<V, P>, uses: UsedRefs<U>): BehaviorConfig;
+  behavior?(self: any, key: MetaRef<V, P>, uses: UsedRefs<U>): BehaviorConfig | Contribution<any>;
   combine?(self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>): OwnerConfig<P>;
 }
 
@@ -129,12 +129,14 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * Default behavior, registered once per node (per row for row templates)
    * and per name the node declares the key under, limited to that node:
    * `self` (its value), its meta keys and initialOf(self). `key` is the
-   * node's ref under that name. The node is typed loosely because the key is
+   * node's ref under that name, and only this behavior writes it. The factory
+   * may return one contribution instead, to a combined key the node declares;
+   * the key then has no writer. The node is typed loosely because the key is
    * declared before the node exists.
    */
   behavior<S extends MetaKeyDef<V, P, U>>(
     this: S & Not<S, Owned, "`combine` and `behavior` are mutually exclusive">,
-    factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig,
+    factory: (self: any, key: MetaRef<V, P>, uses: UsedRefs<U>) => BehaviorConfig | Contribution<any>,
   ): S & Owned {
     return new MetaKeyDef<V, P, U>(this.defaultValue, this.options, { ...this._steps, behavior: factory }) as S & Owned;
   }

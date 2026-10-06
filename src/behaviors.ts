@@ -119,12 +119,18 @@ export interface OwnerConfig<P> extends Omit<BehaviorConfig, "run"> {
 }
 
 export class Contribution<P = unknown> {
+  /** @internal Set for default contributions: the node the contribution is limited to. */
+  readonly _self: AnyNode | undefined;
+
   /** @internal */
   constructor(
     readonly target: MetaRef<any, P>,
     readonly payload: P,
     readonly decl: Declaration,
-  ) {}
+    self?: AnyNode,
+  ) {
+    this._self = self;
+  }
 }
 
 /** Contribute `payload` to the owner of a combined key. The payload type comes from the key. */
@@ -138,12 +144,15 @@ export function contribute<P>(target: MetaRef<any, P>, payload: NoInfer<P>, decl
 export interface BehaviorInternals {
   /** Set for default behaviors: the node the behavior is limited to. */
   self?: AnyNode;
+  /** Set for default behaviors: the name `self` declares the key under, whose only writer the behavior is. */
+  key?: string;
   /** Dev only: where defineBehavior was called. */
   trace?: Error;
 }
 
 export class Behavior {
   /** @internal */ readonly _self: AnyNode | undefined;
+  /** @internal */ readonly _key: string | undefined;
   /** @internal */ readonly _trace: Error | undefined;
 
   /** @internal */
@@ -152,6 +161,7 @@ export class Behavior {
     internals: BehaviorInternals = {},
   ) {
     this._self = internals.self;
+    this._key = internals.key;
     this._trace = internals.trace;
   }
 }

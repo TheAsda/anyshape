@@ -204,6 +204,18 @@ metaKey(0).combine((_self, _key, uses) => {
   type _none = Expect<Equal<typeof uses, readonly []>>;
   return { run() {} };
 });
+// A key's default may be one contribution to a key it uses, never a list.
+const lockReasons = metaKey<string | undefined, string>(undefined).combine((_self, key) => ({
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts[0]?.payload),
+}));
+metaKey(true)
+  .uses(lockReasons)
+  .behavior((_self, _key, [r]) => contribute(r, "locked"));
+metaKey(true)
+  .uses(lockReasons)
+  // @ts-expect-error – one contribution, not a list
+  .behavior((_self, _key, [r]) => [contribute(r, "locked")]);
 
 // `aggregate` is a step: V is fixed by metaKey(), so a literal default widens as without it.
 const flaggedKey = metaKey(false).aggregate((v) => {

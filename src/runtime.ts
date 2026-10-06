@@ -27,10 +27,12 @@
 //               In dev, the error is located where defineBehavior was
 //               called, with the thrown value as its cause.
 //   • Writers – one behavior per target (value, or meta key); a combined key
-//               (`combine`) only by its owner.
+//               (`combine`) only by its owner, a key with `.behavior()`
+//               only by its own default behavior.
 //   • Access  – ctx.get / ctx.set only accept declared references.
-//   • Defaults– a key definition's .behavior() registers a default behavior
-//               per node that declares the key, limited to that node.
+//   • Defaults– a key definition's .behavior() registers a default behavior,
+//               or one default contribution, per node that declares the
+//               key, limited to that node.
 //   • Runtime registration – store.addBehavior(...) runs every check above and
 //               returns a dispose function; disposing resets the meta keys
 //               the behavior wrote to their defaults, the values it wrote
@@ -659,13 +661,23 @@ export class BehaviorRuntime implements RuntimeHooks {
       node instanceof ShapeNode && node.id !== undefined && rootOf(node) === this.store.node;
     if (!inForm(target.node)) fail(`"${refLabel(target)}" is not part of this form`);
     if (!defOf(target)._steps.combine) fail(`"${refLabel(target)}" has no \`combine\``);
+    const refs = [...(decl.triggers ?? []), ...(decl.reads ?? []), ...guardsOf(decl).flatMap((g) => g.refs)];
+    const self = contribution._self;
+    if (self) {
+      for (const ref of [target, ...refs]) {
+        if (refNode(ref) !== self || !kindOf(ref).local)
+          fail(
+            `default contributions may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`,
+          );
+      }
+    }
     const chain = chainTo(scopeOf(target.node));
     if (!chain.includes(host.node)) {
       fail(
         `"${refLabel(target)}" is outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`,
       );
     }
-    for (const ref of [...(decl.triggers ?? []), ...(decl.reads ?? []), ...guardsOf(decl).flatMap((g) => g.refs)]) {
+    for (const ref of refs) {
       const node = refNode(ref);
       if (!inForm(node)) fail(`"${refLabel(ref)}" is not part of this form`);
       if (!chain.includes(scopeOf(node)))
@@ -788,12 +800,16 @@ export class BehaviorRuntime implements RuntimeHooks {
       }
     }
 
-    // Writes: nodes and meta keys only; a combined key only by its owner.
+    // Writes: nodes and meta keys only; a combined key only by its owner, a
+    // key with `.behavior()` only by its own default behavior.
     const targets = writes.map((w) => {
       const target = targetOf(w as AnyRef);
       if (!target) return fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
       if (target.def?._steps.combine && (!owner || refKey(owner.ref) !== refKey(w as AnyRef))) {
         fail(`"${refLabel(w)}" is written only by the owner of its key – contribute() to it instead`);
+      }
+      if (target.def?._steps.behavior && (behavior._self !== target.node || behavior._key !== target.key)) {
+        fail(`"${refLabel(w)}" is written only by its key's default behavior`);
       }
       return target;
     });
@@ -1251,19 +1267,25 @@ export class BehaviorRuntime implements RuntimeHooks {
 // Default behaviors from key definitions
 // ============================================================
 /**
- * @internal Default behaviors declared by key definitions, one per node.
- * Checks every key's uses on the way, combined keys included: their owners
+ * @internal Default behaviors and contributions declared by key
+ * definitions, one per node and key. Checks every key's uses on the way, combined keys included: their owners
  * are created later, with the first contribution.
  */
-export function defaultBehaviors(root: AnyNode): Behavior[] {
-  const out: Behavior[] = [];
+export function defaultBehaviors(root: AnyNode): (Behavior | Contribution)[] {
+  const out: (Behavior | Contribution)[] = [];
   const visit = (node: AnyNode) => {
     for (const [name, def] of Object.entries(node[META_DEFS])) {
       const uses = usedRefs(node, name, def);
       const factory = def._steps.behavior;
       if (!factory) continue;
-      const config = factory(node, metaRefOf(node, name), uses) as BehaviorConfig;
-      out.push(new Behavior({ ...config, name: config.name ?? `${node.path || "<root>"}#${name}` }, { self: node }));
+      const made = factory(node, metaRefOf(node, name), uses);
+      const defaultName = `${node.path || "<root>"}#${name}`;
+      if (made instanceof Contribution) {
+        const { target, payload, decl } = made;
+        out.push(new Contribution(target, payload, { ...decl, name: decl.name ?? defaultName }, node));
+        continue;
+      }
+      out.push(new Behavior({ ...made, name: made.name ?? defaultName }, { self: node, key: name }));
     }
     if (node instanceof ObjectNode)
       for (const child of Object.values(node[FIELDS] as Record<string, AnyNode>)) visit(child);

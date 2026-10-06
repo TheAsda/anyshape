@@ -93,22 +93,24 @@ Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) a
 
 When you touch any of these, break it on purpose and confirm that at least one test fails. A change to the run order's indexes (`order.ts`), to registration and disposal (`runtime.ts`) or to the row lifecycle (`store.ts`) also runs `bun run test:memory` by hand: a missed delete there shows up only as a leak.
 
-| Mechanism                                  | Where                                                                                | Expected to fail                                             |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| Unchanged lens write returns the source    | `lens.ts` `propLens` / `composeLens`                                                 | structural sharing, no-op write                              |
-| New row object re-mapped to the same store | `ArrayStore._replaceItem`                                                            | identity through row writes                                  |
-| Older row version re-attaches              | `ArrayStore._sync`                                                                   | undo, both-versions tests                                    |
-| Rule 4: an attachment change notifies      | `BaseStore._visit` (`attachChanged`)                                                 | rule 4 tests                                                 |
-| Per-phase "last seen"                      | `_seen[phase]`                                                                       | behaviors-then-listeners tests                               |
-| Own-origin filter                          | `BehaviorRuntime.onTrigger`                                                          | two-way link tests                                           |
-| Rank ordering                              | `RunOrder.plan` (`order.ts`) / `runNext`                                             | dependency order, K1–K3, K6                                  |
-| Host filter of the run order               | `HostIndex.near` / `readerOf` (`order.ts`)                                           | K5, "Run order between scope hosts", one writer between rows |
-| Index and edge removal on dispose          | `HostIndex.delete`, the commit of `RunOrder.plan` (`order.ts`)                       | collectability (`test:memory`)                               |
-| Buffered writes dropped on error           | `BehaviorRuntime.execute`                                                            | throwing behavior test                                       |
-| Row totals shifted on detach               | `ArrayStore.shiftTotals`                                                             | count removal tests                                          |
-| Reset re-runs init                         | `BehaviorRuntime.reinit`                                                             | reset recompute tests                                        |
-| Reuse of a checked async result            | the `error` key's owner in `recipes/validation.ts` (`ctx.state.checked`, `ctx.keep`) | reuse and late-result tests                                  |
-| Latest-props slots                         | `delegate` in `react/behaviors.ts`                                                   | latest-props tests                                           |
+| Mechanism                                            | Where                                                                                | Expected to fail                                             |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Unchanged lens write returns the source              | `lens.ts` `propLens` / `composeLens`                                                 | structural sharing, no-op write                              |
+| New row object re-mapped to the same store           | `ArrayStore._replaceItem`                                                            | identity through row writes                                  |
+| Older row version re-attaches                        | `ArrayStore._sync`                                                                   | undo, both-versions tests                                    |
+| Rule 4: an attachment change notifies                | `BaseStore._visit` (`attachChanged`)                                                 | rule 4 tests                                                 |
+| Per-phase "last seen"                                | `_seen[phase]`                                                                       | behaviors-then-listeners tests                               |
+| Own-origin filter                                    | `BehaviorRuntime.onTrigger`                                                          | two-way link tests                                           |
+| Rank ordering                                        | `RunOrder.plan` (`order.ts`) / `runNext`                                             | dependency order, K1–K3, K6                                  |
+| Host filter of the run order                         | `HostIndex.near` / `readerOf` (`order.ts`)                                           | K5, "Run order between scope hosts", one writer between rows |
+| Index and edge removal on dispose                    | `HostIndex.delete`, the commit of `RunOrder.plan` (`order.ts`)                       | collectability (`test:memory`)                               |
+| Buffered writes dropped on error                     | `BehaviorRuntime.execute`                                                            | throwing behavior test                                       |
+| Row totals shifted on detach                         | `ArrayStore.shiftTotals`                                                             | count removal tests                                          |
+| Reset re-runs init                                   | `BehaviorRuntime.reinit`                                                             | reset recompute tests                                        |
+| Reuse of a checked async result                      | the `error` key's owner in `recipes/validation.ts` (`ctx.state.checked`, `ctx.keep`) | reuse and late-result tests                                  |
+| Default contribution registered                      | `defaultBehaviors` (`runtime.ts`)                                                    | the `defined` backstop tests                                 |
+| A key with `.behavior()` written only by its default | the write check (`runtime.ts`)                                                       | the writer tests                                             |
+| Latest-props slots                                   | `delegate` in `react/behaviors.ts`                                                   | latest-props tests                                           |
 
 ## Benchmarks and memory
 
