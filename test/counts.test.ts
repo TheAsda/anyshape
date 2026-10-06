@@ -105,6 +105,7 @@ describe("H · Counts and collect", () => {
 
   test(".aggregate() is declared once: a second call throws instead of replacing the first", () => {
     expect(() =>
+      // @ts-expect-error – the runtime check is what this test pins
       metaKey(0)
         .aggregate((v) => v > 0)
         .aggregate((v) => v < 0),

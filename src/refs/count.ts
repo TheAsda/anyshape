@@ -2,7 +2,7 @@
 // (MetaKeyDef.aggregate), under whatever name. Read-only, on the tally channel.
 
 import { FIELDS, META_DEFS, countSlotOf } from "../internal.js";
-import type { MetaKeyDef } from "../meta.js";
+import type { Countable, MetaKeyDef } from "../meta.js";
 import { ObjectNode, ArrayNode, type AnyNode } from "../shape.js";
 import { isAncestorOrSelf } from "../tree.js";
 import { KIND, type RefKind } from "./kind.js";
@@ -74,7 +74,7 @@ function declaration(node: AnyNode, def: MetaKeyDef<any, any>): string | undefin
  * used as a hook dependency. Throws when the count would always be 0: the key
  * has no aggregate, or no node in the subtree declares it.
  */
-export function countIn(node: AnyNode, def: MetaKeyDef<any, any, any, true>): CountRef {
+export function countIn(node: AnyNode, def: MetaKeyDef<any, any, any> & Countable): CountRef {
   let byDef = countRefs.get(node);
   if (!byDef) countRefs.set(node, (byDef = new Map()));
   let ref = byDef.get(def);

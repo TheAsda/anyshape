@@ -28,6 +28,8 @@ import {
   MetaRef,
   type MetaKeyDef,
   type NoPayload,
+  type Countable,
+  type Owned,
 } from "../src/index";
 import * as core from "../src/index";
 import { control, visible, disabled, submission, error } from "./support/features";
@@ -208,14 +210,14 @@ const flaggedKey = metaKey(false).aggregate((v) => {
   type _v = Expect<Equal<typeof v, boolean>>;
   return v;
 });
-type _w1 = Expect<Equal<typeof flaggedKey, MetaKeyDef<boolean, NoPayload, [], true>>>;
+type _w1 = Expect<Equal<typeof flaggedKey, MetaKeyDef<boolean, NoPayload, []> & Countable>>;
 const countKey = metaKey(0).aggregate((v) => v > 0);
-type _w2 = Expect<Equal<typeof countKey, MetaKeyDef<number, NoPayload, [], true>>>;
+type _w2 = Expect<Equal<typeof countKey, MetaKeyDef<number, NoPayload, []> & Countable>>;
 const labelKey = metaKey("").aggregate((v) => v !== "");
-type _w3 = Expect<Equal<typeof labelKey, MetaKeyDef<string, NoPayload, [], true>>>;
+type _w3 = Expect<Equal<typeof labelKey, MetaKeyDef<string, NoPayload, []> & Countable>>;
 // Spelled-out type arguments are kept as written.
 const issueKey = metaKey<string | undefined, { reason: string }>(undefined).aggregate((v) => v !== undefined);
-type _w4 = Expect<Equal<typeof issueKey, MetaKeyDef<string | undefined, { reason: string }, [], true>>>;
+type _w4 = Expect<Equal<typeof issueKey, MetaKeyDef<string | undefined, { reason: string }, []> & Countable>>;
 // @ts-expect-error – `aggregate` is a step, not an option
 metaKey(false, { aggregate: (v: boolean) => v });
 // The steps after `aggregate` are typed by the widened value.
@@ -226,6 +228,45 @@ metaKey(false)
     type _u = Expect<Equal<[RefValue<typeof key>, RefValue<typeof count>], [boolean, number]>>;
     return { triggers: [count], writes: [key], run: (ctx) => ctx.set(key, true) };
   });
+
+// Capability markers: .aggregate() adds Countable, .behavior() and .combine()
+// add Owned, and every later step keeps them.
+const noop = () => ({ triggers: [], run: () => {} });
+const counted = metaKey(false).aggregate((v) => v);
+const owned = metaKey(false).behavior(noop);
+const combined = metaKey(0).combine(() => ({ run() {} }));
+type _o1 = Expect<Equal<typeof owned, MetaKeyDef<boolean, NoPayload, []> & Owned>>;
+type _o2 = Expect<Equal<typeof combined, MetaKeyDef<number, NoPayload, []> & Owned>>;
+const chained = metaKey(false)
+  .aggregate((v) => v)
+  .uses(countKey, labelKey)
+  .behavior((_self, _key, [count, label]) => {
+    type _u = Expect<Equal<[RefValue<typeof count>, RefValue<typeof label>], [number, string]>>;
+    return { triggers: [count, label], run: () => {} };
+  });
+type _o3 = Expect<
+  Equal<typeof chained, MetaKeyDef<boolean, NoPayload, readonly [typeof countKey, typeof labelKey]> & Countable & Owned>
+>;
+// A marked definition still fits where MetaKeyDef<V> is expected.
+const asPlain: MetaKeyDef<boolean> = chained;
+
+export function stepOrderChecks() {
+  // @ts-expect-error – .aggregate() is declared once
+  counted.aggregate((v) => v);
+  // @ts-expect-error – call .uses() before .combine() or .behavior()
+  owned.uses(countKey);
+  // @ts-expect-error – call .uses() before .combine() or .behavior()
+  combined.uses(countKey);
+  // @ts-expect-error – `combine` and `behavior` are mutually exclusive
+  owned.combine(() => ({ run() {} }));
+  // @ts-expect-error – `combine` and `behavior` are mutually exclusive
+  combined.behavior(noop);
+  // @ts-expect-error – `combine` and `behavior` are mutually exclusive
+  owned.behavior(noop);
+  // The steps in order compile, whatever the markers so far.
+  counted.uses(countKey).combine(() => ({ run() {} }));
+  return asPlain;
+}
 
 export function contributionChecks() {
   contribute(c.n.total, { weight: 2 });

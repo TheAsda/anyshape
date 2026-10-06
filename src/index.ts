@@ -34,6 +34,8 @@ export {
   type MetaKeyOptions,
   type UsedRefs,
   type MergeMetaRefs,
+  type Countable,
+  type Owned,
 } from "./meta.js";
 
 // References

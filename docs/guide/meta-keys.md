@@ -42,6 +42,8 @@ A definition's steps add capabilities, and each step returns a new definition:
 | `.behavior(factory)`    | A default behavior, registered on every node that declares the key.                                                      |
 | `.combine(factory)`     | The key is written by one owner that combines [contributions](../../GLOSSARY.md) ([contributions.md](contributions.md)). |
 
+Each step also marks the definition's type, and the later steps keep the marks: `.aggregate()` adds `Countable`, which `countIn` requires, and `.behavior()` or `.combine()` adds `Owned`. The marks make a step out of order a type error, with the message it throws at run time: `.aggregate()` is declared once, `.uses()` comes before `.behavior()` or `.combine()`, and a key takes one of `.behavior()` and `.combine()`. A marked definition still fits wherever `MetaKeyDef<V>` is expected.
+
 ## Features
 
 A [feature](../../GLOSSARY.md) is a function that returns several key definitions, spread into `.meta()`:
