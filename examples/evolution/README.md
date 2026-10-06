@@ -1,6 +1,6 @@
 # The evolution example
 
-One trip-booking form, built up in 13 stages. Each stage adds one concept to the previous one, so reading them in order is the tutorial. Every stage is a folder under [`src/stages/`](src/stages/): `index.tsx` is the form, `meta.ts` holds the story and notes the app shows beside it.
+One trip-booking form, built up in 14 stages. Each stage adds one concept to the previous one, so reading them in order is the tutorial. Every stage is a folder under [`src/stages/`](src/stages/): `index.tsx` is the form, `meta.ts` holds the story and notes the app shows beside it.
 
 The stages use the [recipes](../../recipes/README.md) for validation, input state and submitting. Recipes are code you copy into your project, not part of the `anyshape` package: in your app, copy the ones you need instead of importing them from `anyshape`.
 
@@ -32,5 +32,6 @@ The example uses the library's source directly, so there's nothing to build firs
 | [11. Reuse](src/stages/stage11)           | The rental car needs a date pair too.                          | A behavior as a function of its nodes; one writer per target.            | [Behaviors](../../docs/guide/behaviors.md)                                                        |
 | [12. Async & server](src/stages/stage12)  | Some destinations are off-limits, and the server has opinions. | An async check, and server errors mapped by path.                        | [Async behaviors](../../docs/guide/async.md), [what your app owns](../../docs/guide/your-side.md) |
 | [13. Status](src/stages/stage13)          | Is the form still checking? Count it.                          | Counting errors and pending checks across the form.                      | [Async behaviors](../../docs/guide/async.md), [meta keys](../../docs/guide/meta-keys.md)          |
+| [14. Steps](src/stages/stage14)           | The booking splits in two; the room type has no default.       | A field that starts empty (`defined`); a step submitted on its own.      | [Forms in steps](../../docs/guide/your-side.md#forms-in-steps)                                    |
 
 For a complete form in one piece, see the [basic example](../basic/README.md).

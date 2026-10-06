@@ -2,7 +2,7 @@
 
 anyshape computes the form's state and gives you the tools to act on it. How the form looks and how it talks to a server are yours: when an error shows, how hidden and disabled fields render, how text becomes a number, how a server's errors land on fields, what submitting does, and how a form in steps moves on. Each section below shows the usual way to do it. The [principles](../principles.md) explain why the library stops here.
 
-Server errors are first shown in [stage 12](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage12).
+Server errors are first shown in [stage 12](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage12); a form in steps in [stage 14](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage14).
 
 ## When an error shows
 
