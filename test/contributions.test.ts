@@ -62,16 +62,22 @@ const shape = form(
 const R = shape.rows.item;
 const initial = (): InferValue<typeof shape> => ({ mode: "", other: "", a: "", b: "", rows: [{ x: 0 }, { x: 0 }] });
 
-/** Joins its parts' payloads, and writes "none" when it runs with no parts: distinct from its default. */
-const reasons = (seen: number[] = []) =>
-  metaKey<string, string>("default").combine((self, key) => ({
-    triggers: [self],
-    writes: [key],
-    run: (ctx) => {
-      seen.push(ctx.parts.length);
-      ctx.set(key, ctx.parts.length ? ctx.parts.map((p) => p.payload).join(", ") : "none");
-    },
-  }));
+/**
+ * Joins its parts' payloads, or writes "none" when it runs with no parts: what
+ * the owner computes from none is distinct from the default, "default". Logs
+ * each run like `tags`.
+ */
+const joined = metaKey<string, string>("default").combine((self, key) => ({
+  triggers: [self],
+  writes: [key],
+  run(ctx) {
+    const n = ((ctx.state.runs as number | undefined) ?? 0) + 1;
+    ctx.state.runs = n;
+    const list = ctx.parts.map((p) => p.payload);
+    log.runs.push({ path: self.path, runs: n, tags: list, origins: [...ctx.origins] });
+    ctx.set(key, list.length ? list.join(", ") : "none");
+  },
+}));
 
 const test = base.extend("log", (): Log => (log = { runs: [], combined: [] }));
 
@@ -340,17 +346,17 @@ describe("Parts", () => {
   });
 
   test("when every guard fails the owner still runs, with no parts", () => {
-    const sh = form(object({ f: field<string>().meta({ reasons: reasons() }), g: field<boolean>() }));
+    const sh = form(object({ f: field<string>().meta({ joined }), g: field<boolean>() }));
     const s = createStore(
       sh,
       { f: "", g: false },
-      { behaviors: contribute(sh.f.reasons, "one", { when: when([sh.g], (g) => g) }) },
+      { behaviors: contribute(sh.f.joined, "one", { when: when([sh.g], (g) => g) }) },
     );
-    expect(s.get(sh.f.reasons), "what the owner computes from none").toBe("none");
+    expect(s.get(sh.f.joined), "what the owner computes from none").toBe("none");
     s.set(sh.g, true);
-    expect(s.get(sh.f.reasons)).toBe("one");
+    expect(s.get(sh.f.joined)).toBe("one");
     s.set(sh.g, false);
-    expect(s.get(sh.f.reasons)).toBe("none");
+    expect(s.get(sh.f.joined)).toBe("none");
   });
 
   test("a contribution's triggers rerun the owner; its reads do not", () => {
@@ -431,30 +437,25 @@ describe("In-place update", () => {
     expect(log.runs).toHaveLength(0);
   });
 
-  test("the last contribution removes the owner and resets the key; the next one starts fresh", ({ log }) => {
-    const s = createStore(shape, initial());
-    const h = s.addBehavior(contribute(shape.a.tags, "one"));
-    expect(s.get(shape.a.tags)).toEqual(["one"]);
-    h();
-    expect(s.get(shape.a.tags)).toEqual([]);
-    log.runs.length = 0;
-    s.set(shape.a, "x");
-    expect(log.runs, "no owner left to run").toEqual([]);
-    s.addBehavior(contribute(shape.a.tags, "two"));
-    expect(log.runs.map((r) => r.runs)).toEqual([1]);
-  });
-
-  test("the key returns to its default when the last contribution is removed; the owner never runs without one", () => {
-    const seen: number[] = [];
-    const sh = form(object({ f: field<string>().meta({ reasons: reasons(seen) }) }));
+  test("the key holds its default before the first contribution and after the last; the owner never runs without one", ({
+    log,
+  }) => {
+    const sh = form(object({ f: field<string>().meta({ joined }) }));
     const s = createStore(sh, { f: "" });
-    expect(s.get(sh.f.reasons), "before the first contribution").toBe("default");
-    const h = s.addBehavior(contribute(sh.f.reasons, "one"));
-    expect(s.get(sh.f.reasons)).toBe("one");
+    expect(s.get(sh.f.joined), "before the first contribution").toBe("default");
+    const h = s.addBehavior(contribute(sh.f.joined, "one"));
+    expect(s.get(sh.f.joined)).toBe("one");
     h();
-    expect(s.get(sh.f.reasons), "the default, not what the owner computes from none").toBe("default");
+    expect(s.get(sh.f.joined), "the default, not what the owner computes from none").toBe("default");
     s.set(sh.f, "x");
-    expect(seen, "parts per owner run").toEqual([1]);
+    s.addBehavior(contribute(sh.f.joined, "two"));
+    expect(
+      log.runs.map((r) => [r.runs, r.tags]),
+      "no run with no parts; the next contribution starts a fresh owner",
+    ).toEqual([
+      [1, ["one"]],
+      [1, ["two"]],
+    ]);
   });
 });
 
