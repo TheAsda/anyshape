@@ -62,6 +62,17 @@ const shape = form(
 const R = shape.rows.item;
 const initial = (): InferValue<typeof shape> => ({ mode: "", other: "", a: "", b: "", rows: [{ x: 0 }, { x: 0 }] });
 
+/** Joins its parts' payloads, and writes "none" when it runs with no parts: distinct from its default. */
+const reasons = (seen: number[] = []) =>
+  metaKey<string, string>("default").combine((self, key) => ({
+    triggers: [self],
+    writes: [key],
+    run: (ctx) => {
+      seen.push(ctx.parts.length);
+      ctx.set(key, ctx.parts.length ? ctx.parts.map((p) => p.payload).join(", ") : "none");
+    },
+  }));
+
 const test = base.extend("log", (): Log => (log = { runs: [], combined: [] }));
 
 describe("Registration", () => {
@@ -328,6 +339,20 @@ describe("Parts", () => {
     expect(s.get(shape.a.tags), "recomputed without it, not 'skip and keep'").toEqual(["always"]);
   });
 
+  test("when every guard fails the owner still runs, with no parts", () => {
+    const sh = form(object({ f: field<string>().meta({ reasons: reasons() }), g: field<boolean>() }));
+    const s = createStore(
+      sh,
+      { f: "", g: false },
+      { behaviors: contribute(sh.f.reasons, "one", { when: when([sh.g], (g) => g) }) },
+    );
+    expect(s.get(sh.f.reasons), "what the owner computes from none").toBe("none");
+    s.set(sh.g, true);
+    expect(s.get(sh.f.reasons)).toBe("one");
+    s.set(sh.g, false);
+    expect(s.get(sh.f.reasons)).toBe("none");
+  });
+
   test("a contribution's triggers rerun the owner; its reads do not", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
@@ -417,6 +442,19 @@ describe("In-place update", () => {
     expect(log.runs, "no owner left to run").toEqual([]);
     s.addBehavior(contribute(shape.a.tags, "two"));
     expect(log.runs.map((r) => r.runs)).toEqual([1]);
+  });
+
+  test("the key returns to its default when the last contribution is removed; the owner never runs without one", () => {
+    const seen: number[] = [];
+    const sh = form(object({ f: field<string>().meta({ reasons: reasons(seen) }) }));
+    const s = createStore(sh, { f: "" });
+    expect(s.get(sh.f.reasons), "before the first contribution").toBe("default");
+    const h = s.addBehavior(contribute(sh.f.reasons, "one"));
+    expect(s.get(sh.f.reasons)).toBe("one");
+    h();
+    expect(s.get(sh.f.reasons), "the default, not what the owner computes from none").toBe("default");
+    s.set(sh.f, "x");
+    expect(seen, "parts per owner run").toEqual([1]);
   });
 });
 
