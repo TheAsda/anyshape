@@ -68,7 +68,7 @@ function ReturnField() {
 
 Every reference is checked by the compiler: `store.get(shape.departure.error)` doesn't compile, because `departure` declares no `error`, and neither does `store.set(shape.return.error, 42)`, because `error` holds a string.
 
-Next, the [evolution example](examples/evolution/README.md) builds one form in 13 stages, from plain values to async checks, one concept per stage. The [basic example](examples/basic/README.md) is a complete form.
+Next, the [evolution example](examples/evolution/README.md) builds one form in 14 stages, from plain values to a form in steps, one concept per stage. The [basic example](examples/basic/README.md) is a complete form.
 
 ## Using anyshape with an AI agent
 
@@ -87,7 +87,7 @@ These docs follow `master`. For the docs of a published version, open its [relea
 **Using anyshape**
 
 - [Guide](docs/guide/README.md): the concepts, one page per topic, ending with writing your own recipe.
-- [Evolution example](examples/evolution/README.md): one form in 13 stages.
+- [Evolution example](examples/evolution/README.md): one form in 14 stages.
 - [Basic example](examples/basic/README.md): a complete form.
 - [Recipes](recipes/README.md): validation, input state, submitting and more, to copy into your project.
 - [Why anyshape works this way](docs/principles.md): the design principles, and what anyshape leaves out.

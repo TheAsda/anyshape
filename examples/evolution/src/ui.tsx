@@ -55,9 +55,9 @@ export function ValueField({
 // ------------------------------------------------------------
 // Stage 2+ style binding: a field with .meta(control()).
 // ------------------------------------------------------------
-type StringNode = ControlNode & { readonly _type: string };
-type NumberNode = ControlNode & { readonly _type: number | null | undefined };
-type BooleanNode = ControlNode & { readonly _type: boolean };
+type StringNode = FieldNode<string> & ControlNode;
+type NumberNode = FieldNode<number | null | undefined> & ControlNode;
+type BooleanNode = FieldNode<boolean> & ControlNode;
 
 export function TextField({
   node,
@@ -160,6 +160,55 @@ export function CheckboxField({ node, label }: { node: BooleanNode; label: strin
         {label}
       </label>
       {c.showError && c.error && <p className="field__error">{c.error}</p>}
+    </div>
+  );
+}
+
+/** A field that starts empty (stage 14): `options` maps each value to its label. */
+export function SelectField<T extends string>({
+  node,
+  label,
+  options,
+}: {
+  node: FieldNode<T | undefined> & ControlNode;
+  label: string;
+  options: Record<T, string>;
+}) {
+  const { control: c, focusRef } = useControl(node);
+  const id = useId();
+  const errorId = `${id}-error`;
+  const entries = Object.entries(options) as [T, string][];
+  return (
+    <div className="field">
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <select
+        ref={focusRef}
+        className="field__input"
+        id={id}
+        value={c.value ?? ""}
+        onChange={(e) => c.onChange(entries.find(([value]) => value === e.target.value)?.[0])}
+        onBlur={c.onBlur}
+        aria-invalid={c.showError && !!c.error}
+        aria-describedby={c.showError && c.error ? errorId : undefined}
+      >
+        <option value="">Choose…</option>
+        {entries.map(([value, text]) => (
+          <option key={value} value={value}>
+            {text}
+          </option>
+        ))}
+      </select>
+      {c.showError && c.error && (
+        <p className="field__error" id={errorId}>
+          {c.error}
+        </p>
+      )}
+      <p className="field__status">
+        {c.touched ? "touched" : "untouched"}
+        {c.dirty ? " · dirty" : ""}
+      </p>
     </div>
   );
 }

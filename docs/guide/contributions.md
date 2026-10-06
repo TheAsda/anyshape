@@ -24,7 +24,7 @@ const shape = form(
 );
 ```
 
-`metaKey<V, P>(default).combine((self, key, uses) => config)` declares a combined key. `V` is the key's value and `P` the payload each contribution carries. Every [node](../../GLOSSARY.md) that declares the key gets one owner: a behavior built from the returned config, which writes the key. Its run reads `ctx.parts`, the contributions that currently apply, in the order they were registered. Each part has:
+`metaKey<V, P>(default).combine((self, key, uses) => config)` declares a combined key. `V` is the key's value and `P` the payload each contribution carries. Every [node](../../GLOSSARY.md) that declares the key gets one owner while something contributes to it: a behavior built from the returned config, which writes the key. Its run reads `ctx.parts`, the contributions that currently apply, in the order they were registered. Each part has:
 
 - `payload`: what the contribution passed, typed `P`;
 - `name` and a stable `id`;
@@ -57,7 +57,7 @@ store.get(shape.promoCode.disabled); // false
 
 `contribute(ref, payload, declaration)` takes the node's reference to the key, a payload of the key's payload type, and the parts of a declaration: `name`, `triggers`, `reads` and `when`. A payload of another type doesn't compile, and neither does contributing to a key declared without `combine`. Contributions are registered like behaviors: `b.add`, `createStore`'s `behaviors`, `store.addBehavior`. A key's default can also be a contribution: every node that declares the key adds it ([meta-keys.md](meta-keys.md#a-keys-default-behavior)).
 
-A contribution whose guard fails is absent: the owner recomputes without it. Removing a contribution has the same effect, and when the last one goes, the key returns to whatever the owner computes from none.
+A contribution whose guard fails is absent: the owner recomputes without it, with an empty `ctx.parts` when no other contribution applies. Removing a contribution has the same effect while others remain. Removing the last one is different: the key returns to its default. An owner runs in a [scope](../../GLOSSARY.md) only while a contribution is registered for it, on that scope's store or an enclosing one (a contribution added on a row store applies to that row alone), so it doesn't run before the first one either: a key that needs a value with no contributions gets it from its default.
 
 Contributions don't conflict with each other. Two places that both have a reason to disable a field each add one; neither needs to know about the other.
 

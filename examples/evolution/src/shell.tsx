@@ -34,6 +34,8 @@ import { Stage as Stage12 } from "./stages/stage12";
 import { meta as meta12 } from "./stages/stage12/meta";
 import { Stage as Stage13 } from "./stages/stage13";
 import { meta as meta13 } from "./stages/stage13/meta";
+import { Stage as Stage14 } from "./stages/stage14";
+import { meta as meta14 } from "./stages/stage14/meta";
 import type { StageMeta } from "./ui";
 
 type StageDef = {
@@ -55,6 +57,7 @@ const stages: StageDef[] = [
   { meta: meta11, Stage: Stage11 },
   { meta: meta12, Stage: Stage12 },
   { meta: meta13, Stage: Stage13 },
+  { meta: meta14, Stage: Stage14 },
 ];
 
 export function Shell() {
