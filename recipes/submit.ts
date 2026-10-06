@@ -6,15 +6,16 @@
 //   2. One batch: `submitting` on, and `revealed` on every node of the
 //      subtree that declares reveal().
 //   3. Validate the subtree, waiting for async checks.
-//   4. Valid: fn(formData), the store's value as it is. Invalid: focus the
-//      first error in document order.
+//   4. Valid: fn(formData), the store's value as it is, typed as its checked
+//      type (InferChecked: no undefined where `defined` is declared).
+//      Invalid: focus the first error in document order.
 //   5. `submitting` off. If fn throws, the handler's promise rejects.
 // ============================================================
 
-import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode, type InferValue } from "anyshape";
+import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode } from "anyshape";
 
 import { focusFirst } from "./focus";
-import { validate } from "./validation";
+import { validate, type InferChecked } from "./validation";
 
 /** true while a submit of the node is running. */
 export const submitting = metaKey(false);
@@ -53,7 +54,7 @@ function ownSubmitting(store: BaseStore<any>): MetaRef<boolean> {
 
 export function handleSubmit<N extends Submittable>(
   store: BaseStore<N>,
-  fn: (formData: InferValue<N>) => void | Promise<void>,
+  fn: (formData: InferChecked<N>) => void | Promise<void>,
 ): FormSubmitHandler {
   const ref = ownSubmitting(store);
   return async (event) => {
@@ -66,7 +67,8 @@ export function handleSubmit<N extends Submittable>(
     });
     try {
       const { valid, errors } = await validate(store);
-      if (valid) await fn(store.get(store.node as AnyNode) as InferValue<N>);
+      // validate() forced every check of the subtree, so `defined` holds.
+      if (valid) await fn(store.get(store.node as AnyNode) as InferChecked<N>);
       else focusFirst(errors);
     } finally {
       running.delete(store);

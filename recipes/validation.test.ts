@@ -14,8 +14,9 @@ import {
 } from "anyshape";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
 
-import { rule, asyncRule, validate, error, control, validation, visible } from "./index";
+import { rule, asyncRule, required, validate, error, control, validation, visible } from "./index";
 import { shape, L, initial, lookup } from "./test/fixtures/account";
+import * as orderFixture from "./test/fixtures/order";
 import { flush, sleep } from "./test/harness";
 
 const test = base.extend("store", () => createStore(shape, initial())).extend("lookup", () => lookup());
@@ -607,5 +608,49 @@ describe("M · validate() and removed rows (#1)", () => {
     calls[0].d.resolve(undefined);
     const r = await Promise.race([pending, sleep(50).then(() => "hung" as const)]);
     expect(r).toEqual({ valid: true, errors: [] });
+  });
+});
+
+describe("M · `defined`: the Required backstop", () => {
+  const { shape: order, D, L: Line, initial: empty } = orderFixture;
+
+  test("an empty `defined` field with no rule shows Required", () => {
+    const s = createStore(order, empty());
+    expect(s.get(D.deliveryType.error)).toBe("Required");
+    s.set(D.deliveryType, "Printed", { origin: "user" });
+    expect(s.get(D.deliveryType.error)).toBeUndefined();
+  });
+
+  test("the author's sync rule speaks first; a rule that lets undefined through still fails closed", () => {
+    const s = createStore(order, empty(), {
+      behaviors: [required(D.deliveryType, { message: "Choose a delivery type" })],
+    });
+    expect(s.get(D.deliveryType.error)).toBe("Choose a delivery type");
+    const lenient = createStore(order, empty(), { behaviors: [rule(D.deliveryType, () => undefined)] });
+    expect(lenient.get(D.deliveryType.error)).toBe("Required");
+  });
+
+  test("an async rule doesn't start while the backstop fails", async () => {
+    const check = vi.fn<(value: string | undefined) => Promise<string | undefined>>(async () => undefined);
+    const s = createStore(order, empty(), { behaviors: [asyncRule(D.deliveryType, check, { start: "always" })] });
+    await flush();
+    expect(check).not.toHaveBeenCalled();
+    expect(s.get(D.deliveryType.error)).toBe("Required");
+    s.set(D.deliveryType, "Printed", { origin: "user" });
+    await flush();
+    expect(check).toHaveBeenCalledOnce();
+    expect(s.get(D.deliveryType.error)).toBeUndefined();
+  });
+
+  test('only undefined fails the backstop: "" passes it', () => {
+    const s = createStore(order, empty());
+    s.set(order.items.sku, "", { origin: "user" });
+    expect(s.get(order.items.sku.error)).toBeUndefined();
+  });
+
+  test("a row added later gets the backstop", () => {
+    const s = createStore(order, empty());
+    const row = s.substore(order.items.lines).append();
+    expect(row.get(Line.sku.error)).toBe("Required");
   });
 });

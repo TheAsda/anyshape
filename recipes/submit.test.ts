@@ -5,10 +5,12 @@ import { test as base, describe, expect } from "vitest";
 
 import { control } from "./features";
 import { registerFocus } from "./focus";
+import { required } from "./rules";
 import { handleSubmit, submission } from "./submit";
 import * as limits from "./test/fixtures/limits";
+import * as order from "./test/fixtures/order";
 import { deferred } from "./test/harness";
-import { rule } from "./validation";
+import { rule, asyncRule } from "./validation";
 
 describe("Submit", () => {
   const { shape, L, initial } = limits;
@@ -212,5 +214,90 @@ describe("Submit: submittable nodes", () => {
   test("a node with its own `submitting` definition is not submittable: the key is matched by definition", () => {
     const foreign = form(object({ name: field<string>() }).meta({ submitting: metaKey(false) }));
     expect(() => handleSubmit(createStore(foreign, { name: "" }), async () => {})).toThrow(/submission\(\)/);
+  });
+});
+
+describe("Submit: a step at the boundary", () => {
+  const { shape, D, L, initial, loadSkus, skusFor } = order;
+  const test = base.extend("store", () => createStore(shape, initial()));
+
+  test("an empty `defined` field blocks Next with no rule registered; only the step is revealed", async ({
+    store: s,
+  }) => {
+    const got: unknown[] = [];
+    await handleSubmit(s.substore(D), (d) => void got.push(d))();
+    expect(got).toEqual([]);
+    expect(s.get(D.deliveryType.error)).toBe("Required");
+    expect(s.get(D.deliveryType.revealed)).toBe(true);
+    expect(s.get(shape.items.sku.revealed)).toBe(false);
+    expect(s.get(D.submitting)).toBe(false);
+  });
+
+  test("the author's rule speaks first; the backstop is the fallback", async () => {
+    const s = createStore(shape, initial(), {
+      behaviors: [required(D.deliveryType, { message: "Choose a delivery type" })],
+    });
+    await handleSubmit(s.substore(D), () => {})();
+    expect(s.get(D.deliveryType.error)).toBe("Choose a delivery type");
+  });
+
+  test("a filled step hands fn its value", async ({ store: s }) => {
+    s.set(D.deliveryType, "Printed");
+    const got: unknown[] = [];
+    await handleSubmit(s.substore(D), (d) => void got.push(d))();
+    expect(got).toEqual([{ deliveryType: "Printed", email: "" }]);
+  });
+
+  test("an async rule that never started runs at the boundary", async () => {
+    const s = createStore(shape, initial(), {
+      behaviors: [asyncRule(D.email, async (v) => (v.includes("@") ? undefined : "Bad email"))],
+    });
+    s.set(D.deliveryType, "Printed");
+    const got: unknown[] = [];
+    await handleSubmit(s.substore(D), (d) => void got.push(d))();
+    expect(got).toEqual([]);
+    expect(s.get(D.email.error)).toBe("Bad email");
+  });
+
+  test("an outside write that clears `error` doesn't let an empty field through: validate() reruns the queue", async ({
+    store: s,
+  }) => {
+    s.set(D.deliveryType.error, undefined);
+    expect(s.get(D.deliveryType.error)).toBeUndefined();
+    const got: unknown[] = [];
+    await handleSubmit(s.substore(D), (d) => void got.push(d))();
+    expect(got).toEqual([]);
+  });
+
+  test("going back and clearing step 1 blocks the final submit", async ({ store: s }) => {
+    s.set(D.deliveryType, "Printed");
+    s.set(shape.items.sku, "P-1");
+    s.set(D.deliveryType, undefined, { origin: "user" });
+    const got: unknown[] = [];
+    await handleSubmit(s, (d) => void got.push(d))();
+    expect(got).toEqual([]);
+    expect(s.get(D.deliveryType.error)).toBe("Required");
+  });
+
+  test("a row added later is checked too", async ({ store: s }) => {
+    s.set(shape.items.sku, "P-1");
+    const row = s.substore(shape.items.lines).append();
+    const got: unknown[] = [];
+    await handleSubmit(s.substore(shape.items), (d) => void got.push(d))();
+    expect(got).toEqual([]);
+    expect(row.get(L.sku.error)).toBe("Required");
+    row.set(L.sku, "P-1");
+    await handleSubmit(s.substore(shape.items), (d) => void got.push(d))();
+    expect(got).toEqual([{ sku: "P-1", note: undefined, lines: [{ sku: "P-1", qty: 1 }] }]);
+  });
+
+  test("step 2's behavior reads the stored type and empties the list when step 1 is cleared", async () => {
+    const s = createStore(shape, initial(), { behaviors: [loadSkus(async (t) => skusFor(t))] });
+    s.set(D.deliveryType, "Electronic");
+    await s.settle();
+    expect(s.get(shape.items.sku.skuOptions)).toEqual(["E-1", "E-2"]);
+    s.set(D.deliveryType, undefined);
+    await s.settle();
+    expect(s.get(shape.items.sku.skuOptions)).toEqual([]);
   });
 });
