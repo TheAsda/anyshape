@@ -82,18 +82,18 @@ describe("H · Counts and collect", () => {
       object({
         a: field<string>().meta({ marked }),
         b: field<string>().meta({ other: metaKey(false) }),
-        rows: array(object({ c: field<string>().meta({ flag: marked }) })),
+        rows: array(object({ c: field<string>().meta({ inRow: marked }) })),
         d: field<string>().meta({ marked }),
       }),
     );
     const s = createStore(f, { a: "", b: "", rows: [{ c: "" }, { c: "" }], d: "" });
     const rows = s.substore(f.rows);
-    rows.itemAt(1).set(f.rows.item.c.flag, true);
+    rows.itemAt(1).set(f.rows.item.c.inRow, true);
 
     const found = s.collect(f, marked);
     expect(found.map((e) => e.path)).toEqual(["a", "rows[0].c", "rows[1].c", "d"]);
     expect(found[0].ref).toBe(f.a.marked);
-    expect(found[2].ref).toBe(f.rows.item.c.flag);
+    expect(found[2].ref).toBe(f.rows.item.c.inRow);
     expect(found[2].store).toBe(rows.itemAt(1));
     expect(found.map((e) => e.store.get(e.ref))).toEqual([false, false, true, false]);
   });
@@ -173,12 +173,12 @@ describe("H · Counts by definition", () => {
 });
 
 describe.each(["development", "production"])("H · countIn rejects a key it can't count (%s)", (mode) => {
-  const flag = metaKey(false);
+  const checked = metaKey(false);
   const counted = metaKey(false).aggregate((v) => v);
   const f = form(
     object({
       a: field<string>().meta({ counted }),
-      b: field<boolean>().meta({ flag }),
+      b: field<boolean>().meta({ checked }),
       rows: array(object({ c: field<string>().meta({ inRow: counted }) })),
       other: object({ d: field<string>() }),
     }),
@@ -196,11 +196,11 @@ describe.each(["development", "production"])("H · countIn rejects a key it can'
 
   test("a key without aggregate throws, naming the node and the key", ({ warn }) => {
     // @ts-expect-error countIn takes only a key declared with .aggregate()
-    expect(() => countIn(f, flag)).toThrow(
-      'countIn on "<root>": key "flag" on "b" has no aggregate – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).',
+    expect(() => countIn(f, checked)).toThrow(
+      'countIn on "<root>": key "checked" on "b" has no aggregate – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).',
     );
     // @ts-expect-error countIn takes only a key declared with .aggregate()
-    expect(() => countIn(f, flag), "a failed call caches nothing").toThrow(/has no aggregate/);
+    expect(() => countIn(f, checked), "a failed call caches nothing").toThrow(/has no aggregate/);
     expect(warn).not.toHaveBeenCalled();
   });
 
