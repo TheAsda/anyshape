@@ -1,6 +1,6 @@
 {
   "name": "anyshape",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Form state for TypeScript: a typed shape, a store that holds values and metadata, and behaviors that keep them consistent.",
   "keywords": [
     "form",
