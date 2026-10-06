@@ -119,17 +119,16 @@ export interface OwnerConfig<P> extends Omit<BehaviorConfig, "run"> {
 }
 
 export class Contribution<P = unknown> {
-  /** @internal Set for default contributions: the node the contribution is limited to. */
-  readonly _self: AnyNode | undefined;
+  /** @internal */ readonly _self: AnyNode | undefined;
 
   /** @internal */
   constructor(
     readonly target: MetaRef<any, P>,
     readonly payload: P,
     readonly decl: Declaration,
-    self?: AnyNode,
+    internals: Pick<BehaviorInternals, "self"> = {},
   ) {
-    this._self = self;
+    this._self = internals.self;
   }
 }
 
@@ -142,7 +141,7 @@ export function contribute<P>(target: MetaRef<any, P>, payload: NoInfer<P>, decl
 
 /** @internal What the core attaches to a behavior besides its config. */
 export interface BehaviorInternals {
-  /** Set for default behaviors: the node the behavior is limited to. */
+  /** Set for default behaviors and contributions: the node they are limited to. */
   self?: AnyNode;
   /** Set for default behaviors: the name `self` declares the key under, whose only writer the behavior is. */
   key?: string;

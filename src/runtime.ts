@@ -1283,7 +1283,7 @@ export function defaultBehaviors(root: AnyNode): (Behavior | Contribution)[] {
       const defaultName = `${node.path || "<root>"}#${name}`;
       if (made instanceof Contribution) {
         const { target, payload, decl } = made;
-        out.push(new Contribution(target, payload, { ...decl, name: decl.name ?? defaultName }, node));
+        out.push(new Contribution(target, payload, { ...decl, name: decl.name ?? defaultName }, { self: node }));
         continue;
       }
       out.push(new Behavior({ ...made, name: made.name ?? defaultName }, { self: node, key: name }));
