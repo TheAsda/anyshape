@@ -26,6 +26,7 @@
 // ============================================================
 
 import { useLayoutEffect, useRef } from "react";
+
 import { Behavior, Contribution, type AnyBehavior, type BehaviorHandle, type Guard } from "../behaviors.js";
 import { defineBehaviors, type BehaviorBuilder } from "../builder.js";
 import { refKey, isDev } from "../internal.js";
@@ -55,7 +56,10 @@ function guardsOf(item: AnyBehavior): Guard[] {
 /** What was declared (not the functions): if it changes, the registration must change. */
 function signature(list: readonly AnyBehavior[]): string {
   const keys = (refs: readonly any[] | undefined) => (refs ?? []).map(refKey).join(",");
-  const guards = (item: AnyBehavior) => guardsOf(item).map((g) => keys(g.refs)).join(";");
+  const guards = (item: AnyBehavior) =>
+    guardsOf(item)
+      .map((g) => keys(g.refs))
+      .join(";");
   return list
     .map((item) => {
       if (item instanceof Contribution) {
@@ -63,7 +67,16 @@ function signature(list: readonly AnyBehavior[]): string {
         return ["C", refKey(item.target), keys(d.triggers), keys(d.reads), guards(item), d.name ?? ""].join("|");
       }
       const c = (item as Behavior).config;
-      return ["B", keys(c.triggers), keys(c.reads), keys(c.writes), JSON.stringify(c.runOn ?? {}), (c.origins ?? []).join(","), guards(item), c.name ?? ""].join("|");
+      return [
+        "B",
+        keys(c.triggers),
+        keys(c.reads),
+        keys(c.writes),
+        JSON.stringify(c.runOn ?? {}),
+        (c.origins ?? []).join(","),
+        guards(item),
+        c.name ?? "",
+      ].join("|");
     })
     .join("\n");
 }
@@ -84,7 +97,7 @@ function delegate(item: AnyBehavior, slot: Slot): AnyBehavior {
   if (item instanceof Behavior) {
     return new Behavior(
       { ...item.config, when: guards, run: (ctx) => (slot.current as Behavior).config.run(ctx) },
-      { trace: item._trace }
+      { trace: item._trace },
     );
   }
   throw new Error("useBehaviors: expected behaviors and contributions");
@@ -100,7 +113,7 @@ function withHint(error: unknown): unknown {
   if (error instanceof Error && /already written by/.test(error.message)) {
     return new Error(
       `${error.message} – if this component is rendered more than once, declare it once, in createStore or a common parent`,
-      { cause: error }
+      { cause: error },
     );
   }
   return error;
@@ -113,7 +126,11 @@ function withHint(error: unknown): unknown {
  * wrote reset to their defaults, the values they wrote stay (see
  * BehaviorHandle).
  */
-export function useBehaviors(build: (b: BehaviorBuilder) => void, deps: readonly unknown[], options: UseBehaviorsOptions = {}): void {
+export function useBehaviors(
+  build: (b: BehaviorBuilder) => void,
+  deps: readonly unknown[],
+  options: UseBehaviorsOptions = {},
+): void {
   const host = useStore(options).scopeStore;
   const current = useRef<{ host: BaseStore<any>; registration: Registration } | null>(null);
   const warned = useRef(false);
@@ -157,7 +174,7 @@ export function useBehaviors(build: (b: BehaviorBuilder) => void, deps: readonly
         warned.current = true;
         console.warn(
           "useBehaviors: the declared behaviors changed without a deps change – keeping the registered ones. " +
-            "Add the values that decide which behaviors are declared to deps."
+            "Add the values that decide which behaviors are declared to deps.",
         );
       }
       return;

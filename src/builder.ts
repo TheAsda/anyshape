@@ -33,7 +33,7 @@ export class BehaviorBuilder {
   /** @internal */
   constructor(
     private readonly out: AnyBehavior[],
-    private readonly guards: readonly Guard[]
+    private readonly guards: readonly Guard[],
   ) {}
 
   /** Add behaviors and contributions (arrays, e.g. from exclusive(), are flattened). */
@@ -49,7 +49,7 @@ export class BehaviorBuilder {
   when<const Rs extends readonly AnyRef[]>(
     refs: Rs,
     test: (...values: Values<Rs>) => boolean,
-    fn: (b: BehaviorBuilder) => void
+    fn: (b: BehaviorBuilder) => void,
   ): void {
     fn(new BehaviorBuilder(this.out, [...this.guards, guardOf(refs, test)]));
   }
@@ -63,13 +63,16 @@ export class BehaviorBuilder {
   private wrap(item: AnyBehavior): AnyBehavior {
     if (!this.guards.length) return item;
     if (item instanceof Contribution) {
-      return new Contribution(item.target, item.payload, { ...item.decl, when: [...asArray(item.decl.when), ...this.guards] });
+      return new Contribution(item.target, item.payload, {
+        ...item.decl,
+        when: [...asArray(item.decl.when), ...this.guards],
+      });
     }
     if (item instanceof Behavior) {
       if (item._self) throw new Error("Default behaviors cannot be added through the builder");
       return new Behavior(
         { ...item.config, when: [...asArray(item.config.when), ...this.guards] },
-        { trace: item._trace }
+        { trace: item._trace },
       );
     }
     throw new Error("Expected a behavior or a contribution");
@@ -80,7 +83,10 @@ export class BehaviorBuilder {
  * Build a list of behaviors and contributions for `shape` (pass it to createStore or addBehavior).
  * @see {@link https://github.com/TheAsda/anyshape/blob/master/docs/guide/behaviors.md | Behaviors} in the guide.
  */
-export function defineBehaviors<S extends ObjectNode<any>>(shape: S, fn: (b: BehaviorBuilder, shape: S) => void): AnyBehavior[] {
+export function defineBehaviors<S extends ObjectNode<any>>(
+  shape: S,
+  fn: (b: BehaviorBuilder, shape: S) => void,
+): AnyBehavior[] {
   const out: AnyBehavior[] = [];
   fn(new BehaviorBuilder(out, []), shape);
   return out;

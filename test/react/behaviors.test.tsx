@@ -1,35 +1,57 @@
-import { useState, StrictMode, Component, type ReactNode } from "react";
+import { StrictMode, Component, type ReactNode } from "react";
 import { test, expect } from "vitest";
 import { cleanup } from "vitest-browser-react";
+
 import {
-  form, object, array, field, defineBehavior, countIn, createStore, contribute, metaKey, type InferValue,
-  type RootStore, type BaseStore,
+  form,
+  object,
+  array,
+  field,
+  defineBehavior,
+  countIn,
+  createStore,
+  contribute,
+  metaKey,
+  type InferValue,
+  type RootStore,
+  type BaseStore,
 } from "../../src/index";
+import { StoreProvider, useBehaviors, useValue } from "../../src/react/index";
 import { control, disabled, error } from "../support/features";
 import { rule, required, pattern, max } from "../support/rules";
-import { StoreProvider, useBehaviors, useValue } from "../../src/react/index";
 import { render, settle, captureWarnings } from "../support/test-utils";
 
 /** A combined key: the payloads of its active contributions. */
 const tags = metaKey<readonly string[], string>([]).combine((self, key) => ({
   triggers: [self],
   writes: [key],
-  run: (ctx) => ctx.set(key, ctx.parts.map((p) => p.payload)),
+  run: (ctx) =>
+    ctx.set(
+      key,
+      ctx.parts.map((p) => p.payload),
+    ),
 }));
 
-const shape = form(object({
-  tagged: field<string>().meta({ tags }),
-  type: field<"person" | "company">(),
-  name: field<string>().meta(control(), { hint: "" }),
-  phone: field<string>().meta(control()),
-  vat: field<string>().meta(control()),
-  note: field<string>().meta({ disabled }),
-  lines: array(object({ qty: field<number>().meta(control(), { hint: "" }) })),
-}));
+const shape = form(
+  object({
+    tagged: field<string>().meta({ tags }),
+    type: field<"person" | "company">(),
+    name: field<string>().meta(control(), { hint: "" }),
+    phone: field<string>().meta(control()),
+    vat: field<string>().meta(control()),
+    note: field<string>().meta({ disabled }),
+    lines: array(object({ qty: field<number>().meta(control(), { hint: "" }) })),
+  }),
+);
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
 const initial = (): Values => ({
-  tagged: "", type: "person", name: "", phone: "12-34", vat: "", note: "",
+  tagged: "",
+  type: "person",
+  name: "",
+  phone: "12-34",
+  vat: "",
+  note: "",
   lines: [{ qty: 5 }, { qty: 1 }],
 });
 
@@ -66,7 +88,7 @@ test("registers on mount, before paint; removed on unmount", async () => {
     <StoreProvider store={s}>
       <Rules />
       <Show />
-    </StoreProvider>
+    </StoreProvider>,
   );
   expect(s.get(shape.name.error)).toBe("Required");
   expect(paintedError).toBe("Required");
@@ -78,12 +100,28 @@ test("unmount resets the meta its behaviors wrote; their values stay", async () 
   const s = createStore(shape, initial());
   function Rules() {
     useBehaviors((b) => {
-      b.add(defineBehavior({ triggers: [shape.name], writes: [shape.name.hint], run: (c) => c.set(shape.name.hint, `for ${c.get(shape.name)}`) }));
-      b.add(defineBehavior({ triggers: [shape.name], writes: [shape.vat], run: (c) => c.set(shape.vat, c.get(shape.name).toUpperCase()) }));
+      b.add(
+        defineBehavior({
+          triggers: [shape.name],
+          writes: [shape.name.hint],
+          run: (c) => c.set(shape.name.hint, `for ${c.get(shape.name)}`),
+        }),
+      );
+      b.add(
+        defineBehavior({
+          triggers: [shape.name],
+          writes: [shape.vat],
+          run: (c) => c.set(shape.vat, c.get(shape.name).toUpperCase()),
+        }),
+      );
     }, []);
     return null;
   }
-  const screen = await mount(<StoreProvider store={s}><Rules /></StoreProvider>);
+  const screen = await mount(
+    <StoreProvider store={s}>
+      <Rules />
+    </StoreProvider>,
+  );
   s.set(shape.name, "ann");
   expect(s.get(shape.name.hint)).toBe("for ann");
   expect(s.get(shape.vat)).toBe("ANN");
@@ -104,7 +142,7 @@ test("under a row provider the behaviors apply to that row only", async () => {
       <StoreProvider store={a}>
         <RowRules />
       </StoreProvider>
-    </StoreProvider>
+    </StoreProvider>,
   );
   expect(a.get(L.qty.error)).toBe("Must be at most 3");
   await settle(() => b.set(L.qty, 9));
@@ -120,7 +158,7 @@ test("deps: props choose the behaviors; the swap is atomic", async () => {
         if (props.strict) b.add(pattern(shape.phone, /^\+\d+$/, { message: "Use +digits" }));
         else b.add(pattern(shape.phone, /^[\d\s-]+$/, { message: "Digits only" }));
       },
-      [props.strict]
+      [props.strict],
     );
     return null;
   }
@@ -152,9 +190,9 @@ test("latest props reach run without re-registering", async () => {
             triggers: [shape.name],
             writes: [shape.name.hint],
             run: (ctx) => ctx.set(shape.name.hint, `${ctx.get(shape.name)}${props.suffix}`),
-          })
+          }),
         ),
-      []
+      [],
     );
     return null;
   }
@@ -180,9 +218,9 @@ test("latest props reach rule checks and guards too", async () => {
         b.add(
           rule(shape.name, (v) => (v.length > props.limit ? "Too long" : undefined), {
             when: { refs: [shape.type], test: () => props.active },
-          })
+          }),
         ),
-      []
+      [],
     );
     return null;
   }
@@ -224,20 +262,25 @@ test("declarations changing without deps: kept, with a warning", async () => {
 test("builder features: when, and one behavior for a target's two values", async () => {
   const s = createStore(shape, initial());
   const lock = defineBehavior({
-    triggers: [shape.type], writes: [shape.note.disabled],
+    triggers: [shape.type],
+    writes: [shape.note.disabled],
     run: (c) => c.set(shape.note.disabled, c.get(shape.type) === "company"),
   });
   function Rules() {
     useBehaviors((b) => {
       b.add(lock);
-      b.when([shape.type], (t) => t === "company", (b) => b.add(required(shape.vat)));
+      b.when(
+        [shape.type],
+        (t) => t === "company",
+        (b) => b.add(required(shape.vat)),
+      );
     }, []);
     return null;
   }
   await mount(
     <StoreProvider store={s}>
       <Rules />
-    </StoreProvider>
+    </StoreProvider>,
   );
   expect(s.get(shape.note.disabled)).toBe(false);
   expect(s.get(shape.vat.error)).toBe(undefined);
@@ -251,8 +294,15 @@ test("StrictMode: registered once, removed on unmount", async () => {
   function Lock() {
     // a plain behavior: registering it twice would violate one-writer-per-target
     useBehaviors(
-      (b) => b.add(defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) })),
-      []
+      (b) =>
+        b.add(
+          defineBehavior({
+            triggers: [shape.name],
+            writes: [shape.note.disabled],
+            run: (c) => c.set(shape.note.disabled, true),
+          }),
+        ),
+      [],
     );
     return null;
   }
@@ -261,7 +311,7 @@ test("StrictMode: registered once, removed on unmount", async () => {
       <StoreProvider store={s}>
         <Lock />
       </StoreProvider>
-    </StrictMode>
+    </StrictMode>,
   );
   expect(uncaught).toEqual([]);
   expect(s.get(shape.note.disabled)).toBe(true);
@@ -272,7 +322,11 @@ test("StrictMode: registered once, removed on unmount", async () => {
 test("the same component twice: a writer conflict with a hint to declare it once", async () => {
   const s = createStore(shape, initial());
   const lock = () =>
-    defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) });
+    defineBehavior({
+      triggers: [shape.name],
+      writes: [shape.note.disabled],
+      run: (c) => c.set(shape.note.disabled, true),
+    });
   function Unkeyed() {
     useBehaviors((b) => b.add(lock()), []);
     return null;
@@ -283,7 +337,7 @@ test("the same component twice: a writer conflict with a hint to declare it once
       <StoreProvider store={s}>
         <Unkeyed />
         <Unkeyed />
-      </StoreProvider>
+      </StoreProvider>,
     );
   } catch (e) {
     thrown = e; // act() may rethrow errors from effects
@@ -332,7 +386,11 @@ test("explicit { store } option", async () => {
 test("a deps change whose new registration fails keeps the old one and surfaces the error with the hint", async () => {
   const s = createStore(shape, initial());
   const lock = () =>
-    defineBehavior({ triggers: [shape.name], writes: [shape.note.disabled], run: (c) => c.set(shape.note.disabled, true) });
+    defineBehavior({
+      triggers: [shape.name],
+      writes: [shape.note.disabled],
+      run: (c) => c.set(shape.note.disabled, true),
+    });
   function Static() {
     useBehaviors((b) => b.add(lock()), []);
     return null;

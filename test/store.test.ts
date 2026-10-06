@@ -1,13 +1,12 @@
 import { test as base, describe, expect } from "vitest";
-import * as company from "./support/fixtures/company";
-import { form, object, array, field, createStore, countIn, type InferValue } from "../src/index";
-import { watchOrigins } from "./support/harness";
+
+import { form, object, array, field, createStore, countIn } from "../src/index";
 import { error } from "./support/features";
+import * as company from "./support/fixtures/company";
+import { address, userShape, initial } from "./support/fixtures/user";
+import { watchOrigins } from "./support/harness";
 
-import { address, userShape, initial, type User } from "./support/fixtures/user";
-
-const test = base
-  .extend("store", () => createStore(userShape, initial()));
+const test = base.extend("store", () => createStore(userShape, initial()));
 
 describe("D · Static meta", () => {
   test("static meta incl. root meta", ({ store: s }) => {
@@ -59,9 +58,9 @@ describe("D · Root + object substores", () => {
     const shipping = s.substore(userShape.shipping);
     expect(s.get(userShape.shipping.city.label)).toBe("City");
     shipping.set(userShape.shipping.city.error, "Bad city");
-    expect(s.get(userShape.shipping.city.error)).toBe("Bad city");          // delegated to owner
-    expect(s.get(userShape.billing.city.error)).toBe(undefined);            // reused shape, separate meta
-    s.set(userShape.shipping.collapsed, true);                  // section meta owned by root
+    expect(s.get(userShape.shipping.city.error)).toBe("Bad city"); // delegated to owner
+    expect(s.get(userShape.billing.city.error)).toBe(undefined); // reused shape, separate meta
+    s.set(userShape.shipping.collapsed, true); // section meta owned by root
     expect(shipping.get(userShape.shipping.collapsed)).toBe(true);
   });
 
@@ -104,8 +103,8 @@ describe("E · Arrays", () => {
     const [a, b] = s.substore(userShape.items).items();
     a.set(userShape.items.item.sku.error, "Required");
     expect(b.get(userShape.items.item.sku.error)).toBe(undefined);
-    expect(b.get(userShape.items.item.sku.required)).toBe(true);   // static meta seeded per item
-    a.set(userShape.items.item.rowError, "Bad row");   // whole-row meta on the item store
+    expect(b.get(userShape.items.item.sku.required)).toBe(true); // static meta seeded per item
+    a.set(userShape.items.item.rowError, "Bad row"); // whole-row meta on the item store
     expect(b.get(userShape.items.item.rowError)).toBe(undefined);
   });
 
@@ -204,7 +203,9 @@ describe("D · Foreign nodes and duplicate rows", () => {
     const line = s.substore(userShape.items).itemAt(0);
     expect(() => s.assertInScope(other.name)).toThrow(/is not part of the store/);
     expect(() => s.assertInScope(userShape.items.item.sku)).toThrow(/inside an array item – use the item's store/);
-    expect(() => s.substore(userShape.shipping).assertInScope(userShape.name), "outside the substore").toThrow(/is not part of the store/);
+    expect(() => s.substore(userShape.shipping).assertInScope(userShape.name), "outside the substore").toThrow(
+      /is not part of the store/,
+    );
     s.assertInScope(userShape.shipping.city);
     s.assertInScope(userShape.items);
     line.assertInScope(userShape.items.item.sku);
@@ -214,12 +215,15 @@ describe("D · Foreign nodes and duplicate rows", () => {
     const [a, b] = s.substore(userShape.items).items();
     const aValue = a.get(userShape.items.item);
     expect(() => b.set(userShape.items.item, aValue)).toThrow(/would contain the same object twice/);
-    expect(s.get(userShape.items).map((i) => i.sku), "unchanged").toEqual(["A", "B"]);
+    expect(
+      s.get(userShape.items).map((i) => i.sku),
+      "unchanged",
+    ).toEqual(["A", "B"]);
   });
 });
 
 describe("D, E · Reference API and array helpers", () => {
-  const { shape, L, initial, originsOf } = company;
+  const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
     .extend("lines", ({ store }) => store.substore(shape.lines));
@@ -251,7 +255,7 @@ describe("D, E · Reference API and array helpers", () => {
 
   // ---------------------------------------------------------------------------
   // Array helpers
-  test("append / insert / remove / move", ({ store: s, lines }) => {
+  test("append / insert / remove / move", ({ lines }) => {
     const c = lines.append({ sku: "C" });
     expect(lines.items().map((r) => r.get(L.sku))).toEqual(["A", "B", "C"]);
     expect(c.get(L.qty), "factory default kept").toBe(1);
@@ -279,7 +283,7 @@ describe("D, E · Reference API and array helpers", () => {
     expect(seen).toEqual([["user"]]);
   });
 
-  test("helpers reject out-of-range indexes", ({ store: s, lines }) => {
+  test("helpers reject out-of-range indexes", ({ lines }) => {
     const [a] = lines.items();
     expect(() => lines.itemAt(-1)).toThrow(RangeError);
     expect(() => lines.itemAt(2)).toThrow(RangeError);
@@ -287,10 +291,13 @@ describe("D, E · Reference API and array helpers", () => {
     expect(() => lines.insert(3, { sku: "X" })).toThrow(RangeError);
     expect(() => lines.move(a, -1)).toThrow(RangeError);
     expect(() => lines.move(a, 2)).toThrow(RangeError);
-    expect(lines.items().map((r) => r.get(L.sku)), "nothing changed").toEqual(["A", "B"]);
+    expect(
+      lines.items().map((r) => r.get(L.sku)),
+      "nothing changed",
+    ).toEqual(["A", "B"]);
   });
 
-  test("helpers reject objects and rows that are not in this array", ({ store: s, lines }) => {
+  test("helpers reject objects and rows that are not in this array", ({ lines }) => {
     expect(() => lines.item({ sku: "A", qty: 1, notes: [] })).toThrow(/not currently in "lines"/);
     const [note] = lines.itemAt(0).substore(L.notes).items();
     expect(() => lines.remove(note as never)).toThrow(/does not belong to "lines"/);

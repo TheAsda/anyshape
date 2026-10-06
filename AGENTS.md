@@ -11,6 +11,7 @@ Recipes (`recipes/`, the React recipes in `recipes/react/`, the examples) build 
 - Before designing or reviewing a change to the core or its public interface, check it against [`docs/principles.md`](docs/principles.md).
 - When writing code, follow [`CONTRIBUTING.md`](CONTRIBUTING.md): tests red first, pinned results before an optimization, current-design comments, changesets.
 - Before writing or moving a test, or running the checks, read [`docs/testing.md`](docs/testing.md): setup and commands, the file per layer, the conventions, the mechanisms to mutation-check.
+- Run `bun run format` and `bun run lint` before committing.
 
 ## Agent skills
 

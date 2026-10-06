@@ -6,12 +6,13 @@
 // shows a computed chain plus a cross-field budget rule.
 // ============================================================
 
-import { useId, useRef } from "react";
 import { countIn } from "anyshape";
 import { StoreProvider, useArray, useValue } from "anyshape/react";
+import { useId, useRef } from "react";
+
 import { useControl } from "../../../recipes/react";
-import { shape, CATALOG, lookingUp } from "./form";
 import { NumberField, ReadonlyField } from "./fields";
+import { shape, CATALOG, lookingUp } from "./form";
 
 // The row template: fields inside a StoreProvider row are addressed
 // through the template and resolved against that row's store.
@@ -28,7 +29,7 @@ const item = shape.order.items.item;
  * stays listed – the select needs it to render the selection.
  */
 function SkuField() {
-  const c = useControl(item.sku);
+  const { control: c, focusRef } = useControl(item.sku);
   const rows = useValue(shape.order.items);
   const id = useId();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -61,7 +62,7 @@ function SkuField() {
       </label>
       <select
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         value={c.value}
         onBlur={c.onBlur}
@@ -80,9 +81,7 @@ function SkuField() {
             </option>
           ))}
       </select>
-      {c.showError && (
-        <p className="field__error">{c.error}</p>
-      )}
+      {c.showError && <p className="field__error">{c.error}</p>}
       {c.pending && <p className="field__status">Checking…</p>}
     </div>
   );
@@ -101,7 +100,7 @@ function ItemName() {
 
 /** The total, computed and rule-checked; the input is read-only. */
 function TotalField() {
-  const c = useControl(shape.order.total);
+  const { control: c } = useControl(shape.order.total);
   return (
     <div className={c.showError ? "field field--error" : "field"}>
       <span className="field__label">Total</span>

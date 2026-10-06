@@ -7,13 +7,20 @@ Every stage of the [evolution example](https://github.com/TheAsda/anyshape/tree/
 ## Creating and providing a store
 
 ```tsx
-import { useEffect } from "react";
 import {
-  form, object, field, array, metaKey, defineBehaviors, defineBehavior, type FieldNode, type MetaRef, type InferValue,
+  form,
+  object,
+  field,
+  array,
+  metaKey,
+  defineBehaviors,
+  defineBehavior,
+  type FieldNode,
+  type MetaRef,
+  type InferValue,
 } from "anyshape";
-import {
-  StoreProvider, useForm, useStore, useValue, useField, useArray, useSync, useBehaviors,
-} from "anyshape/react";
+import { StoreProvider, useForm, useStore, useValue, useField, useArray, useSync, useBehaviors } from "anyshape/react";
+import { useEffect } from "react";
 
 const error = metaKey<string | undefined>(undefined);
 const visible = metaKey(true);
@@ -83,7 +90,11 @@ export function TripForm({ saved }: { saved?: Trip }) {
 function Summary() {
   const destination = useValue(shape.destination);
   const travelerCount = useValue(shape.travelers, (rows) => rows.length);
-  return <p>{travelerCount} going to {destination || "…"}</p>;
+  return (
+    <p>
+      {travelerCount} going to {destination || "…"}
+    </p>
+  );
 }
 ```
 
@@ -125,10 +136,14 @@ function Travelers() {
       {items.map((row) => (
         <StoreProvider key={row.stableId} store={row}>
           <TextField node={shape.travelers.item.name} label="Name" />
-          <button type="button" onClick={() => remove(row)}>Remove</button>
+          <button type="button" onClick={() => remove(row)}>
+            Remove
+          </button>
         </StoreProvider>
       ))}
-      <button type="button" onClick={() => append()}>Add traveler</button>
+      <button type="button" onClick={() => append()}>
+        Add traveler
+      </button>
     </section>
   );
 }
@@ -167,7 +182,9 @@ function DestinationOptions({ available }: { available: string[] }) {
   const options = useValue(shape.destination.destinations);
   return (
     <datalist id="destinations">
-      {options.map((name) => <option key={name} value={name} />)}
+      {options.map((name) => (
+        <option key={name} value={name} />
+      ))}
     </datalist>
   );
 }

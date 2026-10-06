@@ -17,10 +17,9 @@ const shape = form(
     car: object({
       license: field<string>(),
     }),
-    travelers: array(
-      object({ name: field<string>(), passport: field<string>() }),
-      { create: () => ({ name: "", passport: "" }) },
-    ),
+    travelers: array(object({ name: field<string>(), passport: field<string>() }), {
+      create: () => ({ name: "", passport: "" }),
+    }),
   }),
 );
 

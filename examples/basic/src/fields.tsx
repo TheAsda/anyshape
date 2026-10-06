@@ -1,8 +1,9 @@
 // ============================================================
 // Generic input components over useControl. `useControl` returns
-// value / onChange plus the control() state (error, touched,
-// dirty, pending), a focusRef that registers the element
-// for submit-time error focusing, and onBlur / showError.
+// `control` – value / onChange plus the control() state (error,
+// touched, dirty, pending) and onBlur / showError – and beside it
+// a focusRef that registers the element for submit-time error
+// focusing.
 //
 // showError: an error shows once the field was left (onBlur) or
 // covered by a submit and no check is pending, and then stays live
@@ -14,10 +15,11 @@
 // trip them, in this demo), in addition to the live error.
 // ============================================================
 
-import { useId } from "react";
-import { useValue } from "anyshape/react";
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 import type { AnyNode } from "anyshape";
+import { useValue } from "anyshape/react";
+import { useId } from "react";
+
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 
 // Node types accepted by each component: a ControlNode whose value type
 // matches the input. Passing e.g. a number field to TextField is a type
@@ -71,7 +73,7 @@ interface TextFieldProps extends CommonProps {
 }
 
 export function TextField({ node, label, hint, type = "text", placeholder, autoComplete }: TextFieldProps) {
-  const c = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -84,7 +86,7 @@ export function TextField({ node, label, hint, type = "text", placeholder, autoC
       </label>
       <input
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         type={type}
         value={c.value}
@@ -116,7 +118,7 @@ interface TextAreaFieldProps extends CommonProps {
 }
 
 export function TextAreaField({ node, label, hint, rows = 4, placeholder }: TextAreaFieldProps) {
-  const c = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -129,7 +131,7 @@ export function TextAreaField({ node, label, hint, rows = 4, placeholder }: Text
       </label>
       <textarea
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         rows={rows}
         value={c.value}
@@ -162,7 +164,7 @@ interface NumberFieldProps extends CommonProps {
 }
 
 export function NumberField({ node, label, hint, min, max, placeholder, suffix }: NumberFieldProps) {
-  const c = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -176,7 +178,7 @@ export function NumberField({ node, label, hint, min, max, placeholder, suffix }
       <div className="field__affix">
         <input
           id={id}
-          ref={c.focusRef}
+          ref={focusRef}
           className="field__input"
           type="number"
           inputMode="numeric"
@@ -210,7 +212,7 @@ interface SelectFieldProps extends CommonProps {
 }
 
 export function SelectField({ node, label, hint, options }: SelectFieldProps) {
-  const c = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -223,7 +225,7 @@ export function SelectField({ node, label, hint, options }: SelectFieldProps) {
       </label>
       <select
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         value={c.value}
         onBlur={c.onBlur}
@@ -256,7 +258,7 @@ interface CheckboxFieldProps extends CommonProps {
 }
 
 export function CheckboxField({ node, label, hint }: CheckboxFieldProps) {
-  const c = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -266,7 +268,7 @@ export function CheckboxField({ node, label, hint }: CheckboxFieldProps) {
     <div className={show ? "field field--checkbox field--error" : "field field--checkbox"}>
       <input
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         type="checkbox"
         checked={c.value}
         onBlur={c.onBlur}
@@ -295,7 +297,7 @@ interface DateFieldProps extends CommonProps {
 }
 
 export function DateField({ node, label, hint }: DateFieldProps) {
-  const c = useControl(node);
+  const { control: c, focusRef } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -308,7 +310,7 @@ export function DateField({ node, label, hint }: DateFieldProps) {
       </label>
       <input
         id={id}
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         type="date"
         value={c.value}

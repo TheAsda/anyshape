@@ -2,29 +2,52 @@
 // the DevTools performance tracks. Time comes from a stubbed performance.now
 // that the test's reactions, listeners and behaviors advance.
 
-import { form, object, array, field, createStore, defineBehavior, type InferValue, type RootStore, type AnyRef, type AnyNode } from "../src/index";
-import type { ProbedInstance } from "../src/store";
 import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from "vitest";
+
+import {
+  form,
+  object,
+  array,
+  field,
+  createStore,
+  defineBehavior,
+  type InferValue,
+  type RootStore,
+  type AnyRef,
+  type AnyNode,
+} from "../src/index";
 import { pathLabel } from "../src/internal";
-import { deferred, flush } from "./support/harness";
+import type { ProbedInstance } from "../src/store";
 import { validation } from "./support/features";
+import { deferred, flush } from "./support/harness";
 import { required, rule } from "./support/rules";
 
-const shape = form(object({
-  code: field<string>(),
-  name: field<string>(),
-  rows: array(object({ sku: field<string>(), title: field<string>() })),
-}));
+const shape = form(
+  object({
+    code: field<string>(),
+    name: field<string>(),
+    rows: array(object({ sku: field<string>(), title: field<string>() })),
+  }),
+);
 type Values = InferValue<typeof shape>;
 const R = shape.rows.item;
-const initial = (): Values => ({ code: "a", name: "", rows: [{ sku: "x", title: "" }, { sku: "y", title: "" }] });
+const initial = (): Values => ({
+  code: "a",
+  name: "",
+  rows: [
+    { sku: "x", title: "" },
+    { sku: "y", title: "" },
+  ],
+});
 
 /** Combined `error` keys, on the root and in rows. */
-const signup = form(object({
-  email: field<string>().meta(validation()),
-  copy: field<string>(),
-  lines: array(object({ email: field<string>().meta(validation()) })),
-}));
+const signup = form(
+  object({
+    email: field<string>().meta(validation()),
+    copy: field<string>(),
+    lines: array(object({ email: field<string>().meta(validation()) })),
+  }),
+);
 const L = signup.lines.item;
 const signupValues = () => ({ email: "", copy: "", lines: [{ email: "" }, { email: "" }] });
 
@@ -48,7 +71,15 @@ function record(s: RootStore<any>): unknown[][] {
     }
     return typeof arg === "function" ? arg() : arg;
   };
-  (s as any)._probe = new Proxy({}, { get: (_, name) => (...args: unknown[]) => void events.push([name, ...args.map(show)]) });
+  (s as any)._probe = new Proxy(
+    {},
+    {
+      get:
+        (_, name) =>
+        (...args: unknown[]) =>
+          void events.push([name, ...args.map(show)]),
+    },
+  );
   return events;
 }
 
@@ -71,12 +102,14 @@ describe("T · Probe", () => {
     const s = createStore(shape, initial());
     s.addBehavior(
       defineBehavior({
-        name: "title", triggers: [R.sku], writes: [R.title],
+        name: "title",
+        triggers: [R.sku],
+        writes: [R.title],
         run: (ctx) => {
           t += 4;
           ctx.set(R.title, ctx.get(R.sku).toUpperCase());
         },
-      })
+      }),
     );
     const events = record(s);
     t = 10;
@@ -95,13 +128,16 @@ describe("T · Probe", () => {
     const lookup = deferred<string>();
     s.addBehavior(
       defineBehavior({
-        name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+        name: "lookup",
+        triggers: [shape.code],
+        writes: [shape.name],
+        runOn: { init: false },
         run: async (ctx) => {
           t += 2;
           const name = await lookup.promise;
           ctx.set(shape.name, name);
         },
-      })
+      }),
     );
     s._react(shape.name, () => void (t += 5));
     const events = record(s);
@@ -129,9 +165,12 @@ describe("T · Probe", () => {
     const s = createStore(shape, initial());
     s.addBehavior(
       defineBehavior({
-        name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+        name: "lookup",
+        triggers: [shape.code],
+        writes: [shape.name],
+        runOn: { init: false },
         run: () => new Promise<void>(() => {}),
-      })
+      }),
     );
     s.set(shape.code, "b");
     const events = record(s);
@@ -155,16 +194,29 @@ describe("T · Probe", () => {
     t = 10;
     const handle = s.addBehavior([
       required(L.email),
-      defineBehavior({ name: "copy", triggers: [signup.email], writes: [signup.copy], run: (ctx) => ctx.set(signup.copy, ctx.get(signup.email)) }),
+      defineBehavior({
+        name: "copy",
+        triggers: [signup.email],
+        writes: [signup.copy],
+        run: (ctx) => ctx.set(signup.copy, ctx.get(signup.email)),
+      }),
     ]);
     expect(events.map((e) => e[0]).slice(0, 3)).toEqual(["registrationStart", "registrationEnd", "flushStart"]);
     expect(events[1]).toEqual([
-      "registrationEnd", 10,
+      "registrationEnd",
+      10,
       {
         store: "<root>",
         added: ["copy"],
         removed: [],
-        owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], contributions: ["unique @lines[1]", "required(lines[].email) @<root>"], more: 0 }],
+        owners: [
+          {
+            key: "lines[].email#error",
+            triggers: ["lines[].email"],
+            contributions: ["unique @lines[1]", "required(lines[].email) @<root>"],
+            more: 0,
+          },
+        ],
       },
     ]);
 
@@ -175,7 +227,9 @@ describe("T · Probe", () => {
       store: "<root>",
       added: [],
       removed: ["copy"],
-      owners: [{ key: "lines[].email#error", triggers: ["lines[].email"], contributions: ["unique @lines[1]"], more: 0 }],
+      owners: [
+        { key: "lines[].email#error", triggers: ["lines[].email"], contributions: ["unique @lines[1]"], more: 0 },
+      ],
     });
   });
   test("disposing a handle that registered nothing is no registration change", () => {
@@ -188,18 +242,31 @@ describe("T · Probe", () => {
 });
 
 describe("T · Flush budget", () => {
-  const order = form(object({
-    lines: array(object({ qty: field<number>(), total: field<number>() })),
-    sum: field<number>(),
-    note: field<string>(),
-    profile: object({ size: field<number>() }),
-  }));
+  const order = form(
+    object({
+      lines: array(object({ qty: field<number>(), total: field<number>() })),
+      sum: field<number>(),
+      note: field<string>(),
+      profile: object({ size: field<number>() }),
+    }),
+  );
   const O = order.lines.item;
-  const orderValues = () => ({ lines: [{ qty: 1, total: 0 }, { qty: 2, total: 0 }, { qty: 3, total: 0 }], sum: 0, note: "", profile: { size: 0 } });
+  const orderValues = () => ({
+    lines: [
+      { qty: 1, total: 0 },
+      { qty: 2, total: 0 },
+      { qty: 3, total: 0 },
+    ],
+    sum: 0,
+    note: "",
+    profile: { size: 0 },
+  });
   /** A behavior that takes `ms` per run and changes `write`, if any. */
   const slow = (name: string, ms: number, triggers: AnyRef[], write?: AnyNode) =>
     defineBehavior({
-      name, triggers, writes: write ? [write] : [],
+      name,
+      triggers,
+      writes: write ? [write] : [],
       run: (ctx) => {
         t += ms;
         if (write) ctx.set(write, ctx.get(write) + 1);
@@ -223,11 +290,14 @@ describe("T · Flush budget", () => {
     s._react(order.sum, () => void (t += 2));
     s.subscribe(order.lines, () => void (t += 4));
     warn.mockClear();
-    s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
+    s.set(
+      order.lines,
+      s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })),
+    );
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
       "[form] A flush took 42.5 ms, over the 33.3 ms budget: 38.5 ms in behaviors, 4.0 ms in listeners. " +
-        'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run), "note" 1.0 ms (1 run).'
+        'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run), "note" 1.0 ms (1 run).',
     );
   });
 
@@ -242,7 +312,7 @@ describe("T · Flush budget", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
       "[form] A flush took 35.0 ms, over the 33.3 ms budget: 35.0 ms in behaviors, 0.0 ms in listeners. " +
-        'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run).'
+        'Slowest behaviors: "total" 30.0 ms (3 runs), "sum" 5.0 ms (1 run).',
     );
   });
 
@@ -251,19 +321,25 @@ describe("T · Flush budget", () => {
       behaviors: [slow("total", 10, [O.qty], O.total), slow("sum", 5, [order.lines], order.sum)],
     });
     warn.mockClear();
-    s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
+    s.set(
+      order.lines,
+      s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })),
+    );
     const [, ...definedAt] = warn.mock.calls[0] as [string, ...Error[]];
     expect(definedAt.map((e) => e.message)).toEqual(['"total" is defined here', '"sum" is defined here']);
     for (const e of definedAt) {
-      const frames = e.stack!.split("\n").filter((l) => l.trim().startsWith("at "));
-      expect(frames[0]).toMatch(/diagnostics\.test\.ts/); // the call to defineBehavior in `slow`
+      const frame = e.stack!.split("\n").find((l) => l.trim().startsWith("at "));
+      expect(frame).toMatch(/diagnostics\.test\.ts/); // the call to defineBehavior in `slow`
     }
   });
 
   test("a flush within budget doesn't warn", () => {
     const s = createStore(order, orderValues(), { behaviors: [slow("total", 10, [O.qty], O.total)] });
     warn.mockClear();
-    s.set(order.lines, s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })));
+    s.set(
+      order.lines,
+      s.get(order.lines).map((l) => ({ ...l, qty: l.qty + 1 })),
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -272,31 +348,41 @@ describe("T · Flush budget", () => {
     const reply = deferred<void>();
     s.addBehavior(
       defineBehavior({
-        name: "load", triggers: [order.note], writes: [order.profile], runOn: { init: false },
+        name: "load",
+        triggers: [order.note],
+        writes: [order.profile],
+        runOn: { init: false },
         run: async (ctx) => {
           t += 40;
           await reply.promise;
           let first = true;
           // Applying the write validates the object: a slow read stands for a big value.
-          ctx.set(order.profile, { get size() { if (first) { first = false; t += 40; } return 1; } });
+          ctx.set(order.profile, {
+            get size() {
+              if (first) {
+                first = false;
+                t += 40;
+              }
+              return 1;
+            },
+          });
         },
-      })
+      }),
     );
     s.set(order.note, "go");
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
-      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in behaviors, 0.0 ms in listeners. Slowest behaviors: "load" 40.0 ms (1 run).'
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms in behaviors, 0.0 ms in listeners. Slowest behaviors: "load" 40.0 ms (1 run).',
     );
     t += 1000;
     reply.resolve();
     await flush();
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[1][0]).toBe(
-      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms applying async writes, 0.0 ms in behaviors, 0.0 ms in listeners. Slowest behaviors: "load" 40.0 ms.'
+      '[form] A flush took 40.0 ms, over the 33.3 ms budget: 40.0 ms applying async writes, 0.0 ms in behaviors, 0.0 ms in listeners. Slowest behaviors: "load" 40.0 ms.',
     );
   });
 });
-
 
 describe("T · DevTools tracks", () => {
   let stamp: Mock<(...args: unknown[]) => void>;
@@ -312,18 +398,25 @@ describe("T · DevTools tracks", () => {
   });
   /** The detail.devtools of each performance.measure call, with its name, start and end. */
   const measured = () =>
-    measure.mock.calls.map(([name, options]: any) => ({ name, start: options.start, end: options.end, ...options.detail.devtools }));
+    measure.mock.calls.map(([name, options]: any) => ({
+      name,
+      start: options.start,
+      end: options.end,
+      ...options.detail.devtools,
+    }));
 
   test("each flush, its two phases and each run are entries in the anyshape group: label, start, end, track, color", () => {
     const s = createStore(shape, initial());
     s.addBehavior(
       defineBehavior({
-        name: "title", triggers: [R.sku], writes: [R.title],
+        name: "title",
+        triggers: [R.sku],
+        writes: [R.title],
         run: (ctx) => {
           t += 4;
           ctx.set(R.title, ctx.get(R.sku).toUpperCase());
         },
-      })
+      }),
     );
     s.subscribe(shape.rows, () => void (t += 1));
     stamp.mockClear();
@@ -345,12 +438,20 @@ describe("T · DevTools tracks", () => {
     stamp.mockClear();
     measure.mockClear();
     t = 10;
-    s.set(shape.rows, s.get(shape.rows).map((r) => ({ ...r, sku: r.sku + "!" })));
+    s.set(
+      shape.rows,
+      s.get(shape.rows).map((r) => ({ ...r, sku: r.sku + "!" })),
+    );
     expect(stamp.mock.calls.filter((c) => c[3] === "flush").map((c) => c[0])).toEqual(["behavior runs", "listeners"]);
     expect(measured()).toEqual([
       {
-        name: "flush over budget", start: 10, end: 51,
-        dataType: "track-entry", track: "flush", trackGroup: "anyshape", color: "error",
+        name: "flush over budget",
+        start: 10,
+        end: 51,
+        dataType: "track-entry",
+        track: "flush",
+        trackGroup: "anyshape",
+        color: "error",
         tooltipText: "A flush took 41.0 ms, over the 33.3 ms budget",
         properties: [
           ["Behaviors", "40.0 ms"],
@@ -366,14 +467,17 @@ describe("T · DevTools tracks", () => {
     const replies: ReturnType<typeof deferred<string>>[] = [];
     s.addBehavior(
       defineBehavior({
-        name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+        name: "lookup",
+        triggers: [shape.code],
+        writes: [shape.name],
+        runOn: { init: false },
         run: async (ctx) => {
           t += 1;
           const reply = deferred<string>();
           replies.push(reply);
           ctx.set(shape.name, await reply.promise);
         },
-      })
+      }),
     );
     stamp.mockClear();
     t = 10;
@@ -383,7 +487,8 @@ describe("T · DevTools tracks", () => {
     t = 50;
     replies[1].resolve("Gamma");
     await flush();
-    const tracks = (track: string) => stamp.mock.calls.filter((c) => c[3] === track).map((c) => [c[0], c[1], c[2], c[5]]);
+    const tracks = (track: string) =>
+      stamp.mock.calls.filter((c) => c[3] === track).map((c) => [c[0], c[1], c[2], c[5]]);
     expect(tracks("async")).toEqual([
       ["lookup @<root> (cancelled)", 10, 20, "secondary-light"],
       ["lookup @<root>", 20, 50, "secondary"],
@@ -397,18 +502,25 @@ describe("T · DevTools tracks", () => {
 
   test("a registration change is a detailed entry listing, per combined key it changed, the owner's triggers and contributions", () => {
     const s = createStore(signup, signupValues());
-    s.substore(signup.lines).itemAt(1).addBehavior(rule(L.email, () => undefined, { name: "unique" }));
+    s.substore(signup.lines)
+      .itemAt(1)
+      .addBehavior(rule(L.email, () => undefined, { name: "unique" }));
     measure.mockClear();
     t = 10;
     const handle = s.addBehavior([
       required(L.email),
-      defineBehavior({ name: "copy", triggers: [signup.email], writes: [signup.copy], run: (ctx) => void (t += 3) }),
+      defineBehavior({ name: "copy", triggers: [signup.email], writes: [signup.copy], run: () => void (t += 3) }),
     ]);
     handle();
     expect(measured()).toEqual([
       {
-        name: "registration @<root>", start: 10, end: 10,
-        dataType: "track-entry", track: "registration", trackGroup: "anyshape", color: "tertiary-dark",
+        name: "registration @<root>",
+        start: 10,
+        end: 10,
+        dataType: "track-entry",
+        track: "registration",
+        trackGroup: "anyshape",
+        color: "tertiary-dark",
         tooltipText: "1 behavior added, 0 removed, 1 combined key changed",
         properties: [
           ["Added", "copy"],
@@ -417,8 +529,13 @@ describe("T · DevTools tracks", () => {
         ],
       },
       {
-        name: "registration @<root>", start: 13, end: 13,
-        dataType: "track-entry", track: "registration", trackGroup: "anyshape", color: "tertiary-dark",
+        name: "registration @<root>",
+        start: 13,
+        end: 13,
+        dataType: "track-entry",
+        track: "registration",
+        trackGroup: "anyshape",
+        color: "tertiary-dark",
         tooltipText: "0 behaviors added, 1 removed, 1 combined key changed",
         properties: [
           ["Removed", "copy"],
@@ -431,7 +548,9 @@ describe("T · DevTools tracks", () => {
 
   test("an owner's contributions are listed up to 20, then counted", () => {
     const s = createStore(signup, signupValues());
-    s.substore(signup.lines).itemAt(1).addBehavior(rule(L.email, () => undefined, { name: "unique" }));
+    s.substore(signup.lines)
+      .itemAt(1)
+      .addBehavior(rule(L.email, () => undefined, { name: "unique" }));
     measure.mockClear();
     s.addBehavior(Array.from({ length: 21 }, (_, i) => rule(L.email, () => undefined, { name: `r${i}` })));
     const listed = Object.fromEntries(measured()[0].properties)["lines[].email#error contributions"];
@@ -444,9 +563,12 @@ describe("T · DevTools tracks", () => {
     const reply = deferred<string>();
     s.addBehavior(
       defineBehavior({
-        name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+        name: "lookup",
+        triggers: [shape.code],
+        writes: [shape.name],
+        runOn: { init: false },
         run: async (ctx) => ctx.set(shape.name, await reply.promise),
-      })
+      }),
     );
     await s.settle();
     s.set(shape.code, "b");
@@ -458,8 +580,13 @@ describe("T · DevTools tracks", () => {
     await settled;
     expect(measured()).toEqual([
       {
-        name: "settle @<root>", start: 10, end: 30,
-        dataType: "track-entry", track: "async", trackGroup: "anyshape", color: "secondary-dark",
+        name: "settle @<root>",
+        start: 10,
+        end: 30,
+        dataType: "track-entry",
+        track: "async",
+        trackGroup: "anyshape",
+        color: "secondary-dark",
         tooltipText: "settle() waited 20.0 ms for the runs in flight inside <root>",
         properties: [],
       },
@@ -483,10 +610,9 @@ describe("T · DevTools tracks", () => {
   });
 });
 
-
 describe("T · Production", () => {
   test("in production nothing is measured: no clock reads, no warning, no entries", async () => {
-    const stamp = (console.timeStamp = vi.fn());
+    const stamp = (console.timeStamp = vi.fn<Console["timeStamp"]>());
     const measure = vi.spyOn(performance, "measure");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubEnv("NODE_ENV", "production");
@@ -496,7 +622,10 @@ describe("T · Production", () => {
         behaviors: [
           defineBehavior({ name: "title", triggers: [R.sku], writes: [R.title], run: () => void (t += 40) }),
           defineBehavior({
-            name: "lookup", triggers: [shape.code], writes: [shape.name], runOn: { init: false },
+            name: "lookup",
+            triggers: [shape.code],
+            writes: [shape.name],
+            runOn: { init: false },
             run: async (ctx) => ctx.set(shape.name, await reply.promise),
           }),
         ],

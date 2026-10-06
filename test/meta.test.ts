@@ -1,11 +1,10 @@
-import {
-  form, object, array, field, MetaRef, createStore, type InferValue, type InferMeta,
-} from "../src/index";
-import { control, validation, touched, visible, disabled, submission } from "./support/features";
-import { META, META_DEFS, CREATE, defOf } from "../src/internal";
 import { test, describe, expect } from "vitest";
 
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+import { form, object, array, field, MetaRef, createStore, type InferValue, type InferMeta } from "../src/index";
+import { META_DEFS, CREATE, defOf } from "../src/internal";
+import { control, validation, touched, visible, disabled, submission } from "./support/features";
+
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;
 
 // ---------------------------------------------------------------------------
@@ -25,14 +24,18 @@ const shape = form(
       create: () => ({ sku: "", qty: 1 }),
     }),
     tags: array(object({ text: field<string>() })),
-  }).meta(submission())
+  }).meta(submission()),
 );
 
 function values(): InferValue<typeof shape> {
   return {
-    note: "", name: "", company: { vat: "" },
-    shipping: { street: "", city: "" }, billing: { street: "", city: "" },
-    lines: [], tags: [],
+    note: "",
+    name: "",
+    company: { vat: "" },
+    shipping: { street: "", city: "" },
+    billing: { street: "", city: "" },
+    lines: [],
+    tags: [],
   };
 }
 
@@ -51,7 +54,7 @@ type _9 = Expect<Equal<InferMeta<typeof shape.note>, {}>>;
 // Compile-time only – never called.
 export function typeOnlyChecks() {
   // @ts-expect-error – `note` declares no meta
-  shape.note.error;
+  void shape.note.error;
   // @ts-expect-error – `create` must return a complete item
   array(object({ a: field<string>() }), { create: () => ({}) });
 }
@@ -60,8 +63,13 @@ describe("C · Declarations", () => {
   test("defaults from plain values and key definitions", () => {
     const s = createStore(shape, values());
     const n = shape.name;
-    expect([s.get(n.error), s.get(n.touched), s.get(n.dirty), s.get(n.revealed), s.get(n.label)])
-      .toEqual([undefined, false, false, false, "Name"]);
+    expect([s.get(n.error), s.get(n.touched), s.get(n.dirty), s.get(n.revealed), s.get(n.label)]).toEqual([
+      undefined,
+      false,
+      false,
+      false,
+      "Name",
+    ]);
     expect(s.get(shape.submitting)).toBe(false);
   });
 
@@ -77,15 +85,22 @@ describe("C · Declarations", () => {
   });
 
   test("a node declares each key once: a second declaration throws, plain value or key definition", () => {
-    const alreadyDeclared = (key: string, kind: string) => `Meta key "${key}" is already declared on this ${kind} – a node declares each key once`;
+    const alreadyDeclared = (key: string, kind: string) =>
+      `Meta key "${key}" is already declared on this ${kind} – a node declares each key once`;
     expect(() => field<string>().meta({ hint: "a" }).meta({ hint: 1 })).toThrow(alreadyDeclared("hint", "field"));
     expect(() => field<string>().meta({ hint: "a" }, { hint: "b" })).toThrow(alreadyDeclared("hint", "field"));
     expect(() => field<string>().meta(validation()).meta(validation())).toThrow(alreadyDeclared("error", "field"));
     expect(() => field<string>().meta(control(), { touched })).toThrow(alreadyDeclared("touched", "field"));
     expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(alreadyDeclared("error", "field"));
     expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(alreadyDeclared("error", "field"));
-    expect(() => object({ a: field<string>() }).meta({ hint: "" }).meta({ hint: "" })).toThrow(alreadyDeclared("hint", "object"));
-    expect(() => array(object({ a: field<string>() })).meta({ hint: "" }).meta({ hint: "" })).toThrow(alreadyDeclared("hint", "array"));
+    expect(() => object({ a: field<string>() }).meta({ hint: "" }).meta({ hint: "" })).toThrow(
+      alreadyDeclared("hint", "object"),
+    );
+    expect(() =>
+      array(object({ a: field<string>() }))
+        .meta({ hint: "" })
+        .meta({ hint: "" }),
+    ).toThrow(alreadyDeclared("hint", "array"));
   });
 
   test("reserved meta keys are rejected", () => {
@@ -125,7 +140,7 @@ describe("C · Meta references", () => {
 
   test("a meta key cannot share a name with a child", () => {
     expect(() => object({ error: field<string>() }).meta(validation())).toThrow(
-      `"error" is a field of "<root>" and cannot also be a meta key`
+      `"error" is a field of "<root>" and cannot also be a meta key`,
     );
     expect(() => object({ label: field<string>() }).meta({ label: "Group" })).toThrow(/"label" is a field of/);
   });
@@ -138,9 +153,11 @@ describe("C · Meta references", () => {
   });
 
   test("paths through nested arrays, for nodes and meta refs", () => {
-    const f = form(object({
-      outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
-    }));
+    const f = form(
+      object({
+        outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
+      }),
+    );
     expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
     expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
     expect(f.outer.item.inner.path).toBe("outer[].inner");
@@ -187,7 +204,7 @@ describe("C · Reserved names, table-driven", () => {
 
   test("_fields, _meta and _metaDefs are ordinary field names", () => {
     const f = form(
-      object({ _fields: field<string>(), _meta: field<number>(), _metaDefs: field<boolean>() }).meta({ hint: "h" })
+      object({ _fields: field<string>(), _meta: field<number>(), _metaDefs: field<boolean>() }).meta({ hint: "h" }),
     );
     const s = createStore(f, { _fields: "a", _meta: 1, _metaDefs: true });
     s.set(f._meta, 2);
@@ -196,9 +213,11 @@ describe("C · Reserved names, table-driven", () => {
   });
 
   test("_fields, _meta and _metaDefs are ordinary meta keys", () => {
-    const f = form(object({
-      group: object({ x: field<string>() }).meta({ _fields: 1, _meta: "m", _metaDefs: false }),
-    }));
+    const f = form(
+      object({
+        group: object({ x: field<string>() }).meta({ _fields: 1, _meta: "m", _metaDefs: false }),
+      }),
+    );
     const s = createStore(f, { group: { x: "a" } });
     s.set(f.group._meta, "n");
     expect([s.get(f.group._fields), s.get(f.group._meta), s.get(f.group._metaDefs)]).toEqual([1, "n", false]);

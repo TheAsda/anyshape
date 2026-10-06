@@ -1,15 +1,14 @@
 // H · Counts: countIn, collect, aggregate keys, counts across rows.
 
-import {
-  form, object, array, field, metaKey, createStore, countIn, initialOf, when,
-} from "../src/index";
-import { control, revealed, dirty, error } from "./support/features";
-import { test, test as base, describe, expect } from "vitest";
+import { test, test as base, describe, expect, vi } from "vitest";
+
+import { form, object, array, field, metaKey, createStore, countIn, initialOf } from "../src/index";
+import { revealed, dirty, error } from "./support/features";
 import * as company from "./support/fixtures/company";
 import * as limits from "./support/fixtures/limits";
 
 describe("H · Counts and collect", () => {
-  const { shape, L, initial, originsOf } = company;
+  const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
     .extend("lines", ({ store }) => store.substore(shape.lines));
@@ -51,12 +50,16 @@ describe("H · Counts and collect", () => {
   test("a row write that drops its nested rows moves their counts before the reactions run", () => {
     // No behaviors: the count is the only thing that changes for the reactions.
     const flaggedKey = metaKey(false).aggregate((v) => v);
-    const f = form(object({ rows: array(object({ notes: array(object({ text: field<string>().meta({ flagged: flaggedKey }) })) })) }));
+    const f = form(
+      object({
+        rows: array(object({ notes: array(object({ text: field<string>().meta({ flagged: flaggedKey }) })) })),
+      }),
+    );
     const s = createStore(f, { rows: [{ notes: [{ text: "" }] }, { notes: [] }] });
     const row = s.substore(f.rows).itemAt(0);
     const note = row.substore(f.rows.item.notes).itemAt(0);
     note.set(f.rows.item.notes.item.text.flagged, true);
-    note.set(f.rows.item.notes.item.text, "n");   // a flush that walks the rows first
+    note.set(f.rows.item.notes.item.text, "n"); // a flush that walks the rows first
     const seen: number[] = [];
     s._react(countIn(f, flaggedKey), (next) => seen.push(next));
     row.set(f.rows.item.notes, []);
@@ -75,48 +78,24 @@ describe("H · Counts and collect", () => {
 
   test("collect(node, def) lists every instance that declares the definition, whatever its value or name", () => {
     const marked = metaKey(false);
-    const f = form(object({
-      a: field<string>().meta({ marked }),
-      b: field<string>().meta({ other: metaKey(false) }),
-      rows: array(object({ c: field<string>().meta({ flag: marked }) })),
-      d: field<string>().meta({ marked }),
-    }));
+    const f = form(
+      object({
+        a: field<string>().meta({ marked }),
+        b: field<string>().meta({ other: metaKey(false) }),
+        rows: array(object({ c: field<string>().meta({ inRow: marked }) })),
+        d: field<string>().meta({ marked }),
+      }),
+    );
     const s = createStore(f, { a: "", b: "", rows: [{ c: "" }, { c: "" }], d: "" });
     const rows = s.substore(f.rows);
-    rows.itemAt(1).set(f.rows.item.c.flag, true);
+    rows.itemAt(1).set(f.rows.item.c.inRow, true);
 
     const found = s.collect(f, marked);
     expect(found.map((e) => e.path)).toEqual(["a", "rows[0].c", "rows[1].c", "d"]);
     expect(found[0].ref).toBe(f.a.marked);
-    expect(found[2].ref).toBe(f.rows.item.c.flag);
+    expect(found[2].ref).toBe(f.rows.item.c.inRow);
     expect(found[2].store).toBe(rows.itemAt(1));
     expect(found.map((e) => e.store.get(e.ref))).toEqual([false, false, true, false]);
-  });
-
-  test("countIn warns when nothing in the subtree can aggregate the key", () => {
-    const flag = metaKey(false);
-    const elsewhere = metaKey(false).aggregate((v) => v);
-    const local = form(
-      object({
-        a: field<string>().meta(control()),
-        b: field<boolean>().meta({ flag }),
-      })
-    );
-    const original = console.warn;
-    const seen: string[] = [];
-    console.warn = (...args: unknown[]) => void seen.push(args.join(" "));
-    try {
-      expect(countIn(local, error)).toBeDefined(); // aggregable: silent
-      countIn(local, flag); // declared, but without an aggregate: always 0
-      countIn(local, flag); // cached ref: still one warning
-      countIn(local, elsewhere); // not declared in the subtree (e.g. the wrong key)
-      expect(countIn(local, error)).toBe(countIn(local, error));
-    } finally {
-      console.warn = original;
-    }
-    expect(seen.length).toBe(2);
-    expect(seen[0]).toMatch(/has no aggregate/);
-    expect(seen[1]).toMatch(/no node under "<root>" declares it/);
   });
 
   test("aggregate must be false for the default", async () => {
@@ -125,7 +104,12 @@ describe("H · Counts and collect", () => {
   });
 
   test(".aggregate() is declared once: a second call throws instead of replacing the first", () => {
-    expect(() => metaKey(0).aggregate((v) => v > 0).aggregate((v) => v < 0)).toThrow(/\.aggregate\(\) is declared once/);
+    expect(() =>
+      // @ts-expect-error – the runtime check is what this test pins
+      metaKey(0)
+        .aggregate((v) => v > 0)
+        .aggregate((v) => v < 0),
+    ).toThrow(/\.aggregate\(\) is declared once/);
   });
 
   test("collect on a row store: paths from the root, only that row; nested rows", ({ store: s }) => {
@@ -140,10 +124,12 @@ describe("H · Counts and collect", () => {
 
   test("a custom counted key written by application code counts like the built-in ones", () => {
     const flaggedKey = metaKey(false).aggregate((v) => v);
-    const f = form(object({
-      a: field<string>().meta({ flagged: flaggedKey }),
-      rows: array(object({ b: field<string>().meta({ flagged: flaggedKey }) })),
-    }));
+    const f = form(
+      object({
+        a: field<string>().meta({ flagged: flaggedKey }),
+        rows: array(object({ b: field<string>().meta({ flagged: flaggedKey }) })),
+      }),
+    );
     const s = createStore(f, { a: "", rows: [{ b: "" }, { b: "" }] });
     const flagged = countIn(f, flaggedKey);
     s.set(f.a.flagged, true);
@@ -153,7 +139,12 @@ describe("H · Counts and collect", () => {
     expect(s.get(countIn(f.rows, flaggedKey))).toBe(1);
     rows.remove(rows.itemAt(1));
     expect(s.get(flagged)).toBe(1);
-    expect(s.collect(f, flaggedKey).filter((e) => e.store.get(e.ref)).map((e) => e.path)).toEqual(["a"]);
+    expect(
+      s
+        .collect(f, flaggedKey)
+        .filter((e) => e.store.get(e.ref))
+        .map((e) => e.path),
+    ).toEqual(["a"]);
   });
 });
 
@@ -161,11 +152,13 @@ describe("H · Counts by definition", () => {
   test("countIn counts a key definition, whatever name a node declares it under", () => {
     const flagged = metaKey(false).aggregate((v) => v);
     const other = metaKey(false).aggregate((v) => v);
-    const f = form(object({
-      a: field<string>().meta({ flagged }),
-      b: field<string>().meta({ marked: flagged, flagged: other }),
-      rows: array(object({ c: field<string>().meta({ flagged }) })),
-    }));
+    const f = form(
+      object({
+        a: field<string>().meta({ flagged }),
+        b: field<string>().meta({ marked: flagged, flagged: other }),
+        rows: array(object({ c: field<string>().meta({ flagged }) })),
+      }),
+    );
     const s = createStore(f, { a: "", b: "", rows: [{ c: "" }, { c: "" }] });
     s.set(f.a.flagged, true);
     s.set(f.b.marked, true);
@@ -179,8 +172,60 @@ describe("H · Counts by definition", () => {
   });
 });
 
+describe.each(["development", "production"])("H · countIn rejects a key it can't count (%s)", (mode) => {
+  const checked = metaKey(false);
+  const counted = metaKey(false).aggregate((v) => v);
+  const f = form(
+    object({
+      a: field<string>().meta({ counted }),
+      b: field<boolean>().meta({ checked }),
+      rows: array(object({ c: field<string>().meta({ inRow: counted }) })),
+      other: object({ d: field<string>() }),
+    }),
+  );
+  // oxlint-disable-next-line no-empty-pattern -- Vitest needs a destructuring pattern as a fixture's first argument
+  const test = base.extend("warn", ({}, { onCleanup }) => {
+    vi.stubEnv("NODE_ENV", mode);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    onCleanup(() => {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    });
+    return warn;
+  });
+
+  test("a key without aggregate throws, naming the node and the key", ({ warn }) => {
+    // @ts-expect-error countIn takes only a key declared with .aggregate()
+    expect(() => countIn(f, checked)).toThrow(
+      'countIn on "<root>": key "checked" on "b" has no aggregate – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).',
+    );
+    // @ts-expect-error countIn takes only a key declared with .aggregate()
+    expect(() => countIn(f, checked), "a failed call caches nothing").toThrow(/has no aggregate/);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("a key no node in the subtree declares throws, naming the node", ({ warn }) => {
+    expect(() => countIn(f.other, counted)).toThrow(
+      'countIn on "other": no node in the subtree declares the key – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).',
+    );
+    expect(() => countIn(f.other, counted), "a failed call caches nothing").toThrow(
+      /no node in the subtree declares the key/,
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("a counted key declared in the subtree, by a field or a row template, does not throw", ({ warn }) => {
+    const s = createStore(f, { a: "", b: false, rows: [{ c: "" }], other: { d: "" } });
+    s.substore(f.rows).itemAt(0).set(f.rows.item.c.inRow, true);
+    expect(s.get(countIn(f, counted))).toBe(1);
+    expect(s.get(countIn(f.rows, counted)), "declared only by the row template").toBe(1);
+    expect(s.get(countIn(f.a, counted))).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
 describe("H · Stable count references", () => {
-  const { shape, L, initial } = limits;
+  const { shape } = limits;
 
   // ---------------------------------------------------------------------------
   // Stable references

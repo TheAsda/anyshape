@@ -1,6 +1,7 @@
-import { defineConfig } from 'vite';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+import { defineConfig } from "vite";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -10,20 +11,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // declarations come from tsc (tsconfig.build.json), one per module.
 export default defineConfig({
   build: {
-    target: 'es2022',
+    target: "es2022",
     minify: false,
     sourcemap: false,
     lib: {
       entry: {
-        index: resolve(__dirname, 'src/index.ts'),
-        'react/index': resolve(__dirname, 'src/react/index.ts'),
+        index: resolve(__dirname, "src/index.ts"),
+        "react/index": resolve(__dirname, "src/react/index.ts"),
       },
-      formats: ['es'],
+      formats: ["es"],
     },
     rollupOptions: {
       external: [/^react($|\/)/],
       // The code both entries import: one chunk, under a stable name.
-      output: { chunkFileNames: 'core.js' },
+      output: { chunkFileNames: "core.js" },
     },
   },
 });

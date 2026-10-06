@@ -10,6 +10,7 @@
 // ============================================================
 
 import { type AnyNode, type InferValue, type Ref, type ShapeNode, type CountRef, type Contribution } from "anyshape";
+
 import { rule, type RulePart, type Validatable } from "./validation";
 
 export type Message<V = any> = string | ((value: V) => string);
@@ -37,7 +38,10 @@ export function labelOf(node: AnyNode): string {
   return path.slice(path.lastIndexOf(".") + 1).replace(/\[\]$/, "") || "<root>";
 }
 
-export function required<N extends Validatable>(node: N, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
+export function required<N extends Validatable>(
+  node: N,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
   return rule(node, (v) => (isEmpty(v) ? message(options.message, "Required", v) : undefined), {
     name: options.name ?? `required(${node.path})`,
   });
@@ -52,7 +56,7 @@ function limitRule<N extends Validatable>(
   fails: (value: any, limit: number) => boolean,
   fallback: (limit: number) => string,
   label: string,
-  options: RuleRecipeOptions<InferValue<N>>
+  options: RuleRecipeOptions<InferValue<N>>,
 ): Contribution<RulePart> {
   const ref = typeof limit === "number" ? undefined : limit;
   return rule(
@@ -65,40 +69,99 @@ function limitRule<N extends Validatable>(
     {
       name: options.name ?? `${label}(${node.path}, ${ref === undefined ? limit : ref.path})`,
       triggers: ref === undefined ? [] : [ref],
-    }
+    },
   );
 }
 
 type Lengthy = Validatable & ShapeNode<string | readonly unknown[] | null | undefined>;
 
-export function minLength<N extends Lengthy>(node: N, length: Limit, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
-  return limitRule(node, length, (v, l) => !isEmpty(v) && v.length < l, (l) => `At least ${l} characters`, "minLength", options);
+export function minLength<N extends Lengthy>(
+  node: N,
+  length: Limit,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
+  return limitRule(
+    node,
+    length,
+    (v, l) => !isEmpty(v) && v.length < l,
+    (l) => `At least ${l} characters`,
+    "minLength",
+    options,
+  );
 }
 
-export function maxLength<N extends Lengthy>(node: N, length: Limit, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
-  return limitRule(node, length, (v, l) => !isEmpty(v) && v.length > l, (l) => `At most ${l} characters`, "maxLength", options);
+export function maxLength<N extends Lengthy>(
+  node: N,
+  length: Limit,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
+  return limitRule(
+    node,
+    length,
+    (v, l) => !isEmpty(v) && v.length > l,
+    (l) => `At most ${l} characters`,
+    "maxLength",
+    options,
+  );
 }
 
 type Numeric = Validatable & ShapeNode<number | null | undefined>;
 
-export function min<N extends Numeric>(node: N, limit: Limit, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
-  return limitRule(node, limit, (v, l) => v != null && v < l, (l) => `Must be at least ${l}`, "min", options);
+export function min<N extends Numeric>(
+  node: N,
+  limit: Limit,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
+  return limitRule(
+    node,
+    limit,
+    (v, l) => v != null && v < l,
+    (l) => `Must be at least ${l}`,
+    "min",
+    options,
+  );
 }
 
-export function max<N extends Numeric>(node: N, limit: Limit, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
-  return limitRule(node, limit, (v, l) => v != null && v > l, (l) => `Must be at most ${l}`, "max", options);
+export function max<N extends Numeric>(
+  node: N,
+  limit: Limit,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
+  return limitRule(
+    node,
+    limit,
+    (v, l) => v != null && v > l,
+    (l) => `Must be at most ${l}`,
+    "max",
+    options,
+  );
 }
 
 type Textual = Validatable & ShapeNode<string | null | undefined>;
 
-export function pattern<N extends Textual>(node: N, regex: RegExp, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
-  return rule(node, (v) => (isEmpty(v) || regex.test(v as string) ? undefined : message(options.message, "Invalid format", v)), {
-    name: options.name ?? `pattern(${node.path})`,
-  });
+export function pattern<N extends Textual>(
+  node: N,
+  regex: RegExp,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
+  return rule(
+    node,
+    (v) => (isEmpty(v) || regex.test(v as string) ? undefined : message(options.message, "Invalid format", v)),
+    {
+      name: options.name ?? `pattern(${node.path})`,
+    },
+  );
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function email<N extends Textual>(node: N, options: RuleRecipeOptions<InferValue<N>> = {}): Contribution<RulePart> {
-  return pattern(node, EMAIL, { message: "Invalid email address", ...options, name: options.name ?? `email(${node.path})` });
+export function email<N extends Textual>(
+  node: N,
+  options: RuleRecipeOptions<InferValue<N>> = {},
+): Contribution<RulePart> {
+  return pattern(node, EMAIL, {
+    message: "Invalid email address",
+    ...options,
+    name: options.name ?? `email(${node.path})`,
+  });
 }

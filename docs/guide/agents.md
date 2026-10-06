@@ -26,52 +26,53 @@ Every public name, with the page that explains it. A test checks these tables ag
 
 ### `anyshape`
 
-| Name | What it is | Page |
-|---|---|---|
-| `form` | Instantiates a [shape](../../GLOSSARY.md): `form(object({ ... }))`. Every node gets its identity and path. | [shape.md](shape.md) |
-| `object`, `field`, `array` | Declare a shape: an object of children, a typed value slot, an array of object rows. | [shape.md](shape.md) |
-| `ShapeNode`, `FieldNode`, `ObjectNode`, `ArrayNode` | The node classes. `.meta(...)` declares meta keys on a node. | [shape.md](shape.md) |
-| `AnyNode`, `ContainerNode` | Any node; an object or array node. | [shape.md](shape.md) |
-| `InferValue`, `InferMeta` | The value type of a node or meta reference; a node's meta keys and their types. | [shape.md](shape.md) |
-| `Ref`, `FieldId`, `ArrayOptions` | A node or a meta reference; a node's id; the options of `array()` (`create`). | [shape.md](shape.md) |
-| `metaKey` | Declares a meta key with a default and options; `.aggregate`, `.uses`, `.behavior`, `.combine` add capabilities. | [meta-keys.md](meta-keys.md) |
-| `MetaKeyDef` | A meta key's definition. Sweeps and counts find keys by it. | [meta-keys.md](meta-keys.md) |
-| `MetaRef` | `node.key`: one meta key of one node. | [meta-keys.md](meta-keys.md) |
-| `MetaKeyOptions` | `metaKey`'s options: `keepOnReset`. | [meta-keys.md](meta-keys.md) |
-| `Meta`, `MergeMetaRefs`, `UsedRefs`, `NoPayload` | The types behind `.meta()` and `.uses()`; the payload type of a key without `combine`. | [meta-keys.md](meta-keys.md) |
-| `countIn`, `CountRef` | How many nodes in a subtree have a counted key set. | [meta-keys.md](meta-keys.md) |
-| `initialOf`, `InitialRef` | A node's [baseline](../../GLOSSARY.md) value. | [store.md](store.md) |
-| `pendingIn`, `PendingInRef` | How many targets in a subtree a running async behavior is writing. | [async.md](async.md) |
-| `pendingOf`, `PendingOfRef` | Whether a running async behavior is writing one target. | [async.md](async.md) |
-| `AnyRef`, `RefValue` | Any reference; the type `get` returns for it. | [store.md](store.md) |
-| `createStore` | Creates a store from a shape, its initial values and its behaviors. | [store.md](store.md) |
-| `RootStore`, `BaseStore` | The store `createStore` returns; what every store (root, substore, row) shares. | [store.md](store.md) |
-| `ArrayStore`, `ItemStore`, `NewItemArgs` | An array's store with its row operations; one row's store; what `append` and `insert` take. | [arrays.md](arrays.md) |
-| `WriteOptions`, `Origin` | A write's options (`origin`, `as: "initial"`); who made a write. | [store.md](store.md) |
-| `Listener`, `Unsubscribe` | `subscribe`'s callback and the function it returns. | [store.md](store.md) |
-| `CollectEntry` | One entry of `store.collect(node, def)`. | [meta-keys.md](meta-keys.md) |
-| `StoreOptions`, `BehaviorErrorInfo` | `createStore`'s options (`behaviors`, `onError`); what `onError` is told. | [store.md](store.md) |
-| `defineBehavior`, `Behavior`, `BehaviorConfig` | Declares one behavior: its triggers, reads, writes and run. | [behaviors.md](behaviors.md) |
-| `defineBehaviors`, `BehaviorBuilder` | Builds a form's list of behaviors: `b.add`, `b.when`, `b.each`. | [behaviors.md](behaviors.md) |
-| `BehaviorContext` | A run's `ctx`: `get`, `set`, `changed`, `origins`, `state`, `signal`, `keep`. | [behaviors.md](behaviors.md) |
-| `OriginKind`, `WritableRef`, `Declaration`, `AnyBehavior` | An origins filter's kinds; a reference a behavior may write; what behaviors and [contributions](../../GLOSSARY.md) share; either of them. | [behaviors.md](behaviors.md) |
-| `BehaviorHandle` | What `store.addBehavior` returns: call it to remove the behaviors. | [behaviors.md](behaviors.md) |
-| `when`, `Guard` | A guard: a test over declared references. | [guards.md](guards.md) |
-| `contribute`, `Contribution` | Feeds a payload to a combined key's owner. | [contributions.md](contributions.md) |
-| `OwnerConfig`, `OwnerContext`, `Part` | What `.combine` returns; the owner's `ctx` with `ctx.parts`; one contribution as the owner sees it. | [contributions.md](contributions.md) |
+| Name                                                      | What it is                                                                                                                                | Page                                 |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `form`                                                    | Instantiates a [shape](../../GLOSSARY.md): `form(object({ ... }))`. Every node gets its identity and path.                                | [shape.md](shape.md)                 |
+| `object`, `field`, `array`                                | Declare a shape: an object of children, a typed value slot, an array of object rows.                                                      | [shape.md](shape.md)                 |
+| `ShapeNode`, `FieldNode`, `ObjectNode`, `ArrayNode`       | The node classes. `.meta(...)` declares meta keys on a node.                                                                              | [shape.md](shape.md)                 |
+| `AnyNode`, `ContainerNode`                                | Any node; an object or array node.                                                                                                        | [shape.md](shape.md)                 |
+| `InferValue`, `InferMeta`                                 | The value type of a node or meta reference; a node's meta keys and their types.                                                           | [shape.md](shape.md)                 |
+| `Ref`, `FieldId`, `ArrayOptions`                          | A node or a meta reference; a node's id; the options of `array()` (`create`).                                                             | [shape.md](shape.md)                 |
+| `metaKey`                                                 | Declares a meta key with a default and options; `.aggregate`, `.uses`, `.behavior`, `.combine` add capabilities.                          | [meta-keys.md](meta-keys.md)         |
+| `MetaKeyDef`                                              | A meta key's definition. Sweeps and counts find keys by it.                                                                               | [meta-keys.md](meta-keys.md)         |
+| `MetaRef`                                                 | `node.key`: one meta key of one node.                                                                                                     | [meta-keys.md](meta-keys.md)         |
+| `MetaKeyOptions`                                          | `metaKey`'s options: `keepOnReset`.                                                                                                       | [meta-keys.md](meta-keys.md)         |
+| `Countable`, `Owned`                                      | The markers a definition's type carries after `.aggregate()`; after `.behavior()` or `.combine()`.                                        | [meta-keys.md](meta-keys.md)         |
+| `Meta`, `MergeMetaRefs`, `UsedRefs`, `NoPayload`          | The types behind `.meta()` and `.uses()`; the payload type of a key without `combine`.                                                    | [meta-keys.md](meta-keys.md)         |
+| `countIn`, `CountRef`                                     | How many nodes in a subtree have a counted key set.                                                                                       | [meta-keys.md](meta-keys.md)         |
+| `initialOf`, `InitialRef`                                 | A node's [baseline](../../GLOSSARY.md) value.                                                                                             | [store.md](store.md)                 |
+| `pendingIn`, `PendingInRef`                               | How many targets in a subtree a running async behavior is writing.                                                                        | [async.md](async.md)                 |
+| `pendingOf`, `PendingOfRef`                               | Whether a running async behavior is writing one target.                                                                                   | [async.md](async.md)                 |
+| `AnyRef`, `RefValue`                                      | Any reference; the type `get` returns for it.                                                                                             | [store.md](store.md)                 |
+| `createStore`                                             | Creates a store from a shape, its initial values and its behaviors.                                                                       | [store.md](store.md)                 |
+| `RootStore`, `BaseStore`                                  | The store `createStore` returns; what every store (root, substore, row) shares.                                                           | [store.md](store.md)                 |
+| `ArrayStore`, `ItemStore`, `NewItemArgs`                  | An array's store with its row operations; one row's store; what `append` and `insert` take.                                               | [arrays.md](arrays.md)               |
+| `WriteOptions`, `Origin`                                  | A write's options (`origin`, `as: "initial"`); who made a write.                                                                          | [store.md](store.md)                 |
+| `Listener`, `Unsubscribe`                                 | `subscribe`'s callback and the function it returns.                                                                                       | [store.md](store.md)                 |
+| `CollectEntry`                                            | One entry of `store.collect(node, def)`.                                                                                                  | [meta-keys.md](meta-keys.md)         |
+| `StoreOptions`, `BehaviorErrorInfo`                       | `createStore`'s options (`behaviors`, `onError`); what `onError` is told.                                                                 | [store.md](store.md)                 |
+| `defineBehavior`, `Behavior`, `BehaviorConfig`            | Declares one behavior: its triggers, reads, writes and run.                                                                               | [behaviors.md](behaviors.md)         |
+| `defineBehaviors`, `BehaviorBuilder`                      | Builds a form's list of behaviors: `b.add`, `b.when`, `b.each`.                                                                           | [behaviors.md](behaviors.md)         |
+| `BehaviorContext`                                         | A run's `ctx`: `get`, `set`, `changed`, `origins`, `state`, `signal`, `keep`.                                                             | [behaviors.md](behaviors.md)         |
+| `OriginKind`, `WritableRef`, `Declaration`, `AnyBehavior` | An origins filter's kinds; a reference a behavior may write; what behaviors and [contributions](../../GLOSSARY.md) share; either of them. | [behaviors.md](behaviors.md)         |
+| `BehaviorHandle`                                          | What `store.addBehavior` returns: call it to remove the behaviors.                                                                        | [behaviors.md](behaviors.md)         |
+| `when`, `Guard`                                           | A guard: a test over declared references.                                                                                                 | [guards.md](guards.md)               |
+| `contribute`, `Contribution`                              | Feeds a payload to a combined key's owner.                                                                                                | [contributions.md](contributions.md) |
+| `OwnerConfig`, `OwnerContext`, `Part`                     | What `.combine` returns; the owner's `ctx` with `ctx.parts`; one contribution as the owner sees it.                                       | [contributions.md](contributions.md) |
 
 ### `anyshape/react`
 
-| Name | What it is | Page |
-|---|---|---|
-| `useForm`, `UseFormOptions` | Creates a store once per mount; `values` loads data as the baseline. | [react.md](react.md) |
-| `StoreProvider`, `StoreProviderProps` | Provides a store (the form, a substore or a row) to the hooks below it. | [react.md](react.md) |
-| `useStore`, `HookOptions` | The provided store; the `{ store }` option every hook takes. | [react.md](react.md) |
-| `useValue`, `SelectOptions` | Reads any reference and re-renders when it changes; optionally through a selector. | [react.md](react.md) |
-| `useField`, `FieldBinding` | A controlled input's binding: `{ value, onChange, store }`. | [react.md](react.md) |
-| `useArray`, `ArrayBinding` | An array's rows and row operations. | [react.md](react.md) |
-| `useSync` | Writes React data (props, query results) into a value or meta key. | [react.md](react.md) |
-| `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component. | [react.md](react.md) |
+| Name                                  | What it is                                                                         | Page                 |
+| ------------------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
+| `useForm`, `UseFormOptions`           | Creates a store once per mount; `values` loads data as the baseline.               | [react.md](react.md) |
+| `StoreProvider`, `StoreProviderProps` | Provides a store (the form, a substore or a row) to the hooks below it.            | [react.md](react.md) |
+| `useStore`, `HookOptions`             | The provided store; the `{ store }` option every hook takes.                       | [react.md](react.md) |
+| `useValue`, `SelectOptions`           | Reads any reference and re-renders when it changes; optionally through a selector. | [react.md](react.md) |
+| `useField`, `FieldBinding`            | A controlled input's binding: `{ value, onChange, store }`.                        | [react.md](react.md) |
+| `useArray`, `ArrayBinding`            | An array's rows and row operations.                                                | [react.md](react.md) |
+| `useSync`                             | Writes React data (props, query results) into a value or meta key.                 | [react.md](react.md) |
+| `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component.     | [react.md](react.md) |
 
 ## Common mistakes
 
@@ -134,14 +135,19 @@ const codeLength = defineBehavior({
 Fix: one behavior that computes the key from both checks, or a combined key that both feed with `contribute` ([contributions.md](contributions.md)):
 
 ```ts
-const checkedError = metaKey<string | undefined, (value: string) => string | undefined>(undefined).combine((self, key) => ({
-  triggers: [self],
-  writes: [key],
-  run: (ctx) => {
-    const value = ctx.get(self) as string;
-    ctx.set(key, ctx.parts.map((part) => part.payload(value)).find((message) => message !== undefined));
-  },
-}));
+const checkedError = metaKey<string | undefined, (value: string) => string | undefined>(undefined).combine(
+  (self, key) => ({
+    triggers: [self],
+    writes: [key],
+    run: (ctx) => {
+      const value = ctx.get(self) as string;
+      ctx.set(
+        key,
+        ctx.parts.map((part) => part.payload(value)).find((message) => message !== undefined),
+      );
+    },
+  }),
+);
 
 const checked = form(object({ code: field<string>().meta({ error: checkedError }) }));
 
@@ -161,6 +167,7 @@ const checkedStore = createStore(checked, { code: "" }, { behaviors: checks });
 **The same `useBehaviors` in a component rendered twice.** Each copy registers the behavior again, so its target has two writers and the second registration throws. Declare such behaviors once, in `defineBehaviors` or a common parent.
 
 **Type errors.** These fail to compile:
+
 - reading or writing a meta key the node doesn't declare, such as `store.get(shape.price.error)` here;
 - writing a value of the wrong type, such as `store.set(shape.code.error, 42)`;
 - passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`;
@@ -168,19 +175,19 @@ const checkedStore = createStore(checked, { code: "" }, { behaviors: checks });
 
 ## Which page for which task
 
-| Task | Read |
-|---|---|
-| Declare a form, its fields and rows | [shape.md](shape.md), [arrays.md](arrays.md) |
-| Read, write, load, reset or watch values | [store.md](store.md) |
-| Add a meta key beside a value (such as `error`, `visible` or `touched`) | [meta-keys.md](meta-keys.md) |
-| Compute a field from others, or keep two fields consistent | [behaviors.md](behaviors.md) |
-| Add validation | the [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts), [contributions.md](contributions.md) |
-| Apply a rule only under a condition, or show a section conditionally | [guards.md](guards.md) |
-| Rows, with rules per row | [arrays.md](arrays.md) |
-| Several reasons for one key (disabled, error) | [contributions.md](contributions.md) |
-| A server check, debouncing, a "checking…" state | [async.md](async.md) |
-| Bind inputs and components | [react.md](react.md) |
-| When an error shows, server errors, parsing, submitting | [your-side.md](your-side.md) |
-| Write your own reusable key and helpers | [writing-a-recipe.md](writing-a-recipe.md) |
+| Task                                                                    | Read                                                                                                                                 |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Declare a form, its fields and rows                                     | [shape.md](shape.md), [arrays.md](arrays.md)                                                                                         |
+| Read, write, load, reset or watch values                                | [store.md](store.md)                                                                                                                 |
+| Add a meta key beside a value (such as `error`, `visible` or `touched`) | [meta-keys.md](meta-keys.md)                                                                                                         |
+| Compute a field from others, or keep two fields consistent              | [behaviors.md](behaviors.md)                                                                                                         |
+| Add validation                                                          | the [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts), [contributions.md](contributions.md) |
+| Apply a rule only under a condition, or show a section conditionally    | [guards.md](guards.md)                                                                                                               |
+| Rows, with rules per row                                                | [arrays.md](arrays.md)                                                                                                               |
+| Several reasons for one key (disabled, error)                           | [contributions.md](contributions.md)                                                                                                 |
+| A server check, debouncing, a "checking…" state                         | [async.md](async.md)                                                                                                                 |
+| Bind inputs and components                                              | [react.md](react.md)                                                                                                                 |
+| When an error shows, server errors, parsing, submitting                 | [your-side.md](your-side.md)                                                                                                         |
+| Write your own reusable key and helpers                                 | [writing-a-recipe.md](writing-a-recipe.md)                                                                                           |
 
 Words used across the docs are defined in the [glossary](../../GLOSSARY.md).

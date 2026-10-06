@@ -11,13 +11,28 @@
 // ============================================================
 
 import {
-  createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore,
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ShapeNode, type AnyNode, type InferValue } from "../shape.js";
-import { ItemStore, type ArrayStore, type BaseStore, type AnyRef, type RefValue, type NewItemArgs, type WriteOptions } from "../store.js";
-import type { ArrayNode } from "../shape.js";
+
 import { refNode, refLabel, rootOf, scopeOf } from "../internal.js";
+import { ShapeNode, type AnyNode, type ArrayNode, type InferValue } from "../shape.js";
+import {
+  ItemStore,
+  type ArrayStore,
+  type BaseStore,
+  type AnyRef,
+  type RefValue,
+  type NewItemArgs,
+  type WriteOptions,
+} from "../store.js";
 
 // ============================================================
 // Context
@@ -63,7 +78,7 @@ export function resolveStore(start: BaseStore<any>, ref: AnyRef): BaseStore<any>
   }
   throw new Error(
     `"${refLabel(ref)}" is inside a row that the provided store cannot reach – ` +
-      `render it under a <StoreProvider> for that row, or pass { store: row }`
+      `render it under a <StoreProvider> for that row, or pass { store: row }`,
   );
 }
 
@@ -90,7 +105,7 @@ export function useValue<R extends AnyRef, T>(ref: R, select: (value: RefValue<R
 export function useValue(
   ref: AnyRef,
   a?: HookOptions | ((value: unknown) => unknown),
-  b?: SelectOptions<unknown>
+  b?: SelectOptions<unknown>,
 ): unknown {
   const select = typeof a === "function" ? a : undefined;
   const options = (typeof a === "function" ? b : a) as SelectOptions<unknown> | undefined;

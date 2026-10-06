@@ -22,6 +22,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import ts from "typescript";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,12 +30,19 @@ const bin = (name: string) => join(root, "node_modules", ".bin", name);
 
 /** Files the tarball must hold. */
 const REQUIRED = [
-  "package.json", "LICENSE",
-  "dist/index.js", "dist/index.d.ts", "dist/react/index.js", "dist/react/index.d.ts",
+  "package.json",
+  "LICENSE",
+  "dist/index.js",
+  "dist/index.d.ts",
+  "dist/react/index.js",
+  "dist/react/index.d.ts",
   // The docs agents read at node_modules/anyshape/…: every guide page in
   // the source tree, so a new page needs no edit here.
-  "GLOSSARY.md", "docs/principles.md",
-  ...readdirSync(join(root, "docs/guide")).filter((f) => f.endsWith(".md")).map((page) => `docs/guide/${page}`),
+  "GLOSSARY.md",
+  "docs/principles.md",
+  ...readdirSync(join(root, "docs/guide"))
+    .filter((f) => f.endsWith(".md"))
+    .map((page) => `docs/guide/${page}`),
 ];
 /** Path prefixes the tarball must not hold. */
 const FORBIDDEN = ["src/", "test/", "bench/", "recipes/", "examples/", "scripts/", ".changeset/"];
@@ -93,9 +101,14 @@ try {
   const dist = join(core, "node_modules", "anyshape", "dist");
 
   const distJs = readdirSync(dist, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".js"));
-  const symbols = distJs.flatMap((f) => [...readFileSync(join(dist, f), "utf8").matchAll(/Symbol\("(anyshape\.\w+)"\)/g)].map((m) => m[1]));
+  const symbols = distJs.flatMap((f) =>
+    [...readFileSync(join(dist, f), "utf8").matchAll(/Symbol\("(anyshape\.\w+)"\)/g)].map((m) => m[1]),
+  );
   check(symbols.includes("anyshape.fields"), "the core internals are in dist/");
-  check(new Set(symbols).size === symbols.length, `each core internal is defined once in dist/ (${symbols.join(", ")})`);
+  check(
+    new Set(symbols).size === symbols.length,
+    `each core internal is defined once in dist/ (${symbols.join(", ")})`,
+  );
 
   const reached = importsFrom(dist, "index.js");
   const reactImports = reached.filter(({ spec }) => /^react($|\/)/.test(spec));
@@ -127,25 +140,49 @@ try {
       if (!html.includes('value="Ada"')) throw new Error("the hook did not read the store: " + html);
     `,
   });
-  run("npm", ["install", "--no-audit", "--no-fund", tarball, "react@19", "react-dom@19", "@types/react@19", "@types/react-dom@19"], withReact);
+  run(
+    "npm",
+    [
+      "install",
+      "--no-audit",
+      "--no-fund",
+      tarball,
+      "react@19",
+      "react-dom@19",
+      "@types/react@19",
+      "@types/react-dom@19",
+    ],
+    withReact,
+  );
   // Every shipped declaration file, not only those the entries reach: a
   // module's .d.ts must not import a declaration stripInternal dropped.
-  writeFileSync(join(withReact, "tsconfig.dist.json"), JSON.stringify({
-    extends: "./tsconfig.json", include: ["node_modules/anyshape/dist/**/*.d.ts"], exclude: [],
-  }));
+  writeFileSync(
+    join(withReact, "tsconfig.dist.json"),
+    JSON.stringify({
+      extends: "./tsconfig.json",
+      include: ["node_modules/anyshape/dist/**/*.d.ts"],
+      exclude: [],
+    }),
+  );
   check(passes(bin("tsc"), ["-p", "tsconfig.dist.json"], withReact), "every shipped declaration file typechecks");
   if (check(passes(bin("tsc"), ["-p", "."], withReact), "a consumer with react typechecks both entries")) {
     run(bin("tsc"), ["-p", ".", "--noEmit", "false", "--outDir", "out"], withReact);
-    check(passes("node", ["out/index.js"], withReact), "a consumer with react renders a hook on a node from the core entry");
+    check(
+      passes("node", ["out/index.js"], withReact),
+      "a consumer with react renders a hook on a node from the core entry",
+    );
   }
 
   // ---- The declarations against the source ----
-  for (const [entry, source] of [["anyshape", "src/index.ts"], ["anyshape/react", "src/react/index.ts"]]) {
+  for (const [entry, source] of [
+    ["anyshape", "src/index.ts"],
+    ["anyshape/react", "src/react/index.ts"],
+  ]) {
     const shipped = exportNames(join(withReact, "index.tsx"), entry, withReact);
     const expected = exportNames(join(root, source), undefined, root);
     check(
       shipped.join() === expected.join(),
-      `${entry}'s declarations export the source entry's names (${expected.length})`
+      `${entry}'s declarations export the source entry's names (${expected.length})`,
     );
   }
 
@@ -165,13 +202,22 @@ if (failures.length) {
 function writeConsumer(dir: string, sources: Record<string, string>): void {
   mkdirSync(dir);
   writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "consumer", private: true, type: "module" }));
-  writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({
-    compilerOptions: {
-      strict: true, target: "es2022", module: "nodenext", moduleResolution: "nodenext", jsx: "react-jsx",
-      noEmit: true, skipLibCheck: false, types: [],
-    },
-    include: Object.keys(sources),
-  }));
+  writeFileSync(
+    join(dir, "tsconfig.json"),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: "es2022",
+        module: "nodenext",
+        moduleResolution: "nodenext",
+        jsx: "react-jsx",
+        noEmit: true,
+        skipLibCheck: false,
+        types: [],
+      },
+      include: Object.keys(sources),
+    }),
+  );
   for (const [name, text] of Object.entries(sources)) writeFileSync(join(dir, name), text);
 }
 
@@ -182,9 +228,7 @@ function importsFrom(dir: string, file: string, seen = new Set<string>()): { fil
   const text = readFileSync(join(dir, file), "utf8");
   const specs = [...text.matchAll(/\b(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]);
   return specs.flatMap((spec) =>
-    spec.startsWith(".")
-      ? [{ file, spec }, ...importsFrom(dir, join(dirname(file), spec), seen)]
-      : [{ file, spec }]
+    spec.startsWith(".") ? [{ file, spec }, ...importsFrom(dir, join(dirname(file), spec), seen)] : [{ file, spec }],
   );
 }
 
@@ -193,9 +237,14 @@ function importsFrom(dir: string, file: string, seen = new Set<string>()): { fil
  * `specifier`, the module `file` imports under that name.
  */
 function exportNames(file: string, specifier: string | undefined, project: string): string[] {
-  const config = ts.getParsedCommandLineOfConfigFile(join(project, "tsconfig.json"), {}, {
-    ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => {},
-  })!;
+  const config = ts.getParsedCommandLineOfConfigFile(
+    join(project, "tsconfig.json"),
+    {},
+    {
+      ...ts.sys,
+      onUnRecoverableConfigFileDiagnostic: () => {},
+    },
+  )!;
   const program = ts.createProgram([file], config.options);
   const checker = program.getTypeChecker();
   const source = program.getSourceFile(file)!;
@@ -204,5 +253,8 @@ function exportNames(file: string, specifier: string | undefined, project: strin
         .filter(ts.isImportDeclaration)
         .find((s) => (s.moduleSpecifier as ts.StringLiteral).text === specifier)!.moduleSpecifier
     : source;
-  return checker.getExportsOfModule(checker.getSymbolAtLocation(module)!).map((s) => s.name).sort();
+  return checker
+    .getExportsOfModule(checker.getSymbolAtLocation(module)!)
+    .map((s) => s.name)
+    .sort();
 }

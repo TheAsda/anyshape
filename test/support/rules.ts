@@ -1,12 +1,23 @@
 // Test-local rules: contributions to the test-local `error` key, with the
 // messages the core tests assert.
-import { contribute, type AnyNode, type AnyRef, type Contribution, type Declaration, type MetaRef } from "../../src/index";
+import {
+  contribute,
+  type AnyNode,
+  type AnyRef,
+  type Contribution,
+  type Declaration,
+  type MetaRef,
+} from "../../src/index";
 import type { Check } from "./features";
 
 /** A node with the test-local validation(), whose value is `V`. */
 export type Validated<V = any> = AnyNode & { readonly _type: V; readonly error: MetaRef<string | undefined, Check> };
 
-export function rule<V>(node: Validated<V>, check: (value: V, ctx: Parameters<Check>[1]) => string | undefined, decl: Declaration = {}): Contribution<Check> {
+export function rule<V>(
+  node: Validated<V>,
+  check: (value: V, ctx: Parameters<Check>[1]) => string | undefined,
+  decl: Declaration = {},
+): Contribution<Check> {
   return contribute(node.error, check, { name: `rule(${node.path})`, ...decl });
 }
 
@@ -20,9 +31,9 @@ export function max(node: Validated, limit: number | AnyRef, options: { message?
     node,
     (v, ctx) => {
       const l = ref === undefined ? (limit as number) : (ctx.get(ref) as number | undefined);
-      return l !== undefined && (v as number) > l ? options.message ?? `Must be at most ${l}` : undefined;
+      return l !== undefined && (v as number) > l ? (options.message ?? `Must be at most ${l}`) : undefined;
     },
-    { name: `max(${node.path})`, triggers: ref === undefined ? [] : [ref] }
+    { name: `max(${node.path})`, triggers: ref === undefined ? [] : [ref] },
   );
 }
 

@@ -5,9 +5,10 @@
 // whole value with useValue(shape) and stringify it.
 // ------------------------------------------------------------
 
-import { useState } from "react";
 import { form, object, field, type InferValue } from "anyshape";
 import { StoreProvider, useForm, useValue } from "anyshape/react";
+import { useState } from "react";
+
 import { ValueField, ResultCard, SubmitButton } from "../../ui";
 
 const shape = form(
@@ -32,7 +33,13 @@ export function Stage() {
   const [submitted, setSubmitted] = useState<typeof values | null>(null);
   return (
     <StoreProvider store={form}>
-      <form className="stage-form" onSubmit={(e) => { e.preventDefault(); setSubmitted(values); }}>
+      <form
+        className="stage-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSubmitted(values);
+        }}
+      >
         <ValueField node={shape.destination} label="Destination" placeholder="Lisbon" />
         <ValueField node={shape.startDate} label="Departure" type="date" />
         <ValueField node={shape.endDate} label="Return" type="date" />

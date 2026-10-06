@@ -48,4 +48,3 @@ export function captureWarnings() {
   console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
   return { warnings, restore: () => (console.warn = original) };
 }
-

@@ -6,11 +6,15 @@
 //   • `pending` while a check of the field runs (pendingOf(node.error)).
 //   • showError: an error is shown once the field is revealed – on blur
 //     (onBlur) or by a submit – and no check is pending.
+//   • focusRef, beside the control rather than one of its properties: the
+//     React compiler treats a value read as `x.somethingRef` as a ref, and
+//     then flags every other read of `x` during render.
 // ============================================================
 
-import { useCallback, useRef } from "react";
 import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "anyshape";
 import { useField, useValue, type HookOptions } from "anyshape/react";
+import { useCallback, useRef } from "react";
+
 import { registerFocus, type FocusTarget } from "../focus";
 
 /** A node with the control() keys. */
@@ -36,13 +40,18 @@ export interface ControlBinding<N extends ControlNode> {
   showError: boolean;
   /** Stable; marks the field revealed. Pass it to the input's onBlur. */
   onBlur: () => void;
-  /** Stable callback ref: registers the element (or any FocusTarget) for focusing errors. */
-  focusRef: (target: FocusTarget | null) => void;
   store: BaseStore<any>;
 }
 
-/** A node with control(): value, onChange and the control state. */
-export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
+/**
+ * A node with control(): `control` holds the value, onChange and the
+ * control state; `focusRef` is a stable callback ref that registers the
+ * element (or any FocusTarget) for focusing errors. Destructure the two.
+ */
+export function useControl<N extends ControlNode>(
+  node: N,
+  options?: HookOptions,
+): { control: ControlBinding<N>; focusRef: (target: FocusTarget | null) => void } {
   const { value, onChange, store } = useField(node, options);
   const error = useValue(node.error, { store });
   const touched = useValue(node.touched, { store });
@@ -56,7 +65,7 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
       unregister.current?.();
       unregister.current = target ? registerFocus(store, node, target) : null;
     },
-    [store, node]
+    [store, node],
   );
 
   const onBlur = useCallback(() => {
@@ -64,7 +73,7 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
     if (store.isAttached()) store.set(node.revealed, true, { origin: "user" });
   }, [store, node]);
 
-  return {
+  const control: ControlBinding<N> = {
     value,
     onChange,
     error,
@@ -75,7 +84,7 @@ export function useControl<N extends ControlNode>(node: N, options?: HookOptions
     // Edit to show errors at another moment, e.g. `error !== undefined && touched`.
     showError: error !== undefined && revealed && !pending,
     onBlur,
-    focusRef,
     store,
   };
+  return { control, focusRef };
 }

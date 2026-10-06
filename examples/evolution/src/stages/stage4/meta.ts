@@ -13,4 +13,3 @@ export const meta: StageMeta = {
   notes:
     "No useEffect, no useMemo, no manual recompute on change — a calculate is a behavior from a source list to one target. Because sources are references, stage 6 will add the travelers array as a source of the same budget and it just re-fires when rows are added or removed.",
 };
-

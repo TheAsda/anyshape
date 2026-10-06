@@ -3,10 +3,11 @@
 // The trip booking lives in ./support/trip.ts (shared with the React suite).
 // ============================================================
 
+import { test, expect } from "vitest";
+
 import { createStore, countIn, type AnyNode, type BaseStore } from "../src/index";
 import { dirty, error, touched } from "./support/features";
 import { trip, T, tripBehaviors, emptyTrip, savedBooking, quiet } from "./support/trip";
-import { test, expect } from "vitest";
 
 // ---------------------------------------------------------------------------
 // INT1
@@ -108,7 +109,12 @@ test("INT4 traveler rows: append, edit, remove, undo keep identity, per-row meta
   s.set(trip.travelers, before);
   expect(ada.isAttached()).toBe(true);
   expect(travelers.items()).toEqual([ada, tim, zoe]);
-  expect(travelers.items().map((r) => r.stableId).slice(0, 2)).toEqual(ids);
+  expect(
+    travelers
+      .items()
+      .map((r) => r.stableId)
+      .slice(0, 2),
+  ).toEqual(ids);
   expect(tim.get(T.passport.error), "meta survived").toBe("8 letters or digits");
   expect(s.get(countIn(trip, error))).toBe(errorsBefore);
 });
@@ -136,14 +142,18 @@ test("INT5 a limit synced from outside: error while exceeded; reset keeps the li
   expect(s.get(trip.seats.error)).toBe("Not enough seats left");
   s.reset();
   expect(s.get(trip.seats.error), "still exceeded after reset: the error is recomputed, not just cleared").toBe(
-    "Not enough seats left"
+    "Not enough seats left",
   );
 });
 
 // ---------------------------------------------------------------------------
 // INT6
 test("INT6 loaded data with both promo and voucher: both enabled and in error until one is cleared", () => {
-  const s = createStore(trip, { ...savedBooking(), promo: "SUMMER", voucher: "V-100" }, { behaviors: tripBehaviors(), ...quiet });
+  const s = createStore(
+    trip,
+    { ...savedBooking(), promo: "SUMMER", voucher: "V-100" },
+    { behaviors: tripBehaviors(), ...quiet },
+  );
   expect([s.get(trip.promo.disabled), s.get(trip.voucher.disabled)]).toEqual([false, false]);
   expect(s.get(trip.promo.error)).toBe("Only one of promo, voucher can be set");
   expect(s.get(trip.voucher.error)).toBe("Only one of promo, voucher can be set");

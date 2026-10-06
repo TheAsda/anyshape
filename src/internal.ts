@@ -3,11 +3,11 @@
 // Not exported from the package index.
 // ============================================================
 
-import { ArrayNode, type AnyNode } from "./shape.js";
-import type { MetaRef } from "./refs/meta.js";
 import type { MetaKeyDef } from "./meta.js";
-import { BaseStore, ItemStore, type AnyRef } from "./store.js";
 import { kindOf, type Target } from "./refs/kind.js";
+import type { MetaRef } from "./refs/meta.js";
+import { ArrayNode, type AnyNode } from "./shape.js";
+import { BaseStore, ItemStore, type AnyRef } from "./store.js";
 
 /**
  * Dev build? Read as `process.env.NODE_ENV`, which bundlers replace: an app's
@@ -72,6 +72,11 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
   return (node as any)[key];
 }
 
+/** Names a key where a node declares it, for error messages: `"name" on "path"`. */
+export function keyAt(node: AnyNode, name: string): string {
+  return `"${name}" on "${node.path || "<root>"}"`;
+}
+
 /**
  * The node's refs to the keys `def` uses, matched by definition, in the order
  * of .uses(). The node declares `def` as `name`.
@@ -79,10 +84,11 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
 export function usedRefs(node: AnyNode, name: string, def: MetaKeyDef<any, any>): MetaRef<any, any>[] {
   return (def._steps.uses ?? []).map((used, i) => {
     const names = Object.keys(node[META_DEFS]).filter((n) => node[META_DEFS][n] === used);
-    const at = `Key "${name}" on "${node.path || "<root>"}" uses a key the node`;
+    const at = `Key ${keyAt(node, name)} uses a key the node`;
     const which = `(uses[${i}], default ${String(used.defaultValue)})`;
     if (!names.length) throw new Error(`${at} doesn't declare ${which} – declare it in .meta()`);
-    if (names.length > 1) throw new Error(`${at} declares twice (${names.map((n) => `"${n}"`).join(", ")}) ${which} – declare it once`);
+    if (names.length > 1)
+      throw new Error(`${at} declares twice (${names.map((n) => `"${n}"`).join(", ")}) ${which} – declare it once`);
     return metaRefOf(node, names[0]);
   });
 }
@@ -155,7 +161,8 @@ export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemSt
   const rows: ItemStore<any>[] = [];
   let h = host;
   while (h !== outer) {
-    if (!(h instanceof ItemStore)) throw new Error(`"${host.node.path || "<root>"}" is not inside "${outer.node.path || "<root>"}"`);
+    if (!(h instanceof ItemStore))
+      throw new Error(`"${host.node.path || "<root>"}" is not inside "${outer.node.path || "<root>"}"`);
     rows.unshift(h);
     h = h.arrayStore.scopeStore;
   }
@@ -175,4 +182,3 @@ export function concretePath(host: BaseStore<any>, node: AnyNode): string {
 export function pathLabel(host: BaseStore<any>, node: AnyNode): string {
   return concretePath(host, node) || "<root>";
 }
-

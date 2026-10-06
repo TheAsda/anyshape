@@ -16,10 +16,10 @@
 // The one-writer check (runtime.ts) lists the writes through the same index.
 // ============================================================
 
-import type { AnyNode } from "./shape.js";
 import { refNode, refKey, outerHost, scopeOf, hostAt } from "./internal.js";
-import type { AnyRef, BaseStore } from "./store.js";
 import { kindOf, type Target } from "./refs/kind.js";
+import type { AnyNode } from "./shape.js";
+import type { AnyRef, BaseStore } from "./store.js";
 
 /** What the run order needs from a registration. */
 export interface Ranked {
@@ -152,7 +152,10 @@ class Vertex<R extends Ranked> {
   readonly inputs: Input<R>[];
 
   /** `declaredBy` declares its edges: `reg` itself, unless an owner is refreshed in place. */
-  constructor(readonly reg: R, declaredBy: Ranked) {
+  constructor(
+    readonly reg: R,
+    declaredBy: Ranked,
+  ) {
     this.writes = declaredBy.targets.map((target, at) => ({ reg, target, at }));
     this.inputs = declaredBy.inputs.map((ref) => {
       const node = refNode(ref);
@@ -354,7 +357,12 @@ export class RunOrder<R extends Ranked> {
       }
     }
     const placed = new Set(queue);
-    const names = [...region].filter((v) => !placed.has(v)).sort((a, b) => a.reg.seq - b.reg.seq).map((v) => `"${v.reg.name}"`);
-    return new Error(`Behaviors form a cycle: ${names.join(", ")} – merge them into one behavior that writes all their targets`);
+    const names = [...region]
+      .filter((v) => !placed.has(v))
+      .sort((a, b) => a.reg.seq - b.reg.seq)
+      .map((v) => `"${v.reg.name}"`);
+    return new Error(
+      `Behaviors form a cycle: ${names.join(", ")} – merge them into one behavior that writes all their targets`,
+    );
   }
 }

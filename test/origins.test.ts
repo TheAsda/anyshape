@@ -1,14 +1,13 @@
 // G · Origins, baselines (initial values) and reset.
 
-import {
-  form, object, array, field, createStore, countIn, initialOf, defineBehavior, type Origin,
-} from "../src/index";
-import { control, touched, disabled, dirty, error } from "./support/features";
-import { rule, max } from "./support/rules";
 import { test as base, describe, expect } from "vitest";
-import { watchOrigins } from "./support/harness";
+
+import { form, object, field, createStore, countIn, initialOf, defineBehavior, type Origin } from "../src/index";
+import { control, disabled, dirty, error } from "./support/features";
 import * as company from "./support/fixtures/company";
 import * as limits from "./support/fixtures/limits";
+import { watchOrigins } from "./support/harness";
+import { rule, max } from "./support/rules";
 
 describe("G · Origins, baselines and reset", () => {
   const { shape, L, initial, originsOf } = company;
@@ -44,12 +43,12 @@ describe("G · Origins, baselines and reset", () => {
     s._react(shape.lines, (_n, _p, i) => toRoot.push([...i.origins]));
     row._react(L.sku, (_n, _p, i) => toRow.push([...i.origins]));
 
-    row.set(L.sku, "Z", { origin: "user" });              // row → enclosing array
+    row.set(L.sku, "Z", { origin: "user" }); // row → enclosing array
     expect(toRoot).toEqual([["user"]]);
     expect(toRow).toEqual([["user"]]);
 
     const current = s.get(shape).lines;
-    s.set(shape.lines, [current[1]]);                      // array write detaches the row
+    s.set(shape.lines, [current[1]]); // array write detaches the row
     expect(toRow.at(-1)).toEqual(["program"]);
   });
 
@@ -78,7 +77,7 @@ describe("G · Origins, baselines and reset", () => {
     expect(s.get(shape.name)).toBe("Cid");
   });
 
-  test("rows keep their own initial value through edits and reordering", ({ store: s, lines }) => {
+  test("rows keep their own initial value through edits and reordering", ({ lines }) => {
     const [a, b] = lines.items();
     a.set(L.qty, 9);
     expect(a.get(initialOf(L.qty))).toBe(1);
@@ -136,11 +135,16 @@ describe("G · Origins, baselines and reset", () => {
   });
 
   test("initial values and counts can't be set directly", ({ store: s }) => {
-    expect(() => s.set(initialOf(shape.name) as never, "x" as never)).toThrow(/Initial values are written with \{ as: "initial" \}/);
+    expect(() => s.set(initialOf(shape.name) as never, "x" as never)).toThrow(
+      /Initial values are written with \{ as: "initial" \}/,
+    );
     expect(() => s.set(countIn(shape, error) as never, 1 as never)).toThrow(/Counts are read-only/);
   });
 
-  test("saving (a root baseline write) makes every current row clean; rows added later start dirty", ({ store: s, lines }) => {
+  test("saving (a root baseline write) makes every current row clean; rows added later start dirty", ({
+    store: s,
+    lines,
+  }) => {
     const added = lines.append({ sku: "N" });
     const [a] = lines.items();
     a.set(L.sku, "A2");
@@ -156,11 +160,14 @@ describe("G · Origins, baselines and reset", () => {
     const later = lines.append({ sku: "L" });
     expect(later.get(L.sku.dirty)).toBe(true);
     s.reset();
-    expect(lines.items().map((r) => r.get(L.sku)), "reset goes back to the saved rows").toEqual(["A2", "B", "N"]);
+    expect(
+      lines.items().map((r) => r.get(L.sku)),
+      "reset goes back to the saved rows",
+    ).toEqual(["A2", "B", "N"]);
   });
 
   // ---------------------------------------------------------------------------
-  test("reset writes with origin \"initial\": behaviors see it, touched does not flip", ({ store: s }) => {
+  test('reset writes with origin "initial": behaviors see it, touched does not flip', ({ store: s }) => {
     s.set(shape.name, "Bob");
     const origins = watchOrigins(s, shape.name);
     s.reset();
@@ -172,8 +179,7 @@ describe("G · Origins, baselines and reset", () => {
 
 describe("G · Reset re-runs behaviors and keeps limits", () => {
   const { shape, L, initial } = limits;
-  const test = base
-    .extend("store", () => createStore(shape, initial()));
+  const test = base.extend("store", () => createStore(shape, initial()));
 
   // ---------------------------------------------------------------------------
   // keepOnReset
@@ -191,7 +197,11 @@ describe("G · Reset re-runs behaviors and keeps limits", () => {
   // ---------------------------------------------------------------------------
   // reset() re-runs behaviors (found by the React tests)
   test("reset re-validates: a kept limit still applies to the reset value", () => {
-    const s = createStore(shape, { ...initial(), lines: [{ qty: 5, notes: [] }] }, { behaviors: max(L.qty, L.qty.maxQty) });
+    const s = createStore(
+      shape,
+      { ...initial(), lines: [{ qty: 5, notes: [] }] },
+      { behaviors: max(L.qty, L.qty.maxQty) },
+    );
     const row = s.substore(shape.lines).itemAt(0);
     row.set(L.qty.maxQty, 3);
     expect(row.get(L.qty.error)).toBe("Must be at most 3");
@@ -200,7 +210,11 @@ describe("G · Reset re-runs behaviors and keeps limits", () => {
   });
 
   test("reset: rule errors match the initial values again", () => {
-    const s = createStore(shape, { ...initial(), name: "" }, { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
+    const s = createStore(
+      shape,
+      { ...initial(), name: "" },
+      { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) },
+    );
     expect(s.get(shape.name.error)).toBe("Required");
     s.set(shape.name, "Bob", { origin: "user" });
     expect(s.get(shape.name.error)).toBe(undefined);
@@ -213,9 +227,17 @@ describe("G · Reset re-runs behaviors and keeps limits", () => {
   });
 
   test("reset: behavior-written meta is recomputed, without flicker", () => {
-    const s = createStore(shape, { ...initial(), name: "" }, {
-      behaviors: defineBehavior({ triggers: [shape.name], writes: [shape.flag.disabled], run: (c) => c.set(shape.flag.disabled, c.get(shape.name) === "") }),
-    });
+    const s = createStore(
+      shape,
+      { ...initial(), name: "" },
+      {
+        behaviors: defineBehavior({
+          triggers: [shape.name],
+          writes: [shape.flag.disabled],
+          run: (c) => c.set(shape.flag.disabled, c.get(shape.name) === ""),
+        }),
+      },
+    );
     expect(s.get(shape.flag.disabled)).toBe(true);
     let notified = 0;
     s.subscribe(shape.flag.disabled, () => notified++);
@@ -253,15 +275,19 @@ describe("G · Reset re-runs behaviors and keeps limits", () => {
         a: object({ x: field<string>().meta(control()), locked: field<boolean>().meta({ disabled }) }),
         b: field<string>().meta(control()),
         flag: field<boolean>(),
-      })
+      }),
     );
     const lockA = defineBehavior({
-      name: "lockA", triggers: [f.flag], writes: [f.a.locked.disabled],
+      name: "lockA",
+      triggers: [f.flag],
+      writes: [f.a.locked.disabled],
       run: (c) => c.set(f.a.locked.disabled, c.get(f.flag)),
     });
     let outsideRuns = 0;
     const outside = defineBehavior({
-      name: "outside", triggers: [f.flag], writes: [f.b],
+      name: "outside",
+      triggers: [f.flag],
+      writes: [f.b],
       run: (c) => (outsideRuns++, c.set(f.b, c.get(f.flag) ? "on" : "off")),
     });
     const s = createStore(f, { a: { x: "", locked: false }, b: "", flag: true }, { behaviors: [lockA, outside] });

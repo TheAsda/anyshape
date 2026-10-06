@@ -1,12 +1,13 @@
 // Submit and focus in a real DOM: document order, and handleSubmit on a <form>.
 
-import { test, expect } from "vitest";
 import { form, object, field, createStore, type InferValue, type RootStore } from "anyshape";
 import { StoreProvider, useForm } from "anyshape/react";
+import { test, expect } from "vitest";
+
 import { control } from "../features";
-import { rule } from "../validation";
 import { focusFirst, registerFocus } from "../focus";
 import { handleSubmit, submission } from "../submit";
+import { rule } from "../validation";
 import { useControl } from "./index";
 import { render, settle } from "./test-utils";
 
@@ -14,15 +15,22 @@ const shape = form(
   object({
     name: field<string>().meta(control()),
     code: field<string>().meta(control()),
-  }).meta(submission())
+  }).meta(submission()),
 );
 type Values = InferValue<typeof shape>;
 const empty = (): Values => ({ name: "", code: "" });
 
 /** An input registered as its node's focus target. */
 function Field(props: { node: typeof shape.name | typeof shape.code; id: string }) {
-  const c = useControl(props.node);
-  return <input data-testid={props.id} ref={c.focusRef} value={c.value} onChange={(e) => c.onChange(e.target.value)} />;
+  const { control, focusRef } = useControl(props.node);
+  return (
+    <input
+      data-testid={props.id}
+      ref={focusRef}
+      value={control.value}
+      onChange={(e) => control.onChange(e.target.value)}
+    />
+  );
 }
 
 test("a submit focuses the first error in DOM order, not shape order", async () => {

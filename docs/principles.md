@@ -56,7 +56,7 @@ Argued in [#18], [#20], [#26], [#50]. See [ADR 0001][adr-0001].
 
 ### 7. Recipes build only on the public entries; the core never imports a recipe
 
-Recipes, the React recipes and the examples import only `anyshape` and `anyshape/react`. The core, its tests included, imports nothing from `recipes/`. A check in the test suite enforces both directions. Test fixtures that both sides need are copied across the boundary on purpose, and those copies stay.
+Recipes, the React recipes and the examples import only `anyshape` and `anyshape/react`. The core, its tests included, imports nothing from `recipes/`. The lint's boundary rules (`.oxlintrc.json`) enforce both directions. Test fixtures that both sides need are copied across the boundary on purpose, and those copies stay.
 
 **Why:** a copied recipe has to work against the published package unchanged. A core test that leans on a recipe hides a capability the core is missing.
 

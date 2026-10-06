@@ -1,5 +1,6 @@
-import { propLens, composeLens, identityLens } from "../src/lens";
 import { test, describe, expect } from "vitest";
+
+import { propLens, composeLens, identityLens } from "../src/lens";
 
 describe("B · propLens", () => {
   test("propLens.get tolerates a missing parent", () => {

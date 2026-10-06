@@ -9,11 +9,13 @@
 // per-path errors back onto fields, and jumps to the first one.
 // ============================================================
 
-import { useEffect, useRef, useState } from "react";
 import { countIn, pendingIn, type RootStore } from "anyshape";
 import { StoreProvider, useForm, useStore, useValue } from "anyshape/react";
+import { useEffect, useRef, useState } from "react";
+
 import { handleSubmit, error, dirty } from "../../../recipes";
 import { useControl } from "../../../recipes/react";
+import { TextField, TextAreaField, CheckboxField, DateField } from "./fields";
 import {
   shape,
   initialValues,
@@ -25,12 +27,6 @@ import {
   type Submitted,
   type Values,
 } from "./form";
-import {
-  TextField,
-  TextAreaField,
-  CheckboxField,
-  DateField,
-} from "./fields";
 import { ItemsSection } from "./ItemsSection";
 
 const sample: Values = {
@@ -92,9 +88,6 @@ export function App() {
 function RequisitionWizard() {
   const form = useStore<RootStore<typeof shape>>();
   const step = useValue(shape.step) ?? 0;
-  // Read inside submit handlers without rebinding them each render.
-  const stepRef = useRef(step);
-  stepRef.current = step;
   const [result, setResult] = useState<Submitted | undefined>();
 
   const goTo = (n: number) => form.set(shape.step, n);
@@ -110,9 +103,11 @@ function RequisitionWizard() {
 
   const onSubmit = handleSubmit(form, async (values) => {
     // Enter in any input submits the form element; on early steps
-    // that should behave like Continue, not like a save attempt.
-    if (stepRef.current < 2) {
-      continueStep(stepRef.current);
+    // that should behave like Continue, not like a save attempt. The
+    // step is read from the store: it's current when the handler runs.
+    const current = form.get(shape.step) ?? 0;
+    if (current < 2) {
+      continueStep(current);
       return;
     }
     try {
@@ -148,18 +143,16 @@ function RequisitionWizard() {
       <main className="form-card">
         <h1>Purchase requisition</h1>
         <p className="intro">
-          A three-step wizard over one store. <strong>Continue</strong> runs a submit scoped to the
-          visible step; <strong>Submit</strong> saves to a fake server that rejects the sample data
-          by field path – the errors land back on their fields and the wizard jumps to the first
-          one. The card on the right lists every way to watch it fail.
+          A three-step wizard over one store. <strong>Continue</strong> runs a submit scoped to the visible step;{" "}
+          <strong>Submit</strong> saves to a fake server that rejects the sample data by field path – the errors land
+          back on their fields and the wizard jumps to the first one. The card on the right lists every way to watch it
+          fail.
         </p>
         <ol className="steps">
           {["Requester", "Line items", "Logistics"].map((title, i) => (
             <li
               key={title}
-              className={
-                "steps__item" + (i === step ? " steps__item--current" : i < step ? " steps__item--done" : "")
-              }
+              className={"steps__item" + (i === step ? " steps__item--current" : i < step ? " steps__item--done" : "")}
             >
               {title}
             </li>
@@ -228,7 +221,7 @@ function RequesterSection() {
  */
 function DepartmentField() {
   const form = useStore<RootStore<typeof shape>>();
-  const c = useControl(shape.requester.department);
+  const { control: c, focusRef } = useControl(shape.requester.department);
   const budget = useValue(shape.requester.budget);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -246,11 +239,7 @@ function DepartmentField() {
       form.set(shape.requester.budget, dep ? dep.budget : undefined);
       // Only the error this lookup owns is written here; a success
       // clears nothing – the next validation run replaces errors.
-      if (!dep)
-        form.set(
-          shape.requester.department.error,
-          "Unknown department – known: DEP-1100, DEP-2201, DEP-3302",
-        );
+      if (!dep) form.set(shape.requester.department.error, "Unknown department – known: DEP-1100, DEP-2201, DEP-3302");
       form.set(shape.requester.department.lookingUp, undefined);
     }, 600);
   }, [c.value, form]);
@@ -262,7 +251,7 @@ function DepartmentField() {
       </label>
       <input
         id="dep"
-        ref={c.focusRef}
+        ref={focusRef}
         className="field__input"
         value={c.value}
         placeholder="DEP-1100"
@@ -271,8 +260,7 @@ function DepartmentField() {
         onChange={(e) => c.onChange(e.target.value)}
       />
       <p className="field__hint">
-        DEP-1100 / DEP-2201 / DEP-3302 exist; DEP-2201 turns out to be reorganized at save time.
-        Remaining budget:{" "}
+        DEP-1100 / DEP-2201 / DEP-3302 exist; DEP-2201 turns out to be reorganized at save time. Remaining budget:{" "}
         {budget !== undefined ? `€${budget.toLocaleString("en-US")}` : "not looked up yet"}
       </p>
       {c.showError && <p className="field__error">{c.error}</p>}
@@ -294,11 +282,7 @@ function LogisticsSection() {
           label="Ordered on"
           hint="Picking this fills needed-by 14 days later"
         />
-        <DateField
-          node={shape.logistics.neededBy}
-          label="Needed by"
-          hint="Must be after the order date"
-        />
+        <DateField node={shape.logistics.neededBy} label="Needed by" hint="Must be after the order date" />
       </div>
       <CheckboxField
         node={shape.logistics.shipToOffice}

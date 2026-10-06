@@ -1,18 +1,18 @@
 node_modules/
 dist/
-extension/dist/
 *.tsbuildinfo
 .DS_Store
 *.log
 .env
 .env.local
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
 *~
-.omo/
 # Vitest browser mode (failure screenshots, traces)
 .vitest/
-# Raw AI conversation exports (local only)
-docs/*-conversation*.json
+# Serena, a local MCP tool
+.serena/

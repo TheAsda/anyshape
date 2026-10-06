@@ -91,7 +91,11 @@ const total = defineBehavior({
   name: "total",
   triggers: [shape.travelers],
   writes: [shape.total],
-  run: (ctx) => ctx.set(shape.total, ctx.get(shape.travelers).reduce((sum, traveler) => sum + traveler.fare, 0)),
+  run: (ctx) =>
+    ctx.set(
+      shape.total,
+      ctx.get(shape.travelers).reduce((sum, traveler) => sum + traveler.fare, 0),
+    ),
 });
 
 const tripStore = createStore(

@@ -37,16 +37,16 @@ const suggestReturn = defineBehavior({
 
 A behavior's config declares everything it touches:
 
-| Part | Meaning |
-|---|---|
-| `name` | Used in error messages, DevTools and [origins](../../GLOSSARY.md). Give every behavior one. |
-| `triggers` | A change to any of these runs the behavior. |
-| `reads` | Readable in `run`, but a change to them doesn't run it. |
-| `writes` | The only targets `ctx.set` accepts, values or [meta keys](../../GLOSSARY.md). Each target has one writer. Targets are readable too. |
-| `when` | [Guards](../../GLOSSARY.md): the behavior runs only while they pass ([guards.md](guards.md)). |
-| `runOn` | `{ init: false }` skips the run when the behavior is created. |
-| `origins` | Run on a change only when it came from one of these kinds: `"user"`, `"program"`, `"initial"`, `"behavior"`. |
-| `run(ctx)` | The rule. It may return a promise ([async.md](async.md)). |
+| Part       | Meaning                                                                                                                             |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `name`     | Used in error messages, DevTools and [origins](../../GLOSSARY.md). Give every behavior one.                                         |
+| `triggers` | A change to any of these runs the behavior.                                                                                         |
+| `reads`    | Readable in `run`, but a change to them doesn't run it.                                                                             |
+| `writes`   | The only targets `ctx.set` accepts, values or [meta keys](../../GLOSSARY.md). Each target has one writer. Targets are readable too. |
+| `when`     | [Guards](../../GLOSSARY.md): the behavior runs only while they pass ([guards.md](guards.md)).                                       |
+| `runOn`    | `{ init: false }` skips the run when the behavior is created.                                                                       |
+| `origins`  | Run on a change only when it came from one of these kinds: `"user"`, `"program"`, `"initial"`, `"behavior"`.                        |
+| `run(ctx)` | The rule. It may return a promise ([async.md](async.md)).                                                                           |
 
 `suggestReturn` runs only on the user's edits, so loading a half-filled form from the server never fills in the return, and it never runs at creation.
 

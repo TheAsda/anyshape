@@ -4,25 +4,26 @@
 // ============================================================
 
 import { it, expect } from "vitest";
-import {
-  form, object, array, field, createStore, defineBehavior, type ItemStore,
-} from "../src/index";
+
+import { form, object, array, field, createStore, defineBehavior, type ItemStore } from "../src/index";
 import { control } from "../test/support/features";
 import { rule } from "../test/support/rules";
 
 const gc = (globalThis as { gc?: () => void }).gc;
 
-const shape = form(object({
-  lines: array(
-    object({
-      sku: field<string>().meta(control()),
-      qty: field<number>().meta(control()),
-      lineTotal: field<number>(),
-      lookup: field<string>(),
-    }),
-    { create: () => ({ sku: "", qty: 1, lineTotal: 0, lookup: "" }) }
-  ),
-}));
+const shape = form(
+  object({
+    lines: array(
+      object({
+        sku: field<string>().meta(control()),
+        qty: field<number>().meta(control()),
+        lineTotal: field<number>(),
+        lookup: field<string>(),
+      }),
+      { create: () => ({ sku: "", qty: 1, lineTotal: 0, lookup: "" }) },
+    ),
+  }),
+);
 const L = shape.lines.item;
 
 async function collectGarbage() {
@@ -33,21 +34,25 @@ async function collectGarbage() {
 }
 
 it.skipIf(!gc)("removed rows are collectable: stores, values and per-row state", async () => {
-  const s = createStore(shape, { lines: [] }, {
-    behaviors: [
-      defineBehavior({ triggers: [L.qty], writes: [L.lineTotal], run: (c) => c.set(L.lineTotal, c.get(L.qty) * 2) }),
-      rule(L.sku, (v) => (v ? undefined : "Required")),
-      defineBehavior({
-        triggers: [L.sku],
-        writes: [L.lookup],
-        runOn: { init: false },
-        run: async (c) => {
-          const sku = c.get(L.sku);
-          c.set(L.lookup, await c.keep([sku], async () => (sku === "taken" ? "Taken" : "")));
-        },
-      }),
-    ],
-  });
+  const s = createStore(
+    shape,
+    { lines: [] },
+    {
+      behaviors: [
+        defineBehavior({ triggers: [L.qty], writes: [L.lineTotal], run: (c) => c.set(L.lineTotal, c.get(L.qty) * 2) }),
+        rule(L.sku, (v) => (v ? undefined : "Required")),
+        defineBehavior({
+          triggers: [L.sku],
+          writes: [L.lookup],
+          runOn: { init: false },
+          run: async (c) => {
+            const sku = c.get(L.sku);
+            c.set(L.lookup, await c.keep([sku], async () => (sku === "taken" ? "Taken" : "")));
+          },
+        }),
+      ],
+    },
+  );
   const lines = s.substore(shape.lines);
   const stores: WeakRef<ItemStore<typeof L>>[] = [];
   const values: WeakRef<object>[] = [];
@@ -63,7 +68,7 @@ it.skipIf(!gc)("removed rows are collectable: stores, values and per-row state",
       values.push(new WeakRef(row.get(L) as object));
       unsubscribe();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
 
   await collectGarbage();
@@ -84,7 +89,7 @@ it.skipIf(!gc)("a row removed while its subscription is still active is collecta
       row.subscribe(L.sku, () => {}); // never unsubscribed, e.g. a leaked listener
       refs.push(new WeakRef(row));
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -98,12 +103,12 @@ it.skipIf(!gc)("a removed row whose own behaviors were disposed is collectable",
     for (let i = 0; i < 50; i++) {
       const row = lines.append();
       const dispose = row.addBehavior(
-        defineBehavior({ triggers: [L.qty], writes: [L.lineTotal], run: (c) => c.set(L.lineTotal, c.get(L.qty) * 2) })
+        defineBehavior({ triggers: [L.qty], writes: [L.lineTotal], run: (c) => c.set(L.lineTotal, c.get(L.qty) * 2) }),
       );
       refs.push(new WeakRef(row));
       dispose();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -113,22 +118,26 @@ it.skipIf(!gc)("a removed row whose own behaviors were disposed is collectable",
 // The run order's indexes (order.ts) by scope host: a disposed registration
 // leaves no entry under its own host, the hosts enclosing it or the host it
 // reads on, and no edge in the registrations that stay (#63).
-const nested = form(object({
-  lines: array(
-    object({
-      qty: field<number>(),
-      total: field<number>(),
-      sku: field<string>(),
-      notes: array(object({ text: field<string>(), len: field<number>() })),
-    }),
-    { create: () => ({ qty: 1, total: 0, sku: "", notes: [] }) }
-  ),
-  sum: field<number>(),
-}));
+const nested = form(
+  object({
+    lines: array(
+      object({
+        qty: field<number>(),
+        total: field<number>(),
+        sku: field<string>(),
+        notes: array(object({ text: field<string>(), len: field<number>() })),
+      }),
+      { create: () => ({ qty: 1, total: 0, sku: "", notes: [] }) },
+    ),
+    sum: field<number>(),
+  }),
+);
 const NL = nested.lines.item;
 const NN = NL.notes.item;
-const lineTotal = () => defineBehavior({ triggers: [NL.qty], writes: [NL.total], run: (c) => c.set(NL.total, c.get(NL.qty) * 2) });
-const lineSku = () => defineBehavior({ triggers: [NL.total], writes: [NL.sku], run: (c) => c.set(NL.sku, `T${c.get(NL.total)}`) });
+const lineTotal = () =>
+  defineBehavior({ triggers: [NL.qty], writes: [NL.total], run: (c) => c.set(NL.total, c.get(NL.qty) * 2) });
+const lineSku = () =>
+  defineBehavior({ triggers: [NL.total], writes: [NL.sku], run: (c) => c.set(NL.sku, `T${c.get(NL.total)}`) });
 
 it.skipIf(!gc)("removed nested rows whose own behaviors were disposed are collectable", async () => {
   const s = createStore(nested, { lines: [], sum: 0 });
@@ -138,17 +147,27 @@ it.skipIf(!gc)("removed nested rows whose own behaviors were disposed are collec
     for (let i = 0; i < 30; i++) {
       const line = lines.append();
       const handles = [
-        line.addBehavior(defineBehavior({ triggers: [NL.notes], writes: [NL.sku], run: (c) => c.set(NL.sku, `${c.get(NL.notes).length}`) })),
+        line.addBehavior(
+          defineBehavior({
+            triggers: [NL.notes],
+            writes: [NL.sku],
+            run: (c) => c.set(NL.sku, `${c.get(NL.notes).length}`),
+          }),
+        ),
       ];
       for (let j = 0; j < 3; j++) {
         const note = line.substore(NL.notes).append({ text: "ab", len: 0 });
-        handles.push(note.addBehavior(defineBehavior({ triggers: [NN.text], writes: [NN.len], run: (c) => c.set(NN.len, c.get(NN.text).length) })));
+        handles.push(
+          note.addBehavior(
+            defineBehavior({ triggers: [NN.text], writes: [NN.len], run: (c) => c.set(NN.len, c.get(NN.text).length) }),
+          ),
+        );
         refs.push(new WeakRef(note));
       }
       refs.push(new WeakRef(line));
       for (const dispose of handles) dispose();
     }
-    for (const line of [...lines.items()]) lines.remove(line);
+    for (const line of lines.items()) lines.remove(line);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -162,11 +181,17 @@ it.skipIf(!gc)("a removed row whose disposed behavior read the whole list is col
     for (let i = 0; i < 50; i++) {
       const row = lines.append();
       // Its input is kept under the root, the host that reads the list.
-      const dispose = row.addBehavior(defineBehavior({ triggers: [nested.lines], writes: [NL.sku], run: (c) => c.set(NL.sku, `${c.get(nested.lines).length}`) }));
+      const dispose = row.addBehavior(
+        defineBehavior({
+          triggers: [nested.lines],
+          writes: [NL.sku],
+          run: (c) => c.set(NL.sku, `${c.get(nested.lines).length}`),
+        }),
+      );
       refs.push(new WeakRef(row));
       dispose();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -174,7 +199,15 @@ it.skipIf(!gc)("a removed row whose disposed behavior read the whole list is col
 
 it.skipIf(!gc)("removed rows whose disposed behaviors were linked to a root behavior are collectable", async () => {
   // "sum" stays registered: every row's chain ranks before it.
-  const sum = defineBehavior({ triggers: [nested.lines], writes: [nested.sum], run: (c) => c.set(nested.sum, c.get(nested.lines).reduce((t, l) => t + l.total, 0)) });
+  const sum = defineBehavior({
+    triggers: [nested.lines],
+    writes: [nested.sum],
+    run: (c) =>
+      c.set(
+        nested.sum,
+        c.get(nested.lines).reduce((t, l) => t + l.total, 0),
+      ),
+  });
   const s = createStore(nested, { lines: [], sum: 0 }, { behaviors: sum });
   const lines = s.substore(nested.lines);
   const refs: WeakRef<object>[] = [];
@@ -185,7 +218,7 @@ it.skipIf(!gc)("removed rows whose disposed behaviors were linked to a root beha
       refs.push(new WeakRef(row));
       for (const dispose of handles) dispose();
     }
-    for (const row of [...lines.items()]) lines.remove(row);
+    for (const row of lines.items()) lines.remove(row);
   })();
   await collectGarbage();
   expect(refs.filter((r) => r.deref() !== undefined).length).toBe(0);
@@ -213,7 +246,10 @@ it.skipIf(!gc)("a dropped store is collectable with its rows and behaviors", asy
 async function keptPerRow(rows: number): Promise<number> {
   await collectGarbage();
   const before = process.memoryUsage().heapUsed;
-  const s = createStore(nested, { lines: Array.from({ length: rows }, () => ({ qty: 1, total: 2, sku: "T2", notes: [] })), sum: 0 });
+  const s = createStore(nested, {
+    lines: Array.from({ length: rows }, () => ({ qty: 1, total: 2, sku: "T2", notes: [] })),
+    sum: 0,
+  });
   for (const row of s.substore(nested.lines).items()) {
     row.addBehavior(lineTotal());
     row.addBehavior(lineSku());

@@ -35,12 +35,14 @@ Each node gets a reference per key: `shape.destination.error`. Read and write it
 
 A definition's steps add capabilities, and each step returns a new definition:
 
-| Step | What it adds |
-|---|---|
-| `.aggregate(isCounted)` | The key can be counted per subtree with `countIn`. |
-| `.uses(...definitions)` | The default [behavior](../../GLOSSARY.md) or owner gets references to other keys of the same node. |
-| `.behavior(factory)` | A default behavior, registered on every node that declares the key. |
-| `.combine(factory)` | The key is written by one owner that combines [contributions](../../GLOSSARY.md) ([contributions.md](contributions.md)). |
+| Step                    | What it adds                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `.aggregate(isCounted)` | The key can be counted per subtree with `countIn`.                                                                       |
+| `.uses(...definitions)` | The default [behavior](../../GLOSSARY.md) or owner gets references to other keys of the same node.                       |
+| `.behavior(factory)`    | A default behavior, registered on every node that declares the key.                                                      |
+| `.combine(factory)`     | The key is written by one owner that combines [contributions](../../GLOSSARY.md) ([contributions.md](contributions.md)). |
+
+Each step also marks the definition's type, and the later steps keep the marks: `.aggregate()` adds `Countable`, which `countIn` requires, and `.behavior()` or `.combine()` adds `Owned`. The marks make a step out of order a type error, with the message it throws at run time: `.aggregate()` is declared once, `.uses()` comes before `.behavior()` or `.combine()`, and a key takes one of `.behavior()` and `.combine()`. A marked definition still fits wherever `MetaKeyDef<V>` is expected.
 
 ## Features
 
@@ -117,7 +119,7 @@ tripStore.set(trip.destination.error, "Required");
 tripStore.get(countIn(trip, error)); // 1
 ```
 
-A count is a reference like any other: read it with `get` or `useValue`, subscribe to it, or use it as a behavior's trigger. `countIn` returns the same reference for the same node and definition.
+A count is a reference like any other: read it with `get` or `useValue`, subscribe to it, or use it as a behavior's trigger. `countIn` returns the same reference for the same node and definition. It takes only a definition declared with `.aggregate()`, and it throws when no node under `node`, rows included, declares the key, since that count would always be 0.
 
 `store.collect(node, definition)` sweeps the subtree instead of counting: one entry per node that declares the key, whatever its value, in shape order with rows expanded. Each entry has the node's `path` with row indexes (`"travelers[0].name"`), its reference `ref`, and the `store` that addresses it (the root, or the row's [store](../../GLOSSARY.md)).
 
@@ -133,6 +135,7 @@ const messages = tripStore
 - **Looking a key up by its name**, as `node["error"]` or by listing a node's keys. Take the node typed with the key you need, or sweep by definition with `collect`.
 - **A feature that creates its definitions inside the function.** Each call makes new keys; declare the definitions once.
 - **`isCounted` true for the default.** `.aggregate()` throws: untouched nodes must count as zero.
+- **Counting a key no node under the counted node declares.** `countIn` throws. Count from a node whose subtree declares the key.
 - **Writing a combined key from a behavior.** Registration rejects it; contribute to the key instead ([contributions.md](contributions.md)).
 
 ## See also
