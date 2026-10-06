@@ -55,9 +55,9 @@ export function ValueField({
 // ------------------------------------------------------------
 // Stage 2+ style binding: a field with .meta(control()).
 // ------------------------------------------------------------
-type StringNode = ControlNode & { readonly _type: string };
-type NumberNode = ControlNode & { readonly _type: number | null | undefined };
-type BooleanNode = ControlNode & { readonly _type: boolean };
+type StringNode = FieldNode<string> & ControlNode;
+type NumberNode = FieldNode<number | null | undefined> & ControlNode;
+type BooleanNode = FieldNode<boolean> & ControlNode;
 
 export function TextField({
   node,
@@ -170,7 +170,7 @@ export function SelectField<T extends string>({
   label,
   options,
 }: {
-  node: ControlNode & { readonly _type: T | undefined };
+  node: FieldNode<T | undefined> & ControlNode;
   label: string;
   options: Record<T, string>;
 }) {

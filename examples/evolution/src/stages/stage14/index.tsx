@@ -23,7 +23,8 @@ import {
   type FieldNode,
 } from "anyshape";
 import { StoreProvider, useForm, useArray, useValue } from "anyshape/react";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { flushSync } from "react-dom";
 
 import {
   control,
@@ -39,6 +40,7 @@ import {
   asyncRule,
   error,
   defined,
+  focusFirst,
 } from "../../../../../recipes";
 import { TextField, NumberField, CheckboxField, SelectField, ReadonlyRow, ResultCard } from "../../ui";
 
@@ -82,7 +84,6 @@ const shape = form(
       roomType: field<RoomType | undefined>().meta(control(), { defined }),
       nightlyRate: field<number | undefined>().meta(control()),
       nights: field<number | undefined>(),
-      estimatedBudget: field<number | undefined>(),
     }).meta(submission()),
     // Step 2: the extras.
     extras: object({
@@ -101,6 +102,8 @@ const shape = form(
         { create: () => ({ name: "", passport: "" }) },
       ),
       notes: field<string>().meta(control()),
+      // Computed from the travelers too, so it lives with them on step 2.
+      estimatedBudget: field<number | undefined>(),
     }).meta(submission()),
   }).meta(submission()),
 );
@@ -113,13 +116,13 @@ const initialValues: InferValue<typeof shape> = {
     roomType: undefined,
     nightlyRate: undefined,
     nights: undefined,
-    estimatedBudget: undefined,
   },
   extras: {
     rentingCar: false,
     car: { license: "", licenseExpiry: "", pickupOn: "", dropoffOn: "" },
     travelers: [],
     notes: "",
+    estimatedBudget: undefined,
   },
 };
 
@@ -170,7 +173,7 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
   );
   b.add(
     calculate(
-      s.trip.estimatedBudget,
+      s.extras.estimatedBudget,
       [s.trip.nights, s.trip.nightlyRate, s.extras.travelers],
       (nights, rate, travelers) =>
         nights !== undefined && rate !== undefined && nights >= 0
@@ -199,13 +202,20 @@ export const behaviors = defineBehaviors(shape, (b, s) => {
 
 function Derived() {
   const nights = useValue(shape.trip.nights);
-  const budget = useValue(shape.trip.estimatedBudget);
+  const budget = useValue(shape.extras.estimatedBudget);
   return (
     <div className="field-group">
       <ReadonlyRow label="Nights" value={nights === undefined ? "—" : String(nights)} />
       <ReadonlyRow label="Estimated budget" value={budget === undefined ? "—" : `€${budget.toFixed(2)}`} />
     </div>
   );
+}
+
+/** Step 2 reads the STORED type: the user can go back and clear the room type. */
+function TripSummary() {
+  const destination = useValue(shape.trip.destination);
+  const roomType = useValue(shape.trip.roomType); // RoomType | undefined
+  return <span>{roomType === undefined ? "No room chosen" : `${ROOMS[roomType]} in ${destination}`}</span>;
 }
 
 function CarGroup() {
@@ -269,18 +279,14 @@ function StepSubmit({ section, label }: { section: AnyNode; label: string }) {
 export function Stage() {
   const form = useForm(shape, initialValues, { behaviors });
   const [step, setStep] = useState<1 | 2>(1);
-  const [chosen, setChosen] = useState("");
   const [submitted, setSubmitted] = useState<object | null>(null);
 
-  // Next submits step 1 alone. `trip` is its checked type: roomType
-  // is a RoomType here, so it indexes ROOMS with no undefined check.
-  const next = handleSubmit(form.substore(shape.trip), (trip) => {
-    setChosen(`${ROOMS[trip.roomType]} in ${trip.destination}`);
-    setStep(2);
-  });
+  // Next submits step 1 alone. Its fn gets the trip's CHECKED type
+  // (roomType: RoomType, no undefined); all it does is advance.
+  const next = handleSubmit(form.substore(shape.trip), () => setStep(2));
 
   // Book submits the whole form, step 1 included.
-  const book = handleSubmit(form, async (values) => {
+  const submitAll = handleSubmit(form, async (values) => {
     try {
       await save(values);
       setSubmitted(values);
@@ -293,11 +299,20 @@ export function Stage() {
           const target = t && t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref);
           if (target) target.store.set(target.ref, message);
         }
-        // The server only rejects the dates, which are on step 1: go back to show them.
-        setStep(1);
       }
     }
   });
+
+  // An error on step 1, from the checks or the server, is out of sight
+  // on step 2: go back, then focus the first one.
+  const book = async (event: FormEvent) => {
+    event.preventDefault();
+    await submitAll();
+    const tripErrors = form.collect(shape.trip, error).filter((e) => e.store.get(e.ref) !== undefined);
+    if (tripErrors.length === 0) return;
+    flushSync(() => setStep(1));
+    focusFirst(tripErrors);
+  };
 
   return (
     <StoreProvider store={form}>
@@ -314,7 +329,7 @@ export function Stage() {
         ) : (
           <>
             <div className="smart-submit">
-              <span>{chosen}</span>
+              <TripSummary />
               <button type="button" className="button button--link" onClick={() => setStep(1)}>
                 ← Back to the trip
               </button>
