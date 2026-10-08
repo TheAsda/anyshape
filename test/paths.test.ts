@@ -1,4 +1,4 @@
-// O · Paths: resolvePath, and setting server errors through it.
+// Paths: resolvePath, and setting server errors through it.
 
 import { test as base, describe, expect } from "vitest";
 
@@ -6,7 +6,7 @@ import { createStore, countIn, defineBehavior } from "../src/index";
 import { error } from "./support/features";
 import * as limits from "./support/fixtures/limits";
 
-describe("O · Paths", () => {
+describe("Paths", () => {
   const { shape, L, initial } = limits;
   const test = base
     .extend("store", () => createStore(shape, initial()))

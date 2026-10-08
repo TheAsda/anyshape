@@ -8,7 +8,7 @@ import { watchOrigins } from "./support/harness";
 
 const test = base.extend("store", () => createStore(userShape, initial()));
 
-describe("D · Static meta", () => {
+describe("Static meta", () => {
   test("static meta incl. root meta", ({ store: s }) => {
     expect(s.get(userShape.title)).toBe("User");
     expect(s.get(userShape.name.label)).toBe("Full name");
@@ -16,7 +16,7 @@ describe("D · Static meta", () => {
   });
 });
 
-describe("D · Root + object substores", () => {
+describe("Root + object substores", () => {
   test("get/set through root", ({ store: s }) => {
     s.set(userShape.shipping.city, "Vilnius");
     expect(s.get(userShape.shipping.city)).toBe("Vilnius");
@@ -72,7 +72,7 @@ describe("D · Root + object substores", () => {
   });
 });
 
-describe("E · Arrays", () => {
+describe("Arrays", () => {
   test("items() returns stores in order with stable ids", ({ store: s }) => {
     const items = s.substore(userShape.items);
     const [a, b] = items.items();
@@ -175,7 +175,7 @@ describe("E · Arrays", () => {
   });
 });
 
-describe("D · Meta delegation and substore arguments", () => {
+describe("Meta delegation and substore arguments", () => {
   test("meta of a deep node is one value, whichever store is asked", ({ store: s }) => {
     const section = s.substore(userShape.shipping);
     section.set(userShape.shipping.city.error, "Bad");
@@ -189,7 +189,7 @@ describe("D · Meta delegation and substore arguments", () => {
   });
 });
 
-describe("D · Foreign nodes and duplicate rows", () => {
+describe("Foreign nodes and duplicate rows", () => {
   test("nodes of another form, or uninstantiated descriptions, are rejected", ({ store: s }) => {
     const other = form(object({ name: field<string>(), shipping: address }));
     expect(() => s.get(other.name)).toThrow(/is not part of the store/);
@@ -222,7 +222,7 @@ describe("D · Foreign nodes and duplicate rows", () => {
   });
 });
 
-describe("D, E · Reference API and array helpers", () => {
+describe("Reference API and array helpers", () => {
   const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
@@ -323,7 +323,7 @@ describe("D, E · Reference API and array helpers", () => {
   });
 });
 
-describe("I · Own-node meta keys", () => {
+describe("Own-node meta keys", () => {
   const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))

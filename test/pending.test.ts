@@ -108,7 +108,7 @@ describe("Pending", () => {
   });
 });
 
-describe("Pending · async runs", () => {
+describe("Pending: async runs", () => {
   /** An async behavior writing `a.checked`, whose runs wait for their gates. */
   function checkA(s: ReturnType<typeof createStore<typeof shape>>) {
     const gates: ReturnType<typeof deferred<void>>[] = [];

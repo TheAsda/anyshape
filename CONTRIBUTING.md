@@ -35,6 +35,7 @@ Comments describe the code as it is now, not how it got there. Drop notes like "
 
 - **An ADR** in `docs/adr/` only for a decision that is hard to reverse, would surprise a reader without its context, and was a real trade-off between options.
 - **Rules for contributors** go in this file, or in [`AGENTS.md`](AGENTS.md) when coding agents need them too.
+- **[`CODING_STANDARDS.md`](CODING_STANDARDS.md)** indexes the sources a review reads. It holds a rule of its own only when the rule covers every file and has no other home, such as writing in our own words.
 - **[`GLOSSARY.md`](GLOSSARY.md)** holds domain words only, never implementation names. A term the glossary lists under _Avoid_ stays out of code names too.
 
 ## Changesets

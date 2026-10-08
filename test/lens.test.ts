@@ -2,7 +2,7 @@ import { test, describe, expect } from "vitest";
 
 import { propLens, composeLens, identityLens } from "../src/lens";
 
-describe("B · propLens", () => {
+describe("propLens", () => {
   test("propLens.get tolerates a missing parent", () => {
     const lens = propLens("a");
     expect(lens.get(undefined)).toBe(undefined);
@@ -38,7 +38,7 @@ describe("B · propLens", () => {
   });
 });
 
-describe("B · identityLens and composition", () => {
+describe("identityLens and composition", () => {
   test("identityLens reads the source and replaces it on write", () => {
     const source = { a: 1 };
     expect(identityLens.get(source)).toBe(source);

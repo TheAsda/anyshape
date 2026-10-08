@@ -24,9 +24,17 @@ _Avoid_: path, selector
 A live form: the values for one shape, the meta of every node, and the behaviors that keep them consistent.
 _Avoid_: state, form instance
 
+**Substore**:
+A store narrowed to one object or array node of a form: it reads, writes, settles and submits only that part, in the scope of the store it came from. A row's store is one.
+_Avoid_: sub-form, slice, section
+
 **Scope**:
 The form root or one row: the instance in which a node's value and meta are read and written. A behavior declared on a row's nodes runs separately in each row's scope.
 _Avoid_: context
+
+**Row**:
+One item of an array in a live store: its own scope, with its own values, meta and behavior instances, kept through reorders.
+_Avoid_: array element
 
 **Meta key**:
 A named piece of state a node declares beside its value (such as `error`, `visible` or `touched`), with a default. The core gives no meta key a meaning.
@@ -55,6 +63,10 @@ _Avoid_: default, original, pristine
 **Contribution**:
 A declaration that supplies one input to the single behavior owning a meta key, without writing the key itself. The key decides how its contributions combine; a contribution whose guard is false is absent.
 _Avoid_: provider, source, partial writer
+
+**Owner**:
+The one behavior that writes a combined meta key in a scope, computing its value from the key's contributions.
+_Avoid_: aggregator, reducer, collector
 
 **Cause**:
 What a run exists to handle: the origins of the changes that started it and which inputs changed. A run cancelled by an input change passes its cause to the run that replaces it.

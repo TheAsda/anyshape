@@ -45,7 +45,7 @@ export function typeOnlyChecks() {
 
 const test = base.extend("store", () => createStore(shape, initial()));
 
-describe("N · Rules", () => {
+describe("Rules", () => {
   test("isEmpty and labelOf", () => {
     expect([undefined, null, "", "  ", [], 0, "x", [1], false].map(isEmpty)).toEqual([
       true,
@@ -138,7 +138,7 @@ describe("N · Rules", () => {
   });
 });
 
-describe("N · Messages", () => {
+describe("Messages", () => {
   test("messages as functions; exclusive's custom messages; path segments in exclusive's default text", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
@@ -166,7 +166,7 @@ describe("N · Messages", () => {
   });
 });
 
-describe("N · Reference limits", () => {
+describe("Reference limits", () => {
   const { shape, L, initial } = limits;
 
   // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ describe("N · Reference limits", () => {
     expect(s.get(f.wanted.error), "the message uses the current limit").toBe("Must be at most 1");
   });
 });
-describe("N · Guarded recipes", () => {
+describe("Guarded recipes", () => {
   test("a builder block guards a rule and a behavior: absent while false, run when it turns true", () => {
     const behaviors = defineBehaviors(shape, (b) =>
       b.when(

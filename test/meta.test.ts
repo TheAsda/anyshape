@@ -59,7 +59,7 @@ export function typeOnlyChecks() {
   array(object({ a: field<string>() }), { create: () => ({}) });
 }
 
-describe("C · Declarations", () => {
+describe("Declarations", () => {
   test("defaults from plain values and key definitions", () => {
     const s = createStore(shape, values());
     const n = shape.name;
@@ -111,7 +111,7 @@ describe("C · Declarations", () => {
   });
 });
 
-describe("C · Meta references", () => {
+describe("Meta references", () => {
   test("meta refs point at the instantiated node", () => {
     const ref = shape.name.error;
     expect(ref instanceof MetaRef).toBe(true);
@@ -164,7 +164,7 @@ describe("C · Meta references", () => {
   });
 });
 
-describe("C · Closed meta in the store", () => {
+describe("Closed meta in the store", () => {
   test("only declared keys have refs", () => {
     const s = createStore(shape, values());
     s.set(shape.name.label, "Full name");
@@ -176,7 +176,7 @@ describe("C · Closed meta in the store", () => {
   });
 });
 
-describe("C · Arrays", () => {
+describe("Arrays", () => {
   test("array create is kept on the instantiated node", () => {
     const a = shape.lines[CREATE]!();
     const b = shape.lines[CREATE]!();
@@ -192,7 +192,7 @@ describe("C · Arrays", () => {
 
 const NODE_INTERNALS = ["id", "lens", "path", "parent", "meta", "constructor", "_type", "_hasCreate"];
 
-describe("C · Reserved names, table-driven", () => {
+describe("Reserved names, table-driven", () => {
   test("every node-internal name is rejected as a field name and as a meta key", () => {
     for (const name of NODE_INTERNALS) {
       expect(() => object({ [name]: field<string>() }), `field "${name}"`).toThrow(/reserved name/);
