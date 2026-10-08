@@ -1,4 +1,4 @@
-// G · Origins, baselines (initial values) and reset.
+// Origins, baselines (initial values) and reset.
 
 import { test as base, describe, expect } from "vitest";
 
@@ -9,7 +9,7 @@ import * as limits from "./support/fixtures/limits";
 import { watchOrigins } from "./support/harness";
 import { rule, max } from "./support/rules";
 
-describe("G · Origins, baselines and reset", () => {
+describe("Origins, baselines and reset", () => {
   const { shape, L, initial, originsOf } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
@@ -177,7 +177,7 @@ describe("G · Origins, baselines and reset", () => {
   });
 });
 
-describe("G · Reset re-runs behaviors and keeps limits", () => {
+describe("Reset re-runs behaviors and keeps limits", () => {
   const { shape, L, initial } = limits;
   const test = base.extend("store", () => createStore(shape, initial()));
 

@@ -1,4 +1,4 @@
-// H · Counts: countIn, collect, aggregate keys, counts across rows.
+// Counts: countIn, collect, aggregate keys, counts across rows.
 
 import { test, test as base, describe, expect, vi } from "vitest";
 
@@ -7,7 +7,7 @@ import { revealed, dirty, error } from "./support/features";
 import * as company from "./support/fixtures/company";
 import * as limits from "./support/fixtures/limits";
 
-describe("H · Counts and collect", () => {
+describe("Counts and collect", () => {
   const { shape, L, initial } = company;
   const test = base
     .extend("store", () => createStore(shape, initial()))
@@ -148,7 +148,7 @@ describe("H · Counts and collect", () => {
   });
 });
 
-describe("H · Counts by definition", () => {
+describe("Counts by definition", () => {
   test("countIn counts a key definition, whatever name a node declares it under", () => {
     const flagged = metaKey(false).aggregate((v) => v);
     const other = metaKey(false).aggregate((v) => v);
@@ -172,7 +172,7 @@ describe("H · Counts by definition", () => {
   });
 });
 
-describe.each(["development", "production"])("H · countIn rejects a key it can't count (%s)", (mode) => {
+describe.each(["development", "production"])("countIn rejects a key it can't count (%s)", (mode) => {
   const checked = metaKey(false);
   const counted = metaKey(false).aggregate((v) => v);
   const f = form(
@@ -224,7 +224,7 @@ describe.each(["development", "production"])("H · countIn rejects a key it can'
   });
 });
 
-describe("H · Stable count references", () => {
+describe("Stable count references", () => {
   const { shape } = limits;
 
   // ---------------------------------------------------------------------------

@@ -31,7 +31,7 @@ export function typeOnlyChecks() {
   asyncRule(shape.name, () => undefined);
 }
 
-describe("M · Sync queue", () => {
+describe("Sync queue", () => {
   test("queue: rules in order, first error wins, runs on creation", () => {
     const required = rule(shape.name, (v) => (v ? undefined : "Required"));
     const minLength = rule(shape.name, (v) => (v.length >= 3 ? undefined : "At least 3"));
@@ -136,7 +136,7 @@ describe("M · Sync queue", () => {
   });
 });
 
-describe("M · Component rules", () => {
+describe("Component rules", () => {
   test("a rule added on a row applies to that row, after the form's rules", () => {
     const s = createStore(shape, { ...initial() }, { behaviors: rule(L.sku, (v) => (v ? undefined : "Required")) });
     const [a, b] = s.substore(shape.lines).items();
@@ -158,7 +158,7 @@ describe("M · Component rules", () => {
   });
 });
 
-describe("M · Hidden / disabled are guards (#21)", () => {
+describe("Hidden / disabled are guards (#21)", () => {
   test("a hidden field is still validated: nothing is skipped", () => {
     const s = createStore(shape, initial(), {
       behaviors: rule(shape.company.vat, (v) => (v ? undefined : "Required")),
@@ -195,7 +195,7 @@ const party = form(
 );
 const atLeastOne = rule(party.travelers, (rows) => (rows.length === 0 ? "Add at least one traveler" : undefined));
 
-describe("M · Rules on a whole array", () => {
+describe("Rules on a whole array", () => {
   test("array-level rules: an error on the array itself, counted and validated", async () => {
     const s = createStore(party, { travelers: [] }, { behaviors: atLeastOne });
     const travelers = s.substore(party.travelers);
@@ -215,7 +215,7 @@ describe("M · Rules on a whole array", () => {
   });
 });
 
-describe("M · Async", () => {
+describe("Async", () => {
   test("async: starts on user changes, pending while in flight, result arrives as a new batch", async ({
     lookup: { calls, check },
   }) => {
@@ -350,7 +350,7 @@ describe("M · Async", () => {
 
 // #28: as on the basic form's requester.email – a sync rule triggered by
 // another field (here `name`, the approver) plus a debounced server check.
-describe("M · Async: an unrelated trigger keeps the check in flight (#28)", () => {
+describe("Async: an unrelated trigger keeps the check in flight (#28)", () => {
   const behaviors = (check: ReturnType<typeof lookup>["check"]) => [
     rule(shape.email, (v, ctx) => (v === ctx.get(shape.name) ? "Can't approve yourself" : undefined), {
       triggers: [shape.name],
@@ -397,7 +397,7 @@ describe("M · Async: an unrelated trigger keeps the check in flight (#28)", () 
   });
 });
 
-describe("M · A check that throws", () => {
+describe("A check that throws", () => {
   const spyConsole = () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     onTestFinished(() => spy.mockRestore());
@@ -451,7 +451,7 @@ describe("M · A check that throws", () => {
   });
 });
 
-describe("M · validate()", () => {
+describe("validate()", () => {
   test("validate: errors in shape order with concrete paths; subtrees, rows and sections", async () => {
     const s = createStore(shape, initial(), {
       behaviors: [
@@ -545,7 +545,7 @@ describe("M · validate()", () => {
   });
 });
 
-describe("M · Async: inputs", () => {
+describe("Async: inputs", () => {
   test("a changed read value makes validate() re-check; identical inputs reuse the result", async ({
     lookup: { calls, check },
   }) => {
@@ -579,7 +579,7 @@ describe("M · Async: inputs", () => {
   });
 });
 
-describe("M · validate() and removed rows (#1)", () => {
+describe("validate() and removed rows (#1)", () => {
   test("a row removed while its check is pending: validate() doesn't wait for it or list it", async ({
     lookup: { calls, check },
   }) => {
@@ -611,7 +611,7 @@ describe("M · validate() and removed rows (#1)", () => {
   });
 });
 
-describe("M · `defined`: the Required backstop", () => {
+describe("`defined`: the Required backstop", () => {
   const { shape: order, D, L: Line, initial: empty } = orderFixture;
 
   test("an empty `defined` field with no rule shows Required", () => {

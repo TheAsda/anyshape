@@ -136,7 +136,7 @@ const test = base
   .extend("store", () => createStore(shape, initial()))
   .extend("lines", ({ store }) => store.substore(shape.lines));
 
-describe("K · Ordering and init", () => {
+describe("Ordering and init", () => {
   test("init: every instance runs once on creation, in dependency order", () => {
     const runs: Record<string, number> = {};
     const s = createStore(shape, initial(), { behaviors: pricing(runs) });
@@ -189,7 +189,7 @@ describe("K · Ordering and init", () => {
   });
 });
 
-describe("K · Own writes, two-way links, state", () => {
+describe("Own writes, two-way links, state", () => {
   test("a two-way link: own writes do not re-trigger it", () => {
     let runs = 0;
     const s = createStore(shape, initial(), {
@@ -295,7 +295,7 @@ describe("K · Own writes, two-way links, state", () => {
   });
 });
 
-describe("L · Origins and guards", () => {
+describe("Origins and guards", () => {
   test("origins: reset the city only when the user changes the country", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehavior({
@@ -360,7 +360,7 @@ describe("L · Origins and guards", () => {
   });
 });
 
-describe("L · Errors and access", () => {
+describe("Errors and access", () => {
   test("a throwing behavior: writes dropped, error reported, form keeps running", () => {
     const { list, onError } = errors();
     const s = createStore(shape, initial(), {
@@ -426,7 +426,7 @@ describe("L · Errors and access", () => {
   });
 });
 
-describe("J · Registration checks", () => {
+describe("Registration checks", () => {
   test("one writer per target", () => {
     const w = (name: string, target: any) =>
       defineBehavior({ name, triggers: [shape.title], writes: [target], run: () => {} });
@@ -513,7 +513,7 @@ describe("J · Registration checks", () => {
   });
 });
 
-describe("L · Rows", () => {
+describe("Rows", () => {
   test("row instances are independent and pause while the row is removed", () => {
     let runs = 0;
     const s = createStore(shape, initial(), {
@@ -560,7 +560,7 @@ describe("L · Rows", () => {
   });
 });
 
-describe("L · Runtime registration", () => {
+describe("Runtime registration", () => {
   test("addBehavior on a row applies to that row only; dispose resets its meta, its values stay", ({ store: s }) => {
     const [a, b] = s.substore(shape.lines).items();
     const off = a.addBehavior(
@@ -673,7 +673,7 @@ describe("L · Runtime registration", () => {
   });
 });
 
-describe("L · Default behaviors: touched, dirty", () => {
+describe("Default behaviors: touched, dirty", () => {
   test("touched: only user changes", () => {
     const s = createStore(shape, initial(), { behaviors: pricing({}) });
     s.set(shape.name, "Bob");
@@ -743,7 +743,7 @@ describe("L · Default behaviors: touched, dirty", () => {
   });
 });
 
-describe("K · Rows created by the helpers while behaviors edit them", () => {
+describe("Rows created by the helpers while behaviors edit them", () => {
   test("append / insert return the new row when a behavior edits it in the same flush", () => {
     const lineTotal = pricing({})[3];
     const s = createStore(shape, initial(), { behaviors: [lineTotal] });
@@ -763,7 +763,7 @@ describe("K · Rows created by the helpers while behaviors edit them", () => {
   });
 });
 
-describe("J · Feature default behaviors", () => {
+describe("Feature default behaviors", () => {
   test("a feature's default behavior may only use its own node", () => {
     const mirror = () => ({
       mirror: metaKey("").behavior((self, key) => ({
@@ -781,7 +781,7 @@ describe("J · Feature default behaviors", () => {
   });
 });
 
-describe("L · Counts as triggers", () => {
+describe("Counts as triggers", () => {
   test("a count as a trigger re-runs when the count changes, including on row removal", () => {
     const dirtyCount = countIn(shape, dirty);
     const mirror = defineBehavior({
@@ -800,7 +800,7 @@ describe("L · Counts as triggers", () => {
   });
 });
 
-describe("J · More registration checks", () => {
+describe("More registration checks", () => {
   test("only values and meta keys can be written", () => {
     const writeCount = defineBehavior({ name: "c", writes: [countIn(shape, dirty) as never], run: () => {} });
     const writeInitial = defineBehavior({ name: "i", writes: [initialOf(shape.total) as never], run: () => {} });
@@ -839,7 +839,7 @@ describe("J · More registration checks", () => {
   });
 });
 
-describe("K · Ordering edges", () => {
+describe("Ordering edges", () => {
   test("container edge: a row writer runs before a root behavior reading the whole array", () => {
     const log: string[] = [];
     const perRow = defineBehavior({
@@ -882,7 +882,7 @@ describe("K · Ordering edges", () => {
   });
 });
 
-describe("K · Run order across registration changes", () => {
+describe("Run order across registration changes", () => {
   type NumberField = typeof shape.start;
   // A behavior that logs its runs and writes `to` from its first trigger.
   const step = (log: string[], name: string, triggers: NumberField[], to: NumberField) =>
@@ -991,7 +991,7 @@ describe("K · Run order across registration changes", () => {
   });
 });
 
-describe("K · Run order between scope hosts", () => {
+describe("Run order between scope hosts", () => {
   // Each reader is registered before its writer: without an edge it would run first.
   const logged = (log: string[], name: string, triggers: any[], to: any, value: (c: BehaviorContext) => unknown) =>
     defineBehavior({ name, triggers, writes: [to], run: (c) => (log.push(name), c.set(to, value(c))) });
@@ -1185,7 +1185,7 @@ describe("K · Run order between scope hosts", () => {
   });
 });
 
-describe("L · The run context", () => {
+describe("The run context", () => {
   test("ctx.changed is false on the init run and true only for triggers that changed", () => {
     const seen: string[] = [];
     const b = defineBehavior({
@@ -1246,7 +1246,7 @@ describe("L · The run context", () => {
   });
 });
 
-describe("J · Handles and the default onError", () => {
+describe("Handles and the default onError", () => {
   test("replaceBehavior rejects a handle of another store and a disposed handle", () => {
     const s1 = createStore(shape, initial());
     const s2 = createStore(shape, initial());
@@ -1295,7 +1295,7 @@ describe("J · Handles and the default onError", () => {
   });
 });
 
-describe("J · Atomic replacement", () => {
+describe("Atomic replacement", () => {
   const { shape, L, initial } = limits;
   const test = base.extend("store", () => createStore(shape, initial()));
 

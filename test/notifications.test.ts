@@ -51,7 +51,7 @@ const test = base
   .extend("lines", ({ store }) => store.substore(shape.lines))
   .extend("recorder", () => recorder());
 
-describe("F · Rule 1 – value subscriptions", () => {
+describe("Rule 1 – value subscriptions", () => {
   test("rule 1: only changed values fire, ancestors included", ({ store: s, recorder: r }) => {
     s.subscribe(shape.shipping.city, r.on("city"));
     s.subscribe(shape.shipping, r.on("shipping"));
@@ -78,7 +78,7 @@ describe("F · Rule 1 – value subscriptions", () => {
   });
 });
 
-describe("F · Rule 2 – separate channels, no meta bubbling", () => {
+describe("Rule 2 – separate channels, no meta bubbling", () => {
   test("rule 2: meta and value channels are separate", ({ store: s, recorder: r }) => {
     s.subscribe(shape.name, r.on("value"));
     s.subscribe(shape.name.touched, r.on("meta"));
@@ -109,7 +109,7 @@ describe("F · Rule 2 – separate channels, no meta bubbling", () => {
   });
 });
 
-describe("F · Rule 3 – array structure channel", () => {
+describe("Rule 3 – array structure channel", () => {
   test("rule 3: editing a row does not fire subscribeItems; items() is stable", ({ lines, recorder: r }) => {
     lines.subscribeItems(r.on("items"));
     lines.subscribe(shape.lines, r.on("arrayValue"));
@@ -133,7 +133,7 @@ describe("F · Rule 3 – array structure channel", () => {
   });
 });
 
-describe("F · Rule 4 – attachment changes", () => {
+describe("Rule 4 – attachment changes", () => {
   test("rule 4: removal fires all subscribers of the detached store once", ({ store: s, lines }) => {
     const row = lines.itemAt(1);
     const r = recorder();
@@ -212,7 +212,7 @@ describe("F · Rule 4 – attachment changes", () => {
 
 // Row writes leave the sequence of rows as it is: these pin what the flush
 // must still find among the rows.
-describe("F · Row writes", () => {
+describe("Row writes", () => {
   test("rows written in one batch notify in array order", ({ store: s, lines }) => {
     const [a, b] = lines.items();
     a.set(L.price, 11); // a flush that walks the rows first
@@ -266,7 +266,7 @@ describe("F · Row writes", () => {
   });
 });
 
-describe("F · Rule 5 – batching", () => {
+describe("Rule 5 – batching", () => {
   test("rule 5: batch notifies once; reads see new values inside", ({ store: s, recorder: r }) => {
     s.subscribe(shape, r.on("root"));
     s.batch(() => {
@@ -312,7 +312,7 @@ function withTotal() {
   return { s, lines: s.substore(shape.lines) };
 }
 
-describe("F · Rule 7 – behaviors, then listeners", () => {
+describe("Rule 7 – behaviors, then listeners", () => {
   test("rule 7: derived writes settle before listeners; listeners see the final state once", () => {
     const { s, lines } = withTotal();
     const seen: number[] = [];
@@ -392,7 +392,7 @@ describe("F · Rule 7 – behaviors, then listeners", () => {
   });
 });
 
-describe("F · Subscription housekeeping", () => {
+describe("Subscription housekeeping", () => {
   test("unsubscribe stops notifications", ({ store: s, recorder: r }) => {
     const off = s.subscribe(shape.name, r.on("name"));
     off();
@@ -418,7 +418,7 @@ describe("F · Subscription housekeeping", () => {
   });
 });
 
-describe("F · Errors during the flush", () => {
+describe("Errors during the flush", () => {
   test("a throwing listener: the others still run, the first error is rethrown", ({ store: s, recorder: r }) => {
     s.subscribe(shape.name, () => {
       r.log.push("a");
@@ -458,7 +458,7 @@ describe("F · Errors during the flush", () => {
   });
 });
 
-describe("F · Array replacement and flat forms", () => {
+describe("Array replacement and flat forms", () => {
   test("rule 3: replacing the array with new objects of the same length fires subscribeItems", ({
     store: s,
     lines,
@@ -487,7 +487,7 @@ describe("F · Array replacement and flat forms", () => {
   });
 });
 
-describe("F · Meta-key subscriptions", () => {
+describe("Meta-key subscriptions", () => {
   const { shape, initial } = company;
   const test = base.extend("store", () => createStore(shape, initial()));
 

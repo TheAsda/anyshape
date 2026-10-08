@@ -83,7 +83,7 @@ function record(s: RootStore<any>): unknown[][] {
   return events;
 }
 
-describe("T · Probe", () => {
+describe("Probe", () => {
   test("a flush reports its start, the end of its reactions and its end", () => {
     const s = createStore(shape, initial());
     const events = record(s);
@@ -241,7 +241,7 @@ describe("T · Probe", () => {
   });
 });
 
-describe("T · Flush budget", () => {
+describe("Flush budget", () => {
   const order = form(
     object({
       lines: array(object({ qty: field<number>(), total: field<number>() })),
@@ -384,7 +384,7 @@ describe("T · Flush budget", () => {
   });
 });
 
-describe("T · DevTools tracks", () => {
+describe("DevTools tracks", () => {
   let stamp: Mock<(...args: unknown[]) => void>;
   let measure: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
@@ -610,7 +610,7 @@ describe("T · DevTools tracks", () => {
   });
 });
 
-describe("T · Production", () => {
+describe("Production", () => {
   test("in production nothing is measured: no clock reads, no warning, no entries", async () => {
     const stamp = (console.timeStamp = vi.fn<Console["timeStamp"]>());
     const measure = vi.spyOn(performance, "measure");

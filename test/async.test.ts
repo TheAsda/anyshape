@@ -48,7 +48,7 @@ function errors() {
   return { list, onError };
 }
 
-describe("J · Async runs", () => {
+describe("Async runs", () => {
   test("an async run's writes apply when its promise resolves, not before", async () => {
     const s = createStore(shape, initial());
     const lookup = deferred<string>();
@@ -137,7 +137,7 @@ describe("J · Async runs", () => {
   });
 });
 
-describe("J · Cancellation", () => {
+describe("Cancellation", () => {
   test("a trigger change cancels the run in flight and reruns; the cancelled run's writes are dropped", async () => {
     const s = createStore(shape, initial());
     const calls: { code: string; signal: AbortSignal; result: ReturnType<typeof deferred<string>> }[] = [];
@@ -369,7 +369,7 @@ describe("J · Cancellation", () => {
   });
 });
 
-describe("J · Reruns", () => {
+describe("Reruns", () => {
   /** An async behavior that records each run's cause and waits for a gate. */
   function recorder(config: {
     triggers: AnyRef[];
@@ -466,7 +466,7 @@ describe("J · Reruns", () => {
   });
 });
 
-describe("J · Transactional state", () => {
+describe("Transactional state", () => {
   test("ctx.state changed in place by a cancelled run is not saved; a completed run's is", async () => {
     const s = createStore(shape, initial());
     const seen: unknown[] = [];
@@ -493,7 +493,7 @@ describe("J · Transactional state", () => {
   });
 });
 
-describe("J · settle()", () => {
+describe("settle()", () => {
   afterEach(() => void vi.useRealTimers());
 
   test("waits for the runs in flight that write inside the node, reruns included", async () => {
@@ -595,7 +595,7 @@ describe("J · settle()", () => {
   });
 });
 
-describe("J · Kept work", () => {
+describe("Kept work", () => {
   /** Looks up the code's label in kept work keyed by the code; the region is label + name. */
   function lookup(scope: { code: AnyRef; out: AnyRef; name?: AnyRef }) {
     const starts: { key: string; signal: AbortSignal; result: ReturnType<typeof deferred<string>> }[] = [];
@@ -697,7 +697,7 @@ describe("J · Kept work", () => {
   });
 });
 
-describe("J · Definition traces", () => {
+describe("Definition traces", () => {
   const failing = () =>
     defineBehavior({
       triggers: [shape.code],

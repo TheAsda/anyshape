@@ -39,7 +39,7 @@ export function typeOnlyChecks() {
 
 const test = base.extend("store", () => createStore(shape, initial()));
 
-describe("N · Behaviors", () => {
+describe("Behaviors", () => {
   test("calculate: recalculated on every source change, a user edit included", () => {
     const s = createStore(shape, initial(), {
       behaviors: calculate(shape.slug, [shape.title], (t) => t.toLowerCase().replace(/\s+/g, "-")),
@@ -139,7 +139,7 @@ const disabledOf = (s: ReturnType<typeof exclusiveStore>) =>
 const errorsOf = (s: ReturnType<typeof exclusiveStore>) =>
   [shape.price, shape.discount, shape.promo].map((f) => s.get(f.error));
 
-describe("N · exclusive", () => {
+describe("exclusive", () => {
   test("exclusive: filling one disables the others", () => {
     const s = exclusiveStore();
     expect(disabledOf(s)).toEqual([false, false, false]);
@@ -170,7 +170,7 @@ describe("N · exclusive", () => {
   });
 });
 
-describe("N · disabled: reasons OR together", () => {
+describe("disabled: reasons OR together", () => {
   test("disableWhen and exclusive on one field: disabled while either applies", () => {
     const s = createStore(shape, initial(), {
       behaviors: [
@@ -207,7 +207,7 @@ describe("N · disabled: reasons OR together", () => {
   });
 });
 
-describe("N · Builder", () => {
+describe("Builder", () => {
   test("builder: when with rules", () => {
     const behaviors = defineBehaviors(shape, (b) => {
       b.add(required(shape.name));
@@ -308,7 +308,7 @@ describe("N · Builder", () => {
   });
 });
 
-describe("N · link on load", () => {
+describe("link on load", () => {
   test("link: loading a whole new value changes both sides, nothing is written", () => {
     let writes = 0;
     const s = createStore(shape, initial(), {
@@ -323,7 +323,7 @@ describe("N · link on load", () => {
   });
 });
 
-describe("N · Misuse", () => {
+describe("Misuse", () => {
   test("exclusive needs two fields", () => {
     expect(() => exclusive([shape.price])).toThrow("exclusive() needs at least two fields");
   });

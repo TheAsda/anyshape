@@ -1,11 +1,11 @@
-// A · Shape: node instantiation, identity, parents, templates and structural checks.
+// Shape: node instantiation, identity, parents, templates and structural checks.
 
 import { test, describe, expect } from "vitest";
 
 import { form, object, array, field, createStore } from "../src/index";
 import { userShape } from "./support/fixtures/user";
 
-describe("A · Nodes", () => {
+describe("Nodes", () => {
   test("parent links", () => {
     expect(userShape.parent).toBe(undefined);
     expect(userShape.shipping.parent).toBe(userShape);
@@ -45,7 +45,7 @@ describe("A · Nodes", () => {
   });
 });
 
-describe("A · Reused shapes containing arrays", () => {
+describe("Reused shapes containing arrays", () => {
   test("a reused shape containing an array: separate templates, ids and paths per use", () => {
     const block = object({ items: array(object({ x: field<string>() })) });
     const f = form(object({ a: block, b: block }));
