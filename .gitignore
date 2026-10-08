@@ -16,3 +16,5 @@ dist/
 .vitest/
 # Serena, a local MCP tool
 .serena/
+# Claude Code: agent worktrees and local settings
+.claude/
