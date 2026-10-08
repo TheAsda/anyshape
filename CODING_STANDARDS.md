@@ -13,7 +13,7 @@ The page a review starts from. It lists the sources a change is reviewed against
 
 ## Rules that live only here
 
-- Write everything in our own words: code, comments, docs, tests and commit messages. An idea from another project or a conversation is restated, not quoted.
+- Write everything in our own words: code, comments, docs, tests and commit messages. An idea from another project is restated, not quoted.
 - Cite only public sources: issues and pull requests on [github.com/TheAsda/anyshape](https://github.com/TheAsda/anyshape), and published docs. A claim stands on its own reasoning or on one of those links.
 
 Both rules come from the [brief for the design docs](https://github.com/TheAsda/anyshape/issues/70#issuecomment-5973258361).
