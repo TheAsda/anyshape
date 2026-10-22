@@ -14,6 +14,7 @@ import {
   defineBehavior,
   defineBehaviors,
   metaKey,
+  initialOf,
   pathOf,
   when,
   pendingOf,
@@ -156,7 +157,7 @@ describe("Registration", () => {
     expect(() => createStore(shape, initial(), { behaviors: writer }), "even with no owner yet").toThrow(
       `Behavior "tagWriter": lists "a#tags" in \`writes\`, but that key is combined (declared with \`combine\`): its owner behavior computes the key from the contributions registered for it, so no other behavior can write it.
 Fix: remove it from \`writes\` and register a contribution instead:
-  contribute("a#tags", <payload>, { name: "…", when: when([mode], (…) => …) })
+  contribute(<ref to "a#tags">, <payload>, { name: "…", when: when([mode], (…) => …) })
 The contribution applies while \`when\` holds; the owner recomputes the key once it stops holding, so there is no "else" write to make.
 See docs/guide/contributions.md.`,
     );
@@ -174,14 +175,31 @@ See docs/guide/contributions.md.`,
       run: () => {},
     });
     const message = messageOf(() => createStore(shape, initial(), { behaviors: writer }));
-    expect(message).toContain('contribute("a#tags", <payload>, { name: "…", when: when([mode, other], (…) => …) })');
+    expect(message).toContain(
+      'contribute(<ref to "a#tags">, <payload>, { name: "…", when: when([mode, other], (…) => …) })',
+    );
     expect(message).toContain('This behavior\'s other writes ("other", "b#note") can stay as they are.');
   });
 
   test("with no triggers, the suggested contribution has no `when`", () => {
     const writer = defineBehavior({ name: "silent", writes: [shape.a.tags], run: () => {} });
     expect(messageOf(() => createStore(shape, initial(), { behaviors: writer }))).toContain(
-      'contribute("a#tags", <payload>, { name: "…" })',
+      'contribute(<ref to "a#tags">, <payload>, { name: "…" })',
+    );
+  });
+
+  test("the first refused write in declared order is the one reported", () => {
+    const twoKeys = defineBehavior({ name: "firstOf", writes: [shape.a.tags, R.x.tags], run: () => {} });
+    expect(messageOf(() => createStore(shape, initial(), { behaviors: twoKeys }))).toContain(
+      'Behavior "firstOf": lists "a#tags" in `writes`, but that key is combined',
+    );
+    const withUnwritable = defineBehavior({
+      name: "firstOf",
+      writes: [shape.a.tags, initialOf(shape.mode) as never],
+      run: () => {},
+    });
+    expect(messageOf(() => createStore(shape, initial(), { behaviors: withUnwritable }))).toContain(
+      'lists "a#tags" in `writes`, but that key is combined',
     );
   });
 });

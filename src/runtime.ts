@@ -156,13 +156,14 @@ function overlaps(a: Target, b: Target): boolean {
 /**
  * Why the core refuses a behavior's `writes` entry: "combined" – the key is
  * computed from contributions by its owner behavior; "default" – the key
- * comes with its own behavior, the only writer among behaviors.
+ * comes with its own behavior, the only writer among behaviors;
+ * "unwritable" – the reference is not a value or a meta key.
  */
-type WriteRefusal = "combined" | "default";
+type WriteRefusal = "combined" | "default" | "unwritable";
 
 /**
  * The refusal part of a "this behavior cannot write this key" error: why the
- * key refuses behaviors, what to do instead (a `contribute()` call to copy,
+ * key refuses behaviors, what to do instead (a `contribute()` call to adapt,
  * its `when` built from the behavior's own triggers), that other writes can
  * stay, and the guide that documents the mechanism.
  */
@@ -176,7 +177,7 @@ function writeRefusal(w: AnyRef, refusal: WriteRefusal, others: AnyRef[], trigge
   if (refusal === "combined") {
     return `lists ${target} in \`writes\`, but that key is combined (declared with \`combine\`): its owner behavior computes the key from the contributions registered for it, so no other behavior can write it.
 Fix: remove it from \`writes\` and register a contribution instead:
-  contribute(${target}, <payload>, { name: "…"${when} })${stay}
+  contribute(<ref to ${target}>, <payload>, { name: "…"${when} })${stay}
 The contribution applies while \`when\` holds; the owner recomputes the key once it stops holding, so there is no "else" write to make.
 See docs/guide/contributions.md.`;
   }
@@ -833,11 +834,12 @@ export class BehaviorRuntime implements RuntimeHooks {
 
     // Writes: nodes and meta keys only; a combined key only by its owner, a
     // key with `.behavior()` only by its own default behavior. Each write is
-    // classified in declared order; the first refusal fails with a message
-    // that says why the key refuses behaviors and what to do instead.
+    // classified in declared order; the first refusal of any kind fails, with
+    // a message that says why the key refuses behaviors and what to do
+    // instead.
     const classified = writes.map((w) => {
       const target = targetOf(w as AnyRef);
-      if (!target) return fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
+      if (!target) return { w, refusal: "unwritable" as const };
       if (target.def?._steps.combine && (!owner || refKey(owner.ref) !== refKey(w as AnyRef))) {
         return { w, refusal: "combined" as const };
       }
@@ -848,6 +850,9 @@ export class BehaviorRuntime implements RuntimeHooks {
     });
     for (const { w, refusal } of classified) {
       if (refusal) {
+        if (refusal === "unwritable") {
+          fail(`cannot write "${refLabel(w)}" – only values and meta keys are writable`);
+        }
         const others = classified.flatMap((c) => (c.refusal || c.w === w ? [] : [c.w]));
         fail(writeRefusal(w, refusal, others, config.triggers ?? []));
       }
