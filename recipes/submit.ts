@@ -12,7 +12,7 @@
 //   5. `submitting` off. If fn throws, the handler's promise rejects.
 // ============================================================
 
-import { metaKey, type MetaRef, type AnyNode, type BaseStore, type ContainerNode } from "anyshape";
+import { metaKey, pathOf, type MetaRef, type AnyNode, type BaseStore, type ContainerNode } from "anyshape";
 
 import { focusFirst } from "./focus";
 import { validate, type InferChecked } from "./validation";
@@ -46,7 +46,7 @@ function ownSubmitting(store: BaseStore<any>): MetaRef<boolean> {
     // Only a node that declares submission() itself is submitted: its own
     // `submitting`, matched by definition (the types can't tell definitions apart).
     ref = store.collect(store.node, submitting).find((e) => e.ref.node === store.node)?.ref;
-    if (!ref) throw new Error(`handleSubmit: "${store.node.path || "<root>"}" does not declare submission()`);
+    if (!ref) throw new Error(`handleSubmit: "${pathOf(store.node) || "<root>"}" does not declare submission()`);
     ownRefs.set(store, ref);
   }
   return ref;

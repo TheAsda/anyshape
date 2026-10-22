@@ -1,9 +1,9 @@
 // countIn(node, def): nodes in a subtree whose key declared with `def` counts
 // (MetaKeyDef.aggregate), under whatever name. Read-only, on the tally channel.
 
-import { FIELDS, META_DEFS, countSlotOf, keyAt } from "../internal.js";
+import { FIELDS, META_DEFS, PATH, countSlotOf, keyAt } from "../internal.js";
 import type { Countable, MetaKeyDef } from "../meta.js";
-import { ObjectNode, ArrayNode, type AnyNode } from "../shape.js";
+import { ObjectNode, ArrayNode, pathOf, type AnyNode } from "../shape.js";
 import { isAncestorOrSelf } from "../tree.js";
 import { KIND, type RefKind } from "./kind.js";
 
@@ -21,7 +21,7 @@ export class CountRef {
     readonly _id: string,
   ) {}
   get path(): string {
-    return `${this.node.path ?? ""}#count`;
+    return `${this.node[PATH] ?? ""}#count`;
   }
   /** @internal */
   get [KIND](): RefKind<CountRef> {
@@ -86,7 +86,7 @@ export function countIn(node: AnyNode, def: MetaKeyDef<any, any, any> & Countabl
         : undefined;
     if (problem) {
       throw new Error(
-        `countIn on "${node.path || "<root>"}": ${problem} – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).`,
+        `countIn on "${pathOf(node) || "<root>"}": ${problem} – its count would always be 0. Counted keys are declared with metaKey(value).aggregate(…).`,
       );
     }
     byDef.set(def, (ref = new CountRef(node, def, `c:${countIds++}`)));

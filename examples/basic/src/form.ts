@@ -13,6 +13,7 @@ import {
   defineBehaviors,
   defineBehavior,
   metaKey,
+  pathOf,
   type InferValue,
   type FieldNode,
 } from "anyshape";
@@ -218,7 +219,7 @@ function round2(n: number): number {
  */
 const twoDates = (start: FieldNode<string>, end: FieldNode<string>, shiftDays: number) =>
   defineBehavior({
-    name: `twoDates(${start.path}-${end.path})`,
+    name: `twoDates(${pathOf(start)}-${pathOf(end)})`,
     triggers: [start, end],
     writes: [start, end],
     origins: ["user"],

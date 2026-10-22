@@ -11,6 +11,7 @@ import {
   createStore,
   defineBehavior,
   when,
+  pathOf,
   type InferValue,
   type StoreOptions,
   type AnyRef,
@@ -387,7 +388,7 @@ describe("Reruns", () => {
           origins: [...ctx.origins].map((o) => o.replace(/^behavior:.*/, "behavior")),
           changed: [...config.triggers, ...(config.reads ?? [])]
             .filter((t) => ctx.changed(t))
-            .map((t) => (t as AnyNode).path),
+            .map((t) => pathOf(t as AnyNode)),
           signal: ctx.signal,
         });
         await gate.promise;

@@ -1,6 +1,7 @@
 // initialOf(node): a node's baseline value. Read-only (written with
 // { as: "initial" }), on the baseline channel.
 
+import { ID, PATH } from "../internal.js";
 import type { AnyNode, InferValue } from "../shape.js";
 import { KIND, type RefKind } from "./kind.js";
 
@@ -12,7 +13,7 @@ export class InitialRef<V = unknown> {
   declare readonly _value: V;
   constructor(readonly node: AnyNode) {}
   get path(): string {
-    return `${this.node.path ?? ""}#initial`;
+    return `${this.node[PATH] ?? ""}#initial`;
   }
   /** @internal */
   get [KIND](): RefKind<InitialRef<any>> {
@@ -22,7 +23,7 @@ export class InitialRef<V = unknown> {
 
 const initialKind: RefKind<InitialRef<any>> = {
   node: (ref) => ref.node,
-  id: (ref) => `i:${ref.node.id}`,
+  id: (ref) => `i:${ref.node[ID]}`,
   label: (ref) => ref.path,
   read: (store, ref) => store._readInitial(ref.node),
   subscribe: (store, ref, phase, fn) => store._addInitialSub(ref.node, phase, fn),

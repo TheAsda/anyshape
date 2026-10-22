@@ -1,6 +1,6 @@
 // node.key: one meta key of one node.
 
-import { defOf } from "../internal.js";
+import { defOf, PATH, ID } from "../internal.js";
 import type { AnyNode } from "../shape.js";
 import { KIND, type RefKind } from "./kind.js";
 
@@ -22,7 +22,7 @@ export class MetaRef<V = unknown, P = unknown> {
 
   /** e.g. "shipping.city#error" */
   get path(): string {
-    return `${this.node.path ?? ""}#${this.key}`;
+    return `${this.node[PATH] ?? ""}#${this.key}`;
   }
 
   /** @internal */
@@ -33,7 +33,7 @@ export class MetaRef<V = unknown, P = unknown> {
 
 const metaKind: RefKind<MetaRef<any>> = {
   node: (ref) => ref.node,
-  id: (ref) => `m:${ref.node.id}:${ref.key}`,
+  id: (ref) => `m:${ref.node[ID]}:${ref.key}`,
   label: (ref) => ref.path,
   read: (store, ref) => store._readMetaRef(ref),
   subscribe: (store, ref, phase, fn) => store._addKeySub(ref, phase, fn),

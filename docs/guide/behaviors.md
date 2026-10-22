@@ -7,7 +7,7 @@ First shown in [stage 4](https://github.com/TheAsda/anyshape/tree/master/example
 ## Declaring one
 
 ```ts
-import { form, object, field, defineBehavior, defineBehaviors, createStore, type FieldNode } from "anyshape";
+import { form, object, field, pathOf, defineBehavior, defineBehaviors, createStore, type FieldNode } from "anyshape";
 
 const DAY = 86_400_000;
 const addDays = (iso: string, days: number) => new Date(Date.parse(iso) + days * DAY).toISOString().slice(0, 10);
@@ -98,7 +98,7 @@ When a second pair of dates needs the same rule, the [nodes](../../GLOSSARY.md) 
 ```ts
 function suggestEnd(start: FieldNode<string>, end: FieldNode<string>, days: number) {
   return defineBehavior({
-    name: `suggestEnd(${end.path})`,
+    name: `suggestEnd(${pathOf(end)})`,
     triggers: [start],
     writes: [end],
     origins: ["user"],

@@ -9,7 +9,7 @@
 //       b.when([s.x.required], (r) => r, (b) => b.add(required(s.x)))
 // ============================================================
 
-import { type AnyNode, type InferValue, type Ref, type ShapeNode, type CountRef, type Contribution } from "anyshape";
+import { pathOf, ShapeNode, type AnyNode, type InferValue, type Ref, type CountRef, type Contribution } from "anyshape";
 
 import { rule, type RulePart, type Validatable } from "./validation";
 
@@ -34,7 +34,7 @@ export function isEmpty(value: unknown): boolean {
 
 /** The last segment of the node's path. Pass `message` to a rule for real labels. */
 export function labelOf(node: AnyNode): string {
-  const path = node.path ?? "";
+  const path = pathOf(node);
   return path.slice(path.lastIndexOf(".") + 1).replace(/\[\]$/, "") || "<root>";
 }
 
@@ -43,7 +43,7 @@ export function required<N extends Validatable>(
   options: RuleRecipeOptions<InferValue<N>> = {},
 ): Contribution<RulePart> {
   return rule(node, (v) => (isEmpty(v) ? message(options.message, "Required", v) : undefined), {
-    name: options.name ?? `required(${node.path})`,
+    name: options.name ?? `required(${pathOf(node)})`,
   });
 }
 
@@ -67,7 +67,9 @@ function limitRule<N extends Validatable>(
       return message(options.message, fallback(resolved), v);
     },
     {
-      name: options.name ?? `${label}(${node.path}, ${ref === undefined ? limit : ref.path})`,
+      name:
+        options.name ??
+        `${label}(${pathOf(node)}, ${ref === undefined ? limit : ref instanceof ShapeNode ? pathOf(ref) : ref.path})`,
       triggers: ref === undefined ? [] : [ref],
     },
   );
@@ -148,7 +150,7 @@ export function pattern<N extends Textual>(
     node,
     (v) => (isEmpty(v) || regex.test(v as string) ? undefined : message(options.message, "Invalid format", v)),
     {
-      name: options.name ?? `pattern(${node.path})`,
+      name: options.name ?? `pattern(${pathOf(node)})`,
     },
   );
 }
@@ -162,6 +164,6 @@ export function email<N extends Textual>(
   return pattern(node, EMAIL, {
     message: "Invalid email address",
     ...options,
-    name: options.name ?? `email(${node.path})`,
+    name: options.name ?? `email(${pathOf(node)})`,
   });
 }

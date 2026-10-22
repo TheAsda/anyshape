@@ -13,6 +13,7 @@ import {
   form,
   object,
   field,
+  pathOf,
   type InferValue,
   type AnyNode,
   array,
@@ -54,7 +55,7 @@ function addDays(iso: string, days: number): string {
 /** Extracted in stage 11: fill the empty end of a date pair. */
 function twoDates(start: FieldNode<string>, end: FieldNode<string>, shiftDays: number) {
   return defineBehavior({
-    name: `twoDates(${start.path}, +${shiftDays}d)`,
+    name: `twoDates(${pathOf(start)}, +${shiftDays}d)`,
     triggers: [start, end],
     writes: [start, end],
     origins: ["user"],

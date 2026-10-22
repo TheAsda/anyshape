@@ -6,7 +6,7 @@
 import type { MetaKeyDef } from "./meta.js";
 import { kindOf, type Target } from "./refs/kind.js";
 import type { MetaRef } from "./refs/meta.js";
-import { ArrayNode, type AnyNode } from "./shape.js";
+import { ArrayNode, pathOf, type AnyNode } from "./shape.js";
 import { BaseStore, ItemStore, type AnyRef } from "./store.js";
 
 /**
@@ -49,6 +49,21 @@ export const META_DEFS: unique symbol = Symbol("anyshape.metaDefs");
 export const META: unique symbol = Symbol("anyshape.meta");
 /** ArrayNode: factory for new rows, if declared. */
 export const CREATE: unique symbol = Symbol("anyshape.create");
+/** ShapeNode: the form-wide identity form() assigns (undefined on reusable templates). */
+export const ID: unique symbol = Symbol("anyshape.id");
+/** ShapeNode: lens from the scope root to this value. */
+export const LENS: unique symbol = Symbol("anyshape.lens");
+/** ShapeNode: the node's path within its scope (undefined on reusable templates). */
+export const PATH: unique symbol = Symbol("anyshape.path");
+/** ShapeNode: the instantiated parent (undefined for roots and reusable templates). */
+export const PARENT: unique symbol = Symbol("anyshape.parent");
+
+// Phantom type markers: `declare`d on the classes, never written at run time,
+// so unlike the symbols above they exist only in the types.
+/** ShapeNode: phantom value type, read by InferValue. */
+export declare const TYPE: unique symbol;
+/** ArrayNode: phantom marker for whether a `create` factory was declared, read by NewItemArgs. */
+export declare const HAS_CREATE: unique symbol;
 
 /** The declaration of the key a meta reference points at. */
 export function defOf<V>(ref: MetaRef<V>): MetaKeyDef<V> {
@@ -74,7 +89,7 @@ export function metaRefOf<V = unknown>(node: AnyNode, key: string): MetaRef<V> {
 
 /** Names a key where a node declares it, for error messages: `"name" on "path"`. */
 export function keyAt(node: AnyNode, name: string): string {
-  return `"${name}" on "${node.path || "<root>"}"`;
+  return `"${name}" on "${pathOf(node) || "<root>"}"`;
 }
 
 /**
@@ -115,21 +130,21 @@ export function targetOf(ref: AnyRef): Target | undefined {
 
 /** The scope a node belongs to: its row template, or the form root. */
 export function scopeOf(node: AnyNode): AnyNode {
-  for (let n: AnyNode = node; ; n = n.parent!) {
-    if (!n.parent || n.parent instanceof ArrayNode) return n;
+  for (let n: AnyNode = node; ; n = n[PARENT]!) {
+    if (!n[PARENT] || n[PARENT] instanceof ArrayNode) return n;
   }
 }
 
 /** Scopes from the root down to `scope`. */
 export function chainTo(scope: AnyNode): AnyNode[] {
   const out: AnyNode[] = [];
-  for (let s: AnyNode | undefined = scope; s; s = s.parent ? scopeOf(s.parent) : undefined) out.unshift(s);
+  for (let s: AnyNode | undefined = scope; s; s = s[PARENT] ? scopeOf(s[PARENT]) : undefined) out.unshift(s);
   return out;
 }
 
 export function rootOf(node: AnyNode): AnyNode {
   let n = node;
-  while (n.parent) n = n.parent;
+  while (n[PARENT]) n = n[PARENT];
   return n;
 }
 
@@ -152,7 +167,7 @@ export function hostAt(host: BaseStore<any>, scope: AnyNode): BaseStore<any> | u
 /** hostAt, for a scope that must be `host`'s or an enclosing one. */
 export function hostFor(host: BaseStore<any>, scope: AnyNode): BaseStore<any> {
   const found = hostAt(host, scope);
-  if (!found) throw new Error(`No store for scope "${scope.path || "<root>"}"`);
+  if (!found) throw new Error(`No store for scope "${pathOf(scope) || "<root>"}"`);
   return found;
 }
 
@@ -162,7 +177,7 @@ export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemSt
   let h = host;
   while (h !== outer) {
     if (!(h instanceof ItemStore))
-      throw new Error(`"${host.node.path || "<root>"}" is not inside "${outer.node.path || "<root>"}"`);
+      throw new Error(`"${pathOf(host.node) || "<root>"}" is not inside "${pathOf(outer.node) || "<root>"}"`);
     rows.unshift(h);
     h = h.arrayStore.scopeStore;
   }
@@ -171,10 +186,10 @@ export function rowsBetween(outer: BaseStore<any>, host: BaseStore<any>): ItemSt
 
 /** Concrete path with row indexes, e.g. "lines[2].notes[0].text". `host` is the scope host of `node`. */
 export function concretePath(host: BaseStore<any>, node: AnyNode): string {
-  if (!(host instanceof ItemStore)) return node.path;
+  if (!(host instanceof ItemStore)) return pathOf(node);
   const arr = host.arrayStore;
   const index = (arr.current() as readonly unknown[]).indexOf(host._currentRef);
-  const relative = node.path.slice(host.node.path.length);
+  const relative = pathOf(node).slice(pathOf(host.node).length);
   return `${concretePath(arr.scopeStore, arr.node)}[${index}]${relative}`;
 }
 

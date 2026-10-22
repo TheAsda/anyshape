@@ -15,7 +15,7 @@
 // trip them, in this demo), in addition to the live error.
 // ============================================================
 
-import type { AnyNode } from "anyshape";
+import type { AnyNode, ShapeNode } from "anyshape";
 import { useValue } from "anyshape/react";
 import { useId } from "react";
 
@@ -24,11 +24,11 @@ import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../
 // Node types accepted by each component: a ControlNode whose value type
 // matches the input. Passing e.g. a number field to TextField is a type
 // error at the call site.
-type StringNode = ControlNode & { readonly _type: string };
-type NumberNode = ControlNode & { readonly _type: number | null | undefined };
-type BooleanNode = ControlNode & { readonly _type: boolean };
+type StringNode = ControlNode & ShapeNode<string>;
+type NumberNode = ControlNode & ShapeNode<number | null | undefined>;
+type BooleanNode = ControlNode & ShapeNode<boolean>;
 /** Any value node with a number value, control or not (e.g. computed fields). */
-type NumberValueNode = AnyNode & { readonly _type: number | null | undefined };
+type NumberValueNode = AnyNode & ShapeNode<number | null | undefined>;
 
 interface CommonProps {
   label: string;

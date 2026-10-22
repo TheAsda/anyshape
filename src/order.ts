@@ -16,7 +16,7 @@
 // The one-writer check (runtime.ts) lists the writes through the same index.
 // ============================================================
 
-import { refNode, refKey, outerHost, scopeOf, hostAt } from "./internal.js";
+import { refNode, refKey, outerHost, scopeOf, hostAt, PARENT } from "./internal.js";
 import { kindOf, type Target } from "./refs/kind.js";
 import type { AnyNode } from "./shape.js";
 import type { AnyRef, BaseStore } from "./store.js";
@@ -49,19 +49,19 @@ export class NodeIndex<T> {
 
   add(node: AnyNode, item: T): void {
     entry(this.at, node, newSet).add(item);
-    for (let n: AnyNode | undefined = node; n; n = n.parent) entry(this.under, n, newSet).add(item);
+    for (let n: AnyNode | undefined = node; n; n = n[PARENT]) entry(this.under, n, newSet).add(item);
   }
 
   delete(node: AnyNode, item: T): void {
     const remove = (set: Set<T>) => set.delete(item) && !set.size;
     prune(this.at, node, remove);
-    for (let n: AnyNode | undefined = node; n; n = n.parent) prune(this.under, n, remove);
+    for (let n: AnyNode | undefined = node; n; n = n[PARENT]) prune(this.under, n, remove);
   }
 
   /** Calls `fn` for the items on `node`, below it, or on one of its ancestors. */
   near(node: AnyNode, fn: (item: T) => void): void {
     this.under.get(node)?.forEach((item) => fn(item));
-    for (let n = node.parent; n; n = n.parent) this.at.get(n)?.forEach((item) => fn(item));
+    for (let n = node[PARENT]; n; n = n[PARENT]) this.at.get(n)?.forEach((item) => fn(item));
   }
 
   /** `under` holds the same items as `at`, so it empties with it. */

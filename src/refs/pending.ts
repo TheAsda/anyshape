@@ -4,7 +4,7 @@
 //     only meta targets declared with it, whatever their name.
 //   • pendingOf – whether that exact target is pending (one writer per target).
 
-import { refNode, refKey, refLabel, targetOf } from "../internal.js";
+import { refNode, refKey, refLabel, targetOf, PATH } from "../internal.js";
 import type { MetaKeyDef } from "../meta.js";
 import type { AnyNode } from "../shape.js";
 import type { AnyRef, BaseStore } from "../store.js";
@@ -30,7 +30,7 @@ export class PendingInRef {
     readonly _id: string,
   ) {}
   get path(): string {
-    return `${this.node.path ?? ""}#pendingIn`;
+    return `${this.node[PATH] ?? ""}#pendingIn`;
   }
   /** @internal */
   get [KIND](): RefKind<PendingInRef> {
