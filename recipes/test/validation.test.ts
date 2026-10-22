@@ -14,10 +14,10 @@ import {
 } from "anyshape";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
 
-import { rule, asyncRule, required, validate, error, control, validation, visible } from "./index";
-import { shape, L, initial, lookup } from "./test/fixtures/account";
-import * as orderFixture from "./test/fixtures/order";
-import { flush, sleep } from "./test/harness";
+import { rule, asyncRule, required, validate, error, control, validation, visible } from "../index";
+import { shape, L, initial, lookup } from "./fixtures/account";
+import * as orderFixture from "./fixtures/order";
+import { flush, sleep } from "./harness";
 
 const test = base.extend("store", () => createStore(shape, initial())).extend("lookup", () => lookup());
 

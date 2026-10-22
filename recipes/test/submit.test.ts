@@ -3,14 +3,14 @@
 import { form, object, array, field, metaKey, createStore } from "anyshape";
 import { test as base, describe, expect } from "vitest";
 
-import { control } from "./features";
-import { registerFocus } from "./focus";
-import { required } from "./rules";
-import { handleSubmit, submission } from "./submit";
-import * as limits from "./test/fixtures/limits";
-import * as order from "./test/fixtures/order";
-import { deferred } from "./test/harness";
-import { rule, asyncRule } from "./validation";
+import { control } from "../features";
+import { registerFocus } from "../focus";
+import { required } from "../rules";
+import { handleSubmit, submission } from "../submit";
+import { rule, asyncRule } from "../validation";
+import * as limits from "./fixtures/limits";
+import * as order from "./fixtures/order";
+import { deferred } from "./harness";
 
 describe("Submit", () => {
   const { shape, L, initial } = limits;

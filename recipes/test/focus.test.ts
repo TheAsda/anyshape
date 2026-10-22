@@ -3,10 +3,10 @@
 import { form, object, field, createStore, type MetaRef, type BaseStore } from "anyshape";
 import { test as base, describe, expect } from "vitest";
 
-import { control } from "./features";
-import { focusFirst, registerFocus, type FocusTarget } from "./focus";
-import * as limits from "./test/fixtures/limits";
-import { rule, validate } from "./validation";
+import { control } from "../features";
+import { focusFirst, registerFocus, type FocusTarget } from "../focus";
+import { rule, validate } from "../validation";
+import * as limits from "./fixtures/limits";
 
 /** Focus one node through focusFirst, as a validation result's single error would. */
 const focusOn = (store: BaseStore<any>, ref: MetaRef<any>) => focusFirst([{ ref, store }]) !== undefined;

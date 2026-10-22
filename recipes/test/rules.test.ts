@@ -16,9 +16,9 @@ import {
   calculate,
   exclusive,
   dirty,
-} from "./index";
-import * as limits from "./test/fixtures/limits";
-import { shape, L, initial } from "./test/fixtures/profile";
+} from "../index";
+import * as limits from "./fixtures/limits";
+import { shape, L, initial } from "./fixtures/profile";
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {

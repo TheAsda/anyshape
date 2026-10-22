@@ -7,12 +7,12 @@ import { form, object, array, field, createStore, defineBehaviors, type BaseStor
 import { StoreProvider } from "anyshape/react";
 import { test, expect } from "vitest";
 
-import { control } from "../features";
-import { focusFirst } from "../focus";
-import { required } from "../rules";
-import { handleSubmit, submission } from "../submit";
-import { rule, asyncRule } from "../validation";
-import { useControl, fromInput, fromCheckbox } from "./index";
+import { control } from "../../features";
+import { focusFirst } from "../../focus";
+import { useControl, fromInput, fromCheckbox } from "../../react";
+import { required } from "../../rules";
+import { handleSubmit, submission } from "../../submit";
+import { rule, asyncRule } from "../../validation";
 import { render, settle } from "./test-utils";
 
 const shape = form(

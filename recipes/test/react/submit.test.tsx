@@ -16,13 +16,13 @@ import { StoreProvider, useForm, useValue } from "anyshape/react";
 import { useMemo, useState } from "react";
 import { describe, test, expect, expectTypeOf } from "vitest";
 
-import { control } from "../features";
-import { focusFirst, registerFocus } from "../focus";
-import { handleSubmit, submission } from "../submit";
-import * as order from "../test/fixtures/order";
-import type { DeliveryType } from "../test/fixtures/order";
-import { error, rule } from "../validation";
-import { useControl } from "./index";
+import { control } from "../../features";
+import { focusFirst, registerFocus } from "../../focus";
+import { useControl } from "../../react";
+import { handleSubmit, submission } from "../../submit";
+import { error, rule } from "../../validation";
+import * as order from "../fixtures/order";
+import type { DeliveryType } from "../fixtures/order";
 import { render, settle } from "./test-utils";
 
 const shape = form(

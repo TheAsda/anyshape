@@ -3,7 +3,7 @@
 import { form, object, field, createStore } from "anyshape";
 import { describe, expect, test } from "vitest";
 
-import { touched, dirty } from "./features";
+import { touched, dirty } from "../features";
 
 describe("Features", () => {
   test("touched and dirty write the name they are declared under", () => {

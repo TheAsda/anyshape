@@ -43,7 +43,7 @@
       }
     },
     {
-      "files": ["src/react/**", "recipes/react/**", "test/react/**", "examples/**"],
+      "files": ["src/react/**", "recipes/react/**", "recipes/test/react/**", "test/react/**", "examples/**"],
       "plugins": ["react"],
       "rules": {
         "react/rules-of-hooks": "error",
@@ -53,7 +53,7 @@
       }
     },
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "test/**", "recipes/test/**", "recipes/react/test-utils.tsx"],
+      "files": ["**/*.test.ts", "**/*.test.tsx", "test/**", "recipes/test/**"],
       "plugins": ["vitest"],
       "rules": {
         // Vitest's `expect` takes a message as its second argument.
@@ -67,7 +67,7 @@
       }
     },
     {
-      "files": ["test/react/**", "recipes/react/*.test.tsx", "recipes/react/test-utils.tsx"],
+      "files": ["test/react/**", "recipes/test/react/**"],
       "plugins": ["react"],
       "rules": {
         // Test components capture their renders in refs.
@@ -125,7 +125,7 @@
       }
     },
     {
-      "files": ["recipes/react/**"],
+      "files": ["recipes/react/**", "recipes/test/react/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
