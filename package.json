@@ -39,6 +39,7 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "check:package": "bun scripts/check-package.ts",
+    "check:image": "bun scripts/check-playwright-image.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && oxfmt --write",
     "test": "vitest run",
