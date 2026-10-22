@@ -25,9 +25,9 @@ CI also runs these, which you can run by hand:
 The projects are defined in `vitest.config.ts`:
 
 - `unit`: the core, in Node, with no DOM.
-- `recipes`: `recipes/`, in Node, importing the core entry as `anyshape`.
+- `recipes`: `recipes/test/`, in Node, importing the core entry as `anyshape`.
 - `react`: the bindings in real Chromium, through Vitest browser mode (Playwright provider) and `vitest-browser-react`.
-- `recipes-react`: `recipes/react/`, in real Chromium like `react`, importing the core entries as `anyshape` and `anyshape/react`. Both are aliased to `src/`, so the recipes and the core hooks share one copy of the core.
+- `recipes-react`: `recipes/test/react/`, in real Chromium like `react`, importing the core entries as `anyshape` and `anyshape/react`. Both are aliased to `src/`, so the recipes and the core hooks share one copy of the core.
 
 ## Where a test goes
 
