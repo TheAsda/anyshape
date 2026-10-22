@@ -3,7 +3,7 @@
 // behaviors as the features in recipes/, which the core tests never import.
 // ============================================================
 
-import { metaKey, initialOf, type BehaviorContext } from "../../src/index";
+import { metaKey, initialOf, pathOf, type BehaviorContext } from "../../src/index";
 
 /** A check contributed to `error`: an error message, or undefined. */
 export type Check = (value: any, ctx: Pick<BehaviorContext, "get">) => string | undefined;
@@ -15,7 +15,7 @@ export type Check = (value: any, ctx: Pick<BehaviorContext, "get">) => string | 
 export const error = metaKey<string | undefined, Check>(undefined)
   .aggregate((e) => e !== undefined)
   .combine((self, key) => ({
-    name: `${self.path || "<root>"}#error`,
+    name: `${pathOf(self) || "<root>"}#error`,
     triggers: [self],
     writes: [key],
     run(ctx) {

@@ -15,6 +15,7 @@ import {
   pendingOf,
   metaKey,
   contribute,
+  pathOf,
   type InferValue,
   type MetaRef,
   type FieldNode,
@@ -1456,7 +1457,7 @@ describe("Starting a key with a value known at creation", () => {
 
   const sameAsNameLink = (name: FieldNode<string>, shortName: FieldNode<string> & { sameAsName: MetaRef<boolean> }) =>
     defineBehavior({
-      name: `sameAsName(${shortName.path})`,
+      name: `sameAsName(${pathOf(shortName)})`,
       triggers: [name, shortName, shortName.sameAsName],
       writes: [shortName.sameAsName, shortName],
       run: (ctx) => {

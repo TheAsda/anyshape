@@ -3,9 +3,9 @@
 // ------------------------------------------------------------
 // Structure:
 //   • One root value, written immutably through node lenses.
-//   • substore() accepts shape nodes only; membership is checked by walking
-//     `parent`. A store addresses its focus node and every descendant in the
-//     same scope (never across an array boundary).
+//   • substore() accepts shape nodes only; membership is checked by walking the
+//     parents (the PARENT symbol). A store addresses its focus node and every
+//     descendant in the same scope (never across an array boundary).
 //   • Scopes: RootStore and every ItemStore provide the value (and the initial
 //     value) that node lenses are resolved against. Object/array substores
 //     are views that read through their parent's scope.
@@ -48,14 +48,34 @@
 // ============================================================
 
 import type { Behavior, BehaviorHandle, BehaviorList } from "./behaviors.js";
-import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal.js";
+import {
+  FIELDS,
+  META_DEFS,
+  META,
+  CREATE,
+  ID,
+  LENS,
+  PARENT,
+  HAS_CREATE,
+  metaRefOf,
+  countSlotOf,
+  concretePath,
+} from "./internal.js";
 import type { Meta, MetaKeyDef } from "./meta.js";
 import type { CountRef } from "./refs/count.js";
 import type { InitialRef } from "./refs/initial.js";
 import { kindOf } from "./refs/kind.js";
 import type { MetaRef } from "./refs/meta.js";
 import type { PendingInRef, PendingOfRef } from "./refs/pending.js";
-import { ShapeNode, ObjectNode, ArrayNode, type AnyNode, type ContainerNode, type InferValue } from "./shape.js";
+import {
+  ShapeNode,
+  ObjectNode,
+  ArrayNode,
+  pathOf,
+  type AnyNode,
+  type ContainerNode,
+  type InferValue,
+} from "./shape.js";
 import { isAncestorOrSelf } from "./tree.js";
 
 export type Listener = () => void;
@@ -379,7 +399,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** @internal the baseline value of a node; no scope check (get() and subscribe check it) */
   _readInitial(node: AnyNode): any {
-    return node.lens.get(this.scope.getScopeInitial());
+    return node[LENS].get(this.scope.getScopeInitial());
   }
 
   /** Restore values to their initial state and meta to defaults (keepOnReset keys are kept). */
@@ -399,7 +419,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** @internal read without scope check */
   _read(node: AnyNode): any {
-    return node.lens.get(this.scope.getScopeValue());
+    return node[LENS].get(this.scope.getScopeValue());
   }
 
   /** @internal write without validation or logging (caller did both) */
@@ -407,13 +427,13 @@ export abstract class BaseStore<N extends ContainerNode> {
     this.root._assertWritable();
     const scope = this.scope;
     const current = scope.getScopeValue();
-    const next = node.lens.set(current, value);
+    const next = node[LENS].set(current, value);
     if (next !== current) scope.setScopeValue(next);
   }
 
   private _writeInitial(node: AnyNode, value: unknown): void {
     const scope = this.scope;
-    scope.setScopeInitial(node.lens.set(scope.getScopeInitial(), value));
+    scope.setScopeInitial(node[LENS].set(scope.getScopeInitial(), value));
     this.root._markInitial(this.scopeStore);
     if (node instanceof ObjectNode || node instanceof ArrayNode) {
       (this.substore(node as any) as BaseStore<any>)._refreshInitials();
@@ -482,8 +502,8 @@ export abstract class BaseStore<N extends ContainerNode> {
     if (node === this.node) {
       return this.ownsFocusMeta ? this : this.parentStore!._ownerOf(node);
     }
-    if (node.parent === this.node) return this;
-    return (this.substore(node.parent as any) as BaseStore<any>)._ownerOf(node);
+    if (node[PARENT] === this.node) return this;
+    return (this.substore(node[PARENT] as any) as BaseStore<any>)._ownerOf(node);
   }
 
   /** @internal one key of a node's live meta; no scope check (get() and subscribe check it) */
@@ -631,10 +651,10 @@ export abstract class BaseStore<N extends ContainerNode> {
     if (node === this.node) return this;
     this.assertInScope(node);
     if (!(node instanceof ObjectNode || node instanceof ArrayNode)) {
-      throw new Error(`substore() needs an object or array node, got field "${(node as AnyNode).path}"`);
+      throw new Error(`substore() needs an object or array node, got field "${pathOf(node as AnyNode)}"`);
     }
-    if (node.parent !== this.node) {
-      return (this.substore(node.parent as any) as BaseStore<any>).substore(node as any);
+    if (node[PARENT] !== this.node) {
+      return (this.substore(node[PARENT] as any) as BaseStore<any>).substore(node as any);
     }
     let store = this._children.get(node);
     if (!store) {
@@ -842,21 +862,21 @@ export abstract class BaseStore<N extends ContainerNode> {
    * code that keeps state beside the form calls it directly.
    */
   assertInScope(node: AnyNode): void {
-    for (let n: AnyNode | undefined = node; n !== this.node; n = n.parent) {
+    for (let n: AnyNode | undefined = node; n !== this.node; n = n[PARENT]) {
       if (n === undefined) {
         throw new Error(
-          `"${node.path ?? "<uninstantiated node>"}" is not part of the store for "${this.node.path || "<root>"}"`,
+          `"${pathOf(node) || "<uninstantiated node>"}" is not part of the store for "${pathOf(this.node) || "<root>"}"`,
         );
       }
-      if (n.parent instanceof ArrayNode) {
-        throw new Error(`"${node.path}" is inside an array item – use the item's store (arrayStore.item(...))`);
+      if (n[PARENT] instanceof ArrayNode) {
+        throw new Error(`"${pathOf(node)}" is inside an array item – use the item's store (arrayStore.item(...))`);
       }
     }
   }
 
   protected assertAttached(): void {
     if (!this.isAttached()) {
-      throw new Error(`Store for "${this.node.path}" is detached: its array item was removed or replaced`);
+      throw new Error(`Store for "${pathOf(this.node)}" is detached: its array item was removed or replaced`);
     }
   }
 }
@@ -886,7 +906,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> {
   /** @internal – use createStore() */
   constructor(shape: N, initialValues: InferValue<N>, createRuntime: (root: RootStore<N>) => RuntimeHooks) {
     super(shape, undefined);
-    if (shape.id === undefined || shape.parent !== undefined) {
+    if (shape[ID] === undefined || shape[PARENT] !== undefined) {
       throw new Error("RootStore needs the root returned by form()");
     }
     validateValue(shape, initialValues);
@@ -966,7 +986,7 @@ export class RootStore<N extends ObjectNode<any>> extends BaseStore<N> {
     let h = host;
     let from: AnyNode = node;
     for (;;) {
-      for (let n: AnyNode | undefined = from; n; n = n.parent) {
+      for (let n: AnyNode | undefined = from; n; n = n[PARENT]) {
         h._bumpCount(n, slot, delta);
         this._markCount(h, n, slot);
         if (n === h.node) break;
@@ -1084,7 +1104,7 @@ type ItemOf<N extends ArrayNode<any, any>> = N["item"];
 type ItemValue<N extends ArrayNode<any, any>> = InferValue<ItemOf<N>> & object;
 
 /** append / insert arguments: a partial item when the array has `create`, a complete one otherwise. */
-export type NewItemArgs<N extends ArrayNode<any, any>> = N["_hasCreate"] extends true
+export type NewItemArgs<N extends ArrayNode<any, any>> = N[typeof HAS_CREATE] extends true
   ? [partial?: Partial<ItemValue<N>>, options?: WriteOptions]
   : [item: ItemValue<N>, options?: WriteOptions];
 
@@ -1141,7 +1161,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   item(ref: ItemValue<N>): ItemStore<ItemOf<N>> {
     this._sync();
     if (!this.members.has(ref)) {
-      throw new Error(`item(): the object is not currently in "${this.node.path}"`);
+      throw new Error(`item(): the object is not currently in "${pathOf(this.node)}"`);
     }
     return this.itemStores.get(ref)!;
   }
@@ -1149,7 +1169,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   itemAt(index: number): ItemStore<ItemOf<N>> {
     const seq = this._sync();
     if (index < 0 || index >= seq.length) {
-      throw new RangeError(`itemAt(${index}): "${this.node.path}" has ${seq.length} items`);
+      throw new RangeError(`itemAt(${index}): "${pathOf(this.node)}" has ${seq.length} items`);
     }
     return seq[index];
   }
@@ -1163,7 +1183,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const [input, options] = args as [ItemValue<N> | undefined, WriteOptions | undefined];
     const arr = this.current();
     if (index < 0 || index > arr.length) {
-      throw new RangeError(`insert(${index}): "${this.node.path}" has ${arr.length} items`);
+      throw new RangeError(`insert(${index}): "${pathOf(this.node)}" has ${arr.length} items`);
     }
     const item = this.newItem(input);
     const next = arr.slice();
@@ -1184,7 +1204,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const arr = this.current();
     const from = this.indexOfRow(row, arr);
     if (toIndex < 0 || toIndex >= arr.length) {
-      throw new RangeError(`move(…, ${toIndex}): "${this.node.path}" has ${arr.length} items`);
+      throw new RangeError(`move(…, ${toIndex}): "${pathOf(this.node)}" has ${arr.length} items`);
     }
     if (from === toIndex) return;
     const next = arr.slice();
@@ -1194,9 +1214,9 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
   }
 
   private indexOfRow(row: ItemStore<any>, arr: readonly object[]): number {
-    if (row.arrayStore !== (this as unknown)) throw new Error(`The row does not belong to "${this.node.path}"`);
+    if (row.arrayStore !== (this as unknown)) throw new Error(`The row does not belong to "${pathOf(this.node)}"`);
     const index = arr.indexOf(row._currentRef as object);
-    if (index === -1) throw new Error(`The row is detached from "${this.node.path}"`);
+    if (index === -1) throw new Error(`The row is detached from "${pathOf(this.node)}"`);
     return index;
   }
 
@@ -1204,7 +1224,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const create = this.node[CREATE];
     if (create) return { ...(create() as object), ...input } as ItemValue<N>;
     if (input === undefined) {
-      throw new Error(`"${this.node.path}" has no \`create\` factory – pass a complete item`);
+      throw new Error(`"${pathOf(this.node)}" has no \`create\` factory – pass a complete item`);
     }
     return input;
   }
@@ -1218,7 +1238,7 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
 
   /** @internal Is `ref` part of this array's baseline (initial value)? */
   _baselineHas(ref: object): boolean {
-    const arr = this.node.lens.get(this.scope.getScopeInitial()) as readonly object[] | undefined;
+    const arr = this.node[LENS].get(this.scope.getScopeInitial()) as readonly object[] | undefined;
     if (!arr) return false;
     if (this.baseline?.array !== arr) this.baseline = { array: arr, set: new Set(arr) };
     return this.baseline.set.has(ref);
@@ -1363,13 +1383,13 @@ export class ArrayStore<N extends ArrayNode<any, any>> extends BaseStore<N> {
     const arr = this.current();
     const index = arr.indexOf(prev as ItemValue<N>);
     if (index === -1) {
-      throw new Error(`Store for "${this.node.item.path}" is detached: its item was removed or replaced`);
+      throw new Error(`Store for "${pathOf(this.node.item)}" is detached: its item was removed or replaced`);
     }
     if (typeof next !== "object" || next === null) {
-      throw new TypeError(`"${this.node.path}" items must be objects`);
+      throw new TypeError(`"${pathOf(this.node)}" items must be objects`);
     }
     if (this._contains(next)) {
-      throw new Error(`"${this.node.path}" would contain the same object twice`);
+      throw new Error(`"${pathOf(this.node)}" would contain the same object twice`);
     }
     validateValue(this.node.item, next);
 
@@ -1444,13 +1464,13 @@ export function validateValue(node: AnyNode, value: unknown): void {
   if (value == null) return;
 
   if (node instanceof ArrayNode) {
-    if (!Array.isArray(value)) throw new TypeError(`"${node.path}" must be an array`);
+    if (!Array.isArray(value)) throw new TypeError(`"${pathOf(node)}" must be an array`);
     const seen = new Set<object>();
     value.forEach((item, i) => {
       if (typeof item !== "object" || item === null) {
-        throw new TypeError(`"${node.path}[${i}]" must be an object – arrays of primitives are not supported`);
+        throw new TypeError(`"${pathOf(node)}[${i}]" must be an object – arrays of primitives are not supported`);
       }
-      if (seen.has(item)) throw new Error(`"${node.path}" contains the same object twice (index ${i})`);
+      if (seen.has(item)) throw new Error(`"${pathOf(node)}" contains the same object twice (index ${i})`);
       seen.add(item);
       validateValue(node.item, item);
     });

@@ -1,6 +1,18 @@
 import { test, describe, expect } from "vitest";
 
-import { form, object, array, field, MetaRef, createStore, type InferValue, type InferMeta } from "../src/index";
+import {
+  form,
+  object,
+  array,
+  field,
+  metaKey,
+  MetaRef,
+  ArrayNode,
+  createStore,
+  pathOf,
+  type InferValue,
+  type InferMeta,
+} from "../src/index";
 import { META_DEFS, CREATE, defOf } from "../src/internal";
 import { control, validation, touched, visible, disabled, submission } from "./support/features";
 
@@ -47,8 +59,8 @@ type _3 = Expect<Equal<InferValue<typeof shape.name.label>, string>>;
 type _4 = Expect<Equal<InferValue<typeof shape.submitting>, boolean>>;
 type _5 = Expect<Equal<InferValue<typeof shape.company.visible>, boolean>>;
 type _6 = Expect<Equal<InferValue<typeof shape.lines.item.sku.error>, string | undefined>>;
-type _7 = Expect<Equal<typeof shape.lines._hasCreate, true>>;
-type _8 = Expect<Equal<typeof shape.tags._hasCreate, false>>;
+type _7 = Expect<Equal<typeof shape.lines extends ArrayNode<any, true> ? true : false, true>>;
+type _8 = Expect<Equal<typeof shape.tags extends ArrayNode<any, false> ? true : false, true>>;
 type _9 = Expect<Equal<InferMeta<typeof shape.note>, {}>>;
 
 // Compile-time only – never called.
@@ -104,10 +116,25 @@ describe("Declarations", () => {
   });
 
   test("reserved meta keys are rejected", () => {
-    expect(() => field<string>().meta({ path: "" })).toThrow(/reserved/);
-    expect(() => field<string>().meta({ id: 1 })).toThrow(/reserved/);
-    expect(() => field<string>().meta({ item: 1 })).toThrow(/reserved/);
-    expect(() => field<string>().meta({ _type: 1 })).toThrow(/reserved/);
+    // @ts-expect-error – "meta" is reserved and rejected at compile time
+    expect(() => field<string>().meta({ meta: 1 })).toThrow(/reserved/);
+    // @ts-expect-error – "constructor" is reserved and rejected at compile time
+    expect(() => field<string>().meta({ constructor: 1 })).toThrow(/reserved/);
+    // @ts-expect-error – "__proto__" is reserved and rejected at compile time
+    expect(() => field<string>().meta({ ["__proto__"]: 1 })).toThrow(/reserved/);
+    // The plain literal never creates the key: for an object value it swaps
+    // the bag's prototype, which the core rejects instead of dropping it.
+    // @ts-expect-error – "__proto__" is reserved and rejected at compile time
+    expect(() => field<string>().meta({ __proto__: metaKey(true) })).toThrow(/reserved/);
+  });
+
+  test("a meta key named `item` collides only with an array's item template", () => {
+    // .meta() runs before form(), so the node is still a template and its
+    // path label is "<root>".
+    const message = `"item" is the item of "<root>" and cannot also be a meta key`;
+    expect(() => array(object({ x: field<string>() })).meta({ item: 1 })).toThrow(message);
+    expect(() => field<string>().meta({ item: 1 })).not.toThrow();
+    expect(() => object({ a: field<string>() }).meta({ item: 1 })).not.toThrow();
   });
 });
 
@@ -158,9 +185,9 @@ describe("Meta references", () => {
         outer: array(object({ inner: array(object({ v: field<string>().meta(control()) })) })),
       }),
     );
-    expect(f.outer.item.inner.item.v.path).toBe("outer[].inner[].v");
+    expect(pathOf(f.outer.item.inner.item.v)).toBe("outer[].inner[].v");
     expect(f.outer.item.inner.item.v.error.path).toBe("outer[].inner[].v#error");
-    expect(f.outer.item.inner.path).toBe("outer[].inner");
+    expect(pathOf(f.outer.item.inner)).toBe("outer[].inner");
   });
 });
 
@@ -190,16 +217,23 @@ describe("Arrays", () => {
   });
 });
 
-const NODE_INTERNALS = ["id", "lens", "path", "parent", "meta", "constructor", "_type", "_hasCreate"];
+// The names no field name or meta key may take: the .meta() method, and the
+// names JavaScript treats specially on every object. Everything else that the
+// node itself needs (id, lens, path, parent, the type markers) lives behind
+// symbols, so it cannot collide.
+const RESERVED = ["meta", "constructor", "__proto__"];
 
 describe("Reserved names, table-driven", () => {
-  test("every node-internal name is rejected as a field name and as a meta key", () => {
-    for (const name of NODE_INTERNALS) {
+  test("every reserved name is rejected as a field name and as a meta key", () => {
+    for (const name of RESERVED) {
       expect(() => object({ [name]: field<string>() }), `field "${name}"`).toThrow(/reserved name/);
       expect(() => field<string>().meta({ [name]: 1 }), `meta key "${name}"`).toThrow(/reserved name/);
     }
-    expect(() => field<string>().meta({ item: 1 }), "`item` is reserved for meta keys").toThrow(/reserved name/);
-    expect(() => object({ item: field<string>() }), "…but allowed as a field name").not.toThrow();
+  });
+
+  test("`item` is free as a field name and as a meta key off arrays", () => {
+    expect(() => object({ item: field<string>() })).not.toThrow();
+    expect(() => field<string>().meta({ item: 1 })).not.toThrow();
   });
 
   test("_fields, _meta and _metaDefs are ordinary field names", () => {

@@ -12,6 +12,8 @@
 //   • a consumer without react imports and typechecks the core entry;
 //   • a consumer with react typechecks both entries, passes a node created
 //     through `anyshape` to an `anyshape/react` hook, and renders it;
+//   • a consumer that exports a shape emits its declarations: the node
+//     classes are nameable and the internal symbols stay out of them;
 //   • publint and @arethetypeswrong/cli pass.
 // Runs every check and exits non-zero if any failed; a failing setup step
 // (npm pack, npm install, the consumer's emit) stops it at once.
@@ -73,9 +75,11 @@ function passes(cmd: string, args: string[], cwd: string): boolean {
 const tmp = mkdtempSync(join(tmpdir(), "anyshape-package-"));
 try {
   // ---- The tarball ----
-  const [packed] = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", tmp], root)) as [
-    { filename: string; files: { path: string }[] },
-  ];
+  // npm prints an array of packs (older npm) or an object keyed by name (npm 12+).
+  const raw = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", tmp], root)) as
+    | [{ filename: string; files: { path: string }[] }]
+    | Record<string, { filename: string; files: { path: string }[] }>;
+  const packed = Array.isArray(raw) ? raw[0] : Object.values(raw)[0];
   const tarball = join(tmp, packed.filename);
   const files = packed.files.map((f) => f.path);
   for (const path of REQUIRED) check(files.includes(path), `the tarball holds ${path}`);
@@ -184,6 +188,61 @@ try {
       shipped.join() === expected.join(),
       `${entry}'s declarations export the source entry's names (${expected.length})`,
     );
+  }
+
+  // ---- A consumer that exports its shapes ----
+  // A library built on anyshape exports the shapes `form()` returns, so tsc
+  // must be able to name those types (the node classes and the meta
+  // references) in the consumer's own declarations.
+  const lib = join(tmp, "declarations");
+  writeConsumer(lib, {
+    "index.ts": `
+      import {
+        createStore,
+        form,
+        object,
+        field,
+        array,
+        metaKey,
+        pathOf,
+        type InferValue,
+        type ShapeNode,
+      } from "anyshape";
+
+      const required = metaKey(false);
+
+      const line = object({ sku: field<string>().meta({ required }), qty: field<number>() });
+
+      export const booking = form(
+        object({
+          destination: field<string>(),
+          travelers: array(line, { create: () => ({ sku: "", qty: 1 }) }),
+        }).meta({ title: "Booking" }),
+      );
+
+      export const bookingStore = createStore(booking, { destination: "", travelers: [] });
+
+      export type Booking = InferValue<typeof booking>;
+      export const rootPath: string = pathOf(booking);
+      export function label(node: ShapeNode<string>): string {
+        return pathOf(node);
+      }
+    `,
+  });
+  run("npm", ["install", "--no-audit", "--no-fund", tarball], lib);
+  writeFileSync(
+    join(lib, "tsconfig.emit.json"),
+    JSON.stringify({
+      extends: "./tsconfig.json",
+      compilerOptions: { noEmit: false, declaration: true, emitDeclarationOnly: true, outDir: "types" },
+    }),
+  );
+  if (
+    check(passes(bin("tsc"), ["-p", "tsconfig.emit.json"], lib), "an exported shape emits the consumer's declarations")
+  ) {
+    const emitted = readFileSync(join(lib, "types", "index.d.ts"), "utf8");
+    check(/ObjectNode|FieldNode|ArrayNode/.test(emitted), "the emitted declarations name the node classes");
+    check(!emitted.includes("dist/internal"), "the emitted declarations reach no internal module");
   }
 
   // ---- Linters ----

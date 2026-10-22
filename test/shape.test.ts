@@ -2,30 +2,85 @@
 
 import { test, describe, expect } from "vitest";
 
-import { form, object, array, field, createStore } from "../src/index";
+import { form, object, array, field, createStore, parentOf, pathOf } from "../src/index";
+import { ID, LENS } from "../src/internal";
 import { userShape } from "./support/fixtures/user";
 
 describe("Nodes", () => {
   test("parent links", () => {
-    expect(userShape.parent).toBe(undefined);
-    expect(userShape.shipping.parent).toBe(userShape);
-    expect(userShape.shipping.city.parent).toBe(userShape.shipping);
-    expect(userShape.items.item.parent).toBe(userShape.items);
-    expect(userShape.items.item.notes.item.text.parent).toBe(userShape.items.item.notes.item);
+    expect(parentOf(userShape)).toBe(undefined);
+    expect(parentOf(userShape.shipping)).toBe(userShape);
+    expect(parentOf(userShape.shipping.city)).toBe(userShape.shipping);
+    expect(parentOf(userShape.items.item)).toBe(userShape.items);
+    expect(parentOf(userShape.items.item.notes.item.text)).toBe(userShape.items.item.notes.item);
   });
 
   test("reused shapes get distinct nodes", () => {
     expect(userShape.shipping.city === userShape.billing.city).toBe(false);
-    expect(userShape.shipping.city.id === userShape.billing.city.id).toBe(false);
+    expect(userShape.shipping.city[ID] === userShape.billing.city[ID]).toBe(false);
+  });
+
+  test("item template paths are item-relative", () => {
+    expect(pathOf(userShape.items.item.sku)).toBe("items[].sku");
+    expect(pathOf(userShape)).toBe("");
+    expect(pathOf(userShape.items)).toBe("items");
+  });
+
+  test("id, lens, path, parent, _type, _hasCreate and item are free as field names", () => {
+    const shape = form(
+      object({
+        id: field<string>(),
+        lens: field<string>(),
+        path: field<string>(),
+        parent: field<string>(),
+        _type: field<string>(),
+        _hasCreate: field<string>(),
+        item: field<string>(),
+        toString: field<string>(),
+      }).meta({ hint: "x" }),
+    );
+    const initial = {
+      id: "a",
+      lens: "b",
+      path: "c",
+      parent: "d",
+      _type: "e",
+      _hasCreate: "f",
+      item: "g",
+      toString: "h",
+    };
+    const s = createStore(shape, initial);
+    expect(s.get(shape)).toEqual(initial);
+    s.set(shape.id, "a2");
+    expect(s.get(shape.id)).toBe("a2");
+    expect(s.get(shape.hint)).toBe("x");
+    expect(pathOf(shape)).toBe("");
+    expect(pathOf(object({ id: field<string>() })), "a template is unnamed").toBe("");
+    const named = field<string>().meta({ id: 1, path: "", item: 1, toString: "x" });
+    const namedShape = form(object({ name: named }));
+    const namedStore = createStore(namedShape, { name: "v" });
+    expect(namedStore.get(namedShape.name.id)).toBe(1);
+    expect(namedStore.get(namedShape.name.path)).toBe("");
+    expect(namedStore.get(namedShape.name.item)).toBe(1);
   });
 
   test("item template lenses are item-relative", () => {
-    expect(userShape.items.item.sku.lens.get({ sku: "X" })).toBe("X");
-    expect(userShape.items.item.sku.path).toBe("items[].sku");
+    const shape = form(object({ items: array(object({ sku: field<string>() })) }));
+    expect(shape.items.item.sku[LENS].get({ sku: "a" })).toBe("a");
   });
 
-  test("reserved field names rejected", () => {
-    expect(() => object({ parent: field<string>() })).toThrow(/reserved/);
+  test("the names that stay reserved are rejected as field names", () => {
+    const message = (key: string) => `"${key}" is a reserved name and cannot be used as a field name`;
+    // @ts-expect-error – "meta" is reserved and rejected at compile time
+    expect(() => object({ meta: field<string>() })).toThrow(message("meta"));
+    // @ts-expect-error – "constructor" is reserved and rejected at compile time
+    expect(() => object({ constructor: field<string>() })).toThrow(message("constructor"));
+    // @ts-expect-error – "__proto__" is reserved and rejected at compile time
+    expect(() => object({ ["__proto__"]: field<string>() })).toThrow(message("__proto__"));
+    // The plain literal never creates the key: for an object value it swaps
+    // the bag's prototype, and the field would silently disappear.
+    // @ts-expect-error – "__proto__" is reserved and rejected at compile time
+    expect(() => object({ __proto__: field<string>() })).toThrow(message("__proto__"));
   });
 
   test("arrays of primitives rejected", () => {
@@ -50,8 +105,8 @@ describe("Reused shapes containing arrays", () => {
     const block = object({ items: array(object({ x: field<string>() })) });
     const f = form(object({ a: block, b: block }));
     expect(f.a.items.item).not.toBe(f.b.items.item);
-    expect(f.a.items.item.x.path).toBe("a.items[].x");
-    expect(f.b.items.item.x.path).toBe("b.items[].x");
+    expect(pathOf(f.a.items.item.x)).toBe("a.items[].x");
+    expect(pathOf(f.b.items.item.x)).toBe("b.items[].x");
     const nodes = [
       f,
       f.a,
@@ -63,7 +118,7 @@ describe("Reused shapes containing arrays", () => {
       f.b.items.item,
       f.b.items.item.x,
     ];
-    expect(new Set(nodes.map((n) => n.id)).size, "every id is unique").toBe(nodes.length);
+    expect(new Set(nodes.map((n) => n[ID])).size, "every id is unique").toBe(nodes.length);
 
     const s = createStore(f, { a: { items: [{ x: "1" }] }, b: { items: [{ x: "2" }] } });
     const rowA = s.substore(f.a.items).itemAt(0);

@@ -46,7 +46,9 @@ import {
   metaKey,
   contribute,
   pendingOf,
+  pathOf,
   MetaRef,
+  type ShapeNode,
   type AnyNode,
   type ArrayNode,
   type InferValue,
@@ -106,7 +108,9 @@ interface Checked {
 function frozenGet(refs: readonly AnyRef[], values: readonly unknown[]): RuleContext["get"] {
   const byRef = new Map<AnyRef, unknown>(refs.map((r, i) => [r, values[i]]));
   return ((ref: AnyRef) => {
-    if (!byRef.has(ref)) throw new Error(`asyncRule: "${ref.path}" is not declared in the rule's triggers or reads`);
+    if (!byRef.has(ref)) {
+      throw new Error(`asyncRule: "${pathOf(ref)}" is not declared in the rule's triggers or reads`);
+    }
     return byRef.get(ref);
   }) as RuleContext["get"];
 }
@@ -142,7 +146,7 @@ export const error = metaKey<string | undefined, RulePart>(undefined)
   .aggregate((e) => e !== undefined)
   .uses(forced)
   .combine((self, key, [force]) => ({
-    name: `${self.path || "<root>"}#validation`,
+    name: `${pathOf(self) || "<root>"}#validation`,
     triggers: [self, force],
     writes: [key, force],
     run(ctx) {
@@ -250,7 +254,7 @@ export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, unde
  * names the required() it came from, as a `disabled` reason does.
  */
 export const mandatory = metaKey<boolean, string>(false).combine((self, key) => ({
-  name: `${self.path || "<root>"}#mandatory`,
+  name: `${pathOf(self) || "<root>"}#mandatory`,
   writes: [key],
   run: (ctx) => ctx.set(key, ctx.parts.length > 0),
 }));
@@ -259,8 +263,7 @@ export const mandatory = metaKey<boolean, string>(false).combine((self, key) => 
 export const validation = () => ({ error, forced, mandatory });
 
 /** A node with validation(), whose value is `V`. */
-export type Validatable<V = any> = AnyNode & {
-  readonly _type: V;
+export type Validatable<V = any> = ShapeNode<V> & {
   readonly error: MetaRef<string | undefined, RulePart>;
   readonly mandatory: MetaRef<boolean, string>;
 };
@@ -282,12 +285,12 @@ export function rule<V>(
   return contribute(
     errorOf(node),
     { kind: "sync", check },
-    { ...options, name: options.name ?? `rule(${node.path || "<root>"})` },
+    { ...options, name: options.name ?? `rule(${pathOf(node) || "<root>"})` },
   );
 }
 
 function errorOf(node: Validatable): Validatable["error"] {
-  if (!(node.error instanceof MetaRef)) throw new Error(`"${node.path || "<root>"}" has no validation() feature`);
+  if (!(node.error instanceof MetaRef)) throw new Error(`"${pathOf(node) || "<root>"}" has no validation() feature`);
   return node.error;
 }
 
@@ -308,7 +311,7 @@ export function asyncRule<V>(
   return contribute(
     errorOf(node),
     { kind: "async", check, start, debounce },
-    { ...decl, name: decl.name ?? `asyncRule(${node.path || "<root>"})` },
+    { ...decl, name: decl.name ?? `asyncRule(${pathOf(node) || "<root>"})` },
   );
 }
 

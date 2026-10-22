@@ -7,7 +7,7 @@ First shown in [stage 1](https://github.com/TheAsda/anyshape/tree/master/example
 ## Declaring a shape
 
 ```ts
-import { form, object, field, array, createStore, type InferValue } from "anyshape";
+import { form, object, field, array, pathOf, parentOf, createStore, type InferValue } from "anyshape";
 
 const shape = form(
   object({
@@ -37,9 +37,9 @@ const initialValues: Trip = {
 - `field<T>()` is a typed slot for a value. anyshape never checks a field's value at run time; the type is the contract.
 - `object({ ... })` groups children under names.
 - `array(item, { create })` holds rows. A row is always an object, so a list of strings is written as `array(object({ value: field<string>() }))`. `create` builds a new row, which lets `append()` run without an argument ([arrays.md](arrays.md)).
-- `form(object({ ... }))` takes the root object and gives every node below it its identity: an `id`, a `path` such as `"car.license"`, and its `parent`. Use the nodes reached from what `form()` returns.
+- `form(object({ ... }))` takes the root object and gives every node below it its identity: `pathOf(shape.car.license)` is `"car.license"`, and `parentOf(shape.car.license)` is the `car` node.
 
-A few names belong to the node itself (`id`, `path`, `parent`, `lens`, `meta`) and can't name a field.
+A node's identity lives behind symbols, so nearly every name is free for a field: `object({ id: field<string>() })` is fine. The three names that stay reserved are `meta`, `constructor` and `__proto__` – `meta` because the method is there, `constructor` and `__proto__` because JavaScript gives every object those. All three are rejected for fields and for meta keys, at compile time and at run time. An array's child is its item template, so a meta key named `item` collides on an array node but is free elsewhere.
 
 ## A node is a typed reference
 
@@ -55,7 +55,7 @@ const car: { license: string } = store.get(shape.car);
 
 A misspelled node doesn't compile, and neither does a value of the wrong type, such as a number written to `shape.destination`. There is no string path to get wrong: the only place anyshape reads a path is `store.resolvePath`, for errors a server reports by path ([your-side.md](your-side.md)).
 
-A node's `path` is meant for messages and debugging. Code that needs a node is handed the node.
+A node's path – `pathOf(node)` – is meant for messages and debugging. Code that needs a node is handed the node.
 
 ## Declaring meta on a node
 
@@ -84,7 +84,7 @@ type EmailMeta = InferMeta<typeof booking.email>; // { error: string | undefined
 - A key definition made with `metaKey` (`error`) carries a default and can add capabilities: counting, a default behavior, combining several inputs ([meta-keys.md](meta-keys.md)).
 - A [feature](../../GLOSSARY.md) is a function that returns several key definitions; spread it into `.meta()` with the rest: `field<string>().meta(control(), { label: "Email" })`.
 - `.meta()` is called before `form()`, and it returns a new node: the one it was called on is unchanged. For meta on the root, call it on the root object: `form(object({ ... }).meta({ ... }))`.
-- A node declares each key once, and a key can't share its name with a child.
+- A node declares each key once, and a key can't share its name with a child (an array's child is its `item`).
 
 ## Reusing a piece of shape
 

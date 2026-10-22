@@ -6,7 +6,7 @@
 // collect(node, touched). Bundles (validation(), control()) spread several.
 // ============================================================
 
-import { metaKey, initialOf } from "anyshape";
+import { metaKey, initialOf, pathOf } from "anyshape";
 
 import { reveal } from "./submit";
 import { validation } from "./validation";
@@ -44,7 +44,7 @@ export const visible = metaKey(true);
  * about the keys of the nodes inside it.
  */
 export const disabled = metaKey<boolean, string>(false).combine((self, key) => ({
-  name: `${self.path || "<root>"}#disabled`,
+  name: `${pathOf(self) || "<root>"}#disabled`,
   writes: [key],
   run: (ctx) => ctx.set(key, ctx.parts.length > 0),
 }));

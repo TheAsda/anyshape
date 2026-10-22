@@ -101,12 +101,14 @@ import {
   rowsBetween,
   locatedAt,
   pathLabel,
+  ID,
+  PARENT,
 } from "./internal.js";
 import { RunOrder, NodeIndex, type Write } from "./order.js";
 import { kindOf, type Target } from "./refs/kind.js";
 import type { MetaRef } from "./refs/meta.js";
 import { beginRun, pendingIn, type PendingRun } from "./refs/pending.js";
-import { ShapeNode, ObjectNode, ArrayNode, type AnyNode } from "./shape.js";
+import { ShapeNode, ObjectNode, ArrayNode, pathOf, type AnyNode } from "./shape.js";
 import {
   RootStore,
   BaseStore,
@@ -655,7 +657,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       throw new Error(`Contribution "${decl.name ?? refLabel(target)}": ${msg}`);
     };
     const inForm = (node: AnyNode) =>
-      node instanceof ShapeNode && node.id !== undefined && rootOf(node) === this.store.node;
+      node instanceof ShapeNode && node[ID] !== undefined && rootOf(node) === this.store.node;
     if (!inForm(target.node)) fail(`"${refLabel(target)}" is not part of this form`);
     if (!defOf(target)._steps.combine) fail(`"${refLabel(target)}" has no \`combine\``);
     const refs = [...(decl.triggers ?? []), ...(decl.reads ?? []), ...guardsOf(decl).flatMap((g) => g.refs)];
@@ -664,21 +666,21 @@ export class BehaviorRuntime implements RuntimeHooks {
       for (const ref of [target, ...refs]) {
         if (refNode(ref) !== self || !kindOf(ref).local)
           fail(
-            `default contributions may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`,
+            `default contributions may only use their own node ("${pathOf(self) || "<root>"}"), got "${refLabel(ref)}"`,
           );
       }
     }
     const chain = chainTo(scopeOf(target.node));
     if (!chain.includes(host.node)) {
       fail(
-        `"${refLabel(target)}" is outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`,
+        `"${refLabel(target)}" is outside the store it was added to ("${pathOf(host.node) || "<root>"}") – add it to an outer store`,
       );
     }
     for (const ref of refs) {
       const node = refNode(ref);
       if (!inForm(node)) fail(`"${refLabel(ref)}" is not part of this form`);
       if (!chain.includes(scopeOf(node)))
-        fail(`"${refLabel(ref)}" is outside the target's scope ("${scopeOf(target.node).path || "<root>"}")`);
+        fail(`"${refLabel(ref)}" is outside the target's scope ("${pathOf(scopeOf(target.node)) || "<root>"}")`);
     }
   }
 
@@ -709,7 +711,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const once = (refs: AnyRef[]) => [...new Map(refs.map((r) => [refKey(r), r])).values()];
     return new Behavior({
       ...config,
-      name: config.name ?? `${owner.ref.node.path || "<root>"}#${owner.ref.key}`,
+      name: config.name ?? `${pathOf(owner.ref.node) || "<root>"}#${owner.ref.key}`,
       triggers: once([...(config.triggers ?? []), ...mergedRefs(owner.triggers, delta, triggerRefs)]),
       reads: once([...(config.reads ?? []), ...mergedRefs(owner.reads, delta, readRefs)]),
       run: config.run as BehaviorConfig["run"],
@@ -784,7 +786,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const formRoot = this.store.node;
     for (const ref of all) {
       const node = refNode(ref);
-      if (!(node instanceof ShapeNode) || node.id === undefined || rootOf(node) !== formRoot) {
+      if (!(node instanceof ShapeNode) || node[ID] === undefined || rootOf(node) !== formRoot) {
         fail(`"${refLabel(ref)}" is not part of this form`);
       }
     }
@@ -816,7 +818,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       const self = behavior._self;
       for (const ref of all) {
         if (refNode(ref) !== self || !kindOf(ref).local)
-          fail(`default behaviors may only use their own node ("${self.path || "<root>"}"), got "${refLabel(ref)}"`);
+          fail(`default behaviors may only use their own node ("${pathOf(self) || "<root>"}"), got "${refLabel(ref)}"`);
       }
     }
 
@@ -830,7 +832,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const chain = chainTo(scope);
     if (!chain.includes(host.node)) {
       fail(
-        `its references are outside the store it was added to ("${host.node.path || "<root>"}") – add it to an outer store`,
+        `its references are outside the store it was added to ("${pathOf(host.node) || "<root>"}") – add it to an outer store`,
       );
     }
     for (const ref of all) {
@@ -839,7 +841,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const w of writes) {
       if (scopeOf(refNode(w)) !== scope)
         fail(
-          `"${refLabel(w)}" is outside the behavior's scope ("${scope.path || "<root>"}") – behaviors write only their own scope`,
+          `"${refLabel(w)}" is outside the behavior's scope ("${pathOf(scope) || "<root>"}") – behaviors write only their own scope`,
         );
     }
 
@@ -918,7 +920,7 @@ export class BehaviorRuntime implements RuntimeHooks {
       if (reg.runInit) this.mark(binding);
     } else {
       const next = reg.chain[depth + 1];
-      const arrStore = host.substore(next.parent as ArrayNode<any, any>) as ArrayStore<any>;
+      const arrStore = host.substore(next[PARENT] as ArrayNode<any, any>) as ArrayStore<any>;
       binding.arrStore = arrStore;
       let seq = arrStore.items();
       for (const row of seq) this.child(binding, row);
@@ -1277,7 +1279,7 @@ export function defaultBehaviors(root: AnyNode): (Behavior | Contribution)[] {
       const factory = def._steps.behavior;
       if (!factory) continue;
       const made = factory(node, metaRefOf(node, name), uses);
-      const defaultName = `${node.path || "<root>"}#${name}`;
+      const defaultName = `${pathOf(node) || "<root>"}#${name}`;
       if (made instanceof Contribution) {
         const { target, payload, decl } = made;
         out.push(new Contribution(target, payload, { ...decl, name: decl.name ?? defaultName }, { self: node }));

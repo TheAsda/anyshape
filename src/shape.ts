@@ -1,21 +1,24 @@
 // ============================================================
 // Shape nodes
 // ------------------------------------------------------------
-//   • parent       – explicit link to the instantiated parent node
-//   • lens         – relative to the node's scope root (form root or array item)
+//   • identity     – id, lens, path and parent live behind symbols (see
+//                    internal.ts), so every name a node doesn't reserve is
+//                    free for fields and meta keys; pathOf(node) and
+//                    parentOf(node) read them. A node's lens stays relative
+//                    to its scope root (form root or array item).
 //   • array()      – object shapes only; optional `create` factory for new rows
-//   • object()     – rejects field names that collide with node internals
+//   • object()     – rejects the names the node itself needs (`meta`, and the
+//                    names JavaScript treats specially on every object)
 //   • .meta(...)   – plain values and/or key definitions (metaKey, features);
 //                    variadic; must be called before form()
 //   • meta refs    – every declared meta key is exposed on the node:
 //                    form.name        → the value
 //                    form.name.error  → the `error` meta key (MetaRef)
-//                    A meta key cannot share a name with a child.
-//   • internals    – symbol-keyed (see internal.ts), so every name a node
-//                    doesn't reserve is free for fields and meta keys
+//                    A meta key cannot share a name with a child (an array's
+//                    item template counts as a child).
 // ============================================================
 
-import { FIELDS, META_DEFS, META, CREATE } from "./internal.js";
+import { FIELDS, META_DEFS, META, CREATE, ID, LENS, PATH, PARENT, TYPE, HAS_CREATE } from "./internal.js";
 import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
 import { MetaKeyDef, type Meta, type MergeMetaRefs } from "./meta.js";
 import { KIND, type RefKind } from "./refs/kind.js";
@@ -43,10 +46,27 @@ export type InferMeta<N> = {
     : never;
 };
 
-// Names used by the node itself. Neither fields nor meta keys may use them.
-const NODE_INTERNALS = ["id", "lens", "path", "parent", "meta", "constructor", "_type", "_hasCreate"];
-const RESERVED_FIELD_NAMES = new Set(NODE_INTERNALS);
-const RESERVED_META_KEYS = new Set([...NODE_INTERNALS, "item"]);
+// The names the node itself keeps on every object: the .meta() method, and the
+// names JavaScript treats specially on every object. Everything else the node
+// needs (id, lens, path, parent, the type markers) lives behind symbols, so it
+// cannot collide with a field name or a meta key. NoReserved rejects these at
+// compile time; the RESERVED set is the run-time backstop.
+type ReservedName = "meta" | "constructor" | "__proto__";
+const RESERVED: ReadonlySet<string> = new Set(["meta", "constructor", "__proto__"]);
+/** Maps an input of object()/.meta() so a reserved name can only hold `never`. */
+type NoReserved<T> = { [K in keyof T]: K extends ReservedName ? never : T[K] };
+
+/** Field and meta-key bags carry only their own keys. */
+function assertPlainBag(bag: object, message: (key: string) => string): void {
+  // A plain `{ __proto__: x }` literal never creates the key: for an object x
+  // it swaps the bag's prototype, and the name silently disappears. Accept
+  // only ordinary bags (Object.prototype); a `__proto__` own key set with
+  // defineProperty is caught by the RESERVED check, and for a primitive x
+  // JavaScript itself drops the entry, so there is nothing to see.
+  if (Object.getPrototypeOf(bag) !== Object.prototype) {
+    throw new Error(message("__proto__"));
+  }
+}
 
 /** @internal */
 interface InstantiateContext {
@@ -64,7 +84,7 @@ export type Ref<V = any> = ShapeNode<V> | MetaRef<V>;
 // ============================================================
 export abstract class ShapeNode<T = unknown> {
   /** Phantom type for inference – never exists at runtime. */
-  declare readonly _type: T;
+  declare readonly [TYPE]: T;
 
   /** @internal Default values of all declared meta keys. Live meta lives in the stores. */
   declare readonly [META]: Meta;
@@ -77,12 +97,14 @@ export abstract class ShapeNode<T = unknown> {
   }
 
   // ---- filled by form() ----
-  id!: FieldId;
-  /** Lens from the scope root (form root or array item) to this value. */
-  lens!: Lens<any, T>;
-  path!: string;
-  /** Instantiated parent. Undefined for the form root and for reusable (not instantiated) nodes. */
-  parent: ContainerNode | undefined;
+  /** @internal The form-wide identity. Undefined on reusable (not instantiated) nodes. */
+  declare readonly [ID]: FieldId | undefined;
+  /** @internal Lens from the scope root (form root or array item) to this value. */
+  declare readonly [LENS]: Lens<any, T>;
+  /** @internal The node's path within its scope. Undefined on reusable (not instantiated) nodes. */
+  declare readonly [PATH]: string | undefined;
+  /** @internal The instantiated parent. Undefined for the form root and for reusable nodes. */
+  declare readonly [PARENT]: ContainerNode | undefined;
 
   constructor() {
     setMeta(this, {});
@@ -96,22 +118,28 @@ export abstract class ShapeNode<T = unknown> {
    * A node declares each key once: declaring it again throws, whether as a
    * plain value or a key definition (metaKey / feature).
    */
-  meta<Is extends readonly Meta[]>(...inputs: Is): this & MergeMetaRefs<Is> {
-    if (this.id !== undefined) {
+  meta<Is extends readonly Meta[]>(
+    ...inputs: { [K in keyof Is]: Is[K] & NoReserved<Is[K]> }
+  ): this & MergeMetaRefs<Is> {
+    if (this[ID] !== undefined) {
       throw new Error(
-        `.meta() must be called before form() (node "${this.path || "<root>"}"). ` +
+        `.meta() must be called before form() (node "${pathOf(this) || "<root>"}"). ` +
           `For root meta use form(object({...}).meta(...)).`,
       );
     }
 
     const defs: Record<string, MetaKeyDef<any>> = { ...this[META_DEFS] };
     for (const input of inputs) {
+      assertPlainBag(input, (key) => `"${key}" is a reserved name and cannot be used as a meta key`);
       for (const [key, raw] of Object.entries(input)) {
-        if (RESERVED_META_KEYS.has(key)) {
+        if (RESERVED.has(key)) {
           throw new Error(`"${key}" is a reserved name and cannot be used as a meta key`);
         }
         if (this instanceof ObjectNode && Object.prototype.hasOwnProperty.call(this[FIELDS], key)) {
-          throw new Error(`"${key}" is a field of "${this.path || "<root>"}" and cannot also be a meta key`);
+          throw new Error(`"${key}" is a field of "${pathOf(this) || "<root>"}" and cannot also be a meta key`);
+        }
+        if (this instanceof ArrayNode && key === "item") {
+          throw new Error(`"item" is the item of "${pathOf(this) || "<root>"}" and cannot also be a meta key`);
         }
         if (Object.prototype.hasOwnProperty.call(defs, key)) {
           // No path before form(): the node is named by its kind.
@@ -128,6 +156,17 @@ export abstract class ShapeNode<T = unknown> {
     attachMetaRefs(clone);
     return clone;
   }
+}
+
+/** The node's path within its scope: "" for the form root and for reusable (not instantiated) nodes. A reference's path labels one of its keys (`"name#error"`). */
+export function pathOf(node: AnyNode | { readonly path: string }): string {
+  if (node instanceof ShapeNode) return node[PATH] ?? "";
+  return node.path;
+}
+
+/** The instantiated parent, or undefined for the form root and for reusable (not instantiated) nodes. */
+export function parentOf(node: AnyNode): ContainerNode | undefined {
+  return node[PARENT];
 }
 
 /** Set a node's declarations and the defaults derived from them. */
@@ -168,8 +207,9 @@ export class ObjectNode<TFields extends Record<string, AnyNode> = any> extends S
 
   private constructor(fields: TFields) {
     super();
+    assertPlainBag(fields, (key) => `"${key}" is a reserved name and cannot be used as a field name`);
     for (const key of Object.keys(fields)) {
-      if (RESERVED_FIELD_NAMES.has(key)) {
+      if (RESERVED.has(key)) {
         throw new Error(`"${key}" is a reserved name and cannot be used as a field name`);
       }
     }
@@ -199,7 +239,7 @@ export class ArrayNode<TItem extends ObjectNode<any> = any, THasCreate extends b
   /** @internal Factory for new rows, if declared. */
   declare readonly [CREATE]: (() => InferValue<TItem>) | undefined;
   /** Phantom: whether a `create` factory was declared (used by append/insert types). */
-  declare readonly _hasCreate: THasCreate;
+  declare readonly [HAS_CREATE]: THasCreate;
 
   private constructor(item: TItem, create: (() => InferValue<TItem>) | undefined) {
     super();
@@ -226,10 +266,10 @@ function instantiate<N extends AnyNode>(template: N, ctx: InstantiateContext): N
   const node = Object.create(Object.getPrototypeOf(template));
   node[META] = { ...template[META] };
   node[META_DEFS] = template[META_DEFS];
-  node.id = ctx.nextId();
-  node.path = ctx.path;
-  node.lens = ctx.lens;
-  node.parent = ctx.parent;
+  node[ID] = ctx.nextId();
+  node[PATH] = ctx.path;
+  node[LENS] = ctx.lens;
+  node[PARENT] = ctx.parent;
 
   if (template instanceof ObjectNode) {
     const fields: Record<string, AnyNode> = {};
@@ -265,7 +305,9 @@ export function field<T>(): FieldNode<T> {
   return FieldNode.create<T>();
 }
 
-export function object<TFields extends Record<string, AnyNode>>(fields: TFields): ObjectNode<TFields> & TFields {
+export function object<TFields extends Record<string, AnyNode>>(
+  fields: NoReserved<TFields>,
+): ObjectNode<TFields> & TFields {
   return ObjectNode.create(fields);
 }
 

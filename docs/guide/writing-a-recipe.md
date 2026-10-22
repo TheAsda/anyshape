@@ -33,6 +33,7 @@ import {
   metaKey,
   contribute,
   when,
+  pathOf,
   createStore,
   defineBehaviors,
   type AnyNode,
@@ -43,7 +44,7 @@ import {
 } from "anyshape";
 
 export const disabled = metaKey<boolean, string>(false).combine((self, key) => ({
-  name: `${self.path || "<root>"}#disabled`,
+  name: `${pathOf(self) || "<root>"}#disabled`,
   writes: [key],
   run: (ctx) => ctx.set(key, ctx.parts.length > 0),
 }));
@@ -66,7 +67,7 @@ export function disableWhen<const Rs extends readonly AnyRef[]>(
   test: (...values: Values<Rs>) => boolean,
   options: { name?: string } = {},
 ): Contribution<string> {
-  const name = options.name ?? `disableWhen(${target.path})`;
+  const name = options.name ?? `disableWhen(${pathOf(target)})`;
   return contribute(target.disabled, name, { name, when: when(refs, test) });
 }
 ```

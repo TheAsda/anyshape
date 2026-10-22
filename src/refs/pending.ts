@@ -6,7 +6,7 @@
 
 import { refNode, refKey, refLabel, targetOf } from "../internal.js";
 import type { MetaKeyDef } from "../meta.js";
-import type { AnyNode } from "../shape.js";
+import { pathOf, type AnyNode } from "../shape.js";
 import type { AnyRef, BaseStore } from "../store.js";
 import { isAncestorOrSelf } from "../tree.js";
 import { KIND, type RefKind } from "./kind.js";
@@ -30,7 +30,7 @@ export class PendingInRef {
     readonly _id: string,
   ) {}
   get path(): string {
-    return `${this.node.path ?? ""}#pendingIn`;
+    return `${pathOf(this.node)}#pendingIn`;
   }
   /** @internal */
   get [KIND](): RefKind<PendingInRef> {

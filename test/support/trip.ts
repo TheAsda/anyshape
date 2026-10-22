@@ -16,6 +16,7 @@ import {
   defineBehaviors,
   defineBehavior,
   initialOf,
+  pathOf,
   type InferValue,
   type AnyNode,
   type AnyRef,
@@ -80,7 +81,7 @@ function calculate<N extends AnyNode, const Rs extends readonly AnyRef[]>(
   fn: (...values: { -readonly [K in keyof Rs]: RefValue<Rs[K]> }) => InferValue<N>,
 ) {
   return defineBehavior({
-    name: `calculate(${target.path})`,
+    name: `calculate(${pathOf(target)})`,
     triggers: sources,
     writes: [target],
     run: (ctx) => ctx.set(target, fn(...(sources.map((r) => ctx.get(r)) as any))),
@@ -167,7 +168,7 @@ export function tripBehaviors(runs: Record<string, number> = {}) {
           self,
           (v, ctx) => (v !== "" && ctx.get(other) !== "" ? "Only one of promo, voucher can be set" : undefined),
           {
-            name: `only one:${self.path}`,
+            name: `only one:${pathOf(self)}`,
             triggers: [other],
           },
         ),

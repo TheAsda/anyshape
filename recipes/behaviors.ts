@@ -11,6 +11,7 @@ import {
   contribute,
   when,
   initialOf,
+  pathOf,
   type AnyNode,
   type InferValue,
   type MetaRef,
@@ -37,7 +38,7 @@ export function calculate<N extends AnyNode, const Rs extends readonly AnyRef[]>
   options: { name?: string } = {},
 ): Behavior {
   return defineBehavior({
-    name: options.name ?? `calculate(${target.path})`,
+    name: options.name ?? `calculate(${pathOf(target)})`,
     triggers: sources,
     writes: [target],
     run: (ctx) => ctx.set(target, fn(...(sources.map((r) => ctx.get(r)) as Values<Rs>))),
@@ -63,7 +64,7 @@ export function link<A extends AnyNode, B extends AnyNode>(
   options: LinkOptions<InferValue<A>, InferValue<B>>,
 ): Behavior {
   return defineBehavior({
-    name: options.name ?? `link(${a.path}, ${b.path})`,
+    name: options.name ?? `link(${pathOf(a)}, ${pathOf(b)})`,
     triggers: [a, b],
     writes: [a, b],
     runOn: { init: false },
@@ -85,7 +86,7 @@ export function visibleWhen<const Rs extends readonly AnyRef[]>(
   options: { name?: string } = {},
 ): Behavior {
   return defineBehavior({
-    name: options.name ?? `visibleWhen(${target.path})`,
+    name: options.name ?? `visibleWhen(${pathOf(target)})`,
     triggers: refs,
     writes: [target.visible],
     run: (ctx) => ctx.set(target.visible, test(...(refs.map((r) => ctx.get(r)) as Values<Rs>))),
@@ -99,7 +100,7 @@ export function disableWhen<const Rs extends readonly AnyRef[]>(
   test: (...values: Values<Rs>) => boolean,
   options: { name?: string } = {},
 ): Contribution<string> {
-  const name = options.name ?? `disableWhen(${target.path})`;
+  const name = options.name ?? `disableWhen(${pathOf(target)})`;
   return contribute(target.disabled, name, { name, when: when(refs, test) });
 }
 
@@ -116,7 +117,7 @@ export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>
 ): Behavior {
   const initial = initialOf(target);
   return defineBehavior({
-    name: options.name ?? `clearWhen(${target.path})`,
+    name: options.name ?? `clearWhen(${pathOf(target)})`,
     triggers: [...refs, target],
     reads: [initial],
     writes: [target],
@@ -147,14 +148,14 @@ type ExclusiveField = Validatable & Disableable;
  */
 export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveOptions = {}): AnyBehavior[] {
   if (fields.length < 2) throw new Error("exclusive() needs at least two fields");
-  const name = options.name ?? `exclusive(${fields.map((f) => f.path).join(", ")})`;
+  const name = options.name ?? `exclusive(${fields.map(pathOf).join(", ")})`;
   const labels = fields.map(labelOf).join(", ");
   const tooMany = options.message?.tooMany ?? `Only one of ${labels} can be set`;
   const missing = options.message?.missing ?? `One of ${labels} is required`;
 
   const disablers = fields.map((field, i) =>
     contribute(field.disabled, name, {
-      name: `${name}:${field.path}`,
+      name: `${name}:${pathOf(field)}`,
       when: when(fields, (...values: unknown[]) => {
         const filled = values.map((v) => !isEmpty(v));
         return filled.filter(Boolean).length === 1 && !filled[i];
@@ -171,7 +172,7 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
         if (options.required && count === 0) return missing;
         return undefined;
       },
-      { name: `${name}:${field.path}`, triggers: fields.filter((f) => f !== field) },
+      { name: `${name}:${pathOf(field)}`, triggers: fields.filter((f) => f !== field) },
     ),
   );
   return [...disablers, ...rules];

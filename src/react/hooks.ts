@@ -22,7 +22,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { refNode, refLabel, rootOf, scopeOf } from "../internal.js";
+import { refNode, refLabel, rootOf, scopeOf, ID } from "../internal.js";
 import { ShapeNode, type AnyNode, type ArrayNode, type InferValue } from "../shape.js";
 import {
   ItemStore,
@@ -68,7 +68,7 @@ export function useStore<S extends BaseStore<any> = BaseStore<any>>(options?: Ho
  */
 export function resolveStore(start: BaseStore<any>, ref: AnyRef): BaseStore<any> {
   const node = refNode(ref);
-  if (!(node instanceof ShapeNode) || node.id === undefined || rootOf(node) !== start.root.node) {
+  if (!(node instanceof ShapeNode) || node[ID] === undefined || rootOf(node) !== start.root.node) {
     throw new Error(`"${refLabel(ref)}" is not part of this form`);
   }
   const scope = scopeOf(node);

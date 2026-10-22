@@ -18,6 +18,7 @@ import {
   contribute,
   defineBehavior,
   defineBehaviors,
+  pathOf,
   type BehaviorContext,
   type InferValue,
   type InferMeta,
@@ -139,7 +140,7 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
 // ---------------------------------------------------------------------------
 // Key contributions: the payload type flows from the key to contribute() and ctx.parts.
 const total = metaKey<number, { weight: number }>(0).combine((self, key) => ({
-  name: `${self.path}#total`,
+  name: `${pathOf(self)}#total`,
   writes: [key],
   run(ctx) {
     ctx.set(

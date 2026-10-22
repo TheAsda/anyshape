@@ -14,6 +14,7 @@ import {
   defineBehavior,
   defineBehaviors,
   metaKey,
+  pathOf,
   when,
   pendingOf,
   type InferValue,
@@ -35,16 +36,16 @@ interface Log {
 let log: Log = { runs: [], combined: [] };
 
 const tags = metaKey<readonly string[], string>([]).combine((self, key) => {
-  log.combined.push(self.path);
+  log.combined.push(pathOf(self));
   return {
-    name: `${self.path}#tags`,
+    name: `${pathOf(self)}#tags`,
     triggers: [self],
     writes: [key],
     run(ctx) {
       const n = ((ctx.state.runs as number | undefined) ?? 0) + 1;
       ctx.state.runs = n;
       const list = ctx.parts.map((p) => p.payload);
-      log.runs.push({ path: self.path, runs: n, tags: list, origins: [...ctx.origins] });
+      log.runs.push({ path: pathOf(self), runs: n, tags: list, origins: [...ctx.origins] });
       ctx.set(key, list);
     },
   };
@@ -74,7 +75,7 @@ const joined = metaKey<string, string>("default").combine((self, key) => ({
     const n = ((ctx.state.runs as number | undefined) ?? 0) + 1;
     ctx.state.runs = n;
     const list = ctx.parts.map((p) => p.payload);
-    log.runs.push({ path: self.path, runs: n, tags: list, origins: [...ctx.origins] });
+    log.runs.push({ path: pathOf(self), runs: n, tags: list, origins: [...ctx.origins] });
     ctx.set(key, list.length ? list.join(", ") : "none");
   },
 }));
