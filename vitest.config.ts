@@ -45,7 +45,7 @@ export default defineConfig({
         test: {
           name: "recipes",
           environment: "node",
-          include: ["recipes/**/*.test.ts"],
+          include: ["recipes/test/**/*.test.ts"],
         },
       },
       {
@@ -72,7 +72,7 @@ export default defineConfig({
         optimizeDeps,
         test: {
           name: "recipes-react",
-          include: ["recipes/react/**/*.test.tsx"],
+          include: ["recipes/test/react/**/*.test.tsx"],
           browser: browser(),
         },
       },

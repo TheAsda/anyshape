@@ -23,8 +23,8 @@ import {
   clearWhen,
   exclusive,
   error,
-} from "./index";
-import { shape, L, initial, type Values } from "./test/fixtures/profile";
+} from "../index";
+import { shape, L, initial, type Values } from "./fixtures/profile";
 
 // Compile-time only – never called.
 export function typeOnlyChecks() {

@@ -19,10 +19,10 @@ import {
   exclusive,
   handleSubmit,
   type InferChecked,
-} from "./index";
-import type { useControl } from "./react";
-import * as order from "./test/fixtures/order";
-import type { DeliveryType } from "./test/fixtures/order";
+} from "../index";
+import type { useControl } from "../react";
+import * as order from "./fixtures/order";
+import type { DeliveryType } from "./fixtures/order";
 
 const t = form(
   object({

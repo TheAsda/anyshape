@@ -25,9 +25,9 @@ CI also runs these, which you can run by hand:
 The projects are defined in `vitest.config.ts`:
 
 - `unit`: the core, in Node, with no DOM.
-- `recipes`: `recipes/`, in Node, importing the core entry as `anyshape`.
+- `recipes`: `recipes/test/`, in Node, importing the core entry as `anyshape`.
 - `react`: the bindings in real Chromium, through Vitest browser mode (Playwright provider) and `vitest-browser-react`.
-- `recipes-react`: `recipes/react/`, in real Chromium like `react`, importing the core entries as `anyshape` and `anyshape/react`. Both are aliased to `src/`, so the recipes and the core hooks share one copy of the core.
+- `recipes-react`: `recipes/test/react/`, in real Chromium like `react`, importing the core entries as `anyshape` and `anyshape/react`. Both are aliased to `src/`, so the recipes and the core hooks share one copy of the core.
 
 ## Where a test goes
 
@@ -36,8 +36,8 @@ The file names and `describe` titles say what each file covers; there is no list
 - **Core:** `test/`, in the file named after the area of the core the test covers (`notifications.test.ts`, `counts.test.ts`, `async.test.ts`). In the file, put it under the `describe` for its topic, or add a `describe` named after the topic.
 - **A new area** of the core gets its own file, named after it.
 - **React bindings:** `test/react/`, by the same rule (`form.test.tsx` covers `useForm` and `useSync`).
-- **Recipes:** beside the recipe, in the file named after it (`recipes/submit.ts` is tested in `recipes/submit.test.ts`). A test that needs a real browser, such as DOM focus or a rendered field, goes in `recipes/react/`.
-- **The type contract:** `test/types.test.ts` for the core entries, `recipes/types.test.ts` for the recipes. `tsc` asserts them under `bun run typecheck`; Vitest runs the files but checks no types.
+- **Recipes:** `recipes/test/`, in the file named after the recipe it covers (`recipes/submit.ts` is tested in `recipes/test/submit.test.ts`). A test that needs a real browser, such as DOM focus or a rendered field, goes in `recipes/test/react/`.
+- **The type contract:** `test/types.test.ts` for the core entries, `recipes/test/types.test.ts` for the recipes. `tsc` asserts them under `bun run typecheck`; Vitest runs the files but checks no types.
 - **The public names:** `test/exports.test.ts` keeps each entry's names as a snapshot, and checks that the API tables in `docs/guide/agents.md` list exactly those names. A change to the public interface updates both.
 - **Scenarios across the core:** the trip booking (`test/support/trip.ts`) in `test/integration.test.ts`, and rendered in `test/react/integration.test.tsx`.
 - **Benchmarks and memory checks:** `bench/` (see [Benchmarks and memory](#benchmarks-and-memory)).
@@ -55,7 +55,7 @@ Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) a
   - Use a fixture only where it removes repetition without hiding the setup the test is about. A test with its own store options creates its store explicitly.
   - A `describe` that uses another file's fixture binds it at the top (`const { shape, L, initial } = company;`) and defines its own `test`.
   - Fixtures and examples keep declarations and key access in plain view: no helper hides which keys a node declares or how a key is reached. Showing that is what an example is for.
-- **React tests** (`test/react/*.test.tsx` and `recipes/react/*.test.tsx`, each side with its own copy of `test-utils.tsx`). The core React tests use only the core hooks; a field binding there is `useField` with inline handlers.
+- **React tests** (`test/react/*.test.tsx` and `recipes/test/react/*.test.tsx`, each side with its own copy of `test-utils.tsx`). The core React tests use only the core hooks; a field binding there is `useField` with inline handlers.
   - Render with `render()` from `vitest-browser-react`. It's async, and the tree is cleaned up before each test.
   - Drive inputs through locators and `userEvent` (`fill`, `click`, `keyboard`). These are real browser events, so focus moves and blur fires as they would for a user.
   - Assert the DOM with retrying `await expect.element(locator)`. `toHaveTextContent("…")` is an exact match in Vitest 5; `toMatchTextContent` is the substring and regex form.
