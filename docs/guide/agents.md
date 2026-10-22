@@ -63,16 +63,16 @@ Every public name, with the page that explains it. A test checks these tables ag
 
 ### `anyshape/react`
 
-| Name                                  | What it is                                                                         | Page                 |
-| ------------------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
-| `useForm`, `UseFormOptions`           | Creates a store once per mount; `values` loads data as the baseline.               | [react.md](react.md) |
-| `StoreProvider`, `StoreProviderProps` | Provides a store (the form, a substore or a row) to the hooks below it.            | [react.md](react.md) |
-| `useStore`, `HookOptions`             | The provided store; the `{ store }` option every hook takes.                       | [react.md](react.md) |
-| `useValue`, `SelectOptions`           | Reads any reference and re-renders when it changes; optionally through a selector. | [react.md](react.md) |
-| `useField`, `FieldBinding`            | A controlled input's binding: `{ value, onChange, store }`.                        | [react.md](react.md) |
-| `useArray`, `ArrayBinding`            | An array's rows and row operations.                                                | [react.md](react.md) |
-| `useSync`                             | Writes React data (props, query results) into a value or meta key.                 | [react.md](react.md) |
-| `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component.     | [react.md](react.md) |
+| Name                                  | What it is                                                                            | Page                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------- | -------------------- |
+| `useForm`, `UseFormOptions`           | Creates a store on mount (anew for a new shape); `values` loads data as the baseline. | [react.md](react.md) |
+| `StoreProvider`, `StoreProviderProps` | Provides a store (the form, a substore or a row) to the hooks below it.               | [react.md](react.md) |
+| `useStore`, `HookOptions`             | The provided store; the `{ store }` option every hook takes.                          | [react.md](react.md) |
+| `useValue`, `SelectOptions`           | Reads any reference and re-renders when it changes; optionally through a selector.    | [react.md](react.md) |
+| `useField`, `FieldBinding`            | A controlled input's binding: `{ value, onChange, store }`.                           | [react.md](react.md) |
+| `useArray`, `ArrayBinding`            | An array's rows and row operations.                                                   | [react.md](react.md) |
+| `useSync`                             | Writes React data (props, query results) into a value or meta key.                    | [react.md](react.md) |
+| `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component.        | [react.md](react.md) |
 
 ## Common mistakes
 

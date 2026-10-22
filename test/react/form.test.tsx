@@ -1,4 +1,4 @@
-import { useState, StrictMode } from "react";
+import { Component, useState, StrictMode, type ReactNode } from "react";
 import { describe, test, expect } from "vitest";
 
 import {
@@ -13,8 +13,10 @@ import {
   type InferValue,
   type RootStore,
 } from "../../src/index";
-import { StoreProvider, useForm, useSync, useField, useValue } from "../../src/react/index";
-import { control, submission, error } from "../support/features";
+import { StoreProvider, useForm, useSync, useField, useValue, type UseFormOptions } from "../../src/react/index";
+
+type BehaviorList = UseFormOptions<any>["behaviors"];
+import { control, submission, error, dirty } from "../support/features";
 import { rule, max } from "../support/rules";
 import { render, settle, captureWarnings } from "../support/test-utils";
 
@@ -88,6 +90,7 @@ describe("hot reload", () => {
       kind: field<string>().meta(control()),
       pair: field<{ x: string }>().meta(control()),
       list: field<{ y: number }[]>().meta(control()),
+      tags: array(object({ t: field<string>() })).meta({ dirty }),
       gone: field<string>().meta(control()),
     }),
   );
@@ -98,6 +101,7 @@ describe("hot reload", () => {
       kind: object({ x: field<string>().meta(control()) }),
       pair: object({ x: field<string>().meta(control()) }),
       list: array(object({ y: field<number>().meta(control()) })),
+      tags: array(object({ t: field<string>() })).meta({ dirty }),
       added: field<string>().meta(control()),
     }),
   );
@@ -108,6 +112,7 @@ describe("hot reload", () => {
     kind: "k",
     pair: { x: "old" },
     list: [{ y: 1 }, { y: 2 }],
+    tags: [{ t: "a" }],
     gone: "g",
   };
   const initialAfter = (): After => ({
@@ -119,6 +124,7 @@ describe("hot reload", () => {
     kind: { x: "x" },
     pair: { x: "init" },
     list: [{ y: 9 }],
+    tags: [{ t: "a" }],
     added: "new",
   });
 
@@ -161,10 +167,12 @@ describe("hot reload", () => {
       kind: { x: "x" },
       pair: { x: "init" },
       list: [{ y: 9 }],
+      tags: [{ t: "a" }],
       added: "new",
     });
     expect(f.get(after.one.a.dirty), "the baseline came along").toBe(true);
     expect(f.get(after.added.dirty)).toBe(false);
+    expect(f.get(after.tags.dirty), "an unedited array still is its baseline").toBe(false);
     expect(f.get(after.rows)[1], "an unedited row still is its baseline row").toBe(f.get(initialOf(after.rows))[1]);
 
     await settle(() => f.reset());
@@ -200,6 +208,97 @@ describe("hot reload", () => {
     await expect.element(screen.getByTestId("err")).toHaveTextContent("Needed");
     expect(f, "the same store").toBe(store);
     expect(f.get(shape.code)).toBe("kept");
+  });
+
+  /** The App of the tests below: `reload()` swaps in `after` and its behaviors, as an edit does. */
+  function reloadable(behaviorsOf: (s: typeof after) => BehaviorList | undefined = () => undefined) {
+    let live = before as unknown as typeof after;
+    let behaviors = behaviorsOf(live);
+    let f!: RootStore<typeof after>;
+    let set!: (n: number) => void;
+    const reload = () => {
+      live = after;
+      behaviors = behaviorsOf(after);
+      set(1);
+    };
+    function App() {
+      const [, setN] = useState(0);
+      set = setN;
+      f = useForm(live, live === after ? initialAfter() : (initialBefore as unknown as After), { behaviors });
+      return <StoreProvider store={f}>{null}</StoreProvider>;
+    }
+    return { store: () => f, reload, App };
+  }
+
+  test("the carried values are a program write: meta starts over and rows are new", async () => {
+    const { store, reload, App } = reloadable();
+    await render(<App />);
+    const old = store() as unknown as RootStore<typeof before>;
+    await settle(() => old.set(before.one.a, "typed", { origin: "user" }));
+    expect(old.get(before.one.a.touched)).toBe(true);
+    const oldRow = old.substore(before.rows).itemAt(0).stableId;
+
+    await settle(() => reload());
+    expect(store().get(after.one.a)).toBe("typed");
+    expect(store().get(after.one.a.touched), "meta is not carried, and the write is not a user write").toBe(false);
+    expect(store().substore(after.rows).itemAt(0).stableId, "rows are new").not.toBe(oldRow);
+  });
+
+  test("the old store's behaviors are removed", async () => {
+    const { store, reload, App } = reloadable((s) => rule(s.one.a, () => "bad"));
+    await render(<App />);
+    const old = store() as unknown as RootStore<typeof before>;
+    expect(old.get(before.one.a.error)).toBe("bad");
+    await settle(() => reload());
+    expect(store().get(after.one.a.error)).toBe("bad");
+    expect(old.get(before.one.a.error), "removed from the old store").toBeUndefined();
+  });
+
+  test("behaviors kept from the previous shape throw a hint", async () => {
+    const kept = rule(before.one.a, () => undefined);
+    const { reload, App } = reloadable(() => kept);
+    let caught: unknown;
+    class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+      state = { failed: false };
+      static getDerivedStateFromError() {
+        return { failed: true };
+      }
+      componentDidCatch(error: unknown) {
+        caught = error;
+      }
+      render() {
+        return this.state.failed ? null : this.props.children;
+      }
+    }
+    const { restore } = captureWarnings();
+    const quiet = console.error;
+    console.error = () => {};
+    await render(
+      <Boundary>
+        <App />
+      </Boundary>,
+    );
+    await settle(() => reload());
+    console.error = quiet;
+    restore();
+    expect(String(caught)).toMatch(/declared for the previous shape/);
+  });
+
+  test("a hot reload under StrictMode carries the values and does not warn", async () => {
+    const { warnings, restore } = captureWarnings();
+    const { store, reload, App } = reloadable((s) => rule(s.one.a, () => undefined));
+    await render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+    const old = store() as unknown as RootStore<typeof before>;
+    await settle(() => old.set(before.one.a, "typed", { origin: "user" }));
+    await settle(() => reload());
+    restore();
+    expect(store().node).toBe(after);
+    expect(store().get(after.one.a)).toBe("typed");
+    expect(warnings).toEqual([]);
   });
 
   test("a single new shape or behaviors does not warn", async () => {
