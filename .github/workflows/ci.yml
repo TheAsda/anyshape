@@ -16,15 +16,23 @@ concurrency:
 jobs:
   test:
     # All four Vitest projects: unit and recipes in Node, react and
-    # recipes-react in Chromium (browser mode).
+    # recipes-react in Chromium (browser mode). The image ships Chromium and
+    # its system packages, so no browser download or apt runs here.
     runs-on: ubuntu-latest
+    container:
+      # The tag must be the Playwright version bun.lock pins; the check step
+      # below fails with this reminder when the two drift apart.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
+      # setup-bun extracts its download with unzip, which the image does not
+      # ship; npm is already there. The version is the one the packageManager
+      # field in package.json pins.
+      - run: npm install --global bun@"$(node -p 'require("./package.json").packageManager.split("bun@")[1]')"
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
+      # Fails when the image tag and the installed Playwright have drifted,
+      # with the tag to move, instead of a missing executable mid-suite.
+      - run: bun run check:image
       - run: bun run test
       - name: Upload failure screenshots
         # Both browser projects write their screenshots under .vitest/.
