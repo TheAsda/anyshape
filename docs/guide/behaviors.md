@@ -175,6 +175,8 @@ Three things to know:
 
 **In React, this is not `useSync`'s job.** `useSync` writes before paint, but the creation runs happen earlier, inside `createStore` — a behavior reading a synced key at creation sees the key's default, and anything it computed from the default stays. A start the readers must see on their first run belongs in `behaviors`, exactly as above; `useSync` is for data that arrives from React ([react.md](react.md)).
 
+Both patterns start from data the store already has. A deep start that can't be worked out from the row's own values — one handed in from outside — belongs in the values, not in meta: as a value it loads with `values` and returns with `reset()`. And a start captured in `behaviors` is fixed at mount: `useForm` creates the store once per mount, so a later change to what the start was taken from doesn't reach it while the behaviors are the same object. Data that changes during the form's lifetime is `useSync`'s, with the first-run caveat above.
+
 ## Reuse is a plain function
 
 When a second pair of dates needs the same rule, the [nodes](../../GLOSSARY.md) are the only thing that differs. Turn the behavior into a function that takes them:
