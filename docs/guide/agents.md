@@ -159,7 +159,7 @@ const checks = [
 const checkedStore = createStore(checked, { code: "" }, { behaviors: checks });
 ```
 
-**Writing a combined key from a behavior.** A behavior with `writes: [checked.code.error]` is rejected: `"code#error" is written only by the owner of its key – contribute() to it instead`.
+**Writing a combined key from a behavior.** A behavior with `writes: [checked.code.error]` is rejected; the error prints the `contribute(checked.code.error, …)` call to register instead, with a `when` built from the behavior's own triggers.
 
 **Expecting a guard to undo a write.** A behavior whose guard turns false stops running; what it wrote stays. If the value must change back, write one behavior that computes both directions ([guards.md](guards.md)).
 

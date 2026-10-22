@@ -39,9 +39,10 @@ export const visible = metaKey(true);
 
 /**
  * Whether the node is disabled. A combined key: true while any contribution
- * (a reason, e.g. disableWhen, exclusive) is present. Application code may
- * still write it. Only the node's own value: a disabled group says nothing
- * about the keys of the nodes inside it.
+ * (a reason, e.g. disableWhen, exclusive) is present. Behaviors change it by
+ * contributing a reason, never by writing it; application code may still
+ * write it with store.set. Only the node's own value: a disabled group says
+ * nothing about the keys of the nodes inside it.
  */
 export const disabled = metaKey<boolean, string>(false).combine((self, key) => ({
   name: `${pathOf(self) || "<root>"}#disabled`,
