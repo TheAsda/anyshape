@@ -13,7 +13,7 @@ export const shape = form(
     age: field<number | undefined>().meta(control()),
     email: field<string>().meta(control()),
     zip: field<string>().meta(control()),
-    taxId: field<string>().meta(control(), { required: false }),
+    taxId: field<string>().meta(control()),
     personalId: field<string>().meta(control()),
     title: field<string>(),
     slug: field<string>(),

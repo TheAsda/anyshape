@@ -1,5 +1,5 @@
 // The ready-made rules (recipes/rules.ts): messages, reference limits, guarded by a builder block.
-import { form, object, array, field, createStore, defineBehavior, defineBehaviors, countIn } from "anyshape";
+import { form, object, array, field, createStore, defineBehaviors, countIn } from "anyshape";
 import { test as base, describe, expect } from "vitest";
 
 import {
@@ -77,29 +77,54 @@ describe("Rules", () => {
     expect(s.get(shape.age.error)).toBe("Required");
   });
 
-  test("a switchable requirement is a guard on the `required` key", () => {
+  test("a switchable requirement is a guard; `mandatory` is true while the guard holds", () => {
     const s = createStore(shape, initial(), {
       behaviors: defineBehaviors(shape, (b) => {
         b.when(
-          [shape.taxId.required],
-          (r) => r,
+          [shape.type],
+          (t) => t === "company",
           (b) => b.add(required(shape.taxId)),
-        );
-        b.add(
-          defineBehavior({
-            triggers: [shape.type],
-            writes: [shape.taxId.required],
-            run: (c) => c.set(shape.taxId.required, c.get(shape.type) === "company"),
-          }),
         );
       }),
     });
+    expect(s.get(shape.taxId.mandatory)).toBe(false);
     expect(s.get(shape.taxId.error)).toBe(undefined);
     s.set(shape.type, "company");
-    expect(s.get(shape.taxId.required)).toBe(true);
+    expect(s.get(shape.taxId.mandatory)).toBe(true);
     expect(s.get(shape.taxId.error)).toBe("Required");
     s.set(shape.taxId, "LV123");
-    expect(s.get(shape.taxId.error)).toBe(undefined);
+    expect(s.get(shape.taxId.mandatory), "a filled field stays mandatory").toBe(true);
+    s.set(shape.type, "person");
+    expect(s.get(shape.taxId.mandatory)).toBe(false);
+  });
+
+  test("`mandatory` stays true until every required() on the node is absent", () => {
+    const s = createStore(shape, initial(), {
+      behaviors: defineBehaviors(shape, (b) => {
+        b.when(
+          [shape.type],
+          (t) => t === "company",
+          (b) => b.add(required(shape.taxId)),
+        );
+        b.when(
+          [shape.personalId],
+          (id) => id === "",
+          (b) => b.add(required(shape.taxId, { message: "Tax ID or personal ID" })),
+        );
+      }),
+    });
+    expect(s.get(shape.taxId.mandatory), "personal ID empty").toBe(true);
+    s.set(shape.type, "company");
+    s.set(shape.personalId, "010101-12345");
+    expect(s.get(shape.taxId.mandatory), "company").toBe(true);
+    s.set(shape.type, "person");
+    expect(s.get(shape.taxId.mandatory)).toBe(false);
+  });
+
+  test("other rules don't mark a node mandatory", () => {
+    const s = createStore(shape, initial(), { behaviors: [minLength(shape.name, 3), email(shape.email)] });
+    expect(s.get(shape.name.mandatory)).toBe(false);
+    expect(s.get(shape.email.mandatory)).toBe(false);
   });
 
   test("format rules pass on empty values and combine with required", () => {

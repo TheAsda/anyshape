@@ -222,7 +222,7 @@ describe("Builder", () => {
         (b) => b.add(required(shape.personalId)),
       );
     });
-    expect(behaviors.length).toBe(3);
+    expect(behaviors.length, "each required(): a rule and its mark").toBe(6);
     const s = createStore(shape, initial(), { behaviors });
     expect(s.get(shape.personalId.error)).toBe("Required");
     expect(s.get(shape.taxId.error)).toBe(undefined);
@@ -290,7 +290,7 @@ describe("Builder", () => {
       b.each(shape.lines, lineRules);
       b.add(exclusive([shape.price, shape.promo]));
     });
-    expect(behaviors.length, "2 row rules + exclusive: a reason and a rule per field").toBe(6);
+    expect(behaviors.length, "min, required (a rule and its mark) + exclusive: a reason and a rule per field").toBe(7);
     const s = createStore(shape, initial(), { behaviors });
     const row = s.substore(shape.lines).itemAt(1);
     row.set(L.qty, 0);

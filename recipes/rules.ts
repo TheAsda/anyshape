@@ -5,11 +5,23 @@
 // needs (a validated node, with a string, array or number value), so using
 // it on another node is a compile error.
 //   • Format rules pass on empty values – combine them with required.
-//   • required() always applies. A switchable requirement is a guard:
-//       b.when([s.x.required], (r) => r, (b) => b.add(required(s.x)))
+//   • required() is a rule and a mark: it also contributes to the node's
+//     `mandatory`, so the UI can show which fields are required now. It
+//     returns both; add it with b.add, or put it in createStore's behaviors.
+//   • required() always applies. A switchable requirement is a guard, which
+//     applies to the rule and the mark:
+//       b.when([s.type], (t) => t === "company", (b) => b.add(required(s.taxId)))
 // ============================================================
 
-import { type AnyNode, type InferValue, type Ref, type ShapeNode, type CountRef, type Contribution } from "anyshape";
+import {
+  contribute,
+  type AnyNode,
+  type InferValue,
+  type Ref,
+  type ShapeNode,
+  type CountRef,
+  type Contribution,
+} from "anyshape";
 
 import { rule, type RulePart, type Validatable } from "./validation";
 
@@ -38,13 +50,16 @@ export function labelOf(node: AnyNode): string {
   return path.slice(path.lastIndexOf(".") + 1).replace(/\[\]$/, "") || "<root>";
 }
 
+/** The rule, and the node's `mandatory` mark while the rule is present; both under the same name. */
 export function required<N extends Validatable>(
   node: N,
   options: RuleRecipeOptions<InferValue<N>> = {},
-): Contribution<RulePart> {
-  return rule(node, (v) => (isEmpty(v) ? message(options.message, "Required", v) : undefined), {
-    name: options.name ?? `required(${node.path})`,
-  });
+): readonly [Contribution<RulePart>, Contribution<string>] {
+  const name = options.name ?? `required(${node.path})`;
+  return [
+    rule(node, (v) => (isEmpty(v) ? message(options.message, "Required", v) : undefined), { name }),
+    contribute(node.mandatory, name, { name }),
+  ];
 }
 
 /** A limit: a number, or a reference whose value is the limit (undefined = no limit, the rule passes). */

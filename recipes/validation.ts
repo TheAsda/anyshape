@@ -239,12 +239,25 @@ type Walk<N> =
 export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, undefined> : Walk<N>;
 
 /** `error`, written by the field's rules, and `forced` for validate(). */
-export const validation = () => ({ error, forced });
+/**
+ * Whether the node is required now: true while any required() on it is
+ * present (its guard holds), e.g. for an asterisk on the label. The payload
+ * names the required() it came from. `defined` doesn't feed it: a field
+ * with only `defined` says "Required" without being marked.
+ */
+export const mandatory = metaKey<boolean, string>(false).combine((self, key) => ({
+  name: `${self.path || "<root>"}#mandatory`,
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts.length > 0),
+}));
+
+export const validation = () => ({ error, forced, mandatory });
 
 /** A node with validation(), whose value is `V`. */
 export type Validatable<V = any> = AnyNode & {
   readonly _type: V;
   readonly error: MetaRef<string | undefined, RulePart>;
+  readonly mandatory: MetaRef<boolean, string>;
 };
 
 export interface RuleOptions {
