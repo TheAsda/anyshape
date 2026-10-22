@@ -2,7 +2,7 @@
 "anyshape": minor
 ---
 
-**Breaking:** a node's identity is no longer exposed as properties. `node.path`, `node.parent`, `node.id`, `node.lens`, `node._type` and `node._hasCreate` are gone, and so are the names they reserved: nearly every name is now free for a field or a meta key. `pathOf(node)` and `parentOf(node)` take their place, in the style of `initialOf` / `pendingOf`; there is no `idOf` or `lensOf`, because nothing outside the core needs them.
+**Breaking:** a node's identity is no longer exposed as properties. `node.path`, `node.parent`, `node.id`, `node.lens`, `node._type` and `node._hasCreate` are gone, and so are the names they reserved: nearly every name is now free for a field or a meta key. `pathOf(node)` and `parentOf(node)` take their place, in the style of `initialOf` / `pendingOf`; there is no `idOf` or `lensOf`, because nothing outside the core needs them, and the public `FieldId` type goes with `node.id` for the same reason. `pathOf` also accepts a reference and labels the key it points at (`pathOf(node.error)` is `"name#error"`).
 
 ```ts
 // before

@@ -16,7 +16,7 @@
 import {
   contribute,
   pathOf,
-  ShapeNode,
+  type ShapeNode,
   type AnyNode,
   type InferValue,
   type Ref,
@@ -83,9 +83,7 @@ function limitRule<N extends Validatable>(
       return message(options.message, fallback(resolved), v);
     },
     {
-      name:
-        options.name ??
-        `${label}(${pathOf(node)}, ${ref === undefined ? limit : ref instanceof ShapeNode ? pathOf(ref) : ref.path})`,
+      name: options.name ?? `${label}(${pathOf(node)}, ${ref === undefined ? limit : pathOf(ref)})`,
       triggers: ref === undefined ? [] : [ref],
     },
   );

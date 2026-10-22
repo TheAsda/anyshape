@@ -48,7 +48,7 @@ import {
   pendingOf,
   pathOf,
   MetaRef,
-  ShapeNode,
+  type ShapeNode,
   type AnyNode,
   type ArrayNode,
   type InferValue,
@@ -109,9 +109,7 @@ function frozenGet(refs: readonly AnyRef[], values: readonly unknown[]): RuleCon
   const byRef = new Map<AnyRef, unknown>(refs.map((r, i) => [r, values[i]]));
   return ((ref: AnyRef) => {
     if (!byRef.has(ref)) {
-      throw new Error(
-        `asyncRule: "${ref instanceof ShapeNode ? pathOf(ref) : ref.path}" is not declared in the rule's triggers or reads`,
-      );
+      throw new Error(`asyncRule: "${pathOf(ref)}" is not declared in the rule's triggers or reads`);
     }
     return byRef.get(ref);
   }) as RuleContext["get"];

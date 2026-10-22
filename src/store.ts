@@ -3,9 +3,9 @@
 // ------------------------------------------------------------
 // Structure:
 //   • One root value, written immutably through node lenses.
-//   • substore() accepts shape nodes only; membership is checked by walking
-//     the parents (parentOf). A store addresses its focus node and every descendant in the
-//     same scope (never across an array boundary).
+//   • substore() accepts shape nodes only; membership is checked by walking the
+//     parents (the PARENT symbol). A store addresses its focus node and every
+//     descendant in the same scope (never across an array boundary).
 //   • Scopes: RootStore and every ItemStore provide the value (and the initial
 //     value) that node lenses are resolved against. Object/array substores
 //     are views that read through their parent's scope.

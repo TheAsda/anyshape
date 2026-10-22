@@ -3,7 +3,7 @@
 import { test, describe, expect } from "vitest";
 
 import { form, object, array, field, createStore, parentOf, pathOf } from "../src/index";
-import { ID } from "../src/internal";
+import { ID, LENS } from "../src/internal";
 import { userShape } from "./support/fixtures/user";
 
 describe("Nodes", () => {
@@ -26,7 +26,7 @@ describe("Nodes", () => {
     expect(pathOf(userShape.items)).toBe("items");
   });
 
-  test("every name once reserved by the node internals is a free field name", () => {
+  test("id, lens, path, parent, _type, _hasCreate and item are free as field names", () => {
     const shape = form(
       object({
         id: field<string>(),
@@ -56,7 +56,17 @@ describe("Nodes", () => {
     expect(s.get(shape.hint)).toBe("x");
     expect(pathOf(shape)).toBe("");
     expect(pathOf(object({ id: field<string>() })), "a template is unnamed").toBe("");
-    expect(() => field<string>().meta({ id: 1, path: "", item: 1, toString: "x" })).not.toThrow();
+    const named = field<string>().meta({ id: 1, path: "", item: 1, toString: "x" });
+    const namedShape = form(object({ name: named }));
+    const namedStore = createStore(namedShape, { name: "v" });
+    expect(namedStore.get(namedShape.name.id)).toBe(1);
+    expect(namedStore.get(namedShape.name.path)).toBe("");
+    expect(namedStore.get(namedShape.name.item)).toBe(1);
+  });
+
+  test("item template lenses are item-relative", () => {
+    const shape = form(object({ items: array(object({ sku: field<string>() })) }));
+    expect(shape.items.item.sku[LENS].get({ sku: "a" })).toBe("a");
   });
 
   test("the names that stay reserved are rejected as field names", () => {
@@ -67,6 +77,10 @@ describe("Nodes", () => {
     expect(() => object({ constructor: field<string>() })).toThrow(message("constructor"));
     // @ts-expect-error – "__proto__" is reserved and rejected at compile time
     expect(() => object({ ["__proto__"]: field<string>() })).toThrow(message("__proto__"));
+    // The plain literal never creates the key: for an object value it swaps
+    // the bag's prototype, and the field would silently disappear.
+    // @ts-expect-error – "__proto__" is reserved and rejected at compile time
+    expect(() => object({ __proto__: field<string>() })).toThrow(message("__proto__"));
   });
 
   test("arrays of primitives rejected", () => {

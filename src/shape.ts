@@ -2,8 +2,10 @@
 // Shape nodes
 // ------------------------------------------------------------
 //   • identity     – id, lens, path and parent live behind symbols (see
-//                    internal.ts); pathOf(node) / parentOf(node) read them
-//   • lens         – relative to the node's scope root (form root or array item)
+//                    internal.ts), so every name a node doesn't reserve is
+//                    free for fields and meta keys; pathOf(node) and
+//                    parentOf(node) read them. A node's lens stays relative
+//                    to its scope root (form root or array item).
 //   • array()      – object shapes only; optional `create` factory for new rows
 //   • object()     – rejects the names the node itself needs (`meta`, and the
 //                    names JavaScript treats specially on every object)
@@ -14,8 +16,6 @@
 //                    form.name.error  → the `error` meta key (MetaRef)
 //                    A meta key cannot share a name with a child (an array's
 //                    item template counts as a child).
-//   • internals    – symbol-keyed (see internal.ts), so every name a node
-//                    doesn't reserve is free for fields and meta keys
 // ============================================================
 
 import { FIELDS, META_DEFS, META, CREATE, ID, LENS, PATH, PARENT, TYPE, HAS_CREATE } from "./internal.js";
@@ -55,6 +55,18 @@ type ReservedName = "meta" | "constructor" | "__proto__";
 const RESERVED: ReadonlySet<string> = new Set(["meta", "constructor", "__proto__"]);
 /** Maps an input of object()/.meta() so a reserved name can only hold `never`. */
 type NoReserved<T> = { [K in keyof T]: K extends ReservedName ? never : T[K] };
+
+/** Field and meta-key bags carry only their own keys. */
+function assertPlainBag(bag: object, message: (key: string) => string): void {
+  // A plain `{ __proto__: x }` literal never creates the key: for an object x
+  // it swaps the bag's prototype, and the name silently disappears. Accept
+  // only ordinary bags (Object.prototype); a `__proto__` own key set with
+  // defineProperty is caught by the RESERVED check, and for a primitive x
+  // JavaScript itself drops the entry, so there is nothing to see.
+  if (Object.getPrototypeOf(bag) !== Object.prototype) {
+    throw new Error(message("__proto__"));
+  }
+}
 
 /** @internal */
 interface InstantiateContext {
@@ -118,6 +130,7 @@ export abstract class ShapeNode<T = unknown> {
 
     const defs: Record<string, MetaKeyDef<any>> = { ...this[META_DEFS] };
     for (const input of inputs) {
+      assertPlainBag(input, (key) => `"${key}" is a reserved name and cannot be used as a meta key`);
       for (const [key, raw] of Object.entries(input)) {
         if (RESERVED.has(key)) {
           throw new Error(`"${key}" is a reserved name and cannot be used as a meta key`);
@@ -145,9 +158,10 @@ export abstract class ShapeNode<T = unknown> {
   }
 }
 
-/** The node's path within its scope: "" for the form root and for reusable (not instantiated) nodes. */
-export function pathOf(node: AnyNode): string {
-  return node[PATH] ?? "";
+/** The node's path within its scope: "" for the form root and for reusable (not instantiated) nodes. A reference's path labels one of its keys (`"name#error"`). */
+export function pathOf(node: AnyNode | { readonly path: string }): string {
+  if (node instanceof ShapeNode) return node[PATH] ?? "";
+  return node.path;
 }
 
 /** The instantiated parent, or undefined for the form root and for reusable (not instantiated) nodes. */
@@ -193,6 +207,7 @@ export class ObjectNode<TFields extends Record<string, AnyNode> = any> extends S
 
   private constructor(fields: TFields) {
     super();
+    assertPlainBag(fields, (key) => `"${key}" is a reserved name and cannot be used as a field name`);
     for (const key of Object.keys(fields)) {
       if (RESERVED.has(key)) {
         throw new Error(`"${key}" is a reserved name and cannot be used as a field name`);

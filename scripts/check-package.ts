@@ -197,7 +197,17 @@ try {
   const lib = join(tmp, "declarations");
   writeConsumer(lib, {
     "index.ts": `
-      import { form, object, field, array, metaKey, pathOf, type InferValue } from "anyshape";
+      import {
+        createStore,
+        form,
+        object,
+        field,
+        array,
+        metaKey,
+        pathOf,
+        type InferValue,
+        type ShapeNode,
+      } from "anyshape";
 
       const required = metaKey(false);
 
@@ -210,8 +220,13 @@ try {
         }).meta({ title: "Booking" }),
       );
 
+      export const bookingStore = createStore(booking, { destination: "", travelers: [] });
+
       export type Booking = InferValue<typeof booking>;
       export const rootPath: string = pathOf(booking);
+      export function label(node: ShapeNode<string>): string {
+        return pathOf(node);
+      }
     `,
   });
   run("npm", ["install", "--no-audit", "--no-fund", tarball], lib);

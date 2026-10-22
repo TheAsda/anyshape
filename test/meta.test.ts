@@ -5,6 +5,7 @@ import {
   object,
   array,
   field,
+  metaKey,
   MetaRef,
   ArrayNode,
   createStore,
@@ -121,6 +122,10 @@ describe("Declarations", () => {
     expect(() => field<string>().meta({ constructor: 1 })).toThrow(/reserved/);
     // @ts-expect-error – "__proto__" is reserved and rejected at compile time
     expect(() => field<string>().meta({ ["__proto__"]: 1 })).toThrow(/reserved/);
+    // The plain literal never creates the key: for an object value it swaps
+    // the bag's prototype, which the core rejects instead of dropping it.
+    // @ts-expect-error – "__proto__" is reserved and rejected at compile time
+    expect(() => field<string>().meta({ __proto__: metaKey(true) })).toThrow(/reserved/);
   });
 
   test("a meta key named `item` collides only with an array's item template", () => {

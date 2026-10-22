@@ -1,7 +1,7 @@
 // node.key: one meta key of one node.
 
-import { defOf, PATH, ID } from "../internal.js";
-import type { AnyNode } from "../shape.js";
+import { defOf, ID } from "../internal.js";
+import { pathOf, type AnyNode } from "../shape.js";
 import { KIND, type RefKind } from "./kind.js";
 
 export class MetaRef<V = unknown, P = unknown> {
@@ -22,7 +22,7 @@ export class MetaRef<V = unknown, P = unknown> {
 
   /** e.g. "shipping.city#error" */
   get path(): string {
-    return `${this.node[PATH] ?? ""}#${this.key}`;
+    return `${pathOf(this.node)}#${this.key}`;
   }
 
   /** @internal */

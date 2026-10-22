@@ -15,7 +15,7 @@
 // trip them, in this demo), in addition to the live error.
 // ============================================================
 
-import type { AnyNode, ShapeNode } from "anyshape";
+import type { ShapeNode } from "anyshape";
 import { useValue } from "anyshape/react";
 import { useId } from "react";
 
@@ -28,7 +28,7 @@ type StringNode = ControlNode & ShapeNode<string>;
 type NumberNode = ControlNode & ShapeNode<number | null | undefined>;
 type BooleanNode = ControlNode & ShapeNode<boolean>;
 /** Any value node with a number value, control or not (e.g. computed fields). */
-type NumberValueNode = AnyNode & ShapeNode<number | null | undefined>;
+type NumberValueNode = ShapeNode<number | null | undefined>;
 
 interface CommonProps {
   label: string;
