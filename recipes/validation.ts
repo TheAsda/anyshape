@@ -256,7 +256,7 @@ export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, unde
  * names the required() it came from, as a `disabled` reason does.
  */
 export const mandatory = metaKey<boolean, string>(false).combine((self, key) => ({
-  name: `${self.path || "<root>"}#mandatory`,
+  name: `${pathOf(self) || "<root>"}#mandatory`,
   writes: [key],
   run: (ctx) => ctx.set(key, ctx.parts.length > 0),
 }));

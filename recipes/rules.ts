@@ -13,7 +13,16 @@
 //       b.when([s.type], (t) => t === "company", (b) => b.add(required(s.taxId)))
 // ============================================================
 
-import { contribute, pathOf, ShapeNode, type AnyNode, type InferValue, type Ref, type CountRef, type Contribution } from "anyshape";
+import {
+  contribute,
+  pathOf,
+  ShapeNode,
+  type AnyNode,
+  type InferValue,
+  type Ref,
+  type CountRef,
+  type Contribution,
+} from "anyshape";
 
 import { rule, type RulePart, type Validatable } from "./validation";
 
