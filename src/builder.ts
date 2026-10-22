@@ -18,13 +18,19 @@
 //   • Reusable fragments are plain functions taking the builder.
 // ============================================================
 
-import { Behavior, Contribution, when as guardOf, type AnyBehavior, type Guard } from "./behaviors.js";
+import {
+  Behavior,
+  Contribution,
+  flatten,
+  when as guardOf,
+  type AnyBehavior,
+  type BehaviorList,
+  type Guard,
+} from "./behaviors.js";
 import type { ArrayNode, ObjectNode } from "./shape.js";
 import type { AnyRef, RefValue } from "./store.js";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
-type Item = AnyBehavior | readonly Item[];
-
 function asArray<T>(v: T | readonly T[] | undefined): T[] {
   return v === undefined ? [] : Array.isArray(v) ? [...(v as readonly T[])] : [v as T];
 }
@@ -36,12 +42,9 @@ export class BehaviorBuilder {
     private readonly guards: readonly Guard[],
   ) {}
 
-  /** Add behaviors and contributions (arrays, e.g. from exclusive(), are flattened). */
-  add(...items: Item[]): this {
-    for (const item of items) {
-      if (Array.isArray(item)) this.add(...(item as Item[]));
-      else this.out.push(this.wrap(item as AnyBehavior));
-    }
+  /** Add behaviors and contributions (arrays at any depth, e.g. from exclusive() or required(), are flattened). */
+  add(...items: BehaviorList[]): this {
+    for (const item of flatten(items)) this.out.push(this.wrap(item));
     return this;
   }
 

@@ -4,6 +4,8 @@
 //   Built on useField: the value, a user onChange and the node's own
 //   control() keys, read and written through the node's refs.
 //   • `pending` while a check of the field runs (pendingOf(node.error)).
+//   • `mandatory` while a required() on the field is present, e.g. for an
+//     asterisk on the label.
 //   • showError: an error is shown once the field is revealed – on blur
 //     (onBlur) or by a submit – and no check is pending.
 //   • focusRef, beside the control rather than one of its properties: the
@@ -20,6 +22,7 @@ import { registerFocus, type FocusTarget } from "../focus";
 /** A node with the control() keys. */
 export type ControlNode = AnyNode & {
   readonly error: MetaRef<string | undefined>;
+  readonly mandatory: MetaRef<boolean>;
   readonly touched: MetaRef<boolean>;
   readonly dirty: MetaRef<boolean>;
   readonly revealed: MetaRef<boolean>;
@@ -32,6 +35,8 @@ export interface ControlBinding<N extends ControlNode> {
   error: string | undefined;
   touched: boolean;
   dirty: boolean;
+  /** A required() on the field is present now. */
+  mandatory: boolean;
   /** A check of the field is running: `error` is the last completed result. */
   pending: boolean;
   /** Set on blur (onBlur) and by submit; cleared by reset. */
@@ -54,6 +59,7 @@ export function useControl<N extends ControlNode>(
 ): { control: ControlBinding<N>; focusRef: (target: FocusTarget | null) => void } {
   const { value, onChange, store } = useField(node, options);
   const error = useValue(node.error, { store });
+  const mandatory = useValue(node.mandatory, { store });
   const touched = useValue(node.touched, { store });
   const dirty = useValue(node.dirty, { store });
   const revealed = useValue(node.revealed, { store });
@@ -77,6 +83,7 @@ export function useControl<N extends ControlNode>(
     value,
     onChange,
     error,
+    mandatory,
     touched,
     dirty,
     pending,

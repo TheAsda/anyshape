@@ -165,8 +165,21 @@ export class Behavior {
   }
 }
 
-/** Anything addBehavior / createStore accept: behaviors and contributions. */
+/** A behavior or a contribution. */
 export type AnyBehavior = Behavior | Contribution<any>;
+
+/**
+ * What createStore, addBehavior, replaceBehavior and the builder's add accept:
+ * an item, or arrays of items nested to any depth (a recipe may return several).
+ */
+export type BehaviorList = AnyBehavior | readonly BehaviorList[];
+
+/** @internal The items of a list, in order. */
+export function flatten(list: BehaviorList, out: AnyBehavior[] = []): AnyBehavior[] {
+  if (Array.isArray(list)) for (const item of list as readonly BehaviorList[]) flatten(item, out);
+  else out.push(list as AnyBehavior);
+  return out;
+}
 
 export function defineBehavior(config: BehaviorConfig): Behavior {
   if (typeof config?.run !== "function") throw new Error("defineBehavior: `run` must be a function");
@@ -188,7 +201,7 @@ export interface BehaviorErrorInfo {
 }
 
 export interface StoreOptions {
-  behaviors?: AnyBehavior | readonly AnyBehavior[];
+  behaviors?: BehaviorList;
   /** Called when a behavior throws. Default: console.error. */
   onError?: (error: unknown, info: BehaviorErrorInfo) => void;
 }

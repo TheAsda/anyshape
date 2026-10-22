@@ -47,7 +47,7 @@
 //   8. Listeners are () => void; reactions get (next, prev, info).
 // ============================================================
 
-import type { AnyBehavior, Behavior, BehaviorHandle } from "./behaviors.js";
+import type { Behavior, BehaviorHandle, BehaviorList } from "./behaviors.js";
 import { FIELDS, META_DEFS, META, CREATE, metaRefOf, countSlotOf, concretePath } from "./internal.js";
 import type { Meta, MetaKeyDef } from "./meta.js";
 import type { CountRef } from "./refs/count.js";
@@ -105,8 +105,8 @@ export const MAX_BEHAVIOR_ROUNDS = 100;
 export interface RuntimeHooks {
   hasWork(): boolean;
   runNext(): void;
-  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle;
-  replace(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle;
+  add(host: BaseStore<any>, behaviors: BehaviorList): BehaviorHandle;
+  replace(previous: BehaviorHandle, behaviors: BehaviorList): BehaviorHandle;
   /** After reset(node) on `store`: re-run (as init) every instance that writes inside the reset part. */
   reinit(store: BaseStore<any>, node: AnyNode): void;
   /** The behaviors settled: the end of the flush's behavior phase. */
@@ -566,7 +566,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * they wrote reset to their defaults, the values they wrote stay (see
    * BehaviorHandle).
    */
-  addBehavior(behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+  addBehavior(behaviors: BehaviorList): BehaviorHandle {
     return this.root._runtime.add(this.scopeStore, behaviors);
   }
 
@@ -575,7 +575,7 @@ export abstract class BaseStore<N extends ContainerNode> {
    * transaction, on the store `previous` was registered on. If a check fails,
    * `previous` stays registered. Returns the new handle.
    */
-  replaceBehavior(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+  replaceBehavior(previous: BehaviorHandle, behaviors: BehaviorList): BehaviorHandle {
     return this.root._runtime.replace(previous, behaviors);
   }
 

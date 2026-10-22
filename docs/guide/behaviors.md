@@ -50,7 +50,7 @@ A behavior's config declares everything it touches:
 
 `suggestReturn` runs only on the user's edits, so loading a half-filled form from the server never fills in the return, and it never runs at creation.
 
-`defineBehaviors(shape, (b, s) => { ... })` builds the list a [store](../../GLOSSARY.md) takes. `b.add(...)` adds behaviors (arrays are flattened), `b.when(...)` adds guarded ones ([guards.md](guards.md)) and `b.each(...)` adds per-row ones ([arrays.md](arrays.md)). It returns a plain array: pass it to `createStore(shape, values, { behaviors })` or to `useForm`.
+`defineBehaviors(shape, (b, s) => { ... })` builds the list a [store](../../GLOSSARY.md) takes. `b.add(...)` adds behaviors (arrays are flattened at any depth, as they are in `createStore`, `addBehavior` and `replaceBehavior`), `b.when(...)` adds guarded ones ([guards.md](guards.md)) and `b.each(...)` adds per-row ones ([arrays.md](arrays.md)). It returns a plain array: pass it to `createStore(shape, values, { behaviors })` or to `useForm`.
 
 ## The run context
 

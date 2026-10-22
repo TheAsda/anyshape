@@ -3,12 +3,13 @@
 // adapters. The core is reached only through its entries.
 // ============================================================
 
-import { form, object, array, field, createStore, type BaseStore, type InferValue } from "anyshape";
+import { form, object, array, field, createStore, defineBehaviors, type BaseStore, type InferValue } from "anyshape";
 import { StoreProvider } from "anyshape/react";
 import { test, expect } from "vitest";
 
 import { control } from "../features";
 import { focusFirst } from "../focus";
+import { required } from "../rules";
 import { handleSubmit, submission } from "../submit";
 import { rule, asyncRule } from "../validation";
 import { useControl, fromInput, fromCheckbox } from "./index";
@@ -108,6 +109,34 @@ test("useControl: onBlur reveals, showError once revealed", async () => {
   await expect.element(state, { message: "live once revealed" }).toHaveTextContent("-|true|false");
   await settle(() => s.reset());
   await expect.element(state).toHaveTextContent("-|false|false");
+});
+
+test("useControl: mandatory follows a guarded required(), e.g. for an asterisk", async () => {
+  const s = createStore(shape, initial(), {
+    behaviors: defineBehaviors(shape, (b) => {
+      b.when(
+        [shape.agree],
+        (a) => a,
+        (b) => b.add(required(shape.name)),
+      );
+    }),
+  });
+  let c!: ReturnType<typeof useControl<typeof shape.name>>["control"];
+  function C() {
+    c = useControl(shape.name).control;
+    return <label data-testid="c">{`Name${c.mandatory ? " *" : ""}`}</label>;
+  }
+  const screen = await render(
+    <StoreProvider store={s}>
+      <C />
+    </StoreProvider>,
+  );
+  const label = screen.getByTestId("c");
+  await expect.element(label).toHaveTextContent("Name");
+  await settle(() => s.set(shape.agree, true));
+  await expect.element(label).toHaveTextContent("Name *");
+  await settle(() => s.set(shape.agree, false));
+  await expect.element(label).toHaveTextContent("Name");
 });
 
 /** An async check the test resolves: `resolve(error)`. */
