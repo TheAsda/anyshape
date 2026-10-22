@@ -64,16 +64,16 @@ Every public name, with the page that explains it. A test checks these tables ag
 
 ### `anyshape/react`
 
-| Name                                  | What it is                                                                         | Page                 |
-| ------------------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
-| `useForm`, `UseFormOptions`           | Creates a store once per mount; `values` loads data as the baseline.               | [react.md](react.md) |
-| `StoreProvider`, `StoreProviderProps` | Provides a store (the form, a substore or a row) to the hooks below it.            | [react.md](react.md) |
-| `useStore`, `HookOptions`             | The provided store; the `{ store }` option every hook takes.                       | [react.md](react.md) |
-| `useValue`, `SelectOptions`           | Reads any reference and re-renders when it changes; optionally through a selector. | [react.md](react.md) |
-| `useField`, `FieldBinding`            | A controlled input's binding: `{ value, onChange, store }`.                        | [react.md](react.md) |
-| `useArray`, `ArrayBinding`            | An array's rows and row operations.                                                | [react.md](react.md) |
-| `useSync`                             | Writes React data (props, query results) into a value or meta key.                 | [react.md](react.md) |
-| `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component.     | [react.md](react.md) |
+| Name                                  | What it is                                                                            | Page                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------- | -------------------- |
+| `useForm`, `UseFormOptions`           | Creates a store on mount (anew for a new shape); `values` loads data as the baseline. | [react.md](react.md) |
+| `StoreProvider`, `StoreProviderProps` | Provides a store (the form, a substore or a row) to the hooks below it.               | [react.md](react.md) |
+| `useStore`, `HookOptions`             | The provided store; the `{ store }` option every hook takes.                          | [react.md](react.md) |
+| `useValue`, `SelectOptions`           | Reads any reference and re-renders when it changes; optionally through a selector.    | [react.md](react.md) |
+| `useField`, `FieldBinding`            | A controlled input's binding: `{ value, onChange, store }`.                           | [react.md](react.md) |
+| `useArray`, `ArrayBinding`            | An array's rows and row operations.                                                   | [react.md](react.md) |
+| `useSync`                             | Writes React data (props, query results) into a value or meta key.                    | [react.md](react.md) |
+| `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component.        | [react.md](react.md) |
 
 ## Common mistakes
 
@@ -192,6 +192,10 @@ if (chosen !== undefined) chosen.toLowerCase();
 - writing a value of the wrong type, such as `store.set(shape.code.error, 42)`;
 - passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`;
 - importing from `anyshape/recipes`, which doesn't exist: copy the recipe into your project instead.
+
+## Hot reload
+
+Under React Fast Refresh, `useForm` takes up an edited shape or behaviors. A new shape builds a new store that keeps each value (and its baseline) whose path and kind are unchanged; meta starts over. New behaviors replace the registered ones on the same store. Put the shape and its behaviors in separate modules, so that editing a behavior loses nothing. Never create either inside a component: the form would be rebuilt on every render. Details: [react.md](react.md#hot-reload).
 
 ## Which page for which task
 

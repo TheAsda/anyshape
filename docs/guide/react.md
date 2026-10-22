@@ -80,7 +80,7 @@ export function TripForm({ saved }: { saved?: Trip }) {
 }
 ```
 
-- `useForm(shape, initialValues, options)` creates the store once per mount. Its options are `createStore`'s (`behaviors`, `onError`) plus `values`: data to load. Each new `values` object is written as the [baseline](../../GLOSSARY.md), so `reset()` returns to it; while it is `undefined` (still loading), the form shows `initialValues`. Re-rendering with the same object does nothing, so the user's edits survive. Declare the [shape](../../GLOSSARY.md) outside components.
+- `useForm(shape, initialValues, options)` creates the store on mount, and a new one only when it is given a new shape (see [Hot reload](#hot-reload)). Its options are `createStore`'s (`behaviors`, `onError`) plus `values`: data to load. Each new `values` object is written as the [baseline](../../GLOSSARY.md), so `reset()` returns to it; while it is `undefined` (still loading), the form shows `initialValues`. Re-rendering with the same object does nothing, so the user's edits survive. Declare the [shape](../../GLOSSARY.md) and the behaviors outside components.
 - `<StoreProvider store={store}>` provides a store to the hooks below it: the form, a substore, or a row's store.
 - `useStore()` returns the provided store. Every hook also takes `{ store }` to use another one.
 
@@ -232,9 +232,28 @@ function CarToast({ notify }: { notify: (message: string) => void }) {
 
 A DOM element, a component handle or any other outside reference is not form state: it can't be submitted, compared or reset. Keep it in your own registry beside the form, keyed by the store and the node. The [focus recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/focus.ts) is the pattern: `registerFocus(store, node, target)` stores a focus target in a `WeakMap` keyed by the node's [scope](../../GLOSSARY.md) store and the node, and returns the function that unregisters it. `reset()` leaves the registry alone, and the targets of removed rows are skipped by checking `store.isAttached()`.
 
+## Hot reload
+
+Under Vite or another bundler with React Fast Refresh, an edit re-runs the edited module and the modules that import it, and React keeps the state of the components it re-renders. `useForm` takes up what changed:
+
+- **An edited shape** builds a new store. Every value whose path is in both shapes, with the same kind (field, object or array), is carried over with its [baseline](../../GLOSSARY.md), rows by index, so `reset()` and dirty keep their meaning. Added fields take their value from `values ?? initialValues`; removed fields are dropped. A field whose type changed keeps its old value until it is written.
+- **Meta is not carried over.** Behaviors recompute the keys they write; keys written from outside, such as a touched flag, start from their defaults. Row components remount, since the new store's rows are new, so state that lives only in a row component is lost.
+- **Edited behaviors** replace the registered ones on the same store: values and meta stay.
+- **Behaviors kept from the previous shape** (held in component state across the edit) can't run on the new store: `useForm` throws and says to build them from the new shape.
+
+Keep the shape and its behaviors in separate modules. An edit to the behaviors then leaves the shape alone, so nothing is lost; an edit to the shape re-runs both, and the store is rebuilt as above.
+
+```text
+form.ts        shape = form(object({ ... }))
+behaviors.ts   imports shape; behaviors = defineBehaviors(shape, ...)
+Form.tsx       useForm(shape, initialValues, { behaviors })
+```
+
+Splitting the shape itself (one module per step of a wizard) doesn't help: an edit to any part re-runs the module that calls `form(...)`, which builds the whole shape again.
+
 ## Common mistakes
 
-- **Creating the shape inside a component.** `useForm` keeps the first one and warns in development; declare shapes at module level.
+- **Creating the shape or the behaviors inside a component.** `useForm` then rebuilds the store, or registers the behaviors again, on every render, and warns in development. Declare them at module level.
 - **Mirroring props with `useEffect` and `store.set`.** Use `useSync`.
 - **Reading a row's node outside its row's provider.** The hook throws and names the fix: render under a `<StoreProvider>` for that row, or pass `{ store: row }`.
 
