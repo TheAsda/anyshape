@@ -41,6 +41,12 @@ function useShownError(node: CheckedNode): string | undefined {
 
 The [recipes](../../GLOSSARY.md)' `useControl` hook makes this decision in one line, `showError`, which your copy can change: show errors once the value changed, or right away, or never while a check runs ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/react/control.ts)). The library has no error display of its own to configure.
 
+## Showing which fields are required
+
+A label's asterisk follows the requirement, including one a [guard](../../GLOSSARY.md) switches on and off. Don't restate the guard's condition in a second key: it drifts from the rule. Contribute to a combined key next to the rule instead, so the same guard switches both. The key is true while it has a contribution, like a `disabled` key fed by reasons ([contributions.md](contributions.md)).
+
+The validation recipe does this for you. `validation()` declares `mandatory`, and the `required(node)` rule also contributes to the node's `mandatory`, so `b.when([s.type], (t) => t === "company", (b) => b.add(required(s.taxId)))` sets `taxId.mandatory` only for companies. `useControl` reads it as `control.mandatory` ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts)). The `defined` backstop doesn't feed it, so a field with only `defined` says "Required" with `mandatory` false.
+
 ## Rendering hidden and disabled fields
 
 A hidden or disabled field keeps its value, and the form submits it ([guards.md](guards.md)). How it renders is up to you:

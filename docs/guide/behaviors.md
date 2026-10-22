@@ -50,7 +50,7 @@ A behavior's config declares everything it touches:
 
 `suggestReturn` runs only on the user's edits, so loading a half-filled form from the server never fills in the return, and it never runs at creation.
 
-`defineBehaviors(shape, (b, s) => { ... })` builds the list a [store](../../GLOSSARY.md) takes. `b.add(...)` adds behaviors (arrays are flattened), `b.when(...)` adds guarded ones ([guards.md](guards.md)) and `b.each(...)` adds per-row ones ([arrays.md](arrays.md)). It returns a plain array: pass it to `createStore(shape, values, { behaviors })` or to `useForm`.
+`defineBehaviors(shape, (b, s) => { ... })` builds the list a [store](../../GLOSSARY.md) takes. `b.add(...)` adds behaviors (arrays are flattened at any depth, as they are in `createStore`, `addBehavior` and `replaceBehavior`), `b.when(...)` adds guarded ones ([guards.md](guards.md)) and `b.each(...)` adds per-row ones ([arrays.md](arrays.md)). It returns a plain array: pass it to `createStore(shape, values, { behaviors })` or to `useForm`.
 
 ## The run context
 
@@ -90,6 +90,90 @@ The behavior both triggers on `nights` and writes it. Its own writes never trigg
 - **Never on its own writes**, in any of its instances.
 
 A synchronous behavior has finished by the time `store.set` returns. If it throws, the store passes the error to `onError` and drops the run's writes; the form keeps working.
+
+## Starting a key with a value known at creation
+
+A [meta key](../../GLOSSARY.md) starts at its default, and behaviors run at creation — so a key whose first value can be computed from the data is already computed when the store exists. Give it a start behavior: no triggers, just the write. It runs inside `createStore`, before anything can read the key.
+
+```ts
+import { metaKey } from "anyshape";
+
+const editor = form(object({ title: field<string>() }).meta({ mode: metaKey<"create" | "edit">("create") }));
+
+// A form created with content opens in edit mode, an empty one in create mode.
+const startMode = (start: "create" | "edit") =>
+  defineBehavior({
+    name: "startMode",
+    writes: [editor.mode],
+    run: (ctx) => ctx.set(editor.mode, start),
+  });
+
+const editorStore = createStore(editor, { title: "Hello" }, { behaviors: startMode("edit") });
+```
+
+The behavior has no triggers, so only the creation run and `reset()` run it. Declaration order doesn't matter: one that writes what another reads runs first, so a behavior that reads `mode` on its own first run sees `"edit"`, never the default.
+
+The same pattern works deep in the form. A key whose start comes from the row's own data — a "same as name" checkbox born from whether the values already match — gets a factory, and the factory is registered for the root and for every row:
+
+```ts
+import { array, type MetaRef } from "anyshape";
+
+function sameAsNameLink(name: FieldNode<string>, shortName: FieldNode<string> & { sameAsName: MetaRef<boolean> }) {
+  return defineBehavior({
+    name: `sameAsName(${pathOf(shortName)})`,
+    triggers: [name, shortName, shortName.sameAsName],
+    writes: [shortName.sameAsName, shortName],
+    run: (ctx) => {
+      // Creation and loads ({ as: "initial" }): start from the row's own data.
+      if (ctx.origins.size === 0 || ctx.origins.has("initial")) {
+        ctx.set(shortName.sameAsName, ctx.get(name) === ctx.get(shortName));
+        return;
+      }
+      // The user typed their own short name: the checkbox follows the truth.
+      if (ctx.changed(shortName) && ctx.get(name) !== ctx.get(shortName)) {
+        ctx.set(shortName.sameAsName, false);
+        return;
+      }
+      // While checked, the short name follows the name.
+      if (ctx.get(shortName.sameAsName)) ctx.set(shortName, ctx.get(name));
+    },
+  });
+}
+
+const contacts = form(
+  object({
+    name: field<string>(),
+    shortName: field<string>().meta({ sameAsName: metaKey(false) }),
+    people: array(
+      object({
+        name: field<string>(),
+        shortName: field<string>().meta({ sameAsName: metaKey(false) }),
+      }),
+      { create: () => ({ name: "", shortName: "" }) },
+    ),
+  }),
+);
+
+const contactBehaviors = defineBehaviors(contacts, (b, s) => {
+  b.add(sameAsNameLink(s.name, s.shortName));
+  b.each(s.people, (b, person) => b.add(sameAsNameLink(person.name, person.shortName)));
+});
+
+// Both checkboxes are born checked: the values they describe already match.
+const contactsStore = createStore(
+  contacts,
+  { name: "Ada", shortName: "Ada", people: [{ name: "Grace Hopper", shortName: "Grace Hopper" }] },
+  { behaviors: contactBehaviors },
+);
+```
+
+Three things to know:
+
+**The start and the rules are one behavior.** The creation branch and the copy branch live in the same `run` because the checkbox and the value it follows form a loop: while checked, the behavior writes the value; unchecked or not, it triggers on it. Split in two, each behavior would trigger on what the other writes, and the store rejects the cycle at registration. One behavior that triggers on all three and writes both targets has no cycle — its own writes never re-trigger it.
+
+**`reset()` restores the start.** Behaviors covering their targets re-run after `reset()` as if the store were just created, from the restored values — for every row that still exists. A start needs no `keepOnReset` and nothing to recompute by hand.
+
+**In React, this is not `useSync`'s job.** `useSync` writes before paint, but the creation runs happen earlier, inside `createStore` — a behavior reading a synced key at creation sees the key's default, and anything it computed from the default stays. A start the readers must see on their first run belongs in `behaviors`, exactly as above; `useSync` is for data that arrives from React ([react.md](react.md)).
 
 ## Reuse is a plain function
 

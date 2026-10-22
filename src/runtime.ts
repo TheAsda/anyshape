@@ -68,7 +68,8 @@
 import {
   Behavior,
   Contribution,
-  type AnyBehavior,
+  flatten,
+  type BehaviorList,
   type BehaviorConfig,
   type BehaviorContext,
   type BehaviorErrorInfo,
@@ -402,7 +403,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     for (const [binding, p] of batch) this.run(binding, p);
   }
 
-  add(host: BaseStore<any>, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+  add(host: BaseStore<any>, behaviors: BehaviorList): BehaviorHandle {
     return this.swap(host, undefined, behaviors);
   }
 
@@ -411,19 +412,15 @@ export class BehaviorRuntime implements RuntimeHooks {
    * if any check fails, `previous` stays registered. The UI sees only the
    * final state (no flicker of errors or meta in between).
    */
-  replace(previous: BehaviorHandle, behaviors: AnyBehavior | readonly AnyBehavior[]): BehaviorHandle {
+  replace(previous: BehaviorHandle, behaviors: BehaviorList): BehaviorHandle {
     const entry = handles.get(previous);
     if (!entry || entry.runtime !== this) throw new Error("replace(): not a handle of this store");
     if (entry.disposed) throw new Error("replace(): the handle was already disposed or replaced");
     return this.swap(entry.host, entry, behaviors);
   }
 
-  private swap(
-    host: BaseStore<any>,
-    previous: HandleEntry | undefined,
-    behaviors: AnyBehavior | readonly AnyBehavior[],
-  ): BehaviorHandle {
-    const list = (Array.isArray(behaviors) ? behaviors : [behaviors]) as readonly AnyBehavior[];
+  private swap(host: BaseStore<any>, previous: HandleEntry | undefined, behaviors: BehaviorList): BehaviorHandle {
+    const list = flatten(behaviors);
     if (!host.isAttached()) throw new Error("Cannot add behaviors to a detached row");
     const contributions = list.filter((b): b is Contribution => b instanceof Contribution);
     const plain = list.filter((b): b is Behavior => !(b instanceof Contribution));

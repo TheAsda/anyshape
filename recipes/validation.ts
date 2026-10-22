@@ -6,6 +6,12 @@
 //     queue – runs the node's rules in registration order: the sync rules
 //     until the first error, then the `defined` backstop, then, if they
 //     pass, the async rules.
+//   • `mandatory` is true while a required() on the node is present, so a
+//     guard around required() switches the rule and the key together. The
+//     `defined` backstop doesn't feed it: a field with only `defined` says
+//     "Required" with `mandatory` false. Feeding it would need a key's
+//     default behavior to return two contributions, a core change that waits
+//     for a second user (principle 8).
 //   • `defined` on a field that starts empty (`field<T | undefined>()`)
 //     contributes the backstop: "Required" while the value is undefined,
 //     whatever rules the author registered. InferChecked<N> drops undefined
@@ -244,12 +250,24 @@ type Walk<N> =
 /** What the node holds once its checks pass: its stored type, without undefined where `defined` is declared. */
 export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, undefined> : Walk<N>;
 
-/** `error`, written by the field's rules, and `forced` for validate(). */
-export const validation = () => ({ error, forced });
+/**
+ * Whether the node is required now: true while any required() on it is
+ * present (its guard holds), e.g. for an asterisk on the label. The payload
+ * names the required() it came from, as a `disabled` reason does.
+ */
+export const mandatory = metaKey<boolean, string>(false).combine((self, key) => ({
+  name: `${self.path || "<root>"}#mandatory`,
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts.length > 0),
+}));
+
+/** `error`, written by the field's rules, `forced` for validate(), and `mandatory`, fed by required(). */
+export const validation = () => ({ error, forced, mandatory });
 
 /** A node with validation(), whose value is `V`. */
 export type Validatable<V = any> = ShapeNode<V> & {
   readonly error: MetaRef<string | undefined, RulePart>;
+  readonly mandatory: MetaRef<boolean, string>;
 };
 
 export interface RuleOptions {
