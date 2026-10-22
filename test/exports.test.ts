@@ -9,7 +9,9 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import ts from "typescript";
+// The compiler JS API lives in the TypeScript 5 package; the native `typescript`
+// 7.x that compiles the workspace does not ship it yet.
+import ts from "typescript5";
 import { expect, test } from "vitest";
 
 import * as core from "../src/index";
