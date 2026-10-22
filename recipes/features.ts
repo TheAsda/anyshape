@@ -39,8 +39,10 @@ export const visible = metaKey(true);
 
 /**
  * Whether the node is disabled. A combined key: true while any contribution
- * (a reason, e.g. disableWhen, exclusive) is present. Application code may
- * still write it. Only the node's own value: a disabled group says nothing
+ * (a reason, e.g. disableWhen, exclusive) is present. Behaviors add a reason
+ * with contribute(); writing the key from a behavior is rejected at
+ * registration. Application code may still write it with store.set, as a
+ * one-off override. Only the node's own value: a disabled group says nothing
  * about the keys of the nodes inside it.
  */
 export const disabled = metaKey<boolean, string>(false).combine((self, key) => ({

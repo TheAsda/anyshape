@@ -153,6 +153,39 @@ function overlaps(a: Target, b: Target): boolean {
   return a.key !== undefined && a.node === b.node && a.key === b.key;
 }
 
+/**
+ * Why the core refuses a behavior's `writes` entry: "combined" – the key is
+ * computed from contributions by its owner behavior; "default" – the key
+ * comes with its own behavior, the only writer among behaviors;
+ * "unwritable" – the reference is not a value or a meta key.
+ */
+type WriteRefusal = "combined" | "default" | "unwritable";
+
+/**
+ * The refusal part of a "this behavior cannot write this key" error: why the
+ * key refuses behaviors, what to do instead (a `contribute()` call to adapt,
+ * its `when` built from the behavior's own triggers), that other writes can
+ * stay, and the guide that documents the mechanism.
+ */
+function writeRefusal(w: AnyRef, refusal: WriteRefusal, others: AnyRef[], triggers: readonly AnyRef[]): string {
+  const target = `"${refLabel(w)}"`;
+  const when = triggers.length ? `, when: when([${triggers.map(refLabel).join(", ")}], (…) => …)` : "";
+  const stay =
+    others.length > 0
+      ? `\nThis behavior's other writes (${others.map((o) => `"${refLabel(o)}"`).join(", ")}) can stay as they are.`
+      : "";
+  if (refusal === "combined") {
+    return `lists ${target} in \`writes\`, but that key is combined (declared with \`combine\`): its owner behavior computes the key from the contributions registered for it, so no other behavior can write it.
+Fix: remove it from \`writes\` and register a contribution instead:
+  contribute(<ref to ${target}>, <payload>, { name: "…"${when} })${stay}
+The contribution applies while \`when\` holds; the owner recomputes the key once it stops holding, so there is no "else" write to make.
+See docs/guide/contributions.md.`;
+  }
+  return `lists ${target} in \`writes\`, but that key declares its own behavior (with \`.behavior()\`): the core lets only the behavior that comes with the key write it, so no other behavior can write it.
+Fix: declare a new meta key for this behavior to write (the key's default behavior can follow it through \`.uses(...)\`), or change the key's own \`.behavior()\`.${stay}
+See docs/guide/meta-keys.md.`;
+}
+
 // ============================================================
 // Registrations, bindings, instances
 // ============================================================
@@ -800,18 +833,31 @@ export class BehaviorRuntime implements RuntimeHooks {
     }
 
     // Writes: nodes and meta keys only; a combined key only by its owner, a
-    // key with `.behavior()` only by its own default behavior.
-    const targets = writes.map((w) => {
+    // key with `.behavior()` only by its own default behavior. Each write is
+    // classified in declared order; the first refusal of any kind fails, with
+    // a message that says why the key refuses behaviors and what to do
+    // instead.
+    const classified = writes.map((w) => {
       const target = targetOf(w as AnyRef);
-      if (!target) return fail(`cannot write "${refLabel(w as AnyRef)}" – only values and meta keys are writable`);
+      if (!target) return { w, refusal: "unwritable" as const };
       if (target.def?._steps.combine && (!owner || refKey(owner.ref) !== refKey(w as AnyRef))) {
-        fail(`"${refLabel(w)}" is written only by the owner of its key – contribute() to it instead`);
+        return { w, refusal: "combined" as const };
       }
       if (target.def?._steps.behavior && (behavior._self !== target.node || behavior._key !== target.key)) {
-        fail(`"${refLabel(w)}" is written only by its key's default behavior`);
+        return { w, refusal: "default" as const };
       }
-      return target;
+      return { w, target };
     });
+    for (const { w, refusal } of classified) {
+      if (refusal) {
+        if (refusal === "unwritable") {
+          fail(`cannot write "${refLabel(w)}" – only values and meta keys are writable`);
+        }
+        const others = classified.flatMap((c) => (c.refusal || c.w === w ? [] : [c.w]));
+        fail(writeRefusal(w, refusal, others, config.triggers ?? []));
+      }
+    }
+    const targets = classified.map((c) => c.target!);
 
     // Default behaviors are limited to their own node.
     if (behavior._self) {

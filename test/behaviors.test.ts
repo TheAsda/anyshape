@@ -27,6 +27,7 @@ import {
 } from "../src/index";
 import { control, visible, disabled, touched, dirty, error } from "./support/features";
 import * as limits from "./support/fixtures/limits";
+import { messageOf } from "./support/harness";
 import { rule, max } from "./support/rules";
 
 const shape = form(
@@ -450,7 +451,9 @@ describe("Registration checks", () => {
     const setTrue = (target: any) =>
       defineBehavior({ name: "w", triggers: [shape.title], writes: [target], run: (c) => c.set(target, true) });
     expect(() => createStore(shape, initial(), { behaviors: setTrue(shape.name.touched) })).toThrow(
-      'Behavior "w": "name#touched" is written only by its key\'s default behavior',
+      `Behavior "w": lists "name#touched" in \`writes\`, but that key declares its own behavior (with \`.behavior()\`): the core lets only the behavior that comes with the key write it, so no other behavior can write it.
+Fix: declare a new meta key for this behavior to write (the key's default behavior can follow it through \`.uses(...)\`), or change the key's own \`.behavior()\`.
+See docs/guide/meta-keys.md.`,
     );
     const s = createStore(shape, initial(), { behaviors: setTrue(shape.name.revealed) });
     s.set(shape.title, "changed");
@@ -466,7 +469,7 @@ describe("Registration checks", () => {
     const sh = form(object({ f: field<string>().meta({ error, required }), g: field<string>() }));
     const w = defineBehavior({ name: "w", triggers: [sh.g], writes: [sh.f.required], run: () => {} });
     expect(() => createStore(sh, { f: "", g: "" }, { behaviors: w })).toThrow(
-      'Behavior "w": "f#required" is written only by its key\'s default behavior',
+      /lists "f#required" in `writes`, but that key declares its own behavior/,
     );
     expect(createStore(sh, { f: "", g: "" }).get(sh.f.error)).toBe("Required");
   });
@@ -477,7 +480,19 @@ describe("Registration checks", () => {
       .behavior((self, _key, [t]) => ({ triggers: [self], writes: [t], run: (ctx) => ctx.set(t, true) }));
     const sh = form(object({ f: field<string>().meta({ touched, touchedToo }) }));
     expect(() => createStore(sh, { f: "" })).toThrow(
-      'Behavior "f#touchedToo": "f#touched" is written only by its key\'s default behavior',
+      'Behavior "f#touchedToo": lists "f#touched" in `writes`, but that key declares its own behavior',
+    );
+  });
+
+  test("the default-behavior write message names the behavior's other writes", () => {
+    const w = defineBehavior({
+      name: "w2",
+      triggers: [shape.title],
+      writes: [shape.name.revealed, shape.name.touched],
+      run: () => {},
+    });
+    expect(messageOf(() => createStore(shape, initial(), { behaviors: w }))).toContain(
+      'This behavior\'s other writes ("name#revealed") can stay as they are.',
     );
   });
 

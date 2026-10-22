@@ -13,6 +13,16 @@ export function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+/** The message of the error `thunk` throws, for a test that asserts several parts of one message. */
+export function messageOf(thunk: () => unknown): string {
+  try {
+    thunk();
+  } catch (error) {
+    return (error as Error).message;
+  }
+  throw new Error("messageOf: the thunk did not throw");
+}
+
 /** The origins of each change of `ref`, as a behavior triggered by it sees them (ctx.origins). */
 export function watchOrigins(store: RootStore<any>, ref: AnyRef): Origin[][] {
   const seen: Origin[][] = [];

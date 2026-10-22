@@ -159,7 +159,7 @@ const messages = tripStore
 - **`isCounted` true for the default.** `.aggregate()` throws: untouched nodes must count as zero.
 - **Counting a key no node under the counted node declares.** `countIn` throws. Count from a node whose subtree declares the key.
 - **Writing a combined key from a behavior.** Registration rejects it; contribute to the key instead ([contributions.md](contributions.md)).
-- **Writing a key that has `.behavior()` from another behavior.** Registration rejects it: `Behavior "b": "x#dirty" is written only by its key's default behavior`. Declare another key for the other writer, or change the default behavior.
+- **Writing a key that has `.behavior()` from another behavior.** Registration rejects it: ``Behavior "b": lists "x#dirty" in `writes`, but that key declares its own behavior (with `.behavior()`) ...``. Declare another key for the other writer (the key's default behavior can follow it through `.uses(...)`), or change the default behavior.
 
 ## See also
 

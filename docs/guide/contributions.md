@@ -107,7 +107,7 @@ The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/
 
 ## Common mistakes
 
-- **Writing a combined key from a behavior.** Registration rejects it: `... is written only by the owner of its key – contribute() to it instead`.
+- **Writing a combined key from a behavior.** Registration rejects it, and the error shows the `contribute()` call to make instead: its `when` is built from the behavior's own triggers, and its other writes can stay as they are.
 - **Expecting a contribution to leave its mark when its guard fails.** It is absent, and the owner recomputes as if it never existed. That is the difference from a guarded behavior, which keeps its writes ([guards.md](guards.md)).
 - **Registering the same contribution twice for the same node.** Registration throws; a contribution is one input.
 

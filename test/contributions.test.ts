@@ -14,12 +14,13 @@ import {
   defineBehavior,
   defineBehaviors,
   metaKey,
+  initialOf,
   pathOf,
   when,
   pendingOf,
   type InferValue,
 } from "../src/index";
-import { deferred, flush } from "./support/harness";
+import { deferred, flush, messageOf } from "./support/harness";
 
 /** Every owner run: the instance's run counter (ctx.state) and the parts it saw. */
 interface Run {
@@ -152,14 +153,54 @@ describe("Registration", () => {
   });
 
   test("a combined key is written only by its owner among behaviors; application code may write it", () => {
-    const writer = defineBehavior({ triggers: [shape.mode], writes: [shape.a.tags], run: () => {} });
+    const writer = defineBehavior({ name: "tagWriter", triggers: [shape.mode], writes: [shape.a.tags], run: () => {} });
     expect(() => createStore(shape, initial(), { behaviors: writer }), "even with no owner yet").toThrow(
-      /is written only by the owner of its key/,
+      `Behavior "tagWriter": lists "a#tags" in \`writes\`, but that key is combined (declared with \`combine\`): its owner behavior computes the key from the contributions registered for it, so no other behavior can write it.
+Fix: remove it from \`writes\` and register a contribution instead:
+  contribute(<ref to "a#tags">, <payload>, { name: "…", when: when([mode], (…) => …) })
+The contribution applies while \`when\` holds; the owner recomputes the key once it stops holding, so there is no "else" write to make.
+See docs/guide/contributions.md.`,
     );
     const s = createStore(shape, initial(), { behaviors: contribute(shape.a.tags, "one") });
-    expect(() => s.addBehavior(writer)).toThrow(/is written only by the owner of its key/);
+    expect(() => s.addBehavior(writer)).toThrow(/register a contribution instead/);
     s.set(shape.a.tags, ["server"]);
     expect(s.get(shape.a.tags)).toEqual(["server"]);
+  });
+
+  test("the combined-key message builds `when` from the behavior's triggers and names its other writes", () => {
+    const writer = defineBehavior({
+      name: "two",
+      triggers: [shape.mode, shape.other],
+      writes: [shape.other, shape.b.note, shape.a.tags],
+      run: () => {},
+    });
+    const message = messageOf(() => createStore(shape, initial(), { behaviors: writer }));
+    expect(message).toContain(
+      'contribute(<ref to "a#tags">, <payload>, { name: "…", when: when([mode, other], (…) => …) })',
+    );
+    expect(message).toContain('This behavior\'s other writes ("other", "b#note") can stay as they are.');
+  });
+
+  test("with no triggers, the suggested contribution has no `when`", () => {
+    const writer = defineBehavior({ name: "silent", writes: [shape.a.tags], run: () => {} });
+    expect(messageOf(() => createStore(shape, initial(), { behaviors: writer }))).toContain(
+      'contribute(<ref to "a#tags">, <payload>, { name: "…" })',
+    );
+  });
+
+  test("the first refused write in declared order is the one reported", () => {
+    const twoKeys = defineBehavior({ name: "firstOf", writes: [shape.a.tags, R.x.tags], run: () => {} });
+    expect(messageOf(() => createStore(shape, initial(), { behaviors: twoKeys }))).toContain(
+      'Behavior "firstOf": lists "a#tags" in `writes`, but that key is combined',
+    );
+    const withUnwritable = defineBehavior({
+      name: "firstOf",
+      writes: [shape.a.tags, initialOf(shape.mode) as never],
+      run: () => {},
+    });
+    expect(messageOf(() => createStore(shape, initial(), { behaviors: withUnwritable }))).toContain(
+      'lists "a#tags" in `writes`, but that key is combined',
+    );
   });
 });
 
