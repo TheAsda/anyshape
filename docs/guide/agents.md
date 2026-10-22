@@ -192,6 +192,10 @@ if (chosen !== undefined) chosen.toLowerCase();
 - passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`;
 - importing from `anyshape/recipes`, which doesn't exist: copy the recipe into your project instead.
 
+## Hot reload
+
+Under React Fast Refresh, `useForm` takes up an edited shape or behaviors. A new shape builds a new store that keeps each value (and its baseline) whose path and kind are unchanged; meta starts over. New behaviors replace the registered ones on the same store. Put the shape and its behaviors in separate modules, so that editing a behavior loses nothing. Never create either inside a component: the form would be rebuilt on every render. Details: [react.md](react.md#hot-reload).
+
 ## Which page for which task
 
 | Task                                                                    | Read                                                                                                                                 |

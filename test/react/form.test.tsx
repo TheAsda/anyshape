@@ -1,5 +1,5 @@
 import { useState, StrictMode } from "react";
-import { test, expect } from "vitest";
+import { describe, test, expect } from "vitest";
 
 import {
   form,
@@ -60,16 +60,9 @@ test("useForm creates the store once; later initialValues are ignored", async ()
   await expect.element(screen.getByTestId("name")).toHaveTextContent("n0");
 });
 
-test("useForm passes behaviors and warns when the shape changes", async () => {
-  const other = form(object({ name: field<string>().meta(control()) }).meta(submission()));
-  const { warnings, restore } = captureWarnings();
-  let useOther!: (b: boolean) => void;
+test("useForm passes behaviors", async () => {
   function App() {
-    const [flip, set] = useState(false);
-    useOther = set;
-    const f = useForm((flip ? other : shape) as typeof shape, empty(), {
-      behaviors: rule(shape.name, (v) => (v ? undefined : "Required")),
-    });
+    const f = useForm(shape, empty(), { behaviors: rule(shape.name, (v) => (v ? undefined : "Required")) });
     return (
       <StoreProvider store={f}>
         <Err />
@@ -81,9 +74,176 @@ test("useForm passes behaviors and warns when the shape changes", async () => {
   }
   const screen = await render(<App />);
   await expect.element(screen.getByTestId("err")).toHaveTextContent("Required");
-  await settle(() => useOther(true));
-  restore();
-  expect(warnings.some((w) => /shape` changed/.test(w))).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// useForm: hot reload. An edit under Fast Refresh re-runs the module that
+// declares the shape or the behaviors, so the next render passes new objects
+// built from the same (or an edited) definition, and React keeps useForm's state.
+describe("hot reload", () => {
+  const before = form(
+    object({
+      one: object({ a: field<string>().meta(control()) }),
+      rows: array(object({ q: field<number>().meta(control()) })),
+      kind: field<string>().meta(control()),
+      pair: field<{ x: string }>().meta(control()),
+      list: field<{ y: number }[]>().meta(control()),
+      gone: field<string>().meta(control()),
+    }),
+  );
+  const after = form(
+    object({
+      one: object({ a: field<string>().meta(control()) }),
+      rows: array(object({ q: field<number>().meta(control()), added: field<string>().meta(control()) })),
+      kind: object({ x: field<string>().meta(control()) }),
+      pair: object({ x: field<string>().meta(control()) }),
+      list: array(object({ y: field<number>().meta(control()) })),
+      added: field<string>().meta(control()),
+    }),
+  );
+  type After = InferValue<typeof after>;
+  const initialBefore = {
+    one: { a: "" },
+    rows: [{ q: 1 }, { q: 2 }],
+    kind: "k",
+    pair: { x: "old" },
+    list: [{ y: 1 }, { y: 2 }],
+    gone: "g",
+  };
+  const initialAfter = (): After => ({
+    one: { a: "" },
+    rows: [
+      { q: 1, added: "r0" },
+      { q: 2, added: "r1" },
+    ],
+    kind: { x: "x" },
+    pair: { x: "init" },
+    list: [{ y: 9 }],
+    added: "new",
+  });
+
+  test("a new shape keeps each value whose path and kind are still there, with its baseline", async () => {
+    let live = before as unknown as typeof after;
+    let f!: RootStore<typeof after>;
+    let reload!: () => void;
+    function App() {
+      const [, set] = useState(0);
+      reload = () => {
+        live = after;
+        set(1);
+      };
+      f = useForm(live, live === after ? initialAfter() : (initialBefore as unknown as After));
+      return (
+        <StoreProvider store={f}>
+          <Shown />
+        </StoreProvider>
+      );
+    }
+    function Shown() {
+      return <span data-testid="a">{useValue(live.one.a)}</span>;
+    }
+    const screen = await render(<App />);
+    const old = f as unknown as RootStore<typeof before>;
+    await settle(() => old.set(before.one.a, "typed", { origin: "user" }));
+    await settle(() => old.substore(before.rows).itemAt(0).set(before.rows.item.q, 5, { origin: "user" }));
+
+    await settle(() => reload());
+    await expect
+      .element(screen.getByTestId("a"), { message: "nodes of the new shape resolve" })
+      .toHaveTextContent("typed");
+    expect(f.node).toBe(after);
+    expect(f.get(after)).toEqual({
+      one: { a: "typed" },
+      rows: [
+        { q: 5, added: "r0" },
+        { q: 2, added: "r1" },
+      ],
+      kind: { x: "x" },
+      pair: { x: "init" },
+      list: [{ y: 9 }],
+      added: "new",
+    });
+    expect(f.get(after.one.a.dirty), "the baseline came along").toBe(true);
+    expect(f.get(after.added.dirty)).toBe(false);
+    expect(f.get(after.rows)[1], "an unedited row still is its baseline row").toBe(f.get(initialOf(after.rows))[1]);
+
+    await settle(() => f.reset());
+    expect(f.get(after)).toEqual(initialAfter());
+  });
+
+  test("new behaviors replace the registered ones and keep the values", async () => {
+    const v1 = rule(shape.name, (v) => (v === "ok" ? undefined : "Required"));
+    const v2 = rule(shape.name, (v) => (v === "ok" ? undefined : "Needed"));
+    let live = v1;
+    let f!: RootStore<typeof shape>;
+    let reload!: () => void;
+    function App() {
+      const [, set] = useState(0);
+      reload = () => {
+        live = v2;
+        set(1);
+      };
+      f = useForm(shape, empty(), { behaviors: live });
+      return (
+        <StoreProvider store={f}>
+          <Err />
+        </StoreProvider>
+      );
+    }
+    function Err() {
+      return <span data-testid="err">{useValue(shape.name.error) ?? "-"}</span>;
+    }
+    const screen = await render(<App />);
+    await settle(() => f.set(shape.code, "kept", { origin: "user" }));
+    const store = f;
+    await settle(() => reload());
+    await expect.element(screen.getByTestId("err")).toHaveTextContent("Needed");
+    expect(f, "the same store").toBe(store);
+    expect(f.get(shape.code)).toBe("kept");
+  });
+
+  test("a single new shape or behaviors does not warn", async () => {
+    const { warnings, restore } = captureWarnings();
+    let live = before as unknown as typeof after;
+    let behaviors = rule(before.one.a, () => undefined);
+    let reload!: () => void;
+    let rerender!: () => void;
+    function App() {
+      const [n, set] = useState(0);
+      reload = () => {
+        live = after;
+        behaviors = rule(after.one.a, () => undefined);
+        set(1);
+      };
+      rerender = () => set(n + 1);
+      const f = useForm(live, live === after ? initialAfter() : (initialBefore as unknown as After), { behaviors });
+      return <StoreProvider store={f}>{null}</StoreProvider>;
+    }
+    await render(<App />);
+    await settle(() => reload());
+    await settle(() => rerender());
+    restore();
+    expect(warnings).toEqual([]);
+  });
+
+  test("a shape or behaviors created in the component warns", async () => {
+    const { warnings, restore } = captureWarnings();
+    let rerender!: () => void;
+    function App() {
+      const [n, set] = useState(0);
+      rerender = () => set(n + 1);
+      const inline = form(object({ name: field<string>().meta(control()) }));
+      const f = useForm(inline, { name: "Ann" }, { behaviors: rule(inline.name, () => undefined) });
+      return <span data-testid="name">{f.get(inline.name)}</span>;
+    }
+    const screen = await render(<App />);
+    await settle(() => rerender());
+    await settle(() => rerender());
+    restore();
+    await expect.element(screen.getByTestId("name")).toHaveTextContent("Ann");
+    expect(warnings.filter((w) => /`shape` is a new object on every render/.test(w))).toHaveLength(1);
+    expect(warnings.filter((w) => /`behaviors` is a new object on every render/.test(w))).toHaveLength(1);
+  });
 });
 
 test("values: loading data becomes the baseline; same object keeps edits; a new object reloads", async () => {
