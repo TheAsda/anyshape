@@ -121,7 +121,18 @@ describe("Rules", () => {
     expect(s.get(shape.taxId.mandatory)).toBe(false);
   });
 
-  test("other rules don't mark a node mandatory", () => {
+  test("required() goes into a list as one item: b.add and createStore flatten it", () => {
+    const listed = createStore(shape, initial(), { behaviors: [required(shape.taxId), required(shape.personalId)] });
+    const added = createStore(shape, initial(), {
+      behaviors: defineBehaviors(shape, (b) => b.add([required(shape.taxId), required(shape.personalId)])),
+    });
+    for (const s of [listed, added]) {
+      expect(s.get(shape.taxId.error)).toBe("Required");
+      expect(s.get(shape.personalId.mandatory)).toBe(true);
+    }
+  });
+
+  test("other rules leave `mandatory` false", () => {
     const s = createStore(shape, initial(), { behaviors: [minLength(shape.name, 3), email(shape.email)] });
     expect(s.get(shape.name.mandatory)).toBe(false);
     expect(s.get(shape.email.mandatory)).toBe(false);

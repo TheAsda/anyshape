@@ -656,6 +656,12 @@ describe("Rows", () => {
   });
 });
 
+/**
+ * Two contributions in one array, as a recipe returning several returns them,
+ * so a list of them is itself an item of a list.
+ */
+const pair = (a: string, b: string) => [contribute(shape.a.tags, a), contribute(shape.a.tags, b)] as const;
+
 describe("Builder", () => {
   test("when adds its guard to contributions; nested guards accumulate", () => {
     const s = createStore(shape, initial(), {
@@ -687,7 +693,6 @@ describe("Builder", () => {
   });
 
   test("add flattens arrays at any depth, in order", () => {
-    const pair = (a: string, b: string) => [contribute(shape.a.tags, a), contribute(shape.a.tags, b)] as const;
     const s = createStore(shape, initial(), {
       behaviors: defineBehaviors(shape, (b) => {
         b.add([pair("1", "2"), pair("3", "4")]);
@@ -699,10 +704,6 @@ describe("Builder", () => {
 });
 
 describe("Nested lists", () => {
-  // A recipe may return several contributions (required() returns its rule
-  // and its mark), so a list of them is itself an item of a list.
-  const pair = (a: string, b: string) => [contribute(shape.a.tags, a), contribute(shape.a.tags, b)] as const;
-
   test("createStore's behaviors flatten arrays at any depth, in order", () => {
     const s = createStore(shape, initial(), { behaviors: [pair("1", "2"), [[pair("3", "4")]]] });
     expect(s.get(shape.a.tags)).toEqual(["1", "2", "3", "4"]);

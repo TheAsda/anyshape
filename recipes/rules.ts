@@ -5,11 +5,11 @@
 // needs (a validated node, with a string, array or number value), so using
 // it on another node is a compile error.
 //   • Format rules pass on empty values – combine them with required.
-//   • required() is a rule and a mark: it also contributes to the node's
-//     `mandatory`, so the UI can show which fields are required now. It
-//     returns both; add it with b.add, or put it in createStore's behaviors.
+//   • required() also contributes to the node's `mandatory`, so the UI can
+//     show which fields are required now. It returns both contributions; add
+//     it with b.add, or put it in createStore's behaviors.
 //   • required() always applies. A switchable requirement is a guard, which
-//     applies to the rule and the mark:
+//     applies to both contributions:
 //       b.when([s.type], (t) => t === "company", (b) => b.add(required(s.taxId)))
 // ============================================================
 
@@ -50,7 +50,7 @@ export function labelOf(node: AnyNode): string {
   return path.slice(path.lastIndexOf(".") + 1).replace(/\[\]$/, "") || "<root>";
 }
 
-/** The rule, and the node's `mandatory` mark while the rule is present; both under the same name. */
+/** The rule, and a contribution to the node's `mandatory`; both under the same name. */
 export function required<N extends Validatable>(
   node: N,
   options: RuleRecipeOptions<InferValue<N>> = {},
