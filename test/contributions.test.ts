@@ -685,6 +685,38 @@ describe("Builder", () => {
     s.set(shape.other, "x");
     expect(s.get(shape.a.tags), "nested guards accumulate").toEqual(["both", "mode"]);
   });
+
+  test("add flattens arrays at any depth, in order", () => {
+    const pair = (a: string, b: string) => [contribute(shape.a.tags, a), contribute(shape.a.tags, b)] as const;
+    const s = createStore(shape, initial(), {
+      behaviors: defineBehaviors(shape, (b) => {
+        b.add([pair("1", "2"), pair("3", "4")]);
+        b.add(pair("5", "6"), [[pair("7", "8")]]);
+      }),
+    });
+    expect(s.get(shape.a.tags)).toEqual(["1", "2", "3", "4", "5", "6", "7", "8"]);
+  });
+});
+
+describe("Nested lists", () => {
+  // A recipe may return several contributions (required() returns its rule
+  // and its mark), so a list of them is itself an item of a list.
+  const pair = (a: string, b: string) => [contribute(shape.a.tags, a), contribute(shape.a.tags, b)] as const;
+
+  test("createStore's behaviors flatten arrays at any depth, in order", () => {
+    const s = createStore(shape, initial(), { behaviors: [pair("1", "2"), [[pair("3", "4")]]] });
+    expect(s.get(shape.a.tags)).toEqual(["1", "2", "3", "4"]);
+  });
+
+  test("addBehavior and replaceBehavior flatten arrays; the handle removes all of them", () => {
+    const s = createStore(shape, initial());
+    const handle = s.addBehavior([pair("1", "2"), [pair("3", "4")]]);
+    expect(s.get(shape.a.tags)).toEqual(["1", "2", "3", "4"]);
+    const next = s.replaceBehavior(handle, [[pair("5", "6")]]);
+    expect(s.get(shape.a.tags)).toEqual(["5", "6"]);
+    next();
+    expect(s.get(shape.a.tags)).toEqual([]);
+  });
 });
 
 describe("In-flight runs", () => {
