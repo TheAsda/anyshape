@@ -194,19 +194,20 @@ if (chosen !== undefined) chosen.toLowerCase();
 
 ## Which page for which task
 
-| Task                                                                    | Read                                                                                                                                 |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Declare a form, its fields and rows                                     | [shape.md](shape.md), [arrays.md](arrays.md)                                                                                         |
-| Read, write, load, reset or watch values                                | [store.md](store.md)                                                                                                                 |
-| Add a meta key beside a value (such as `error`, `visible` or `touched`) | [meta-keys.md](meta-keys.md)                                                                                                         |
-| Compute a field from others, or keep two fields consistent              | [behaviors.md](behaviors.md)                                                                                                         |
-| Add validation                                                          | the [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts), [contributions.md](contributions.md) |
-| Apply a rule only under a condition, or show a section conditionally    | [guards.md](guards.md)                                                                                                               |
-| Rows, with rules per row                                                | [arrays.md](arrays.md)                                                                                                               |
-| Several reasons for one key (disabled, error)                           | [contributions.md](contributions.md)                                                                                                 |
-| A server check, debouncing, a "checking…" state                         | [async.md](async.md)                                                                                                                 |
-| Bind inputs and components                                              | [react.md](react.md)                                                                                                                 |
-| When an error shows, server errors, parsing, submitting                 | [your-side.md](your-side.md)                                                                                                         |
-| Write your own reusable key and helpers                                 | [writing-a-recipe.md](writing-a-recipe.md)                                                                                           |
+| Task                                                                     | Read                                                                                                                                 |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Declare a form, its fields and rows                                      | [shape.md](shape.md), [arrays.md](arrays.md)                                                                                         |
+| Read, write, load, reset or watch values                                 | [store.md](store.md)                                                                                                                 |
+| Add a meta key beside a value (such as `error`, `visible` or `touched`)  | [meta-keys.md](meta-keys.md)                                                                                                         |
+| Compute a field from others, or keep two fields consistent               | [behaviors.md](behaviors.md)                                                                                                         |
+| Start a key (at the root or in every row) with a value known at creation | [behaviors.md](behaviors.md)                                                                                                         |
+| Add validation                                                           | the [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts), [contributions.md](contributions.md) |
+| Apply a rule only under a condition, or show a section conditionally     | [guards.md](guards.md)                                                                                                               |
+| Rows, with rules per row                                                 | [arrays.md](arrays.md)                                                                                                               |
+| Several reasons for one key (disabled, error)                            | [contributions.md](contributions.md)                                                                                                 |
+| A server check, debouncing, a "checking…" state                          | [async.md](async.md)                                                                                                                 |
+| Bind inputs and components                                               | [react.md](react.md)                                                                                                                 |
+| When an error shows, server errors, parsing, submitting                  | [your-side.md](your-side.md)                                                                                                         |
+| Write your own reusable key and helpers                                  | [writing-a-recipe.md](writing-a-recipe.md)                                                                                           |
 
 Words used across the docs are defined in the [glossary](../../GLOSSARY.md).

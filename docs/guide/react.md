@@ -190,7 +190,7 @@ function DestinationOptions({ available }: { available: string[] }) {
 }
 ```
 
-`useSync(ref, value)` writes `value` (origin `"program"`) before paint whenever it changes. Declare a key fed this way with `keepOnReset`, or `reset()` clears it until the synced value changes again. A `useEffect` that calls `store.set` does the same job later, after paint; use `useSync`.
+`useSync(ref, value)` writes `value` (origin `"program"`) before paint whenever it changes. Declare a key fed this way with `keepOnReset`, or `reset()` clears it until the synced value changes again. A `useEffect` that calls `store.set` does the same job later, after paint; use `useSync`. One thing it cannot do is put a value in place before the behaviors' creation runs: those run inside `createStore`, before any component renders, so a reader's first run sees the key's default. When the first value is known at creation, give the key a start behavior instead ([behaviors.md](behaviors.md)).
 
 **`useBehaviors` only for logic that comes from the component.** When a rule depends on a prop, the component declares it:
 

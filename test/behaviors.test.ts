@@ -7,6 +7,7 @@ import {
   field,
   createStore,
   defineBehavior,
+  defineBehaviors,
   when,
   initialOf,
   countIn,
@@ -15,6 +16,8 @@ import {
   metaKey,
   contribute,
   type InferValue,
+  type MetaRef,
+  type FieldNode,
   type BehaviorErrorInfo,
   type StoreOptions,
   type Origin,
@@ -1387,5 +1390,188 @@ describe("Atomic replacement", () => {
     expect(b.get(L.qty.error)).toBe(undefined);
     b.set(L.qty, 50);
     expect(b.get(L.qty.error), "row b never had the rule").toBe(undefined);
+  });
+});
+
+describe("Starting a key with a value known at creation", () => {
+  const doc = form(object({ title: field<string>() }).meta({ mode: metaKey<"create" | "edit">("create") }));
+
+  const startMode = (start: "create" | "edit") =>
+    defineBehavior({
+      name: "startMode",
+      writes: [doc.mode],
+      run: (ctx) => ctx.set(doc.mode, start),
+    });
+
+  test("a reader's first run sees the start, whichever order they are declared in", () => {
+    for (const readerFirst of [true, false]) {
+      const seen: ("create" | "edit")[] = [];
+      const reader = defineBehavior({
+        name: "reader",
+        triggers: [doc.title],
+        reads: [doc.mode],
+        run: (ctx) => void seen.push(ctx.get(doc.mode)),
+      });
+      const behaviors = readerFirst ? [reader, startMode("edit")] : [startMode("edit"), reader];
+      const s = createStore(doc, { title: "Hello" }, { behaviors });
+      expect(s.get(doc.mode)).toBe("edit");
+      expect(seen, readerFirst ? "reader declared first" : "start declared first").toEqual(["edit"]);
+      s.set(doc.title, "Changed", { origin: "user" });
+      expect(seen, "later runs see it too").toEqual(["edit", "edit"]);
+    }
+  });
+
+  test("reset returns the key to its start and re-runs the start behavior", () => {
+    let starts = 0;
+    const start = defineBehavior({
+      name: "startMode",
+      writes: [doc.mode],
+      run: (ctx) => (starts++, ctx.set(doc.mode, "edit")),
+    });
+    const s = createStore(doc, { title: "Hello" }, { behaviors: start });
+    expect(starts, "runs once at creation").toBe(1);
+    s.set(doc.mode, "create");
+    expect(s.get(doc.mode)).toBe("create");
+    s.reset();
+    expect(s.get(doc.mode), "back to the start, not the default").toBe("edit");
+    expect(starts).toBe(2);
+  });
+
+  // A deep key: "same as name" starts as the truth about the row's own data,
+  // and while checked the short name follows the name.
+  const contacts = form(
+    object({
+      name: field<string>(),
+      shortName: field<string>().meta({ sameAsName: metaKey(false) }),
+      people: array(
+        object({
+          name: field<string>(),
+          shortName: field<string>().meta({ sameAsName: metaKey(false) }),
+        }),
+        { create: () => ({ name: "", shortName: "" }) },
+      ),
+    }),
+  );
+  const P = contacts.people.item;
+
+  const sameAsNameLink = (name: FieldNode<string>, shortName: FieldNode<string> & { sameAsName: MetaRef<boolean> }) =>
+    defineBehavior({
+      name: `sameAsName(${shortName.path})`,
+      triggers: [name, shortName, shortName.sameAsName],
+      writes: [shortName.sameAsName, shortName],
+      run: (ctx) => {
+        if (ctx.origins.size === 0 || ctx.origins.has("initial")) {
+          ctx.set(shortName.sameAsName, ctx.get(name) === ctx.get(shortName));
+          return;
+        }
+        if (ctx.changed(shortName) && ctx.get(name) !== ctx.get(shortName)) {
+          ctx.set(shortName.sameAsName, false);
+          return;
+        }
+        if (ctx.get(shortName.sameAsName)) ctx.set(shortName, ctx.get(name));
+      },
+    });
+
+  const contactBehaviors = defineBehaviors(contacts, (b, s) => {
+    b.add(sameAsNameLink(s.name, s.shortName));
+    b.each(s.people, (b, person) => b.add(sameAsNameLink(person.name, person.shortName)));
+  });
+
+  const contactsValues = (): InferValue<typeof contacts> => ({
+    name: "Ada",
+    shortName: "Ada",
+    people: [{ name: "Grace Hopper", shortName: "Grace Hopper" }],
+  });
+
+  test("each key starts from its own data at creation", () => {
+    const s = createStore(
+      contacts,
+      {
+        name: "Ada",
+        shortName: "Ada",
+        people: [
+          { name: "Grace Hopper", shortName: "Grace" },
+          { name: "Edsger Dijkstra", shortName: "Edsger Dijkstra" },
+        ],
+      },
+      { behaviors: contactBehaviors },
+    );
+    expect(s.get(contacts.shortName.sameAsName)).toBe(true);
+    const [a, b] = s.substore(contacts.people).items();
+    expect(a.get(P.shortName.sameAsName), "row data disagrees").toBe(false);
+    expect(b.get(P.shortName.sameAsName), "row data agrees").toBe(true);
+  });
+
+  test("a load with { as: 'initial' } recomputes the start", () => {
+    const s = createStore(contacts, contactsValues(), { behaviors: contactBehaviors });
+    const row = s.substore(contacts.people).itemAt(0);
+    row.set(P.shortName, "G", { origin: "user" });
+    expect(row.get(P.shortName.sameAsName)).toBe(false);
+    // A new baseline on the same row is an "initial" origin: the start is recomputed.
+    row.set(P.shortName, "Grace Hopper", { as: "initial" });
+    expect(row.get(P.shortName.sameAsName)).toBe(true);
+    // A root load replaces rows: the new rows start from their own data.
+    s.set(
+      contacts,
+      { name: "Ada", shortName: "Ada", people: [{ name: "Edsger Dijkstra", shortName: "Edsger" }] },
+      { as: "initial" },
+    );
+    expect(s.substore(contacts.people).itemAt(0).get(P.shortName.sameAsName)).toBe(false);
+  });
+
+  test("an appended row starts from its own values", () => {
+    const s = createStore(contacts, contactsValues(), { behaviors: contactBehaviors });
+    const row = s.substore(contacts.people).append({ name: "Barbara Liskov", shortName: "Barbara" });
+    expect(row.get(P.shortName.sameAsName)).toBe(false);
+  });
+
+  test("reset restores each key to its start, recomputed from the baseline", () => {
+    const s = createStore(contacts, contactsValues(), { behaviors: contactBehaviors });
+    const row = s.substore(contacts.people).itemAt(0);
+    row.set(P.shortName, "G", { origin: "user" });
+    s.set(contacts.shortName, "Ad", { origin: "user" });
+    expect(row.get(P.shortName.sameAsName)).toBe(false);
+    expect(s.get(contacts.shortName.sameAsName)).toBe(false);
+    s.reset();
+    expect(row.get(P.shortName)).toBe("Grace Hopper");
+    expect(row.get(P.shortName.sameAsName)).toBe(true);
+    expect(s.get(contacts.shortName)).toBe("Ada");
+    expect(s.get(contacts.shortName.sameAsName)).toBe(true);
+  });
+
+  test("checking copies the name, typing a different short name unchecks", () => {
+    const s = createStore(contacts, contactsValues(), { behaviors: contactBehaviors });
+    const row = s.substore(contacts.people).itemAt(0);
+    expect(row.get(P.shortName.sameAsName), "starts from the row's data").toBe(true);
+    row.set(P.name, "Grace Brewster Hopper", { origin: "user" });
+    expect(row.get(P.shortName), "checked: the short name follows").toBe("Grace Brewster Hopper");
+    expect(row.get(P.shortName.sameAsName)).toBe(true);
+    row.set(P.shortName, "GH", { origin: "user" });
+    expect(row.get(P.shortName.sameAsName), "the user's own short name unchecks it").toBe(false);
+    row.set(P.name, "Grace Hopper", { origin: "user" });
+    expect(row.get(P.shortName), "unchecked: the name is no longer copied").toBe("GH");
+    expect(row.get(P.shortName.sameAsName)).toBe(false);
+    row.set(P.shortName.sameAsName, true, { origin: "user" });
+    expect(row.get(P.shortName), "checking copies again").toBe("Grace Hopper");
+  });
+
+  test("splitting the start and the copy into two behaviors forms a cycle", () => {
+    const s = createStore(contacts, contactsValues());
+    const start = defineBehavior({
+      name: "startSameAsName",
+      triggers: [contacts.shortName],
+      writes: [contacts.shortName.sameAsName],
+      run: (ctx) => ctx.set(contacts.shortName.sameAsName, ctx.get(contacts.name) === ctx.get(contacts.shortName)),
+    });
+    const copy = defineBehavior({
+      name: "copyName",
+      triggers: [contacts.shortName.sameAsName],
+      reads: [contacts.name],
+      writes: [contacts.shortName],
+      run: (ctx) => {
+        if (ctx.get(contacts.shortName.sameAsName)) ctx.set(contacts.shortName, ctx.get(contacts.name));
+      },
+    });
+    expect(() => s.addBehavior([start, copy])).toThrow(/cycle: "startSameAsName", "copyName"/);
   });
 });

@@ -10,6 +10,7 @@ import {
   countIn,
   initialOf,
   createStore,
+  defineBehavior,
   type InferValue,
   type RootStore,
 } from "../../src/index";
@@ -282,4 +283,57 @@ test("caveat: a new values object with identical data replaces the user's edits"
   await settle(() => setData({ ...empty(), name: "Loaded" }));
   expect(f.get(shape.name)).toBe("Loaded");
   expect(f.get(shape.name.dirty)).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// A key whose start is known at creation: the first render shows it
+// (docs/guide/behaviors.md, "Starting a key with a value known at creation").
+test("the first render shows the start the behaviors wrote", async () => {
+  const doc = form(object({ title: field<string>() }).meta({ mode: metaKey<"create" | "edit">("create") }));
+  const startMode = defineBehavior({
+    name: "startMode",
+    writes: [doc.mode],
+    run: (ctx) => ctx.set(doc.mode, "edit"),
+  });
+  function Mode() {
+    return <span data-testid="mode">{useValue(doc.mode)}</span>;
+  }
+  function App() {
+    const f = useForm(doc, { title: "Hello" }, { behaviors: startMode });
+    return (
+      <StoreProvider store={f}>
+        <Mode />
+      </StoreProvider>
+    );
+  }
+  const screen = await render(<App />);
+  await expect.element(screen.getByTestId("mode")).toHaveTextContent("edit");
+});
+
+test("a behavior's first run sees a useSync key's default, not the synced value", async () => {
+  const doc = form(object({ title: field<string>() }).meta({ limit: metaKey(0, { keepOnReset: true }) }));
+  const seen: number[] = [];
+  const watch = defineBehavior({
+    name: "watch",
+    triggers: [doc.title],
+    reads: [doc.limit],
+    run: (ctx) => {
+      seen.push(ctx.get(doc.limit));
+    },
+  });
+  function App() {
+    const f = useForm(doc, { title: "" }, { behaviors: watch });
+    return (
+      <StoreProvider store={f}>
+        <Sync />
+      </StoreProvider>
+    );
+  }
+  function Sync() {
+    useSync(doc.limit, 5);
+    return <span data-testid="limit">{useValue(doc.limit)}</span>;
+  }
+  const screen = await render(<App />);
+  await expect.element(screen.getByTestId("limit")).toHaveTextContent("5");
+  expect(seen, "the creation run saw the default").toEqual([0]);
 });
