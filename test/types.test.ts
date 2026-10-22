@@ -31,9 +31,10 @@ import {
   type NoPayload,
   type Countable,
   type Owned,
+  type CombinedKey,
 } from "../src/index";
 import * as core from "../src/index";
-import { control, visible, disabled, submission, error } from "./support/features";
+import { control, visible, disabled, submission, error, type Check } from "./support/features";
 import { rule } from "./support/rules";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -113,6 +114,8 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   s.set(t.text.nope, 1);
   // @ts-expect-error – refs come from nodes (t.text.error) or collect, never constructed
   void new MetaRef(t.text, "error");
+  // Application code may write a combined key: store.set takes it.
+  s.set(t.text.error, "required");
   // @ts-expect-error – counts are read-only
   s.set(countIn(t, error), 1);
   // @ts-expect-error – countIn takes only a key declared with .aggregate()
@@ -249,7 +252,7 @@ const counted = metaKey(false).aggregate((v) => v);
 const owned = metaKey(false).behavior(noop);
 const combined = metaKey(0).combine(() => ({ run() {} }));
 type _o1 = Expect<Equal<typeof owned, MetaKeyDef<boolean, NoPayload, []> & Owned>>;
-type _o2 = Expect<Equal<typeof combined, MetaKeyDef<number, NoPayload, []> & Owned>>;
+type _o2 = Expect<Equal<typeof combined, MetaKeyDef<number, NoPayload, []> & Owned & CombinedKey>>;
 const chained = metaKey(false)
   .aggregate((v) => v)
   .uses(countKey, labelKey)
@@ -262,6 +265,30 @@ type _o3 = Expect<
 >;
 // A marked definition still fits where MetaKeyDef<V> is expected.
 const asPlain: MetaKeyDef<boolean> = chained;
+
+// ---------------------------------------------------------------------------
+// Combined keys: a behavior's `writes` and ctx.set reject the key's ref
+// (the compiler names the fix); the owner's config inside .combine() and
+// store.set still take it. The owner cases compile above: writes: [k] (line
+// ~176), the mixed writes: [key, force] (~190) and ctx.set(key) (~160).
+type _o5 = Expect<Equal<typeof t.text.error, MetaRef<string | undefined, Check> & CombinedKey>>;
+defineBehavior({
+  name: "w",
+  triggers: [t.text],
+  // @ts-expect-error – a combined key is written only by its owner: contribute() to it
+  writes: [t.text.error],
+  run: () => {},
+});
+// Also in a mixed array: the plain ref passes, the combined one does not.
+// @ts-expect-error – a combined key is written only by its owner, also in a mixed array
+defineBehavior({ name: "w", triggers: [t.text], writes: [t.text.hint, t.text.error], run: () => {} });
+metaKey(false).behavior(() => ({
+  triggers: [t.text],
+  run: (ctx) => {
+    // @ts-expect-error – a combined key is written only by its owner: contribute() to it
+    ctx.set(t.text.error, "nope");
+  },
+}));
 
 export function stepOrderChecks() {
   // @ts-expect-error – .aggregate() is declared once

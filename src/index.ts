@@ -37,6 +37,7 @@ export {
   type MergeMetaRefs,
   type Countable,
   type Owned,
+  type CombinedKey,
 } from "./meta.js";
 
 // References

@@ -152,7 +152,12 @@ describe("Registration", () => {
   });
 
   test("a combined key is written only by its owner among behaviors; application code may write it", () => {
-    const writer = defineBehavior({ triggers: [shape.mode], writes: [shape.a.tags], run: () => {} });
+    const writer = defineBehavior({
+      triggers: [shape.mode],
+      // @ts-expect-error – the prototype (#147) makes listing a combined key a compile error; the throw below stays for untyped callers
+      writes: [shape.a.tags],
+      run: () => {},
+    });
     expect(() => createStore(shape, initial(), { behaviors: writer }), "even with no owner yet").toThrow(
       /is written only by the owner of its key/,
     );

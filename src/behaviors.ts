@@ -12,12 +12,22 @@
 // ============================================================
 
 import { isDev } from "./internal.js";
+import type { CombinedKeyWritable } from "./meta.js";
 import { MetaRef } from "./refs/meta.js";
 import type { AnyNode, InferValue } from "./shape.js";
 import type { AnyRef, RefValue, Origin } from "./store.js";
 
 export type OriginKind = "user" | "program" | "initial" | "behavior";
-export type WritableRef = AnyNode | MetaRef<any>;
+/** Anything store.set and the owner of a combined key may write: nodes and every meta reference. */
+export type AnyWritableRef = AnyNode | MetaRef<any>;
+/**
+ * What a behavior's `writes` and ctx.set take: `AnyWritableRef` without a
+ * combined key's reference. A combined key is written only by its owner –
+ * the compiler rejects it with the marker's message; contribute() to it
+ * instead. The owner config inside `combine` writes its own key: its writes
+ * and ctx.set take `AnyWritableRef`.
+ */
+export type WritableRef = AnyNode | (MetaRef<any> & CombinedKeyWritable);
 
 // ============================================================
 // Definitions
@@ -111,10 +121,14 @@ export interface Part<P = unknown> {
 export interface OwnerContext<P> extends BehaviorContext {
   /** The contributions that apply to this instance and whose guards pass, in registration order. */
   readonly parts: readonly Part<P>[];
+  /** The owner writes its own key: ctx.set accepts what a behavior's writes forbid. */
+  set<R extends AnyWritableRef>(ref: R, value: InferValue<R>): void;
 }
 
 /** What `combine` returns: the owner behavior of a combined key. */
-export interface OwnerConfig<P> extends Omit<BehaviorConfig, "run"> {
+export interface OwnerConfig<P> extends Omit<BehaviorConfig, "run" | "writes"> {
+  /** The owner's `writes` take its own key, the one writer a combined key has. */
+  writes?: readonly AnyWritableRef[];
   run(ctx: OwnerContext<P>): void | Promise<void>;
 }
 

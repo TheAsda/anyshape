@@ -29,6 +29,7 @@ type AnyMetaKeyDef = MetaKeyDef<any, any, any>;
 
 declare const CountableBrand: unique symbol;
 declare const OwnedBrand: unique symbol;
+declare const CombinedBrand: unique symbol;
 /** Marks a definition .aggregate() made countable: countIn takes only such a key. */
 export interface Countable {
   readonly [CountableBrand]: true;
@@ -37,14 +38,38 @@ export interface Countable {
 export interface Owned {
   readonly [OwnedBrand]: true;
 }
+/**
+ * Marks a definition .combine() made the key of an owner: the key is written
+ * only by that owner, so a behavior's `writes` and ctx.set reject its ref
+ * (the compiler shows the brand's value, which names the fix). The owner
+ * config inside .combine() and store.set still take the ref.
+ */
+export interface CombinedKey {
+  readonly [CombinedBrand]: "combined key: use contribute()";
+}
+/**
+ * The type side of CombinedKey that a behavior's `writes` and ctx.set check a
+ * reference against: a combined key's ref carries the brand, any other
+ * reference has no such property.
+ * @internal
+ */
+export interface CombinedKeyWritable {
+  readonly [CombinedBrand]?: undefined;
+}
 /** The markers `S` carries, for a step that changes the rest of its type. */
-type Markers<S> = (S extends Countable ? Countable : unknown) & (S extends Owned ? Owned : unknown);
+type Markers<S> = (S extends Countable ? Countable : unknown) &
+  (S extends Owned ? Owned : unknown) &
+  (S extends CombinedKey ? CombinedKey : unknown);
 /** Fails a step's `this` check with `Message` when the receiver already carries marker `M`. */
 type Not<S, M, Message extends string> = S extends M ? { readonly error: Message } : unknown;
 
 /** The node's refs to the keys a definition uses, in the order of .uses(). */
 export type UsedRefs<U extends readonly AnyMetaKeyDef[]> = {
-  readonly [K in keyof U]: U[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : never;
+  readonly [K in keyof U]: U[K] extends MetaKeyDef<infer V, infer P, any>
+    ? U[K] extends CombinedKey
+      ? MetaRef<V, P> & CombinedKey
+      : MetaRef<V, P>
+    : never;
 };
 
 /**
@@ -146,13 +171,18 @@ export class MetaKeyDef<V = unknown, P = unknown, U extends readonly AnyMetaKeyD
    * instance, configured by `combine` and fed by contribute(ref, payload)
    * declarations, which its run reads as ctx.parts. Called once per node and
    * key, like `behavior`; `key` is the node's ref under the name it declares
-   * the key with. Mutually exclusive with `behavior`.
+   * the key with. Mutually exclusive with `behavior`. The refs .meta() keeps
+   * carry the CombinedKey marker: only this owner's writes and ctx.set take
+   * them.
    */
   combine<S extends MetaKeyDef<V, P, U>>(
     this: S & Not<S, Owned, "`combine` and `behavior` are mutually exclusive">,
     factory: (self: ShapeNode<unknown>, key: MetaRef<V, P>, uses: UsedRefs<U>) => OwnerConfig<P>,
-  ): S & Owned {
-    return new MetaKeyDef<V, P, U>(this.defaultValue, this.options, { ...this._steps, combine: factory }) as S & Owned;
+  ): S & Owned & CombinedKey {
+    return new MetaKeyDef<V, P, U>(this.defaultValue, this.options, {
+      ...this._steps,
+      combine: factory,
+    }) as S & Owned & CombinedKey;
   }
 }
 
@@ -165,7 +195,11 @@ export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOpti
 // Type mapping: declarations → meta references
 // ============================================================
 type RefsOf<T> = {
-  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;
+  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P, any>
+    ? T[K] extends CombinedKey
+      ? MetaRef<V, P> & CombinedKey
+      : MetaRef<V, P>
+    : MetaRef<T[K], NoPayload>;
 };
 
 /** Meta references declared by all inputs of one .meta(a, b, c) call, typed with their payloads. */

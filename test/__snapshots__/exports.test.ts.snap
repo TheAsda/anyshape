@@ -39,6 +39,7 @@ exports[`the core entry's public names 1`] = `
     "BehaviorErrorInfo",
     "BehaviorHandle",
     "CollectEntry",
+    "CombinedKey",
     "ContainerNode",
     "Contribution",
     "Countable",

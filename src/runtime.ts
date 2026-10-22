@@ -69,6 +69,7 @@ import {
   Behavior,
   Contribution,
   flatten,
+  type AnyWritableRef,
   type BehaviorList,
   type BehaviorConfig,
   type BehaviorContext,
@@ -80,7 +81,6 @@ import {
   type OwnerConfig,
   type OwnerContext,
   type Part,
-  type WritableRef,
 } from "./behaviors.js";
 import {
   refNode,
@@ -179,7 +179,7 @@ export interface Registration {
   inputs: AnyRef[];
   /** refKeys of `inputs`. */
   inputKeys: Set<string>;
-  writes: WritableRef[];
+  writes: AnyWritableRef[];
   /** What each write changes, in the order of `writes`. */
   targets: Target[];
   guards: Guard[];
@@ -1102,7 +1102,7 @@ export class BehaviorRuntime implements RuntimeHooks {
     const reg = leaf.reg;
     const info = (): BehaviorErrorInfo => ({ behavior: reg.name, scope: concretePath(leaf.host, leaf.host.node) });
 
-    const buffer = new Map<string, { ref: WritableRef; value: unknown }>();
+    const buffer = new Map<string, { ref: AnyWritableRef; value: unknown }>();
     const state = { ...leaf.state }; // saved only if the run completes
     const controller = new AbortController();
     const signal = controller.signal;
