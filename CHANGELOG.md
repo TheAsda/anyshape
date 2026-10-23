@@ -1,5 +1,49 @@
 # anyshape
 
+## 0.3.0
+
+### Minor Changes
+
+- 71ae5f1: **Breaking:** a node's identity is no longer exposed as properties. `node.path`, `node.parent`, `node.id`, `node.lens`, `node._type` and `node._hasCreate` are gone, and so are the names they reserved: nearly every name is now free for a field or a meta key. `pathOf(node)` and `parentOf(node)` take their place, in the style of `initialOf` / `pendingOf`; there is no `idOf` or `lensOf`, because nothing outside the core needs them, and the public `FieldId` type goes with `node.id` for the same reason. `pathOf` also accepts a reference and labels the key it points at (`pathOf(node.error)` is `"name#error"`).
+
+  ```ts
+  // before
+  object({ id: field<string>() }); // threw: "id" is a reserved name
+  rule(node, ...); // took AnyNode & { readonly _type: V; readonly error: ... }
+  `${node.path}#${key}`; // messages and behavior names
+
+  // after
+  object({ id: field<string>() }); // a field named "id" is fine
+  rule(node, ...); // takes ShapeNode<V> & { readonly error: ... }
+  `${pathOf(node)}#${key}`;
+  ```
+
+  A node that requires a value type is now `ShapeNode<V>` instead of `AnyNode & { readonly _type: V }`, and an array with a `create` factory is `ArrayNode<Item, true>` – internally the markers are `declare`d unique symbols, so nothing exists at run time.
+
+  Only `meta`, `constructor` and `__proto__` stay reserved: `meta` is the declaration method, and the other two break the node if a field takes their name. All three are rejected for field names and meta keys at compile time, with the run-time check kept as a backstop. A meta key named `item` collides only with an array's item template, through the child/key rule; on fields and objects it is a normal key.
+
+### Patch Changes
+
+- da116e3: The registration error for a behavior that writes a key it may not write now says why the key refuses behaviors and what to do instead, instead of `… is written only by …`. For a combined key (`combine`), the message shows the `contribute()` call to register, with a `when` built from the behavior's own triggers, and says that no "else" write is needed: the contribution applies while `when` holds, and the owner recomputes the key once it stops. For a key declared with `.behavior()`, the message points to declaring another key (which the key's default behavior can follow through `.uses(...)`) or changing the key's own behavior. When the behavior has other writes, the message says those can stay as they are.
+
+  ```ts
+  const shape = form(object({ mode: field<string>(), a: field<string>().meta({ tags }) }));
+
+  createStore(shape, initial, {
+    behaviors: [defineBehavior({ triggers: [shape.mode], writes: [shape.a.tags], run() {} })],
+  });
+  // Error: Behavior "b1": lists "a#tags" in `writes`, but that key is combined
+  // (declared with `combine`): its owner behavior computes the key from the
+  // contributions registered for it, so no other behavior can write it.
+  // Fix: remove it from `writes` and register a contribution instead:
+  //   contribute(<ref to "a#tags">, <payload>, { name: "…", when: when([mode], (…) => …) })
+  // The contribution applies while `when` holds; the owner recomputes the key
+  // once it stops holding, so there is no "else" write to make.
+  // See docs/guide/contributions.md.
+  ```
+
+- 7cfefb8: `useForm` survives a hot reload. A new `shape` (an edited shape module under React Fast Refresh) used to leave the store on the old shape, so the next hook threw `"…" is not part of this form`. Now it builds a new store that keeps every value and baseline whose path and kind are unchanged. A new `behaviors` object replaces the registered behaviors on the same store. A shape or behaviors created inside a component, a new object on every render, gets a dev warning.
+
 ## 0.2.1
 
 ### Patch Changes
