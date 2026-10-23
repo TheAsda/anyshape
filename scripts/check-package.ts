@@ -25,7 +25,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import ts from "typescript";
+// The compiler JS API lives in the TypeScript 5 package; the native `typescript`
+// 7.x that compiles the workspace does not ship it yet.
+import ts from "typescript5";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const bin = (name: string) => join(root, "node_modules", ".bin", name);
