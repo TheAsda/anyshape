@@ -37,12 +37,12 @@ One item of an array in a live store: its own scope, with its own values, meta a
 _Avoid_: array element
 
 **Meta key**:
-A named piece of state a node declares beside its value (such as `error`, `visible` or `touched`), with a default. The core gives no meta key a meaning.
+A named piece of state a node declares beside its value (such as `error`, `visible` or `edited`), with a default. The core gives no meta key a meaning.
 _Avoid_: flag, attribute, status
 
-**Feature**:
-A reusable bundle of meta key definitions declared together.
-_Avoid_: plugin, mixin
+**Meta group**:
+A set of meta keys declared together on a node by calling one function inside `.meta()`, each under its usual name: `control()` declares the keys an input needs, `defined()` just one.
+_Avoid_: feature, bundle, trait, plugin, mixin
 
 **Behavior**:
 A declared rule that runs when one of its triggers changes, reads only the references it lists, and writes its targets. Each target has exactly one behavior writing it.
