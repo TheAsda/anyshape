@@ -38,9 +38,9 @@ A change to any policy on this page is a breaking change of the package, release
 
 ## `edited` means the user changed the value
 
-**What the default recipes do.** A field's `edited` key turns true on the first write with the `"user"` origin, the binding's `onChange` among them, and stays true. A write from code, a load and a submit don't set it. Many form libraries call a similar flag "touched" and set it on blur; here, blur sets `revealed` instead.
+**What the default recipes do.** A field's `edited` key turns true on the first write with the `"user"` origin, the binding's `onChange` among them, and stays true. A write from code, a load and a submit don't set it. Many form libraries call a similar key "touched" and set it on blur; here, blur sets `revealed` instead.
 
-**The main alternative.** Set the flag on blur, or by a submit, as such libraries do.
+**The main alternative.** Set the key on blur, or by a submit, as such libraries do.
 
 **Why.** "The user changed this" and "the error may show now" are different facts, and one key for both would decide for you that they always coincide.
 

@@ -237,7 +237,7 @@ A DOM element, a component handle or any other outside reference is not form sta
 Under Vite or another bundler with React Fast Refresh, an edit re-runs the edited module and the modules that import it, and React keeps the state of the components it re-renders. `useForm` takes up what changed:
 
 - **An edited shape** builds a new store. Every value whose path is in both shapes, with the same kind (field, object or array), is carried over with its [baseline](../../GLOSSARY.md), rows by index, so `reset()` and dirty keep their meaning. Added fields take their value from `values ?? initialValues`; removed fields are dropped. A field whose type changed keeps its old value until it is written.
-- **Meta is not carried over.** Behaviors recompute the keys they write; keys written from outside, such as a `revealed` flag set on blur, start from their defaults. Row components remount, since the new store's rows are new, so state that lives only in a row component is lost.
+- **Meta is not carried over.** Behaviors recompute the keys they write; keys written from outside, such as `revealed`, set on blur, start from their defaults. Row components remount, since the new store's rows are new, so state that lives only in a row component is lost.
 - **Edited behaviors** replace the registered ones on the same store: values and meta stay.
 - **Behaviors kept from the previous shape** (held in component state across the edit) can't run on the new store: `useForm` throws and says to build them from the new shape.
 
