@@ -168,12 +168,12 @@
           {
             "patterns": [
               {
-                "group": ["anyshape/**", "!anyshape/react"],
-                "message": "An example imports the core entries `anyshape` and `anyshape/react`, and the recipes, not a core module."
+                "group": ["anyshape/**", "!anyshape/react", "!anyshape/recipes", "!anyshape/recipes/react"],
+                "message": "An example imports the package's entries (`anyshape`, `anyshape/react`, `anyshape/recipes`, `anyshape/recipes/react`), or a copy of the recipes, not a core module."
               },
               {
                 "regex": "(^|/)src(/|$)",
-                "message": "An example imports the core entries `anyshape` and `anyshape/react`, and the recipes, not a core module."
+                "message": "An example imports the package's entries (`anyshape`, `anyshape/react`, `anyshape/recipes`, `anyshape/recipes/react`), or a copy of the recipes, not a core module."
               }
             ]
           }

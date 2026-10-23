@@ -1,14 +1,14 @@
 // A form with limits kept across reset (minCode, maxQty), a `disabled` flag,
-// nested rows and submission(). Used by reset, submit, limit and replacement tests.
+// nested rows and submitting(). Used by reset, submit, limit and replacement tests.
 import { form, object, array, field, metaKey, type InferValue } from "anyshape";
 
-import { control, submission, disabled } from "../../index";
+import { control, submitting, disabled } from "../../index";
 
 export const shape = form(
   object({
     name: field<string>().meta(control(), { note: "" }),
     code: field<string>().meta(control(), { minCode: metaKey<number | undefined>(undefined, { keepOnReset: true }) }),
-    flag: field<boolean>().meta({ disabled }),
+    flag: field<boolean>().meta(disabled()),
     lines: array(
       object({
         qty: field<number>().meta(control(), {
@@ -18,7 +18,7 @@ export const shape = form(
         notes: array(object({ text: field<string>().meta(control()) })),
       }),
     ),
-  }).meta(submission()),
+  }).meta(submitting()),
 );
 export type Values = InferValue<typeof shape>;
 export const L = shape.lines.item;

@@ -4,7 +4,8 @@
 // An entry in .meta() is either
 //   • a plain value – a key with a default, free for one user behavior, or
 //   • a key definition (metaKey) – a default plus optional capabilities.
-// Features are plain objects of key definitions (see recipes/features.ts).
+// A meta group is a function returning a plain object of key definitions
+// (see recipes/control.ts).
 // ============================================================
 
 import type { BehaviorConfig, Contribution, OwnerConfig } from "./behaviors.js";

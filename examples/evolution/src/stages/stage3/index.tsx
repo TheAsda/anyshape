@@ -3,14 +3,16 @@
 // Validation is behaviors: defined next to the shape, added
 // per field, and run by the store. handleSubmit(form, fn) only
 // fires when every rule passes; a failing submit reveals all
-// errors and focuses the first one.
+// errors and focuses the first one. The recipes are this
+// example's copy (src/recipes/), edited to show an error from the
+// first keystroke rather than after a blur.
 // ------------------------------------------------------------
 
 import { form, object, field, type InferValue, defineBehaviors } from "anyshape";
 import { StoreProvider, useForm } from "anyshape/react";
 import { useState } from "react";
 
-import { control, submission, handleSubmit, required, minLength } from "../../../../../recipes";
+import { control, submitting, handleSubmit, required, minLength } from "../../recipes";
 import { TextField, ResultCard, SubmitButton } from "../../ui";
 
 const shape = form(
@@ -19,7 +21,7 @@ const shape = form(
     startDate: field<string>().meta(control()),
     endDate: field<string>().meta(control()),
     notes: field<string>().meta(control()),
-  }).meta(submission()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {

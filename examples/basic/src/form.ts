@@ -1,5 +1,5 @@
 // ============================================================
-// The form definition: shape (fields + features) and behaviors
+// The form definition: shape (fields + meta groups) and behaviors
 // (validation rules and reactive logic), plus the fake backend
 // the demo talks to. Imported by the React components below –
 // the library itself is framework-agnostic.
@@ -17,10 +17,9 @@ import {
   type InferValue,
   type FieldNode,
 } from "anyshape";
-
 import {
   control,
-  submission,
+  submitting,
   visible,
   rule,
   asyncRule,
@@ -33,7 +32,7 @@ import {
   visibleWhen,
   clearWhen,
   isEmpty,
-} from "../../../recipes";
+} from "anyshape/recipes";
 
 // A per-field "lookup in flight" tag. metaKey (not a plain value)
 // so the key is countable: countIn(shape, lookingUp) counts every
@@ -43,15 +42,17 @@ export const lookingUp = metaKey<string | undefined>(undefined).aggregate((v) =>
 // ------------------------------------------------------------
 // Shape
 // ------------------------------------------------------------
-// control()    = validation + touched + dirty + a focus target:
-//                everything an input needs.
-// { visible }  = adds `visible` to the group itself; its fields
+// control()    = validation() + edited + dirty + revealed: the keys
+//                an input needs. `edited` means the user changed
+//                the value; `revealed` (blur or submit) decides
+//                when the error shows.
+// visible()    = adds `visible` to the group itself; its fields
 //                don't carry it. Hidden groups are still validated:
 //                their rules are guarded on it (b.when below).
-// submission() = adds `submitting`: the node can be submitted with
+// submitting() = adds `submitting`: the node can be submitted with
 //                handleSubmit(store, fn).
 //
-// The wizard steps are sibling objects that each declare submission();
+// The wizard steps are sibling objects that each declare submitting();
 // the App shows one at a time and Continue submits that step's store.
 // Steps are not hidden when another step shows: the final submit
 // still checks (and the server still rejects) step-1 fields. The
@@ -68,7 +69,7 @@ export const shape = form(
       department: field<string>().meta(control(), { lookingUp }),
       /** Remaining budget of the department – filled by the app-side lookup. */
       budget: field<number | undefined>(),
-    }).meta(submission()),
+    }).meta(submitting()),
     order: object({
       items: array(
         object({
@@ -95,7 +96,7 @@ export const shape = form(
       tax: field<number | undefined>(),
       /** Carries control() because the budget rule targets it. */
       total: field<number | undefined>().meta(control()),
-    }).meta(submission()),
+    }).meta(submitting()),
     logistics: object({
       orderedOn: field<string>().meta(control()),
       neededBy: field<string>().meta(control()),
@@ -105,14 +106,14 @@ export const shape = form(
         street: field<string>().meta(control()),
         city: field<string>().meta(control()),
         zip: field<string>().meta(control()),
-      }).meta({ visible }),
+      }).meta(visible()),
       /** Only total order values above €10,000 need an approval. */
       approval: object({
         approver: field<string>().meta(control()),
         justification: field<string>().meta(control()),
-      }).meta({ visible }),
-    }).meta(submission()),
-  }).meta(submission()),
+      }).meta(visible()),
+    }).meta(submitting()),
+  }).meta(submitting()),
 );
 
 export type Values = InferValue<typeof shape>;

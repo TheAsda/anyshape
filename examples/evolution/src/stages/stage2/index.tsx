@@ -1,7 +1,8 @@
 // ------------------------------------------------------------
 // Stage 2 — Control.
 // The same fields, now with .meta(control()): validation state,
-// touched/dirty tracking and a focus target. This is the
+// edited/dirty tracking and `revealed`, set on blur. useControl
+// adds a focus target. This is the
 // plumbing every input needs; rules arrive in stage 3.
 // ------------------------------------------------------------
 
@@ -9,7 +10,7 @@ import { form, object, field, type InferValue } from "anyshape";
 import { StoreProvider, useForm, useValue } from "anyshape/react";
 import { useState } from "react";
 
-import { control } from "../../../../../recipes";
+import { control } from "../../recipes";
 import { TextField, ResultCard, SubmitButton } from "../../ui";
 
 const shape = form(

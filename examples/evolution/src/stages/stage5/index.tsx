@@ -12,7 +12,7 @@ import { useState } from "react";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -20,7 +20,7 @@ import {
   calculate,
   visibleWhen,
   clearWhen,
-} from "../../../../../recipes";
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -38,8 +38,8 @@ const shape = form(
     car: object({
       license: field<string>().meta(control()),
       licenseExpiry: field<string>().meta(control()),
-    }).meta({ visible }),
-  }).meta(submission()),
+    }).meta(visible()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {

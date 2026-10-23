@@ -5,7 +5,7 @@ export const meta: StageMeta = {
   title: "Disabled",
   story: "The employer pays — so the nightly budget stays on screen, but locked.",
   bullets: [
-    "{ disabled } adds a `disabled` key to a field",
+    "disabled() adds a `disabled` key to a field",
     "disableWhen(node, [sources], fn) drives it exactly like visibleWhen",
     "Same contract as hidden: nothing implicit — rules that should pause are guarded on it, and the value is still submitted",
     "The value stays in the store — the estimated budget keeps computing from the locked rate",

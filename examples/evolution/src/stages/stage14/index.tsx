@@ -1,11 +1,11 @@
 // ------------------------------------------------------------
 // Stage 14 — Steps.
 // The booking splits in two: the trip, then the extras. Each
-// step is a section with submission(), so its Next button is
+// step is a section with submitting(), so its Next button is
 // handleSubmit(form.substore(step), fn): it reveals and
 // validates that step only. The room type has no sensible
 // default, so it STARTS EMPTY and its type says so:
-// RoomType | undefined. { defined } makes it required, and
+// RoomType | undefined. defined() makes it required, and
 // Next's fn gets the CHECKED type: roomType is a RoomType there.
 // ------------------------------------------------------------
 
@@ -29,7 +29,7 @@ import { flushSync } from "react-dom";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -39,10 +39,10 @@ import {
   clearWhen,
   rule,
   asyncRule,
-  error,
+  errorKey,
   defined,
   focusFirst,
-} from "../../../../../recipes";
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, SelectField, ReadonlyRow, ResultCard } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -81,11 +81,11 @@ const shape = form(
       destination: field<string>().meta(control()),
       startDate: field<string>().meta(control()),
       endDate: field<string>().meta(control()),
-      // Starts empty: nobody has chosen yet. { defined } requires a choice.
-      roomType: field<RoomType | undefined>().meta(control(), { defined }),
+      // Starts empty: nobody has chosen yet. defined() requires a choice.
+      roomType: field<RoomType | undefined>().meta(control(), defined()),
       nightlyRate: field<number | undefined>().meta(control()),
       nights: field<number | undefined>(),
-    }).meta(submission()),
+    }).meta(submitting()),
     // Step 2: the extras.
     extras: object({
       rentingCar: field<boolean>().meta(control()),
@@ -94,7 +94,7 @@ const shape = form(
         licenseExpiry: field<string>().meta(control()),
         pickupOn: field<string>().meta(control()),
         dropoffOn: field<string>().meta(control()),
-      }).meta({ visible }),
+      }).meta(visible()),
       travelers: array(
         object({
           name: field<string>().meta(control()),
@@ -105,8 +105,8 @@ const shape = form(
       notes: field<string>().meta(control()),
       // Computed from the travelers too, so it lives with them on step 2.
       estimatedBudget: field<number | undefined>(),
-    }).meta(submission()),
-  }).meta(submission()),
+    }).meta(submitting()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {
@@ -267,8 +267,8 @@ function Travelers() {
 
 /** Stage 13's status, counted over one section: the step, or the whole form. */
 function StepSubmit({ section, label }: { section: AnyNode; label: string }) {
-  const checking = useValue(pendingIn(section, error));
-  const errors = useValue(countIn(section, error));
+  const checking = useValue(pendingIn(section, errorKey));
+  const errors = useValue(countIn(section, errorKey));
   return (
     <div className="smart-submit">
       {errors > 0 && (
@@ -306,7 +306,7 @@ export function Stage() {
         // path to the field, then find its error key by definition.
         for (const [path, message] of Object.entries(e.fieldErrors)) {
           const t = form.resolvePath(path);
-          const target = t && t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref);
+          const target = t && t.store.collect(t.ref, errorKey).find((e) => e.ref.node === t.ref);
           if (target) target.store.set(target.ref, message);
         }
       }
@@ -318,7 +318,7 @@ export function Stage() {
   const book = async (event: FormEvent) => {
     event.preventDefault();
     await submitAll();
-    const tripErrors = form.collect(shape.trip, error).filter((e) => e.store.get(e.ref) !== undefined);
+    const tripErrors = form.collect(shape.trip, errorKey).filter((e) => e.store.get(e.ref) !== undefined);
     if (tripErrors.length === 0) return;
     flushSync(() => setStep(1));
     focusFirst(tripErrors);

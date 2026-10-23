@@ -46,9 +46,11 @@ Rules, behaviors and recipe helpers take what they work on as arguments (`rule(n
 
 ## Core and recipes
 
+The core is mechanism; recipes give its keys a meaning. The package ships one set of recipes, the default recipes, which you import as they are or copy to change.
+
 ### 6. The core is mechanism and names no meta key
 
-The core holds only what every form needs. It never names a meta key or decides what one means, not even `error`. Validation, submit, focus, `touched`, `dirty` and `disabled` are recipes.
+The core holds only what every form needs. It never names a meta key or decides what one means, not even `error`. Validation, submit, focus, `edited`, `dirty` and `disabled` are recipes.
 
 **Why:** one team's validation, submit or disabled policy must not be baked in for everyone else.
 
@@ -56,7 +58,7 @@ Argued in [#18], [#20], [#26], [#50]. See [ADR 0001][adr-0001].
 
 ### 7. Recipes build only on the public entries; the core never imports a recipe
 
-Recipes, the React recipes and the examples import only `anyshape` and `anyshape/react`. The core, its tests included, imports nothing from `recipes/`. The lint's boundary rules (`.oxlintrc.json`) enforce both directions. Test fixtures that both sides need are copied across the boundary on purpose, and those copies stay.
+Recipes, the React recipes included, import only `anyshape` and `anyshape/react`, and the rest of their own set by a relative path. The examples import the package's entries, the recipe entries among them, or a copy of the recipes. The core, its tests included, imports nothing from `recipes/`. The lint's boundary rules (`.oxlintrc.json`) enforce both directions. Test fixtures that both sides need are copied across the boundary on purpose, and those copies stay.
 
 **Why:** a copied recipe has to work against the published package unchanged. A core test that leans on a recipe hides a capability the core is missing.
 
@@ -74,21 +76,23 @@ Argued in [#14], [#21], [#23], [#24], [#37].
 
 ### 9. A recipe has no policy options: a team edits its copy
 
-A shipped recipe hard-codes one sensible policy. It has no `on…` callbacks, no option bags and no type parameters for variants. A team that wants another policy changes its copy of the file. Per-call data, such as an async rule's debounce, is not policy and stays.
+A shipped recipe hard-codes one sensible policy. It has no `on…` callbacks, no option bags and no type parameters for variants. A team that wants another policy changes its copy of the set. Per-call data, such as an async rule's debounce, is not policy and stays.
 
-**Why:** recipes are copied, not depended on. An option only multiplies the code paths that every copy carries.
+**Why:** a team that needs another policy copies the set and edits it (principle 10). An option would only multiply the code paths that every copy carries, and every user of the default recipes would pay for the policies they don't use.
 
 **Not in anyshape:** `onInvalid`, `validateHidden`, option bags.
 
 Argued in [#12], [#19], [#21], [#24], [#26].
 
-### 10. Recipes don't ship in the package
+### 10. The default recipes ship in the package; copying is for customizing
 
-The package holds `anyshape` and `anyshape/react`. Recipes are copied from `recipes/` at a release tag.
+The package holds the default recipes as two entries, `anyshape/recipes` and `anyshape/recipes/react`, beside the core's, with their `.ts` sources and a file listing their policies (`recipes/POLICIES.md`). A form imports them as they are, or a team copies the whole set into its project and edits the copy. A change to a default policy is a breaking change of the package. See [ADR 0006][adr-0006].
 
-**Why:** they are code you own. A published recipe entry would invite you to depend on it, and then a fix to your copy would mean forking the package. Every recipe imports only the public entries, so a copy works as it is.
+**Why:** trying the library on one form shouldn't start with a thousand lines of copied code, and a team that never changes a recipe shouldn't have to own one. A team that does change one owns its copy, which starts from the installed version because the sources ship with it. Keys are matched by definition, so a form uses one set: moving to a copy changes import paths, not call sites, and can't be done one recipe at a time.
 
-Argued in [#4], [#18].
+**Not in anyshape:** a one-call setup such as `basicForm(shape)`, options on the default recipes, copying part of the set.
+
+Argued in [#4], [#18], [#130], [#162].
 
 ### 11. You own presentation and I/O
 
@@ -125,7 +129,7 @@ Argued in [#13], [#25], [#27], [#45], [PR #47][#47], [PR #55][#55].
 
 Every write runs the behaviors it affects, whatever its origin. A behavior that should ignore some writes filters them by origin.
 
-**Why:** a write that skipped behaviors would leave derived values stale. The same rule is what lets `touched` and `dirty` be ordinary behaviors: `touched` simply listens to `"user"` writes only.
+**Why:** a write that skipped behaviors would leave derived values stale. The same rule is what lets `edited` and `dirty` be ordinary behaviors: `edited` simply listens to `"user"` writes only.
 
 **Not in anyshape:** silent writes.
 
@@ -191,7 +195,7 @@ Argued in [#10], [#14].
 
 ### 22. One copy of the core
 
-`anyshape/react` imports the core and never carries its own copy, and the type declarations of both entries share one set of classes. The package check verifies both on the packed tarball.
+`anyshape/react`, `anyshape/recipes` and `anyshape/recipes/react` import the core and never carry their own copy, and the type declarations of every entry share one set of classes. The package check verifies both on the packed tarball.
 
 **Why:** node internals are keyed by unique symbols and the ref classes are nominal. A second copy of the core would have its own symbols and classes, so `instanceof` checks and internal lookups would fail between the copies, and the core's types would not fit the React hooks.
 
@@ -292,6 +296,7 @@ Argued in [#14], [#45], [#58], [#61], [#63].
 [adr-0003]: https://github.com/TheAsda/anyshape/blob/master/docs/adr/0003-behaviors-declare-their-dependencies.md
 [adr-0004]: https://github.com/TheAsda/anyshape/blob/master/docs/adr/0004-one-ordered-pass-per-flush.md
 [adr-0005]: https://github.com/TheAsda/anyshape/blob/master/docs/adr/0005-one-writer-per-target.md
+[adr-0006]: https://github.com/TheAsda/anyshape/blob/master/docs/adr/0006-recipes-ship-as-a-subpath-and-copying-is-for-customizing.md
 [#2]: https://github.com/TheAsda/anyshape/issues/2
 [#3]: https://github.com/TheAsda/anyshape/issues/3
 [#4]: https://github.com/TheAsda/anyshape/issues/4
@@ -327,3 +332,5 @@ Argued in [#14], [#45], [#58], [#61], [#63].
 [#58]: https://github.com/TheAsda/anyshape/issues/58
 [#61]: https://github.com/TheAsda/anyshape/issues/61
 [#63]: https://github.com/TheAsda/anyshape/issues/63
+[#130]: https://github.com/TheAsda/anyshape/issues/130
+[#162]: https://github.com/TheAsda/anyshape/issues/162

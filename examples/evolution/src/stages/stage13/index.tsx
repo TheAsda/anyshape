@@ -1,8 +1,8 @@
 // ------------------------------------------------------------
 // Stage 13 — Form-wide status.
 // The same control metadata that renders each field can be
-// AGGREGATED: pendingIn(shape, error) tells you how many
-// fields are mid-check right now, countIn(shape, error) how
+// AGGREGATED: pendingIn(shape, errorKey) tells you how many
+// fields are mid-check right now, countIn(shape, errorKey) how
 // many need attention. The submit button and the error chip
 // below are just subscriptions to those numbers.
 // ------------------------------------------------------------
@@ -25,7 +25,7 @@ import { useState } from "react";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -35,8 +35,8 @@ import {
   clearWhen,
   rule,
   asyncRule,
-  error,
-} from "../../../../../recipes";
+  errorKey,
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -79,7 +79,7 @@ const shape = form(
       licenseExpiry: field<string>().meta(control()),
       pickupOn: field<string>().meta(control()),
       dropoffOn: field<string>().meta(control()),
-    }).meta({ visible }),
+    }).meta(visible()),
     travelers: array(
       object({
         name: field<string>().meta(control()),
@@ -87,7 +87,7 @@ const shape = form(
       }),
       { create: () => ({ name: "", passport: "" }) },
     ),
-  }).meta(submission()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {
@@ -225,8 +225,8 @@ function Travelers() {
 
 /** The whole form's health, as two numbers. */
 function SmartSubmit() {
-  const checking = useValue(pendingIn(shape, error));
-  const errors = useValue(countIn(shape, error));
+  const checking = useValue(pendingIn(shape, errorKey));
+  const errors = useValue(countIn(shape, errorKey));
   return (
     <div className="smart-submit">
       {errors > 0 && (
@@ -258,7 +258,7 @@ export function Stage() {
               // path to the field, then find its error key by definition.
               for (const [path, message] of Object.entries(e.fieldErrors)) {
                 const t = form.resolvePath(path);
-                const target = t && t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref);
+                const target = t && t.store.collect(t.ref, errorKey).find((e) => e.ref.node === t.ref);
                 if (target) target.store.set(target.ref, message);
               }
             }

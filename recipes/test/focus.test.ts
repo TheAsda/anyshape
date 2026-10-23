@@ -3,7 +3,7 @@
 import { form, object, field, createStore, type MetaRef, type BaseStore } from "anyshape";
 import { test as base, describe, expect } from "vitest";
 
-import { control } from "../features";
+import { control } from "../control";
 import { focusFirst, registerFocus, type FocusTarget } from "../focus";
 import { rule, validate } from "../validation";
 import * as limits from "./fixtures/limits";

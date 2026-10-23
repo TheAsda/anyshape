@@ -7,11 +7,11 @@ import { form, object, array, field, createStore, defineBehaviors, type BaseStor
 import { StoreProvider } from "anyshape/react";
 import { test, expect } from "vitest";
 
-import { control } from "../../features";
-import { focusFirst } from "../../focus";
+import { control } from "../../control";
+import { focusFirst, type FocusTarget } from "../../focus";
 import { useControl, fromInput, fromCheckbox } from "../../react";
 import { required } from "../../rules";
-import { handleSubmit, submission } from "../../submit";
+import { handleSubmit, submitting } from "../../submit";
 import { rule, asyncRule } from "../../validation";
 import { render, settle } from "./test-utils";
 
@@ -24,7 +24,7 @@ const shape = form(
     lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {
       create: () => ({ sku: "", qty: 1 }),
     }),
-  }).meta(submission()),
+  }).meta(submitting()),
 );
 type Values = InferValue<typeof shape>;
 const L = shape.lines.item;
@@ -49,27 +49,27 @@ function initial(): Values {
 export function typeOnlyChecks() {
   // @ts-expect-error – `note` has no control() keys
   useControl(shape.note);
-  const { control: age } = useControl(shape.age);
+  const age = useControl(shape.age);
   // @ts-expect-error – fromInput needs an onChange for strings
   fromInput(age.onChange);
-  const { control: agree } = useControl(shape.agree);
+  const agree = useControl(shape.agree);
   // @ts-expect-error – fromCheckbox needs an onChange for booleans
-  fromCheckbox(useControl(shape.name).control.onChange);
+  fromCheckbox(useControl(shape.name).onChange);
   fromCheckbox(agree.onChange);
-  const value: string = useControl(shape.name).control.value;
-  // @ts-expect-error – the focus ref is beside the control, never one of its properties
-  void useControl(shape.name).control.focusRef;
-  return value;
+  const { value, focusRef } = useControl(shape.name);
+  const name: string = value;
+  focusRef satisfies (target: FocusTarget | null) => void;
+  return name;
 }
 
-test("useControl: state, user writes set touched/dirty, errors", async () => {
+test("useControl: state, user writes set edited/dirty, errors", async () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")),
   });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>["control"];
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
-    c = useControl(shape.name).control;
-    return <span data-testid="c">{`${c.value}|${c.error ?? "-"}|${c.touched}|${c.dirty}`}</span>;
+    c = useControl(shape.name);
+    return <span data-testid="c">{`${c.value}|${c.error ?? "-"}|${c.edited}|${c.dirty}`}</span>;
   }
   const screen = await render(
     <StoreProvider store={s}>
@@ -88,9 +88,9 @@ test("useControl: onBlur reveals, showError once revealed", async () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")),
   });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>["control"];
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
-    c = useControl(shape.name).control;
+    c = useControl(shape.name);
     return <span data-testid="c">{`${c.error ?? "-"}|${c.revealed}|${c.showError}`}</span>;
   }
   const screen = await render(
@@ -111,7 +111,7 @@ test("useControl: onBlur reveals, showError once revealed", async () => {
   await expect.element(state).toHaveTextContent("-|false|false");
 });
 
-test("useControl: mandatory follows a guarded required(), e.g. for an asterisk", async () => {
+test("useControl: requiredNow follows a guarded required(), e.g. for an asterisk", async () => {
   const s = createStore(shape, initial(), {
     behaviors: defineBehaviors(shape, (b) => {
       b.when(
@@ -121,10 +121,10 @@ test("useControl: mandatory follows a guarded required(), e.g. for an asterisk",
       );
     }),
   });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>["control"];
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
-    c = useControl(shape.name).control;
-    return <label data-testid="c">{`Name${c.mandatory ? " *" : ""}`}</label>;
+    c = useControl(shape.name);
+    return <label data-testid="c">{`Name${c.requiredNow ? " *" : ""}`}</label>;
   }
   const screen = await render(
     <StoreProvider store={s}>
@@ -149,9 +149,9 @@ function gate() {
 test("useControl: pending while a check runs; the error shows when revealed and not pending", async () => {
   const lookup = gate();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.name, lookup.check) });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>["control"];
+  let c!: ReturnType<typeof useControl<typeof shape.name>>;
   function C() {
-    c = useControl(shape.name).control;
+    c = useControl(shape.name);
     return <span data-testid="c">{`${c.pending}|${c.error ?? "-"}|${c.showError}`}</span>;
   }
   const screen = await render(
@@ -175,9 +175,9 @@ test("useControl: onBlur after its row was removed does nothing", async () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.items()[1];
-  let c!: ReturnType<typeof useControl<typeof L.sku>>["control"];
+  let c!: ReturnType<typeof useControl<typeof L.sku>>;
   function Sku() {
-    c = useControl(L.sku).control;
+    c = useControl(L.sku);
     return <span data-testid="sku">{c.value ?? "-"}</span>;
   }
   await render(
@@ -195,8 +195,8 @@ test("useControl: onBlur after its row was removed does nothing", async () => {
 test("focusRef registers the element, submit focuses it, unmount clears it", async () => {
   const s = createStore(shape, initial(), { behaviors: rule(shape.name, () => "bad") });
   function Input() {
-    const { control, focusRef } = useControl(shape.name);
-    return <input data-testid="in" ref={focusRef} defaultValue={control.value} />;
+    const { value, focusRef } = useControl(shape.name);
+    return <input data-testid="in" ref={focusRef} defaultValue={value} />;
   }
   const screen = await render(
     <StoreProvider store={s}>
@@ -213,8 +213,8 @@ test("focusRef registers the element, submit focuses it, unmount clears it", asy
 test("focusRef: unmounting one of two inputs keeps the other's registration", async () => {
   const s = createStore(shape, initial());
   function Input({ id }: { id: string }) {
-    const { control, focusRef } = useControl(shape.name);
-    return <input data-testid={id} ref={focusRef} defaultValue={control.value} />;
+    const { value, focusRef } = useControl(shape.name);
+    return <input data-testid={id} ref={focusRef} defaultValue={value} />;
   }
   function Both({ showFirst }: { showFirst: boolean }) {
     return (
@@ -245,8 +245,8 @@ test("fromInput / fromCheckbox with real events; handlers are cached", async () 
   const s = createStore(shape, initial());
   let nameOnChange!: (v: string) => void;
   function Inputs() {
-    const { control: name } = useControl(shape.name);
-    const { control: agree } = useControl(shape.agree);
+    const name = useControl(shape.name);
+    const agree = useControl(shape.agree);
     nameOnChange = name.onChange;
     return (
       <div>
@@ -263,7 +263,7 @@ test("fromInput / fromCheckbox with real events; handlers are cached", async () 
   const name = screen.getByTestId("name");
   await name.fill("Zoe");
   expect(s.get(shape.name)).toBe("Zoe");
-  expect(s.get(shape.name.touched), "written as the user").toBe(true);
+  expect(s.get(shape.name.edited), "written as the user").toBe(true);
   await expect.element(name).toHaveValue("Zoe");
   await screen.getByTestId("agree").click();
   expect(s.get(shape.agree)).toBe(true);

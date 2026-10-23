@@ -14,7 +14,7 @@ import { useState } from "react";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -24,7 +24,7 @@ import {
   clearWhen,
   disabled,
   disableWhen,
-} from "../../../../../recipes";
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -34,8 +34,8 @@ const shape = form(
     destination: field<string>().meta(control()),
     startDate: field<string>().meta(control()),
     endDate: field<string>().meta(control()),
-    // { disabled } adds the `disabled` key this field can now carry.
-    nightlyRate: field<number | undefined>().meta(control(), { disabled }),
+    // disabled() adds the `disabled` key this field can now carry.
+    nightlyRate: field<number | undefined>().meta(control(), disabled()),
     employerPays: field<boolean>().meta(control()),
     notes: field<string>().meta(control()),
     nights: field<number | undefined>(),
@@ -44,8 +44,8 @@ const shape = form(
     car: object({
       license: field<string>().meta(control()),
       licenseExpiry: field<string>().meta(control()),
-    }).meta({ visible }),
-  }).meta(submission()),
+    }).meta(visible()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {

@@ -1,0 +1,18 @@
+{
+  // The recipes' declarations, after the core's (tsconfig.build.json): the
+  // core entries resolve to the core's emitted declarations, so the recipe
+  // declarations import `anyshape` and `anyshape/react` by name and share the
+  // core's classes.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "rootDir": "recipes",
+    "outDir": "dist/recipes",
+    "lib": ["ES2022", "DOM"],
+    "paths": {
+      "anyshape": ["./dist/index.d.ts"],
+      "anyshape/react": ["./dist/react/index.d.ts"]
+    }
+  },
+  "include": ["recipes/**/*"],
+  "exclude": ["recipes/test/**"]
+}

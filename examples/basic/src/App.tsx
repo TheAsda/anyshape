@@ -11,10 +11,10 @@
 
 import { countIn, pendingIn, type RootStore } from "anyshape";
 import { StoreProvider, useForm, useStore, useValue } from "anyshape/react";
+import { handleSubmit, errorKey, dirtyKey } from "anyshape/recipes";
+import { useControl } from "anyshape/recipes/react";
 import { useEffect, useRef, useState } from "react";
 
-import { handleSubmit, error, dirty } from "../../../recipes";
-import { useControl } from "../../../recipes/react";
 import { TextField, TextAreaField, CheckboxField, DateField } from "./fields";
 import {
   shape,
@@ -122,7 +122,7 @@ function RequisitionWizard() {
         let firstStep = 2;
         for (const [path, message] of Object.entries(e.fieldErrors)) {
           const t = form.resolvePath(path);
-          const target = t && t.store.collect(t.ref, error).find((e) => e.ref.node === t.ref);
+          const target = t && t.store.collect(t.ref, errorKey).find((e) => e.ref.node === t.ref);
           if (!target) continue;
           target.store.set(target.ref, message);
           const hit = STEP_OF_PATH.find(([prefix]) => path.startsWith(prefix));
@@ -221,7 +221,7 @@ function RequesterSection() {
  */
 function DepartmentField() {
   const form = useStore<RootStore<typeof shape>>();
-  const { control: c, focusRef } = useControl(shape.requester.department);
+  const { focusRef, ...c } = useControl(shape.requester.department);
   const budget = useValue(shape.requester.budget);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -364,9 +364,9 @@ function FailureTour() {
 }
 
 function FormStatePanel() {
-  const errors = useValue(countIn(shape, error));
-  const checking = useValue(pendingIn(shape, error));
-  const dirtyFields = useValue(countIn(shape, dirty));
+  const errors = useValue(countIn(shape, errorKey));
+  const checking = useValue(pendingIn(shape, errorKey));
+  const dirtyFields = useValue(countIn(shape, dirtyKey));
   const lookups = useValue(countIn(shape, lookingUp));
   const submitting = useValue(shape.submitting);
   return (

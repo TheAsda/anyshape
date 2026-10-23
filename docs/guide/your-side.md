@@ -39,13 +39,13 @@ function useShownError(node: CheckedNode): string | undefined {
 }
 ```
 
-The [recipes](../../GLOSSARY.md)' `useControl` hook makes this decision in one line, `showError`, which your copy can change: show errors once the value changed, or right away, or never while a check runs ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/react/control.ts)). The library has no error display of its own to configure.
+The [default recipes](../../GLOSSARY.md)' `useControl` (`anyshape/recipes/react`) makes this decision in one line, `showError`: once the field is revealed, with no check running ([policy](../../recipes/POLICIES.md#when-an-error-shows), [source](../../recipes/react/control.ts)). A [copied recipe](../../GLOSSARY.md) can change it: show errors once the value changed, or right away. The library has no error display of its own to configure.
 
 ## Showing which fields are required
 
 A label's asterisk follows the requirement, including one a [guard](../../GLOSSARY.md) switches on and off. Don't restate the guard's condition in a second key: it drifts from the rule. Contribute to a combined key next to the rule instead, so the same guard switches both. The key is true while it has a contribution, like a `disabled` key fed by reasons ([contributions.md](contributions.md)).
 
-The validation recipe does this for you. `validation()` declares `mandatory`, and the `required(node)` rule also contributes to the node's `mandatory`, so `b.when([s.type], (t) => t === "company", (b) => b.add(required(s.taxId)))` sets `taxId.mandatory` only for companies. `useControl` reads it as `control.mandatory` ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts)). The `defined` backstop doesn't feed it, so a field with only `defined` says "Required" with `mandatory` false.
+The default recipes do this for you. `validation()` declares `requiredNow`, and the `required(node)` rule also contributes to the node's `requiredNow`, so `b.when([s.type], (t) => t === "company", (b) => b.add(required(s.taxId)))` sets `taxId.requiredNow` only for companies. `useControl` returns it as `requiredNow` ([source](../../recipes/validation.ts)). The `defined` check doesn't feed it, so a field with only `defined()` says "Required" with `requiredNow` false.
 
 ## Rendering hidden and disabled fields
 
@@ -142,7 +142,7 @@ async function submit(send: (values: { startDate: string; travelers: { name: str
 }
 ```
 
-The submit recipe's `handleSubmit(store, fn)` is one complete version: it reveals every error, validates, waits for async checks, calls `fn` with the form's value when valid, and otherwise focuses the first error ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/submit.ts)). `fn` receives the [checked type](../../GLOSSARY.md): the value without `undefined` in the fields that declare the validation recipe's `defined` key, since validating proved they hold a value. Copy it and change what your forms need.
+The default recipes' `handleSubmit(store, fn)` (`anyshape/recipes`) is one complete version: it reveals every error, validates, waits for async checks, calls `fn` with the form's value as it is, hidden and disabled fields included, when valid, and otherwise focuses the first error ([policy](../../recipes/POLICIES.md#what-a-submit-does), [source](../../recipes/submit.ts)). `fn` receives the [checked type](../../GLOSSARY.md): the value without `undefined` in the fields that declare `defined()`, since validating proved they hold a value. For another submit policy, copy the recipes and change your copy.
 
 Focusing that first error needs the DOM elements, which aren't form state: the focus recipe keeps them in its own registry beside the form ([react.md](react.md#state-beside-the-form)).
 
@@ -150,8 +150,8 @@ Focusing that first error needs the DOM elements, which aren't form state: the f
 
 A form in steps asks for a delivery type first, then offers the products for that type. The type starts empty: the user hasn't chosen yet, and comes back to an empty field after `reset()` or when an earlier step is cleared. Its type says so.
 
-- **A field that starts empty** is `field<DeliveryType | undefined>().meta(control(), { defined })`. Its [stored type](../../GLOSSARY.md) keeps `undefined`. The validation recipe's `defined` key adds "Required" to its `error` while the value is `undefined`, after the author's own rules, so the message of a `required` rule you add wins ([recipe source](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts)).
-- **A step is a section with `submission()`**, and its Next button is `handleSubmit(store.substore(step), fn)`. It reveals and validates that step only, and `fn` receives the step's checked type: `{ deliveryType: DeliveryType; email: string }`.
+- **A field that starts empty** is `field<DeliveryType | undefined>().meta(control(), defined())`. Its [stored type](../../GLOSSARY.md) keeps `undefined`. The `defined()` meta group of the default recipes adds "Required" to its `error` while the value is `undefined`, after the author's own rules, so the message of a `required` rule you add wins ([policy](../../recipes/POLICIES.md#defined-adds-a-required-check), [source](../../recipes/validation.ts)).
+- **A step is a section with `submitting()`**, and its Next button is `handleSubmit(store.substore(step), fn)`. It reveals and validates that step only, and `fn` receives the step's checked type: `{ deliveryType: DeliveryType; email: string }`.
 - **Reads keep the stored type.** Step 2 reads `deliveryType` as `DeliveryType | undefined`, in a component and in a behavior, and narrows with `=== undefined`. The value can still be empty there: the user can go back and clear it.
 - **A whole-step gate** reads the step's error count and pending checks. Read both before combining them: a hook call skipped by `&&` breaks React's hook order.
 

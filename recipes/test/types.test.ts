@@ -29,9 +29,9 @@ const t = form(
     text: field<string>().meta(control()),
     count: field<number>().meta(control()),
     plain: field<number>(),
-    hidden: object({ x: field<string>() }).meta({ visible }),
-    off: field<string>().meta(control(), { disabled }),
-    other: field<string>().meta(control(), { disabled }),
+    hidden: object({ x: field<string>() }).meta(visible()),
+    off: field<string>().meta(control(), disabled()),
+    other: field<string>().meta(control(), disabled()),
   }),
 );
 
@@ -94,10 +94,10 @@ test("InferChecked drops undefined only where `defined` is declared", () => {
 
   const kept = form(
     object({
-      maybe: field<string | null | undefined>().meta(control(), { defined }),
+      maybe: field<string | null | undefined>().meta(control(), defined()),
       plain: field<number | undefined>().meta(control()),
-      nested: object({ deep: object({ y: field<boolean | undefined>().meta(control(), { defined }) }) }),
-      rows: array(object({ z: field<string | undefined>().meta(control(), { defined }) })),
+      nested: object({ deep: object({ y: field<boolean | undefined>().meta(control(), defined()) }) }),
+      rows: array(object({ z: field<string | undefined>().meta(control(), defined()) })),
     }),
   );
   expectTypeOf<InferChecked<typeof kept>>().toEqualTypeOf<{

@@ -1,32 +1,32 @@
 // An order placed in steps, for fields that start empty: step 1 picks a
-// delivery type ({ defined }), step 2 a SKU from the options loaded for it.
-// Each step is a section with submission(), so its Next button is
-// handleSubmit on the step's substore. Rows ({ defined } on their sku) are
+// delivery type (defined()), step 2 a SKU from the options loaded for it.
+// Each step is a section with submitting(), so its Next button is
+// handleSubmit on the step's substore. Rows (defined() on their sku) are
 // created empty. Used by the `defined`, submit and checked-type tests.
 import { form, object, array, field, defineBehavior, type InferValue } from "anyshape";
 
-import { control, submission, defined } from "../../index";
+import { control, submitting, defined } from "../../index";
 
 export type DeliveryType = "Electronic" | "Printed";
 
 export const shape = form(
   object({
     delivery: object({
-      deliveryType: field<DeliveryType | undefined>().meta(control(), { defined }),
+      deliveryType: field<DeliveryType | undefined>().meta(control(), defined()),
       email: field<string>().meta(control()),
-    }).meta(submission()),
+    }).meta(submitting()),
     items: object({
-      sku: field<string | undefined>().meta(control(), { defined, skuOptions: [] as readonly string[] }),
+      sku: field<string | undefined>().meta(control(), defined(), { skuOptions: [] as readonly string[] }),
       note: field<string | undefined>().meta(control()),
       lines: array(
         object({
-          sku: field<string | undefined>().meta(control(), { defined }),
+          sku: field<string | undefined>().meta(control(), defined()),
           qty: field<number>().meta(control()),
         }),
         { create: () => ({ sku: undefined, qty: 1 }) },
       ),
-    }).meta(submission()),
-  }).meta(submission()),
+    }).meta(submitting()),
+  }).meta(submitting()),
 );
 export type Values = InferValue<typeof shape>;
 export const D = shape.delivery;

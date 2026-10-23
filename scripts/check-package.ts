@@ -2,16 +2,21 @@
 // The package check (NF1), on the tarball `npm pack` makes from the current
 // build. Run `bun run build` first. It checks:
 //   • the tarball holds the entries, their declarations and the shipped docs
-//     (every page in docs/guide/),
-//     and no source, tests or recipes;
-//   • the core internals are defined once in dist/, and the core entry
-//     reaches no `react` import;
+//     (every page in docs/guide/), the recipe sources and their policies
+//     file, and no core source and no tests;
+//   • the core internals are defined once in dist/, and neither the core
+//     entry nor `anyshape/recipes` reaches a `react` import;
 //   • every shipped declaration file typechecks, and the declarations
 //     export the same names as the source entries (stripInternal drops a
 //     whole statement after a stray tag);
-//   • a consumer without react imports and typechecks the core entry;
-//   • a consumer with react typechecks both entries, passes a node created
-//     through `anyshape` to an `anyshape/react` hook, and renders it;
+//   • a consumer without react imports and typechecks the core entry, and
+//     runs a form built with `anyshape/recipes` that reports an error and
+//     then submits;
+//   • a consumer with react typechecks every entry, passes a node created
+//     through `anyshape` to an `anyshape/react` hook and to `useControl`
+//     from `anyshape/recipes/react`, and renders them;
+//   • the recipe sources, copied out of the installed package unchanged,
+//     typecheck against it;
 //   • a consumer that exports a shape emits its declarations: the node
 //     classes are nameable and the internal symbols stay out of them;
 //   • publint and @arethetypeswrong/cli pass.
@@ -20,7 +25,7 @@
 // ============================================================
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +45,13 @@ const REQUIRED = [
   "dist/index.d.ts",
   "dist/react/index.js",
   "dist/react/index.d.ts",
+  "dist/recipes/index.js",
+  "dist/recipes/index.d.ts",
+  "dist/recipes/react/index.js",
+  "dist/recipes/react/index.d.ts",
+  // The recipe sources a team copies to customize them, and their policies.
+  "recipes/POLICIES.md",
+  ...recipeSources(),
   // The docs agents read at node_modules/anyshape/…: every guide page in
   // the source tree, so a new page needs no edit here.
   "GLOSSARY.md",
@@ -49,7 +61,7 @@ const REQUIRED = [
     .map((page) => `docs/guide/${page}`),
 ];
 /** Path prefixes the tarball must not hold. */
-const FORBIDDEN = ["src/", "test/", "bench/", "recipes/", "examples/", "scripts/", ".changeset/"];
+const FORBIDDEN = ["src/", "test/", "bench/", "recipes/test/", "examples/", "scripts/", ".changeset/"];
 
 const failures: string[] = [];
 function check(ok: boolean, message: string): boolean {
@@ -89,6 +101,7 @@ try {
     check(!files.some((f) => f.startsWith(prefix)), `the tarball holds nothing under ${prefix}`);
   }
   check(!files.some((f) => f.endsWith(".map")), "the tarball holds no sourcemaps");
+  check(!files.some((f) => /\.test\.tsx?$/.test(f)), "the tarball holds no test files");
 
   // ---- A consumer without react ----
   const core = join(tmp, "core");
@@ -101,6 +114,25 @@ try {
       store.set(shape.name, "Ada");
       const name: string = store.get(shape.name);
       if (name !== "Ada") throw new Error("the store did not keep the value");
+    `,
+    "recipes.ts": `
+      import { form, object, field, createStore } from "anyshape";
+      import { control, submitting, required, handleSubmit, type InferChecked } from "anyshape/recipes";
+
+      const shape = form(object({ name: field<string>().meta(control()) }).meta(submitting()));
+      const store = createStore(shape, { name: "" }, { behaviors: [required(shape.name)] });
+      const submitted: InferChecked<typeof shape>[] = [];
+      const submit = handleSubmit(store, (values) => {
+        submitted.push(values);
+      });
+
+      await submit();
+      if (submitted.length !== 0) throw new Error("an invalid form was submitted");
+      if (store.get(shape.name.error) !== "Required") throw new Error("the required rule reported no error");
+      if (!store.get(shape.name.revealed)) throw new Error("the submit did not reveal the field");
+      store.set(shape.name, "Ada");
+      await submit();
+      if (submitted[0]?.name !== "Ada") throw new Error("the valid form was not submitted: " + JSON.stringify(submitted));
     `,
   });
   run("npm", ["install", "--no-audit", "--no-fund", tarball], core);
@@ -119,10 +151,16 @@ try {
   const reached = importsFrom(dist, "index.js");
   const reactImports = reached.filter(({ spec }) => /^react($|\/)/.test(spec));
   check(reactImports.length === 0, `the core entry reaches no react import (${reached.length} imports followed)`);
+  const reachedByRecipes = importsFrom(dist, "recipes/index.js");
+  check(
+    !reachedByRecipes.some(({ spec }) => /^react($|\/)/.test(spec)),
+    `anyshape/recipes reaches no react import (${reachedByRecipes.length} imports followed)`,
+  );
 
   if (check(passes(bin("tsc"), ["-p", "."], core), "a consumer without react typechecks the core entry")) {
     run(bin("tsc"), ["-p", ".", "--noEmit", "false", "--outDir", "out"], core);
     check(passes("node", ["out/index.js"], core), "a consumer without react runs the core entry");
+    check(passes("node", ["out/recipes.js"], core), "a consumer without react runs a form built with the recipes");
   }
 
   // ---- A consumer with react ----
@@ -144,6 +182,24 @@ try {
 
       const html = renderToString(<StoreProvider store={store}><Name /></StoreProvider>);
       if (!html.includes('value="Ada"')) throw new Error("the hook did not read the store: " + html);
+    `,
+    "recipes.tsx": `
+      import { form, object, field, createStore } from "anyshape";
+      import { StoreProvider } from "anyshape/react";
+      import { control } from "anyshape/recipes";
+      import { useControl } from "anyshape/recipes/react";
+      import { renderToString } from "react-dom/server";
+
+      const shape = form(object({ name: field<string>().meta(control()) }));
+      const store = createStore(shape, { name: "Ada" });
+
+      function Name() {
+        const { value, onChange, edited, focusRef } = useControl(shape.name);
+        return <input ref={focusRef} value={value} onChange={(e) => onChange(e.target.value)} title={String(edited)} />;
+      }
+
+      const html = renderToString(<StoreProvider store={store}><Name /></StoreProvider>);
+      if (!html.includes('value="Ada"')) throw new Error("useControl did not read the store: " + html);
     `,
   });
   run(
@@ -171,21 +227,44 @@ try {
     }),
   );
   check(passes(bin("tsc"), ["-p", "tsconfig.dist.json"], withReact), "every shipped declaration file typechecks");
-  if (check(passes(bin("tsc"), ["-p", "."], withReact), "a consumer with react typechecks both entries")) {
+  if (check(passes(bin("tsc"), ["-p", "."], withReact), "a consumer with react typechecks every entry")) {
     run(bin("tsc"), ["-p", ".", "--noEmit", "false", "--outDir", "out"], withReact);
     check(
       passes("node", ["out/index.js"], withReact),
       "a consumer with react renders a hook on a node from the core entry",
     );
+    check(
+      passes("node", ["out/recipes.js"], withReact),
+      "a consumer with react renders useControl from anyshape/recipes/react on a node from the core entry",
+    );
   }
 
+  // ---- The recipe sources, copied ----
+  // A team that customizes the recipes copies the shipped sources; unchanged,
+  // the copy compiles against the installed package.
+  const shippedRecipes = join(withReact, "node_modules", "anyshape", "recipes");
+  const copied = join(withReact, "copied");
+  if (existsSync(shippedRecipes)) cpSync(shippedRecipes, copied, { recursive: true });
+  writeFileSync(
+    join(withReact, "tsconfig.copy.json"),
+    JSON.stringify({ extends: "./tsconfig.json", include: ["copied"] }),
+  );
+  check(
+    existsSync(copied) &&
+      readdirSync(copied, { recursive: true, encoding: "utf8" }).some((f) => f.endsWith(".ts")) &&
+      passes(bin("tsc"), ["-p", "tsconfig.copy.json"], withReact),
+    "the recipe sources, copied out of the installed package, typecheck against it",
+  );
+
   // ---- The declarations against the source ----
-  for (const [entry, source] of [
-    ["anyshape", "src/index.ts"],
-    ["anyshape/react", "src/react/index.ts"],
+  for (const [entry, source, consumer, project] of [
+    ["anyshape", "src/index.ts", "index.tsx", root],
+    ["anyshape/react", "src/react/index.ts", "index.tsx", root],
+    ["anyshape/recipes", "recipes/index.ts", "recipes.tsx", join(root, "recipes")],
+    ["anyshape/recipes/react", "recipes/react/index.ts", "recipes.tsx", join(root, "recipes")],
   ]) {
-    const shipped = exportNames(join(withReact, "index.tsx"), entry, withReact);
-    const expected = exportNames(join(root, source), undefined, root);
+    const shipped = exportNames(join(withReact, consumer), entry, withReact);
+    const expected = exportNames(join(root, source), undefined, project);
     check(
       shipped.join() === expected.join(),
       `${entry}'s declarations export the source entry's names (${expected.length})`,
@@ -249,7 +328,7 @@ try {
 
   // ---- Linters ----
   check(passes(bin("publint"), ["run", "--pack", "npm", "--strict"], root), "publint passes");
-  check(passes(bin("attw"), [tarball, "--profile", "esm-only"], root), "@arethetypeswrong/cli passes (ESM only)");
+  check(attwProblems(tarball).length === 0, "@arethetypeswrong/cli passes (ESM only)");
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }
@@ -257,6 +336,42 @@ try {
 if (failures.length) {
   console.error(`\n${failures.length} package check(s) failed`);
   process.exit(1);
+}
+
+/**
+ * The problems @arethetypeswrong/cli finds in the tarball for an ESM-only
+ * package: its esm-only profile ignores node10 and node16-cjs. The profile
+ * filters only problems keyed by `resolutionKind`; an internal resolution
+ * error is keyed by `resolutionOption` instead, and node10 hits one in the
+ * shipped recipe sources (it resolves `anyshape/recipes` to recipes/index.ts,
+ * and can't resolve `anyshape`, which has only `exports`, from there). So
+ * the same resolutions are dropped by either key.
+ */
+function attwProblems(tarball: string): unknown[] {
+  const ignored = new Set(["node10", "node16-cjs"]);
+  let out: string;
+  try {
+    out = run(bin("attw"), [tarball, "--format", "json"], root);
+  } catch (error) {
+    // attw exits non-zero when it finds a problem; the JSON is still printed.
+    out = (error as { stdout?: string }).stdout ?? "";
+  }
+  const { analysis } = JSON.parse(out) as {
+    analysis: { problems: { kind: string; resolutionKind?: string; resolutionOption?: string }[] };
+  };
+  const problems = analysis.problems.filter(
+    (p) => !ignored.has(p.resolutionKind ?? "") && !ignored.has(p.resolutionOption ?? ""),
+  );
+  for (const p of problems) console.log(JSON.stringify(p));
+  return problems;
+}
+
+/** The recipe sources the tarball ships: every `.ts` file of recipes/ outside its tests. */
+function recipeSources(): string[] {
+  return readdirSync(join(root, "recipes"), { recursive: true, encoding: "utf8" })
+    .map((f) => f.split("\\").join("/"))
+    .filter((f) => f.endsWith(".ts") && !f.startsWith("test/"))
+    .map((f) => `recipes/${f}`);
 }
 
 /** A temporary consumer project: an ES module package, strict, Node resolution, full lib check. */

@@ -9,7 +9,7 @@
 //   • array()      – object shapes only; optional `create` factory for new rows
 //   • object()     – rejects the names the node itself needs (`meta`, and the
 //                    names JavaScript treats specially on every object)
-//   • .meta(...)   – plain values and/or key definitions (metaKey, features);
+//   • .meta(...)   – plain values and/or key definitions (metaKey, meta groups);
 //                    variadic; must be called before form()
 //   • meta refs    – every declared meta key is exposed on the node:
 //                    form.name        → the value
@@ -111,12 +111,12 @@ export abstract class ShapeNode<T = unknown> {
   }
 
   /**
-   * Declare meta keys. Accepts plain objects and features, e.g.
+   * Declare meta keys. Accepts plain objects, such as a meta group returns, e.g.
    *   field<string>().meta(control(), { label: "Name" })
    * Returns a new node; the original stays reusable.
    *
    * A node declares each key once: declaring it again throws, whether as a
-   * plain value or a key definition (metaKey / feature).
+   * plain value or a key definition (metaKey, or through a meta group).
    */
   meta<Is extends readonly Meta[]>(
     ...inputs: { [K in keyof Is]: Is[K] & NoReserved<Is[K]> }

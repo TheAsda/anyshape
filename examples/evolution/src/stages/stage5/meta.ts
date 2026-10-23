@@ -5,7 +5,7 @@ export const meta: StageMeta = {
   title: "Visibility",
   story: "Renting a car? Only then do we ask for license details.",
   bullets: [
-    "{ visible } on a group adds a `visible` flag to the group itself; the fields inside don't carry it",
+    "visible() on a group adds a `visible` key to the group itself; the fields inside don't carry it",
     "visibleWhen(node, [sources], fn) drives it from other fields",
     "clearWhen(node, [node.visible], (v) => !v): the group's values are wiped while it's hidden",
     "b.when([s.car.visible], (v) => v, …) guards the car rules: hidden ⇒ the rules are absent, not validated",

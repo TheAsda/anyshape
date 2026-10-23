@@ -24,7 +24,7 @@ import { useState } from "react";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -32,7 +32,7 @@ import {
   calculate,
   visibleWhen,
   clearWhen,
-} from "../../../../../recipes";
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;
@@ -78,7 +78,7 @@ const shape = form(
       licenseExpiry: field<string>().meta(control()),
       pickupOn: field<string>().meta(control()),
       dropoffOn: field<string>().meta(control()),
-    }).meta({ visible }),
+    }).meta(visible()),
     travelers: array(
       object({
         name: field<string>().meta(control()),
@@ -86,7 +86,7 @@ const shape = form(
       }),
       { create: () => ({ name: "", passport: "" }) },
     ),
-  }).meta(submission()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {

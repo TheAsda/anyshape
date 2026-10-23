@@ -19,6 +19,8 @@
   },
   "files": [
     "dist",
+    "recipes",
+    "!recipes/test",
     "docs/guide",
     "docs/principles.md",
     "GLOSSARY.md"
@@ -34,10 +36,18 @@
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
     },
+    "./recipes": {
+      "types": "./dist/recipes/index.d.ts",
+      "default": "./dist/recipes/index.js"
+    },
+    "./recipes/react": {
+      "types": "./dist/recipes/react/index.d.ts",
+      "default": "./dist/recipes/react/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build": "vite build && tsc -p tsconfig.build.json && tsc -p tsconfig.recipes.build.json",
     "check:package": "bun scripts/check-package.ts",
     "check:image": "bun scripts/check-playwright-image.ts",
     "changeset": "changeset",

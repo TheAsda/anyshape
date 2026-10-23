@@ -16,11 +16,11 @@ import { StoreProvider, useForm, useValue } from "anyshape/react";
 import { useMemo, useState } from "react";
 import { describe, test, expect, expectTypeOf } from "vitest";
 
-import { control } from "../../features";
+import { control } from "../../control";
 import { focusFirst, registerFocus } from "../../focus";
 import { useControl } from "../../react";
-import { handleSubmit, submission } from "../../submit";
-import { error, rule } from "../../validation";
+import { handleSubmit, submitting } from "../../submit";
+import { errorKey, rule } from "../../validation";
 import * as order from "../fixtures/order";
 import type { DeliveryType } from "../fixtures/order";
 import { render, settle } from "./test-utils";
@@ -29,22 +29,15 @@ const shape = form(
   object({
     name: field<string>().meta(control()),
     code: field<string>().meta(control()),
-  }).meta(submission()),
+  }).meta(submitting()),
 );
 type Values = InferValue<typeof shape>;
 const empty = (): Values => ({ name: "", code: "" });
 
 /** An input registered as its node's focus target. */
 function Field(props: { node: typeof shape.name | typeof shape.code; id: string }) {
-  const { control, focusRef } = useControl(props.node);
-  return (
-    <input
-      data-testid={props.id}
-      ref={focusRef}
-      value={control.value}
-      onChange={(e) => control.onChange(e.target.value)}
-    />
-  );
+  const { value, onChange, focusRef } = useControl(props.node);
+  return <input data-testid={props.id} ref={focusRef} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 test("a submit focuses the first error in DOM order, not shape order", async () => {
@@ -111,22 +104,22 @@ describe("Forms in steps", () => {
     createStore(steps, start(), { behaviors: [loadSkus(async (t) => skusFor(t)), ...behaviors] });
 
   function DeliveryStep(props: { onNext?: () => void }) {
-    const { control: type, focusRef } = useControl(D.deliveryType);
-    const { control: email } = useControl(D.email);
+    const { value, onChange, onBlur, error, showError, focusRef } = useControl(D.deliveryType);
+    const email = useControl(D.email);
     return (
       <div>
         <select
           aria-label="Delivery type"
           ref={focusRef}
-          value={type.value ?? ""}
-          onChange={(e) => type.onChange((e.target.value || undefined) as DeliveryType | undefined)}
-          onBlur={type.onBlur}
+          value={value ?? ""}
+          onChange={(e) => onChange((e.target.value || undefined) as DeliveryType | undefined)}
+          onBlur={onBlur}
         >
           <option value="">–</option>
           <option>Electronic</option>
           <option>Printed</option>
         </select>
-        {type.showError && <p role="alert">{type.error}</p>}
+        {showError && <p role="alert">{error}</p>}
         <input aria-label="Email" value={email.value} onChange={(e) => email.onChange(e.target.value)} />
         {props.onNext && <button onClick={props.onNext}>Next</button>}
       </div>
@@ -135,8 +128,8 @@ describe("Forms in steps", () => {
 
   /** Step 2: gated on step 1's checks, and narrowing the stored type itself. */
   function SkuStep() {
-    const errors = useValue(countIn(D, error));
-    const pending = useValue(pendingIn(D, error));
+    const errors = useValue(countIn(D, errorKey));
+    const pending = useValue(pendingIn(D, errorKey));
     const type = useValue(D.deliveryType);
     expectTypeOf(type).toEqualTypeOf<DeliveryType | undefined>();
     const skus = useValue(steps.items.sku.skuOptions);

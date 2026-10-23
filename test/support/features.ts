@@ -1,6 +1,7 @@
 // ============================================================
-// Test-local features: the meta keys the core tests declare, with the same
-// behaviors as the features in recipes/, which the core tests never import.
+// Test-local meta groups: the meta keys the core tests declare, with
+// behaviors like the default recipes' (recipes/), which the core tests never
+// import.
 // ============================================================
 
 import { metaKey, initialOf, pathOf, type BehaviorContext } from "../../src/index";

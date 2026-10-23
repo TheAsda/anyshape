@@ -6,10 +6,10 @@
 //     queue – runs the node's rules in registration order: the sync rules
 //     until the first error, then the `defined` backstop, then, if they
 //     pass, the async rules.
-//   • `mandatory` is true while a required() on the node is present, so a
+//   • `requiredNow` is true while a required() on the node is present, so a
 //     guard around required() switches the rule and the key together. The
 //     `defined` backstop doesn't feed it: a field with only `defined` says
-//     "Required" with `mandatory` false. Feeding it would need a key's
+//     "Required" with `requiredNow` false. Feeding it would need a key's
 //     default behavior to return two contributions, a core change that waits
 //     for a second user (principle 8).
 //   • `defined` on a field that starts empty (`field<T | undefined>()`)
@@ -33,7 +33,7 @@
 //     edits (`s.rentingCar`) starts the check at once.
 //   • `error` is the last completed result, written when a check ends;
 //     pendingOf(node.error) is true while one runs. A "can submit" UI reads
-//     countIn(form, error) === 0 && !pendingIn(form, error).
+//     countIn(form, errorKey) === 0 && !pendingIn(form, errorKey).
 //   • A check that throws is a bug or an unhandled failure (expected
 //     failures return a message): "Validation failed" is written, the
 //     thrown value goes to console.error, and nothing is remembered.
@@ -139,12 +139,12 @@ const same = (a: readonly unknown[], b: readonly unknown[]) =>
  * rules whatever its cause, without their debounce, and resets the flag with
  * its result. A cancelled run writes nothing, so its rerun is still forced.
  */
-export const forced = metaKey(false);
+export const checkForcedKey = metaKey(false);
 
 /** The field's first error: written by the queue, the owner of its rules. Counted per subtree. */
-export const error = metaKey<string | undefined, RulePart>(undefined)
+export const errorKey = metaKey<string | undefined, RulePart>(undefined)
   .aggregate((e) => e !== undefined)
-  .uses(forced)
+  .uses(checkForcedKey)
   .combine((self, key, [force]) => ({
     name: `${pathOf(self) || "<root>"}#validation`,
     triggers: [self, force],
@@ -213,9 +213,15 @@ declare const DefinedBrand: unique symbol;
 export type Defined = true & { readonly [DefinedBrand]: true };
 
 /** The field's value is not undefined: a "Required" backstop in its `error`, after its sync rules. */
-export const defined = metaKey<Defined>(true as Defined)
-  .uses(error)
+export const definedKey = metaKey<Defined>(true as Defined)
+  .uses(errorKey)
   .behavior((_self, _key, [err]) => contribute(err, { kind: "defined" }));
+
+/**
+ * The `defined` meta group, for a field that starts empty
+ * (`field<T | undefined>()`): its checked type has no undefined.
+ */
+export const defined = () => ({ defined: definedKey });
 
 /** True when some property of N, under any name, is a ref to a `Defined` key. */
 type HasDefined<N> = true extends {
@@ -253,19 +259,19 @@ export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, unde
  * present (its guard holds), e.g. for an asterisk on the label. The payload
  * names the required() it came from, as a `disabled` reason does.
  */
-export const mandatory = metaKey<boolean, string>(false).combine((self, key) => ({
-  name: `${pathOf(self) || "<root>"}#mandatory`,
+export const requiredNowKey = metaKey<boolean, string>(false).combine((self, key) => ({
+  name: `${pathOf(self) || "<root>"}#requiredNow`,
   writes: [key],
   run: (ctx) => ctx.set(key, ctx.parts.length > 0),
 }));
 
-/** `error`, written by the field's rules, `forced` for validate(), and `mandatory`, fed by required(). */
-export const validation = () => ({ error, forced, mandatory });
+/** `error`, written by the field's rules, `checkForced` for validate(), and `requiredNow`, fed by required(). */
+export const validation = () => ({ error: errorKey, checkForced: checkForcedKey, requiredNow: requiredNowKey });
 
 /** A node with validation(), whose value is `V`. */
 export type Validatable<V = any> = ShapeNode<V> & {
   readonly error: MetaRef<string | undefined, RulePart>;
-  readonly mandatory: MetaRef<boolean, string>;
+  readonly requiredNow: MetaRef<boolean, string>;
 };
 
 export interface RuleOptions {
@@ -290,7 +296,7 @@ export function rule<V>(
 }
 
 function errorOf(node: Validatable): Validatable["error"] {
-  if (!(node.error instanceof MetaRef)) throw new Error(`"${pathOf(node) || "<root>"}" has no validation() feature`);
+  if (!(node.error instanceof MetaRef)) throw new Error(`"${pathOf(node) || "<root>"}" has no validation() meta group`);
   return node.error;
 }
 
@@ -315,14 +321,14 @@ export function asyncRule<V>(
   );
 }
 
-export interface ValidationError extends CollectEntry<string | undefined> {
+export interface ErrorEntry extends CollectEntry<string | undefined> {
   error: string;
 }
 
 export interface ValidationResult {
   valid: boolean;
   /** In shape order: fields in definition order, rows in array order. */
-  errors: ValidationError[];
+  errors: ErrorEntry[];
 }
 
 /**
@@ -332,12 +338,12 @@ export interface ValidationResult {
  */
 export async function validate(store: BaseStore<any>, node: AnyNode = store.node): Promise<ValidationResult> {
   const errorRefs = new Map<BaseStore<any>, Map<AnyNode, MetaRef<string | undefined>>>();
-  for (const e of store.collect(node, error)) {
+  for (const e of store.collect(node, errorKey)) {
     let byNode = errorRefs.get(e.store);
     if (!byNode) errorRefs.set(e.store, (byNode = new Map()));
     byNode.set(e.ref.node, e.ref);
   }
-  const flags = store.collect(node, forced).filter((f) => {
+  const flags = store.collect(node, checkForcedKey).filter((f) => {
     const errorRef = errorRefs.get(f.store)?.get(f.ref.node);
     return errorRef !== undefined && !f.store.get(pendingOf(errorRef));
   });
@@ -346,8 +352,8 @@ export async function validate(store: BaseStore<any>, node: AnyNode = store.node
   // A field without rules has no run to serve its flag: don't leave it for a rule mounted later.
   store.batch(() => flags.forEach((f) => f.store.isAttached() && f.store.get(f.ref) && f.store.set(f.ref, false)));
   const errors = store
-    .collect(node, error)
+    .collect(node, errorKey)
     .map((e) => ({ ...e, error: e.store.get(e.ref) }))
-    .filter((e): e is ValidationError => e.error !== undefined);
+    .filter((e): e is ErrorEntry => e.error !== undefined);
   return { valid: errors.length === 0, errors };
 }

@@ -8,7 +8,7 @@ import type { FieldNode } from "anyshape";
 import { useStore, useValue } from "anyshape/react";
 import { useId } from "react";
 
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "./recipes/react";
 
 /** What each stage exports alongside its component. */
 export type StageMeta = {
@@ -72,7 +72,7 @@ export function TextField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const { control: c, focusRef } = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -99,7 +99,7 @@ export function TextField({
         </p>
       )}
       <p className="field__status">
-        {c.touched ? "touched" : "untouched"}
+        {c.edited ? "edited" : "unedited"}
         {c.dirty ? " · dirty" : ""}
       </p>
     </div>
@@ -117,7 +117,7 @@ export function NumberField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const { control: c, focusRef } = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -144,7 +144,7 @@ export function NumberField({
         </p>
       )}
       <p className="field__status">
-        {c.touched ? "touched" : "untouched"}
+        {c.edited ? "edited" : "unedited"}
         {c.dirty ? " · dirty" : ""}
       </p>
     </div>
@@ -152,7 +152,7 @@ export function NumberField({
 }
 
 export function CheckboxField({ node, label }: { node: BooleanNode; label: string }) {
-  const { control: c, focusRef } = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   return (
     <div className="field field--checkbox">
       <label className="field__label">
@@ -174,7 +174,7 @@ export function SelectField<T extends string>({
   label: string;
   options: Record<T, string>;
 }) {
-  const { control: c, focusRef } = useControl(node);
+  const { focusRef, ...c } = useControl(node);
   const id = useId();
   const errorId = `${id}-error`;
   const entries = Object.entries(options) as [T, string][];
@@ -206,7 +206,7 @@ export function SelectField<T extends string>({
         </p>
       )}
       <p className="field__status">
-        {c.touched ? "touched" : "untouched"}
+        {c.edited ? "edited" : "unedited"}
         {c.dirty ? " · dirty" : ""}
       </p>
     </div>

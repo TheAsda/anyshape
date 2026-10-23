@@ -12,9 +12,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
-      // More specific entry first.
-      { find: "anyshape/react", replacement: resolve(lib, "react/index.ts") },
-      { find: "anyshape", replacement: resolve(lib, "index.ts") },
+      // Exact matches: each entry to its source.
+      { find: /^anyshape\/react$/, replacement: resolve(lib, "react/index.ts") },
+      { find: /^anyshape$/, replacement: resolve(lib, "index.ts") },
     ],
   },
   server: {
