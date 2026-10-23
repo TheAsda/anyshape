@@ -12,7 +12,7 @@ import { useState } from "react";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -38,8 +38,8 @@ const shape = form(
     car: object({
       license: field<string>().meta(control()),
       licenseExpiry: field<string>().meta(control()),
-    }).meta({ visible }),
-  }).meta(submission()),
+    }).meta(visible()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {

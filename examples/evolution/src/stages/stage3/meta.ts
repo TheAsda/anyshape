@@ -7,7 +7,7 @@ export const meta: StageMeta = {
   bullets: [
     "defineBehaviors(shape, (b, s) => { b.add(required(s.destination), ...) })",
     "Behaviors are passed to useForm at mount — the shape stays reusable",
-    "submission() on the root + handleSubmit(form, fn): invalid never submits",
+    "submitting() on the root + handleSubmit(form, fn): invalid never submits",
     "A failed submit reveals every error and focuses the first (focusRef from stage 2)",
     "showError: shown once blurred or revealed by submit, then live",
   ],

@@ -1,7 +1,8 @@
 // ------------------------------------------------------------
 // Stage 2 — Control.
 // The same fields, now with .meta(control()): validation state,
-// touched/dirty tracking and a focus target. This is the
+// edited/dirty tracking and `revealed`, which decides when an error
+// shows. useControl adds a focus target. This is the
 // plumbing every input needs; rules arrive in stage 3.
 // ------------------------------------------------------------
 

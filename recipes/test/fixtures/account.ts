@@ -1,9 +1,9 @@
 // An account form for validation: person/company type, password confirmation,
 // a hidden-able company section, a
-// disableable promo ({ disabled }), disableable rows and submission().
+// disableable promo (disabled()), disableable rows and submitting().
 import { form, object, array, field, type InferValue } from "anyshape";
 
-import { control, validation, visible, disabled, submission, rule } from "../../index";
+import { control, validation, visible, disabled, submitting, rule } from "../../index";
 import { deferred } from "../harness";
 
 export const shape = form(
@@ -18,8 +18,8 @@ export const shape = form(
     company: object({
       vat: field<string>().meta(control()),
       secret: field<string>().meta(control()),
-    }).meta({ visible }),
-    promo: field<string>().meta(control(), { disabled }),
+    }).meta(visible()),
+    promo: field<string>().meta(control(), disabled()),
     lines: array(
       object({
         sku: field<string>().meta(control()),
@@ -27,8 +27,8 @@ export const shape = form(
         total: field<number>().meta(validation()),
       }),
       { create: () => ({ sku: "", qty: 1, total: 0 }) },
-    ).meta({ disabled }),
-  }).meta(submission()),
+    ).meta(disabled()),
+  }).meta(submitting()),
 );
 export type Values = InferValue<typeof shape>;
 export const L = shape.lines.item;

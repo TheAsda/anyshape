@@ -5,8 +5,8 @@ export const meta: StageMeta = {
   title: "Status",
   story: "How do you know the form is mid-check? Count the control metadata.",
   bullets: [
-    "pendingIn(shape, error) — how many fields have a check in flight, right now",
-    "countIn(shape, error) — how many fields currently carry an error",
+    "pendingIn(shape, errorKey) — how many fields have a check in flight, right now",
+    "countIn(shape, errorKey) — how many fields currently carry an error",
     "Both take the key's definition and are refs: subscribe with useValue like any other value",
     "The submit button disables itself while any check is pending — no bookkeeping in the components",
   ],

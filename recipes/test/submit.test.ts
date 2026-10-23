@@ -3,10 +3,10 @@
 import { form, object, array, field, metaKey, createStore } from "anyshape";
 import { test as base, describe, expect } from "vitest";
 
-import { control } from "../features";
+import { control } from "../control";
 import { registerFocus } from "../focus";
 import { required } from "../rules";
-import { handleSubmit, submission } from "../submit";
+import { handleSubmit, submitting } from "../submit";
 import { rule, asyncRule } from "../validation";
 import * as limits from "./fixtures/limits";
 import * as order from "./fixtures/order";
@@ -108,8 +108,8 @@ describe("Submit: submittable nodes", () => {
   const shape = form(
     object({
       name: field<string>().meta(control()),
-      rows: array(object({ sku: field<string>().meta(control()) }).meta(submission())),
-    }).meta(submission()),
+      rows: array(object({ sku: field<string>().meta(control()) }).meta(submitting())),
+    }).meta(submitting()),
   );
   const R = shape.rows.item;
   const test = base.extend("store", () => createStore(shape, { name: "Ann", rows: [{ sku: "A" }, { sku: "B" }] }));
@@ -189,21 +189,21 @@ describe("Submit: submittable nodes", () => {
     expect([s.get(shape.submitting), a.get(R.submitting), added.get(R.submitting)]).toEqual([false, false, false]);
   });
 
-  test("a store whose own node does not declare submission() is rejected", ({ store: s }) => {
+  test("a store whose own node does not declare submitting() is rejected", ({ store: s }) => {
     const plain = createStore(form(object({ name: field<string>().meta(control()) })), { name: "" });
-    // @ts-expect-error – the root has no submission()
-    expect(() => handleSubmit(plain, async () => {})).toThrow(/submission\(\)/);
+    // @ts-expect-error – the root has no submitting()
+    expect(() => handleSubmit(plain, async () => {})).toThrow(/submitting\(\)/);
     // @ts-expect-error – still rejected on a second call: nothing is cached
-    expect(() => handleSubmit(plain, async () => {}), "a second call").toThrow(/submission\(\)/);
+    expect(() => handleSubmit(plain, async () => {}), "a second call").toThrow(/submitting\(\)/);
     const section = form(object({ step: object({ x: field<string>() }) }));
     const step = createStore(section, { step: { x: "" } }).substore(section.step);
-    // @ts-expect-error – a section is submittable only if it declares submission() itself
+    // @ts-expect-error – a section is submittable only if it declares submitting() itself
     expect(() => handleSubmit(step, async () => {})).toThrow(/"step"/);
     expect(() => handleSubmit(s.substore(shape.rows).itemAt(0), async () => {})).not.toThrow();
   });
 
-  test("a section that declares submission() is submittable through its own store", async () => {
-    const wizard = form(object({ step: object({ x: field<string>().meta(control()) }).meta(submission()) }));
+  test("a section that declares submitting() is submittable through its own store", async () => {
+    const wizard = form(object({ step: object({ x: field<string>().meta(control()) }).meta(submitting()) }));
     const s = createStore(wizard, { step: { x: "a" } });
     const got: unknown[] = [];
     await handleSubmit(s.substore(wizard.step), (formData) => void got.push(formData))();
@@ -213,7 +213,7 @@ describe("Submit: submittable nodes", () => {
 
   test("a node with its own `submitting` definition is not submittable: the key is matched by definition", () => {
     const foreign = form(object({ name: field<string>() }).meta({ submitting: metaKey(false) }));
-    expect(() => handleSubmit(createStore(foreign, { name: "" }), async () => {})).toThrow(/submission\(\)/);
+    expect(() => handleSubmit(createStore(foreign, { name: "" }), async () => {})).toThrow(/submitting\(\)/);
   });
 });
 

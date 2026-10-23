@@ -14,7 +14,7 @@ import {
 } from "anyshape";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
 
-import { rule, asyncRule, required, validate, error, control, validation, visible } from "../index";
+import { rule, asyncRule, required, validate, errorKey, control, validation, visible } from "../index";
 import { shape, L, initial, lookup } from "./fixtures/account";
 import * as orderFixture from "./fixtures/order";
 import { flush, sleep } from "./harness";
@@ -43,8 +43,8 @@ describe("Sync queue", () => {
     expect(s.get(shape.name.error)).toBe(undefined);
   });
 
-  test("rules need the validation() feature", ({ store: s }) => {
-    expect(() => s.addBehavior(rule(shape.note as any, () => undefined))).toThrow(/no validation\(\) feature/);
+  test("rules need the validation() meta group", ({ store: s }) => {
+    expect(() => s.addBehavior(rule(shape.note as any, () => undefined))).toThrow(/no validation\(\) meta group/);
   });
 
   test("guards: conditional rules, guard refs trigger", () => {
@@ -92,13 +92,13 @@ describe("Sync queue", () => {
     lines.itemAt(1).set(L.qty, 0, { origin: "user" });
     expect(lines.itemAt(1).get(L.qty.error)).toBe("Min 1");
     expect(lines.itemAt(0).get(L.qty.error)).toBe(undefined);
-    expect(s.get(countIn(shape, error))).toBe(1);
+    expect(s.get(countIn(shape, errorKey))).toBe(1);
     const bad = lines.append({ qty: 0 });
     expect(bad.get(L.qty.error), "new rows are validated on creation").toBe("Min 1");
-    expect(s.get(countIn(shape.lines, error))).toBe(2);
+    expect(s.get(countIn(shape.lines, errorKey))).toBe(2);
     lines.remove(bad);
     lines.remove(lines.itemAt(1));
-    expect(s.get(countIn(shape, error))).toBe(0);
+    expect(s.get(countIn(shape, errorKey))).toBe(0);
   });
 
   test("rows: a rule can read the whole array (unique SKU)", () => {
@@ -179,7 +179,7 @@ describe("Hidden / disabled are guards (#21)", () => {
     expect(s.get(shape.company.vat.error)).toBe("Required");
     s.set(shape.company.visible, false);
     expect(s.get(shape.company.vat.error)).toBe(undefined);
-    expect(s.get(countIn(shape, error))).toBe(0);
+    expect(s.get(countIn(shape, errorKey))).toBe(0);
     s.set(shape.company.visible, true);
     expect(s.get(shape.company.vat.error)).toBe("Required");
   });
@@ -189,7 +189,7 @@ const party = form(
   object({
     travelers: array(object({ name: field<string>().meta(control()) }), { create: () => ({ name: "" }) }).meta(
       validation(),
-      { visible },
+      visible(),
     ),
   }),
 );
@@ -200,7 +200,7 @@ describe("Rules on a whole array", () => {
     const s = createStore(party, { travelers: [] }, { behaviors: atLeastOne });
     const travelers = s.substore(party.travelers);
     expect(s.get(party.travelers.error)).toBe("Add at least one traveler");
-    expect(s.get(countIn(party, error))).toBe(1);
+    expect(s.get(countIn(party, errorKey))).toBe(1);
 
     const r = await validate(s);
     expect(r.valid).toBe(false);
@@ -208,7 +208,7 @@ describe("Rules on a whole array", () => {
 
     const row = travelers.append();
     expect(s.get(party.travelers.error)).toBe(undefined);
-    expect(s.get(countIn(party, error))).toBe(0);
+    expect(s.get(countIn(party, errorKey))).toBe(0);
 
     travelers.remove(row);
     expect(s.get(party.travelers.error), "back when the last row goes").toBe("Add at least one traveler");
@@ -224,7 +224,7 @@ describe("Async", () => {
     s.set(shape.email, "taken@x.io", { origin: "user" });
     expect(calls.length).toBe(1);
     expect(s.get(pendingOf(shape.email.error))).toBe(true);
-    expect(s.get(pendingIn(shape, error))).toBe(1);
+    expect(s.get(pendingIn(shape, errorKey))).toBe(1);
     let notified = 0;
     s.subscribe(shape.email.error, () => notified++);
     calls[0].d.resolve("Already taken");
@@ -324,8 +324,8 @@ describe("Async", () => {
     expect(calls[0].signal.aborted).toBe(true);
     calls[0].d.resolve("Taken");
     await flush();
-    expect(s.get(countIn(shape, error))).toBe(0);
-    expect(s.get(pendingIn(shape, error)), "the removed row is no longer pending").toBe(0);
+    expect(s.get(countIn(shape, errorKey))).toBe(0);
+    expect(s.get(pendingIn(shape, errorKey)), "the removed row is no longer pending").toBe(0);
   });
 
   test("async: debounce – pending while it waits, one check after the last change", async ({
@@ -475,7 +475,7 @@ describe("validate()", () => {
     expect(await validate(s.substore(shape.lines).itemAt(0))).toEqual({ valid: true, errors: [] });
   });
 
-  test("forcing: validate() checks an unchecked async field at once, without its debounce, and resets `forced`", async ({
+  test("forcing: validate() checks an unchecked async field at once, without its debounce, and resets `checkForced`", async ({
     lookup: { calls, check },
   }) => {
     const s = createStore(shape, initial(), { behaviors: asyncRule(shape.email, check, { debounce: 1000 }) });
@@ -489,7 +489,7 @@ describe("validate()", () => {
     calls[0].d.resolve("Taken");
     const r = await pending;
     expect(r.errors.map((e) => [e.path, e.error])).toEqual([["email", "Taken"]]);
-    expect(s.get(shape.email.forced), "the run that served the force reset it").toBe(false);
+    expect(s.get(shape.email.checkForced), "the run that served the force reset it").toBe(false);
     await validate(s);
     expect(calls.length, "an unchanged value is not checked again").toBe(1);
   });
@@ -506,7 +506,7 @@ describe("validate()", () => {
     ).toEqual(["loaded@x.io", "edited@x.io"]);
     calls[1].d.resolve("Taken");
     expect((await pending).errors.map((e) => e.error)).toEqual(["Taken"]);
-    expect(s.get(shape.email.forced)).toBe(false);
+    expect(s.get(shape.email.checkForced)).toBe(false);
   });
 
   test("forcing: a field in its debounce is not forced, and validate() waits for it", async ({
@@ -518,7 +518,7 @@ describe("validate()", () => {
     s.set(shape.email, "typed@x.io", { origin: "user" });
     let result: Awaited<ReturnType<typeof validate>> | undefined;
     void validate(s).then((r) => (result = r));
-    expect(s.get(shape.email.forced)).toBe(false);
+    expect(s.get(shape.email.checkForced)).toBe(false);
     await vi.advanceTimersByTimeAsync(299);
     expect(calls.length, "the debounce keeps running").toBe(0);
     await vi.advanceTimersByTimeAsync(1);
@@ -529,8 +529,8 @@ describe("validate()", () => {
     expect(result?.errors.map((e) => e.error)).toEqual(["Taken"]);
   });
 
-  test("forcing: a node declaring `error` without `forced` is rejected by createStore", () => {
-    const f = form(object({ name: field<string>().meta({ error }) }));
+  test("forcing: a node declaring `error` without `checkForced` is rejected by createStore", () => {
+    const f = form(object({ name: field<string>().meta({ error: errorKey }) }));
     expect(() => createStore(f, { name: "" })).toThrow(/uses a key the node doesn.t declare/);
   });
 
@@ -539,7 +539,7 @@ describe("validate()", () => {
   }) => {
     const s = createStore(shape, initial());
     await validate(s);
-    expect(s.get(shape.email.forced)).toBe(false);
+    expect(s.get(shape.email.checkForced)).toBe(false);
     s.addBehavior(asyncRule(shape.email, check));
     expect(calls.length, "not a forced run").toBe(0);
   });

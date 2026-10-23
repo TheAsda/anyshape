@@ -1,10 +1,10 @@
 // ============================================================
 // Submit – handleSubmit(store, fn) for a store whose own node declares
-// submission(): the form root, or a section or row that declares it itself.
+// submitting(): the form root, or a section or row that declares it itself.
 // ------------------------------------------------------------
 //   1. One submit at a time per store: a call while one runs resolves at once.
 //   2. One batch: `submitting` on, and `revealed` on every node of the
-//      subtree that declares reveal().
+//      subtree that declares revealed().
 //   3. Validate the subtree, waiting for async checks.
 //   4. Valid: fn(formData), the store's value as it is, typed as its checked
 //      type (InferChecked: no undefined where `defined` is declared).
@@ -14,21 +14,17 @@
 
 import { metaKey, pathOf, type MetaRef, type AnyNode, type BaseStore, type ContainerNode } from "anyshape";
 
+import { revealedKey } from "./control";
 import { focusFirst } from "./focus";
 import { validate, type InferChecked } from "./validation";
 
 /** true while a submit of the node is running. */
-export const submitting = metaKey(false);
+export const submittingKey = metaKey(false);
 
-/** Makes a node submittable: handleSubmit accepts a store whose own node declares it. */
-export const submission = () => ({ submitting });
+/** The `submitting` meta group. Makes a node submittable: handleSubmit accepts a store whose own node declares it. */
+export const submitting = () => ({ submitting: submittingKey });
 
-/** true once the field's error may be shown: set on blur by the bindings and by a submit. Cleared by reset(). */
-export const revealed = metaKey(false);
-
-export const reveal = () => ({ revealed });
-
-/** A node that declares submission(). */
+/** A node that declares submitting(). */
 export type Submittable = ContainerNode & { readonly submitting: MetaRef<boolean> };
 
 /** A <form onSubmit> handler; call it with no event for a programmatic submit. */
@@ -43,10 +39,10 @@ const ownRefs = new WeakMap<BaseStore<any>, MetaRef<boolean>>();
 function ownSubmitting(store: BaseStore<any>): MetaRef<boolean> {
   let ref = ownRefs.get(store);
   if (!ref) {
-    // Only a node that declares submission() itself is submitted: its own
+    // Only a node that declares submitting() itself is submitted: its own
     // `submitting`, matched by definition (the types can't tell definitions apart).
-    ref = store.collect(store.node, submitting).find((e) => e.ref.node === store.node)?.ref;
-    if (!ref) throw new Error(`handleSubmit: "${pathOf(store.node) || "<root>"}" does not declare submission()`);
+    ref = store.collect(store.node, submittingKey).find((e) => e.ref.node === store.node)?.ref;
+    if (!ref) throw new Error(`handleSubmit: "${pathOf(store.node) || "<root>"}" does not declare submitting()`);
     ownRefs.set(store, ref);
   }
   return ref;
@@ -63,7 +59,7 @@ export function handleSubmit<N extends Submittable>(
     running.add(store);
     store.batch(() => {
       store.set(ref, true);
-      for (const e of store.collect(store.node, revealed)) e.store.set(e.ref, true);
+      for (const e of store.collect(store.node, revealedKey)) e.store.set(e.ref, true);
     });
     try {
       const { valid, errors } = await validate(store);

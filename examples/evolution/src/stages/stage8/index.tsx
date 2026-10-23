@@ -12,7 +12,7 @@ import { useState } from "react";
 
 import {
   control,
-  submission,
+  submitting,
   handleSubmit,
   visible,
   required,
@@ -33,10 +33,10 @@ const shape = form(
     destination: field<string>().meta(control()),
     startDate: field<string>().meta(control()),
     endDate: field<string>().meta(control()),
-    nightlyRate: field<number | undefined>().meta(control(), { disabled }),
+    nightlyRate: field<number | undefined>().meta(control(), disabled()),
     employerPays: field<boolean>().meta(control()),
-    loyaltyNumber: field<string>().meta(control(), { disabled }),
-    promoCode: field<string>().meta(control(), { disabled }),
+    loyaltyNumber: field<string>().meta(control(), disabled()),
+    promoCode: field<string>().meta(control(), disabled()),
     notes: field<string>().meta(control()),
     nights: field<number | undefined>(),
     estimatedBudget: field<number | undefined>(),
@@ -44,8 +44,8 @@ const shape = form(
     car: object({
       license: field<string>().meta(control()),
       licenseExpiry: field<string>().meta(control()),
-    }).meta({ visible }),
-  }).meta(submission()),
+    }).meta(visible()),
+  }).meta(submitting()),
 );
 
 const initialValues: InferValue<typeof shape> = {
