@@ -11,10 +11,10 @@
 
 import { countIn, pendingIn, type RootStore } from "anyshape";
 import { StoreProvider, useForm, useStore, useValue } from "anyshape/react";
+import { handleSubmit, errorKey, dirtyKey } from "anyshape/recipes";
+import { useControl } from "anyshape/recipes/react";
 import { useEffect, useRef, useState } from "react";
 
-import { handleSubmit, errorKey, dirtyKey } from "../../../recipes";
-import { useControl } from "../../../recipes/react";
 import { TextField, TextAreaField, CheckboxField, DateField } from "./fields";
 import {
   shape,

@@ -7,7 +7,7 @@ export const meta: StageMeta = {
   bullets: [
     ".meta(control()) on a field adds error/edited/dirty/revealed; useControl adds a focus target and reports a pending check",
     "useControl(node) replaces the manual useValue + set binding",
-    "Typing marks the field edited; onBlur marks it revealed, which decides when its error shows. Errors still need rules (next stage)",
+    "Typing marks the field edited; onBlur marks it revealed. Together they decide when its error shows; errors still need rules (next stage)",
     "The status line under each input is live: watch unedited → edited · dirty",
   ],
   notes:

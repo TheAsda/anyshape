@@ -36,7 +36,7 @@ import {
   rule,
   asyncRule,
   errorKey,
-} from "../../../../../recipes";
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, ReadonlyRow, ResultCard, SubmitButton } from "../../ui";
 
 const DAY_MS = 86_400_000;

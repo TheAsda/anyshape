@@ -13,8 +13,6 @@
     "useDefineForClassFields": true,
     "types": ["vite/client", "node"],
     "paths": {
-      "anyshape/recipes/react": ["../../recipes/react/index.ts"],
-      "anyshape/recipes": ["../../recipes/index.ts"],
       "anyshape/react": ["../../src/react/index.ts"],
       "anyshape": ["../../src/index.ts"]
     }

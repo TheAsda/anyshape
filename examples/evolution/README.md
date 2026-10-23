@@ -2,7 +2,7 @@
 
 One trip-booking form, built up in 14 stages. Each stage adds one concept to the previous one, so reading them in order is the tutorial. Every stage is a folder under [`src/stages/`](src/stages/): `index.tsx` is the form, `meta.ts` holds the story and notes the app shows beside it.
 
-The stages use the [recipes](../../recipes/README.md) for validation, input state and submitting. Recipes are code you copy into your project, not part of the `anyshape` package: in your app, copy the ones you need instead of importing them from `anyshape`.
+The stages use the recipes for validation, input state and submitting, from a copied set in [`src/recipes/`](src/recipes/): the way a team that changes a default policy works. The copy is the package's [default recipes](../../recipes/README.md) with one edit, in [`src/recipes/react/control.ts`](src/recipes/react/control.ts): an error shows from the first keystroke, where the default recipes wait for a blur or a submit. Stage 3 is where it shows. Every stage imports the recipes from the copy and none from `anyshape/recipes`: a form that mixes the two sets is checked wrongly, since keys are matched by definition. To use the defaults as they are, import `anyshape/recipes` instead, as the [basic example](../basic/README.md) does.
 
 ## Running it
 

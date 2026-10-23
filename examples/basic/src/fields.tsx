@@ -7,8 +7,9 @@
 //
 // showError: an error shows once the field was left (onBlur) or
 // covered by a submit and no check is pending, and then stays live
-// while it's fixed. To change when, edit the expression in
-// useControl (recipes/react/control.ts).
+// while it's fixed: the default recipes' policy. To change it,
+// copy the recipes and edit the showError line in the copy's
+// react/control.ts (see recipes/POLICIES.md).
 //
 // Every field also takes an optional `hint`: static helper text
 // that tells the user up front what the rules are (and how to
@@ -17,9 +18,8 @@
 
 import type { ShapeNode } from "anyshape";
 import { useValue } from "anyshape/react";
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "anyshape/recipes/react";
 import { useId } from "react";
-
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
 
 // Node types accepted by each component: a ControlNode whose value type
 // matches the input. Passing e.g. a number field to TextField is a type

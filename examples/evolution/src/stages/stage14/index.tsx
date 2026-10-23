@@ -42,7 +42,7 @@ import {
   errorKey,
   defined,
   focusFirst,
-} from "../../../../../recipes";
+} from "../../recipes";
 import { TextField, NumberField, CheckboxField, SelectField, ReadonlyRow, ResultCard } from "../../ui";
 
 const DAY_MS = 86_400_000;

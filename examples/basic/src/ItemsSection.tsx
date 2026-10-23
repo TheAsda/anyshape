@@ -8,9 +8,9 @@
 
 import { countIn } from "anyshape";
 import { StoreProvider, useArray, useValue } from "anyshape/react";
+import { useControl } from "anyshape/recipes/react";
 import { useId, useRef } from "react";
 
-import { useControl } from "../../../recipes/react";
 import { NumberField, ReadonlyField } from "./fields";
 import { shape, CATALOG, lookingUp } from "./form";
 

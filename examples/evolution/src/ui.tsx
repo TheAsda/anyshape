@@ -8,7 +8,7 @@ import type { FieldNode } from "anyshape";
 import { useStore, useValue } from "anyshape/react";
 import { useId } from "react";
 
-import { useControl, fromInput, fromCheckbox, type ControlNode } from "../../../recipes/react";
+import { useControl, fromInput, fromCheckbox, type ControlNode } from "./recipes/react";
 
 /** What each stage exports alongside its component. */
 export type StageMeta = {

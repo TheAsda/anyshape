@@ -17,7 +17,6 @@ import {
   type InferValue,
   type FieldNode,
 } from "anyshape";
-
 import {
   control,
   submitting,
@@ -33,7 +32,7 @@ import {
   visibleWhen,
   clearWhen,
   isEmpty,
-} from "../../../recipes";
+} from "anyshape/recipes";
 
 // A per-field "lookup in flight" tag. metaKey (not a plain value)
 // so the key is countable: countIn(shape, lookingUp) counts every
