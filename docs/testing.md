@@ -10,13 +10,13 @@ Before you open a pull request, run:
 
 - `bun run test`: all four Vitest projects. Each also runs alone: `test:unit`, `test:recipes`, `test:react`, `test:recipes-react`.
 - `bun run typecheck`: `tsc` on the source, the recipes and the type-level tests, then `kiira check` on the code samples in `README.md`, `docs/guide/` and `docs/principles.md`. The type-level tests and the samples are checked only here, never under Vitest, so CI runs both commands.
-- `bun run lint`: oxlint, configured in `.oxlintrc.json`. Its boundary rules check that recipes and examples import only the entries `anyshape` and `anyshape/react` (and the recipes), and that the core, its tests and benches import no recipe. `bun run lint:fix` applies the fixes oxlint can make.
+- `bun run lint`: oxlint, configured in `.oxlintrc.json`. Its boundary rules check that recipes import only the entries `anyshape` and `anyshape/react` (and the rest of their set), that examples import only the package's entries, `anyshape/recipes` and `anyshape/recipes/react` included (or a copied set), and that the core, its tests and benches import no recipe. `bun run lint:fix` applies the fixes oxlint can make.
 - `bun run format:check`: oxfmt, configured in `.oxfmtrc.json`, on the code, JSON, YAML and Markdown. `bun run format` rewrites the files.
 
 CI also runs these, which you can run by hand:
 
-- `bun run build && bun run check:package` checks the packed tarball: its contents (the shipped docs included), one copy of the core, and consumers with and without React.
-- `bun install && bun run build` in `examples/basic` and in `examples/evolution` builds each example against the library's source.
+- `bun run build && bun run check:package` checks the packed tarball: its contents (the shipped docs, the recipe sources and `recipes/POLICIES.md` included), one copy of the core across all four entries, consumers with and without React, the recipe entries in use, and the shipped recipe sources compiling, copied unchanged, against the installed package.
+- `bun install && bun run build` in `examples/basic` and in `examples/evolution` builds each example against the library's source: `basic` imports the recipe entries, `evolution` its copied set in `src/recipes/`.
 
 `bun run bench` runs the benchmarks, and `bun run test:memory` the memory checks (see [Benchmarks and memory](#benchmarks-and-memory)).
 
@@ -38,13 +38,13 @@ The file names and `describe` titles say what each file covers; there is no list
 - **React bindings:** `test/react/`, by the same rule (`form.test.tsx` covers `useForm` and `useSync`).
 - **Recipes:** `recipes/test/`, in the file named after the recipe it covers (`recipes/submit.ts` is tested in `recipes/test/submit.test.ts`). A test that needs a real browser, such as DOM focus or a rendered field, goes in `recipes/test/react/`.
 - **The type contract:** `test/types.test.ts` for the core entries, `recipes/test/types.test.ts` for the recipes. `tsc` asserts them under `bun run typecheck`; Vitest runs the files but checks no types.
-- **The public names:** `test/exports.test.ts` keeps each entry's names as a snapshot, and checks that the API tables in `docs/guide/agents.md` list exactly those names. A change to the public interface updates both.
+- **The public names:** `test/exports.test.ts` keeps each entry's names as a snapshot (the recipe entries read through TypeScript alone, since the core's tests import no recipe), and checks that the API tables in `docs/guide/agents.md` list exactly those names. A change to the public interface updates both.
 - **Scenarios across the core:** the trip booking (`test/support/trip.ts`) in `test/integration.test.ts`, and rendered in `test/react/integration.test.tsx`.
 - **Benchmarks and memory checks:** `bench/` (see [Benchmarks and memory](#benchmarks-and-memory)).
 
 The project that runs a file follows from its folder and extension (see [Projects](#projects)).
 
-Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) and `test/support/trip.ts`. The core tests declare their meta keys with the test-local features in `test/support/features.ts` and rules in `test/support/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`. The tests don't share code across that boundary, and the lint's boundary rules keep the core's tests from importing `recipes/`, so the copies are deliberate.
+Shared fixtures live in `test/support/fixtures/` (`user`, `limits`, `company`) and `test/support/trip.ts`. The core tests declare their meta keys with the test-local meta groups in `test/support/features.ts` and rules in `test/support/rules.ts`, never with the recipes. The recipe tests have their own copies of the fixtures they share with the core, in `recipes/test/`. The tests don't share code across that boundary, and the lint's boundary rules keep the core's tests from importing `recipes/`, so the copies are deliberate.
 
 ## Conventions
 

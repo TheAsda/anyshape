@@ -42,9 +42,10 @@ Comments describe the code as it is now, not how it got there. Drop notes like "
 
 The changelog and version numbers come from [Changesets](https://github.com/changesets/changesets). CI doesn't enforce this policy; reviews do.
 
-- A pull request that changes the published output adds a changeset with `bun run changeset`. The published output is `src/`, the package's `exports`, types and peer dependencies.
+- A pull request that changes the published output adds a changeset with `bun run changeset`. The published output is `src/`, `recipes/` outside its tests, the package's `exports`, types and peer dependencies.
 - The docs the package ships (the `files` in `package.json`: `docs/guide/`, `docs/principles.md` and `GLOSSARY.md`) get a `patch` changeset only when they give wrong guidance: a sample, rule or claim that would lead a reader or a coding agent to write wrong code. Coding agents read those docs from `node_modules/anyshape/`, so such a fix reaches them only through a release. Wording, typo and new-page changes need none; they ship with the next release.
-- Other docs (the README, this file, `docs/testing.md`, the ADRs), tests, recipes, examples and CI need no changeset.
+- The default recipes ship too (`recipes/`, outside its tests): a change to them gets a changeset. A change to one of their policies (when an error shows, what counts as empty, a message) is breaking, and updates `recipes/POLICIES.md` in the same pull request.
+- Other docs (the README, this file, `docs/testing.md`, the ADRs), tests, examples and CI need no changeset.
 - While the version is 0.x:
   - a breaking change is a `minor` changeset. Its text starts with **Breaking:** and shows the change as code;
   - features and fixes are `patch`;

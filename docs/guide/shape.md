@@ -82,7 +82,7 @@ type EmailMeta = InferMeta<typeof booking.email>; // { error: string | undefined
 
 - A plain value (`label: "Email"`, `visible: true`) declares a key with that default.
 - A key definition made with `metaKey` (`error`) carries a default and can add capabilities: counting, a default behavior, combining several inputs ([meta-keys.md](meta-keys.md)).
-- A [feature](../../GLOSSARY.md) is a function that returns several key definitions; spread it into `.meta()` with the rest: `field<string>().meta(control(), { label: "Email" })`.
+- A [meta group](../../GLOSSARY.md) is a function that returns key definitions; call it inside `.meta()` beside the rest: `field<string>().meta(control(), { label: "Email" })`.
 - `.meta()` is called before `form()`, and it returns a new node: the one it was called on is unchanged. For meta on the root, call it on the root object: `form(object({ ... }).meta({ ... }))`.
 - A node declares each key once, and a key can't share its name with a child (an array's child is its `item`).
 
@@ -118,5 +118,5 @@ A function that returns a piece of shape works the same way, and can take parame
 ## See also
 
 - [The store](store.md): reading and writing through nodes.
-- [Meta keys](meta-keys.md): key definitions, features, counting.
+- [Meta keys](meta-keys.md): key definitions, meta groups, counting.
 - [Arrays and rows](arrays.md): row templates and row stores.

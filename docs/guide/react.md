@@ -230,14 +230,14 @@ function CarToast({ notify }: { notify: (message: string) => void }) {
 
 ## State beside the form
 
-A DOM element, a component handle or any other outside reference is not form state: it can't be submitted, compared or reset. Keep it in your own registry beside the form, keyed by the store and the node. The [focus recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/focus.ts) is the pattern: `registerFocus(store, node, target)` stores a focus target in a `WeakMap` keyed by the node's [scope](../../GLOSSARY.md) store and the node, and returns the function that unregisters it. `reset()` leaves the registry alone, and the targets of removed rows are skipped by checking `store.isAttached()`.
+A DOM element, a component handle or any other outside reference is not form state: it can't be submitted, compared or reset. Keep it in your own registry beside the form, keyed by the store and the node. The [focus recipe](../../recipes/focus.ts) is the pattern: `registerFocus(store, node, target)` stores a focus target in a `WeakMap` keyed by the node's [scope](../../GLOSSARY.md) store and the node, and returns the function that unregisters it. `reset()` leaves the registry alone, and the targets of removed rows are skipped by checking `store.isAttached()`.
 
 ## Hot reload
 
 Under Vite or another bundler with React Fast Refresh, an edit re-runs the edited module and the modules that import it, and React keeps the state of the components it re-renders. `useForm` takes up what changed:
 
 - **An edited shape** builds a new store. Every value whose path is in both shapes, with the same kind (field, object or array), is carried over with its [baseline](../../GLOSSARY.md), rows by index, so `reset()` and dirty keep their meaning. Added fields take their value from `values ?? initialValues`; removed fields are dropped. A field whose type changed keeps its old value until it is written.
-- **Meta is not carried over.** Behaviors recompute the keys they write; keys written from outside, such as a touched flag, start from their defaults. Row components remount, since the new store's rows are new, so state that lives only in a row component is lost.
+- **Meta is not carried over.** Behaviors recompute the keys they write; keys written from outside, such as a `revealed` flag set on blur, start from their defaults. Row components remount, since the new store's rows are new, so state that lives only in a row component is lost.
 - **Edited behaviors** replace the registered ones on the same store: values and meta stay.
 - **Behaviors kept from the previous shape** (held in component state across the edit) can't run on the new store: `useForm` throws and says to build them from the new shape.
 

@@ -9,8 +9,16 @@ The published library: the mechanism every form needs, and no opinion about what
 _Avoid_: base, kernel
 
 **Recipe**:
-Consumer-owned code built only on the core's public interface that gives a metadata key or workflow one team's meaning (e.g. what `disabled` implies, when an error shows). Copied and adapted, not depended on.
-_Avoid_: preset, defaults, extras, utilities
+Code built only on the core's public interface that gives a metadata key or workflow one meaning (e.g. what `disabled` implies, when an error shows), with one policy and no options for another.
+_Avoid_: preset, extras, utilities, plugin
+
+**Default recipes**:
+The set of recipes the package ships, as `anyshape/recipes` and `anyshape/recipes/react`, imported as they are. Their policies are listed in one file beside their sources.
+_Avoid_: built-ins, presets, the standard library
+
+**Copied recipe**:
+A recipe in a team's own project, copied from the default recipes' sources with the rest of the set and changed there. A form uses the default recipes or one copied set, never both.
+_Avoid_: vendored recipe, fork, override
 
 **Shape**:
 The declaration of a form's structure (its fields, objects and arrays, and the meta keys each one carries) from which every value and meta type is inferred.

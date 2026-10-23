@@ -90,7 +90,7 @@ const checkDestinationDebounced = defineBehavior({
 - Each behavior instance has one slot: one piece of kept work at a time.
 - Kept work is aborted when a rerun asks for a different key, when no rerun takes it over, and when the row is removed, the behavior is removed or `reset()` covers it.
 
-The [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts) keeps its debounce and its async checks this way.
+The [validation recipe](../../recipes/validation.ts) keeps its debounce and its async checks this way.
 
 ## Pending
 

@@ -4,7 +4,7 @@ The page a review starts from. It lists the sources a change is reviewed against
 
 ## What a change is reviewed against
 
-- [`AGENTS.md`](AGENTS.md): the project status (pre-release, so a change needs no shims or deprecations) and the core/recipes boundary: recipes and examples build on the public entries only, node internals stay in the core, and no code finds a meta key by a string. Applies to every code change.
+- [`AGENTS.md`](AGENTS.md): the project status (pre-release, so a change needs no shims or deprecations) and the core/recipes boundary: recipes build on the core's public entries only, examples on the package's entries or a copied set, node internals stay in the core, and no code finds a meta key by a string. Applies to every code change.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): tests shown red first, pinned results before an optimization, a sign-off for a change to observable behavior, comments that describe the current code, where a rule goes, and when a changeset is due. Applies to every change.
 - [`docs/principles.md`](docs/principles.md): what the library promises and refuses, and the ideas it turned down. Applies to a change to the core, its public interface or a recipe's design.
 - [`docs/testing.md`](docs/testing.md): where a new test goes, the test and fixture conventions, and the mechanisms that need a mutation check. Applies to a change that adds or moves a test, or touches a listed mechanism.

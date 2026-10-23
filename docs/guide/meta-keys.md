@@ -1,6 +1,6 @@
 # Meta keys
 
-A [meta key](../../GLOSSARY.md) is named state that a [node](../../GLOSSARY.md) declares beside its value, with a default: an error message, whether the field was touched, whether a section is shown. The [core](../../GLOSSARY.md) gives no key a meaning. `error`, `touched` and `visible` are all declared by you, or by a [recipe](../../GLOSSARY.md) you copied.
+A [meta key](../../GLOSSARY.md) is named state that a [node](../../GLOSSARY.md) declares beside its value, with a default: an error message, whether the user edited the field, whether a section is shown. The [core](../../GLOSSARY.md) gives no key a meaning. `error`, `edited` and `visible` are all declared by you, or by a [recipe](../../GLOSSARY.md): the default recipes in `anyshape/recipes` declare them, and so does a copy of them.
 
 First shown in [stage 2](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage2); counting in [stage 13](https://github.com/TheAsda/anyshape/tree/master/examples/evolution/src/stages/stage13).
 
@@ -44,15 +44,15 @@ A definition's steps add capabilities, and each step returns a new definition:
 
 Each step also marks the definition's type, and the later steps keep the marks: `.aggregate()` adds `Countable`, which `countIn` requires, and `.behavior()` or `.combine()` adds `Owned`. The marks make a step out of order a type error, with the message it throws at run time: `.aggregate()` is declared once, `.uses()` comes before `.behavior()` or `.combine()`, and a key takes one of `.behavior()` and `.combine()`. A marked definition still fits wherever `MetaKeyDef<V>` is expected.
 
-## Features
+## Meta groups
 
-A [feature](../../GLOSSARY.md) is a function that returns several key definitions, spread into `.meta()`:
+A [meta group](../../GLOSSARY.md) is a function that returns key definitions, each under its usual name, called inside `.meta()`:
 
 ```ts
-const touched = metaKey(false);
-const revealed = metaKey(false);
+const editedKey = metaKey(false);
+const revealedKey = metaKey(false);
 
-const control = () => ({ error, touched, revealed });
+const control = () => ({ error, edited: editedKey, revealed: revealedKey });
 
 const signup = form(
   object({
@@ -62,7 +62,7 @@ const signup = form(
 );
 ```
 
-The feature returns definitions declared once, outside it. If it created new definitions on each call, every node would get a different key, and nothing could count or sweep them as one. The recipes' `control()` and `validation()` are features ([recipes](https://github.com/TheAsda/anyshape/blob/master/recipes/features.ts)).
+The meta group returns definitions declared once, outside it. If it created new definitions on each call, every node would get a different key, and nothing could count or sweep them as one. The default recipes declare every key through a meta group: `control()` and `validation()` declare several, `visible()`, `defined()` or `submitting()` one each, and their definitions carry a `Key` suffix (`editedKey`), for sweeps and counts ([ADR 0007](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0007-keys-are-declared-through-meta-groups.md), [source](../../recipes/control.ts)).
 
 ## A key's default behavior
 
@@ -75,7 +75,7 @@ const dirty = metaKey(false).behavior((self, key) => ({
   run: (ctx) => ctx.set(key, !Object.is(ctx.get(self), ctx.get(initialOf(self)))),
 }));
 
-const markTouched = metaKey(false).behavior((self, key) => ({
+const markEdited = metaKey(false).behavior((self, key) => ({
   triggers: [self],
   writes: [key],
   origins: ["user"],
@@ -92,14 +92,14 @@ A default behavior is confined to its own node: its value, its meta keys and `in
 
 ```ts
 const showError = metaKey(false)
-  .uses(error, markTouched)
-  .behavior((self, key, [nodeError, wasTouched]) => ({
-    triggers: [nodeError, wasTouched],
+  .uses(error, markEdited)
+  .behavior((self, key, [nodeError, wasEdited]) => ({
+    triggers: [nodeError, wasEdited],
     writes: [key],
-    run: (ctx) => ctx.set(key, ctx.get(nodeError) !== undefined && ctx.get(wasTouched)),
+    run: (ctx) => ctx.set(key, ctx.get(nodeError) !== undefined && ctx.get(wasEdited)),
   }));
 
-const contact = form(object({ phone: field<string>().meta({ error, touched: markTouched, showError }) }));
+const contact = form(object({ phone: field<string>().meta({ error, edited: markEdited, showError }) }));
 ```
 
 The factory may return one [contribution](../../GLOSSARY.md) instead of a config, to a combined key it uses ([contributions.md](contributions.md)). Every node that declares the key adds that contribution, named `<path>#<key>` unless it has a name, with the same confinement to its own node. The key itself then has no writer: it is a mark whose value nothing reads. Here every `locked` field carries a reason in its `disabled`:
@@ -155,7 +155,7 @@ const messages = tripStore
 ## Common mistakes
 
 - **Looking a key up by its name**, as `node["error"]` or by listing a node's keys. Take the node typed with the key you need, or sweep by definition with `collect`.
-- **A feature that creates its definitions inside the function.** Each call makes new keys; declare the definitions once.
+- **A meta group that creates its definitions inside the function.** Each call makes new keys; declare the definitions once.
 - **`isCounted` true for the default.** `.aggregate()` throws: untouched nodes must count as zero.
 - **Counting a key no node under the counted node declares.** `countIn` throws. Count from a node whose subtree declares the key.
 - **Writing a combined key from a behavior.** Registration rejects it; contribute to the key instead ([contributions.md](contributions.md)).
