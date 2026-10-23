@@ -10,7 +10,9 @@
     "types": ["node"],
     "paths": {
       "anyshape": ["./src/index.ts"],
-      "anyshape/react": ["./src/react/index.ts"]
+      "anyshape/react": ["./src/react/index.ts"],
+      "anyshape/recipes": ["./recipes/index.ts"],
+      "anyshape/recipes/react": ["./recipes/react/index.ts"]
     }
   },
   "files": []

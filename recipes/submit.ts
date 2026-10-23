@@ -14,9 +14,9 @@
 
 import { metaKey, pathOf, type MetaRef, type AnyNode, type BaseStore, type ContainerNode } from "anyshape";
 
-import { revealedKey } from "./control";
-import { focusFirst } from "./focus";
-import { validate, type InferChecked } from "./validation";
+import { revealedKey } from "./control.js";
+import { focusFirst } from "./focus.js";
+import { validate, type InferChecked } from "./validation.js";
 
 /** true while a submit of the node is running. */
 export const submittingKey = metaKey(false);

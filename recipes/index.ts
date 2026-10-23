@@ -22,7 +22,7 @@ export {
   type AsyncStart,
   type ErrorEntry,
   type ValidationResult,
-} from "./validation";
+} from "./validation.js";
 export {
   required,
   minLength,
@@ -37,10 +37,10 @@ export {
   type MessageOptions,
   type Limit,
   type ExclusiveOptions,
-} from "./rules";
-export { editedKey, dirtyKey, revealedKey, edited, dirty, revealed, control } from "./control";
-export { visibleKey, visible, visibleWhen } from "./visibility";
-export { disabledKey, disabled, disableWhen, type Disableable } from "./disabling";
-export { calculate, link, clearWhen, type LinkOptions } from "./values";
-export { submittingKey, submitting, handleSubmit, type Submittable, type FormSubmitHandler } from "./submit";
-export { registerFocus, focusFirst, type FocusTarget, type FocusEntry } from "./focus";
+} from "./rules.js";
+export { editedKey, dirtyKey, revealedKey, edited, dirty, revealed, control } from "./control.js";
+export { visibleKey, visible, visibleWhen } from "./visibility.js";
+export { disabledKey, disabled, disableWhen, type Disableable } from "./disabling.js";
+export { calculate, link, clearWhen, type LinkOptions } from "./values.js";
+export { submittingKey, submitting, handleSubmit, type Submittable, type FormSubmitHandler } from "./submit.js";
+export { registerFocus, focusFirst, type FocusTarget, type FocusEntry } from "./focus.js";

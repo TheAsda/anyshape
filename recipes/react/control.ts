@@ -17,7 +17,7 @@ import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef 
 import { useField, useValue, type HookOptions } from "anyshape/react";
 import { useCallback, useRef } from "react";
 
-import { registerFocus, type FocusTarget } from "../focus";
+import { registerFocus, type FocusTarget } from "../focus.js";
 
 /** A node with the control() keys. */
 export type ControlNode = AnyNode & {

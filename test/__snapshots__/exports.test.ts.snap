@@ -24,6 +24,20 @@ exports[`the React entry's public names 1`] = `
 }
 `;
 
+exports[`the React recipe entry's public names 1`] = `
+{
+  "types": [
+    "ControlBinding",
+    "ControlNode",
+  ],
+  "values": [
+    "fromCheckbox",
+    "fromInput",
+    "useControl",
+  ],
+}
+`;
+
 exports[`the core entry's public names 1`] = `
 {
   "types": [
@@ -96,6 +110,75 @@ exports[`the core entry's public names 1`] = `
     "pendingIn",
     "pendingOf",
     "when",
+  ],
+}
+`;
+
+exports[`the recipe entry's public names 1`] = `
+{
+  "types": [
+    "AsyncRuleContext",
+    "AsyncRuleOptions",
+    "AsyncStart",
+    "Defined",
+    "Disableable",
+    "ErrorEntry",
+    "ExclusiveOptions",
+    "FocusEntry",
+    "FocusTarget",
+    "FormSubmitHandler",
+    "InferChecked",
+    "Limit",
+    "LinkOptions",
+    "Message",
+    "MessageOptions",
+    "RuleContext",
+    "RuleOptions",
+    "RulePart",
+    "Submittable",
+    "Validatable",
+    "ValidationResult",
+  ],
+  "values": [
+    "asyncRule",
+    "calculate",
+    "checkForcedKey",
+    "clearWhen",
+    "control",
+    "defined",
+    "definedKey",
+    "dirty",
+    "dirtyKey",
+    "disableWhen",
+    "disabled",
+    "disabledKey",
+    "edited",
+    "editedKey",
+    "email",
+    "errorKey",
+    "exclusive",
+    "focusFirst",
+    "handleSubmit",
+    "isEmpty",
+    "link",
+    "max",
+    "maxLength",
+    "min",
+    "minLength",
+    "pattern",
+    "registerFocus",
+    "required",
+    "requiredNowKey",
+    "revealed",
+    "revealedKey",
+    "rule",
+    "submitting",
+    "submittingKey",
+    "validate",
+    "validation",
+    "visible",
+    "visibleKey",
+    "visibleWhen",
   ],
 }
 `;

@@ -1,12 +1,14 @@
 # anyshape for agents
 
-Read this page before writing anyshape code. It ships inside the package, so it matches the installed version. Its links to recipes, examples and ADRs point at the repository's `master`, which may be newer. It gives the rules, every public name with the page that explains it, the mistakes agents make most often, and which page to open for a task. Every other page in this folder stands alone: open only the ones the task needs.
+Read this page before writing anyshape code. It ships inside the package, so it matches the installed version, and so do the recipe sources and the [policies file](../../recipes/POLICIES.md) it links to. Its links to examples and ADRs point at the repository's `master`, which may be newer. It gives the rules, every public name with the page that explains it, the mistakes agents make most often, and which page to open for a task. Every other page in this folder stands alone: open only the ones the task needs.
 
 ## Rules
 
 - **Reach everything through references.** A value is `shape.trip.return`, a [meta key](../../GLOSSARY.md) on it is `shape.trip.return.error`. Reads, writes, subscriptions and [behaviors](../../GLOSSARY.md) take these references, never string paths. The one exception is `store.resolvePath(path)`, for paths that come from a server ([your-side.md](your-side.md)).
-- **No code finds a meta key by its name.** Code that needs a key is handed the [node](../../GLOSSARY.md)'s reference (`node.error`) or, to sweep a subtree, the key's definition (`store.collect(node, error)`). Don't index a node with a string or list its keys.
-- **The [core](../../GLOSSARY.md) declares no meta key.** There is no built-in `error`, `touched`, `visible` or `disabled`. Declare the keys a form needs ([meta-keys.md](meta-keys.md)), or copy a [recipe](../../GLOSSARY.md) from the [recipes folder](https://github.com/TheAsda/anyshape/tree/master/recipes). Recipes are not in the package: `anyshape/recipes` doesn't exist.
+- **No code finds a meta key by its name.** Code that needs a key is handed the [node](../../GLOSSARY.md)'s reference (`node.error`) or, to sweep a subtree, the key's definition (`store.collect(node, errorKey)`). Don't index a node with a string or list its keys.
+- **The [core](../../GLOSSARY.md) declares no meta key.** There is no built-in `error`, `edited`, `visible` or `disabled` in `anyshape`. Import them from the [default recipes](../../GLOSSARY.md): `anyshape/recipes` (validation, rules, input state, visibility, disabling, submit, focus) and `anyshape/recipes/react` (`useControl` and the input adapters). Their policies (when an error shows, what counts as empty, what a submit does) are listed in [`recipes/POLICIES.md`](../../recipes/POLICIES.md). Declare your own keys for anything else ([meta-keys.md](meta-keys.md)).
+- **Declare keys through meta groups:** `field<string>().meta(control(), defined())`, `object({ ... }).meta(visible(), submitting())`. A bare `{ visible }` declares a key holding the function `visible`, which compiles. The definitions, with a `Key` suffix (`errorKey`, `revealedKey`), are for sweeps and counts only: `countIn(shape, errorKey)`.
+- **To change a default policy, copy the whole set.** Copy `node_modules/anyshape/recipes/` into the project, edit the copy, and switch every recipe import to the copy at once. Keys are matched by definition, so a copied `validate` or `handleSubmit` doesn't see the keys the shipped `control()` declares, and a form that mixes the two is checked wrongly without a compile error ([recipes README](../../recipes/README.md#customizing-copy-the-whole-set)).
 - **Build a form from an object node:** `form(object({ ... }))`.
 - **A behavior declares every reference it touches** in `triggers`, `reads`, `writes` or a [guard](../../GLOSSARY.md). `ctx.get` or `ctx.set` on anything else throws ([behaviors.md](behaviors.md)).
 - **Each target has one writer.** A second behavior writing the same value or meta key is rejected when it is registered. When several declarations need a say in one key, make it a combined key and `contribute` to it ([contributions.md](contributions.md)).
@@ -16,9 +18,9 @@ Read this page before writing anyshape code. It ships inside the package, so it 
 - **The [store](../../GLOSSARY.md) is read and watched through references only:** `store.get(ref)`, `store.set(ref, value)`, `store.subscribe(ref, listener)`. The whole form is `store.get(shape)`.
 - **Derived values are behaviors; side effects are subscriptions.** A behavior writes only the form. Work outside the form (a toast, loading options into React state) subscribes, or uses `useValue` with `useEffect` in React ([react.md](react.md)).
 - **In React, logic goes in `defineBehaviors`.** React data enters the form through `useSync`. `useBehaviors` is only for logic that comes from the component itself.
-- **Inputs are controlled** through `useField`. There is no `register()`.
+- **Inputs are controlled** through `useField`, or `useControl` from `anyshape/recipes/react` for a node with `control()`. There is no `register()`. Destructure `useControl`'s result (`const { value, onChange, onBlur, focusRef } = useControl(node)`): the React compiler lint flags `c.focusRef` beside other reads of `c`.
 - **A reusable component takes its node as a prop.** The provider (the form, or a row) supplies the store.
-- **References outside the form stay outside it.** A DOM element or another handle is not form state: keep it in your own registry beside the form, as the [focus recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/focus.ts) does.
+- **References outside the form stay outside it.** A DOM element or another handle is not form state: keep it in your own registry beside the form, as the [focus recipe](../../recipes/focus.ts) does.
 
 ## API at a glance
 
@@ -74,6 +76,38 @@ Every public name, with the page that explains it. A test checks these tables ag
 | `useArray`, `ArrayBinding`            | An array's rows and row operations.                                                   | [react.md](react.md) |
 | `useSync`                             | Writes React data (props, query results) into a value or meta key.                    | [react.md](react.md) |
 | `useBehaviors`, `UseBehaviorsOptions` | Registers behaviors from a component, for logic that comes from the component.        | [react.md](react.md) |
+
+### `anyshape/recipes`
+
+| Name                                                                   | What it is                                                                                                                                                   | Page                                                                               |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `control`                                                              | The meta group for an input: `validation()` plus `edited`, `dirty` and `revealed`.                                                                           | [POLICIES.md](../../recipes/POLICIES.md#when-an-error-shows)                       |
+| `edited`, `dirty`, `revealed`                                          | One-key meta groups: the user changed the value; it differs from its baseline; its error may show (blur, submit, code).                                      | [POLICIES.md](../../recipes/POLICIES.md#edited-means-the-user-changed-the-value)   |
+| `editedKey`, `dirtyKey`, `revealedKey`                                 | Their key definitions, for sweeps and counts (`countIn(shape, dirtyKey)`).                                                                                   | [meta-keys.md](meta-keys.md)                                                       |
+| `validation`, `defined`                                                | Meta groups: `error`, `checkForced` and `requiredNow`; the "Required" check of a field that starts empty.                                                    | [contributions.md](contributions.md)                                               |
+| `errorKey`, `checkForcedKey`, `requiredNowKey`, `definedKey`           | Their key definitions. `countIn(form, errorKey)` counts errors; `pendingIn(form, errorKey)` counts running checks.                                           | [async.md](async.md)                                                               |
+| `rule`, `RuleOptions`, `RuleContext`                                   | A sync check of one node, contributed to its `error`: a message, or `undefined` when valid.                                                                  | [contributions.md](contributions.md)                                               |
+| `asyncRule`, `AsyncRuleOptions`, `AsyncRuleContext`, `AsyncStart`      | An async check, after the sync rules pass; `start` and `debounce` per rule.                                                                                  | [async.md](async.md)                                                               |
+| `validate`, `ValidationResult`, `ErrorEntry`                           | Checks a subtree, waits for its checks, and lists its errors in shape order.                                                                                 | [POLICIES.md](../../recipes/POLICIES.md#what-a-submit-does)                        |
+| `InferChecked`, `Defined`                                              | A node's checked type: no `undefined` where `defined()` is declared; the mark it looks for.                                                                  | [your-side.md](your-side.md#forms-in-steps)                                        |
+| `Validatable`, `RulePart`                                              | A node with `validation()`; what a rule contributes to `error`.                                                                                              | [contributions.md](contributions.md)                                               |
+| `required`, `minLength`, `maxLength`, `min`, `max`, `pattern`, `email` | Ready rules. `required` also feeds `requiredNow`; the others pass on an empty value.                                                                         | [POLICIES.md](../../recipes/POLICIES.md#format-rules-pass-on-empty-values)         |
+| `isEmpty`                                                              | What the rules count as empty: `undefined`, `null`, whitespace-only strings, empty arrays.                                                                   | [POLICIES.md](../../recipes/POLICIES.md#what-counts-as-empty)                      |
+| `Message`, `MessageOptions`, `Limit`                                   | A rule's `message` (a string, or a function of the value) and `name`; a limit (a number or a reference).                                                     | [POLICIES.md](../../recipes/POLICIES.md#messages-are-fixed-english-strings)        |
+| `exclusive`, `ExclusiveOptions`                                        | At most (or, with `required`, exactly) one of several fields filled: a rule and a `disabled` reason on each.                                                 | [contributions.md](contributions.md)                                               |
+| `visible`, `visibleKey`, `visibleWhen`                                 | The `visible` meta group, its definition, and the behavior that computes it both ways.                                                                       | [guards.md](guards.md)                                                             |
+| `disabled`, `disabledKey`, `disableWhen`, `Disableable`                | The `disabled` meta group (true while any reason applies), its definition, a reason, and a node with it.                                                     | [contributions.md](contributions.md)                                               |
+| `calculate`, `link`, `LinkOptions`, `clearWhen`                        | Value behaviors: a value computed from others; two values kept in step both ways; a value reset to its baseline while a test holds.                          | [behaviors.md](behaviors.md)                                                       |
+| `submitting`, `submittingKey`, `handleSubmit`                          | The meta group that makes a node submittable, its definition, and the submit: reveal, validate, then `fn` with the value as it is, or focus the first error. | [POLICIES.md](../../recipes/POLICIES.md#a-submit-passes-the-stores-value-as-it-is) |
+| `Submittable`, `FormSubmitHandler`                                     | A node with `submitting()`; the handler `handleSubmit` returns, for `<form onSubmit>` or a call with no event.                                               | [your-side.md](your-side.md)                                                       |
+| `registerFocus`, `focusFirst`, `FocusTarget`, `FocusEntry`             | The focus registry beside the form: where focusing an error moves the cursor, in document order.                                                             | [POLICIES.md](../../recipes/POLICIES.md#what-a-submit-does)                        |
+
+### `anyshape/recipes/react`
+
+| Name                                          | What it is                                                                                                                               | Page                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `useControl`, `ControlBinding`, `ControlNode` | An input's binding for a node with `control()`: `value`, `onChange`, `onBlur`, `error`, `showError`, `pending`, the keys and `focusRef`. | [POLICIES.md](../../recipes/POLICIES.md#when-an-error-shows) |
+| `fromInput`, `fromCheckbox`                   | Turn an `onChange` for values into a DOM change handler, the same one for the same `onChange`.                                           | [react.md](react.md)                                         |
 
 ## Common mistakes
 
@@ -177,7 +211,7 @@ const forcedStore = createStore(forced, { deliveryType: undefined as never });
 forcedStore.get(forced.deliveryType).toLowerCase(); // compiles, throws at run time
 ```
 
-Fix: type what the field holds while it is edited, `field<DeliveryType | undefined>()`, and narrow with `=== undefined` where a value is needed. To require it, declare the validation recipe's `defined` key, `.meta(control(), { defined })`: its `error` says "Required" while the value is `undefined`, and the submit recipe's `handleSubmit` hands its `fn` the value without `undefined` ([your-side.md](your-side.md#forms-in-steps)).
+Fix: type what the field holds while it is edited, `field<DeliveryType | undefined>()`, and narrow with `=== undefined` where a value is needed. To require it, declare `.meta(control(), defined())` from `anyshape/recipes`: its `error` says "Required" while the value is `undefined`, and `handleSubmit` hands its `fn` the value without `undefined` ([your-side.md](your-side.md#forms-in-steps)).
 
 ```ts
 const honest = form(object({ deliveryType: field<DeliveryType | undefined>().meta({ error }) }));
@@ -190,8 +224,11 @@ if (chosen !== undefined) chosen.toLowerCase();
 
 - reading or writing a meta key the node doesn't declare, such as `store.get(shape.price.error)` here;
 - writing a value of the wrong type, such as `store.set(shape.code.error, 42)`;
-- passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`;
-- importing from `anyshape/recipes`, which doesn't exist: copy the recipe into your project instead.
+- passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`.
+
+**Declaring a recipe key without its meta group.** `.meta({ visible })` compiles: it declares a plain key whose value is the function `visible`, and `visibleWhen(node, …)` then fails to compile because `node.visible` isn't a boolean key. Call the meta group: `.meta(visible())`.
+
+**Mixing the shipped recipes with a copy.** A recipe that sweeps a subtree finds keys by its own set's definitions. On a form declared with the shipped `control()` and `submitting()`, a copied `validate` finds no `error` key and reports an invalid form as valid, and a copied `handleSubmit` throws that the root doesn't declare `submitting()`. It compiles, because both sets' nodes have the same shape. Import every recipe from one place: the package or the copy.
 
 ## Hot reload
 
@@ -199,20 +236,21 @@ Under React Fast Refresh, `useForm` takes up an edited shape or behaviors. A new
 
 ## Which page for which task
 
-| Task                                                                     | Read                                                                                                                                 |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Declare a form, its fields and rows                                      | [shape.md](shape.md), [arrays.md](arrays.md)                                                                                         |
-| Read, write, load, reset or watch values                                 | [store.md](store.md)                                                                                                                 |
-| Add a meta key beside a value (such as `error`, `visible` or `touched`)  | [meta-keys.md](meta-keys.md)                                                                                                         |
-| Compute a field from others, or keep two fields consistent               | [behaviors.md](behaviors.md)                                                                                                         |
-| Start a key (at the root or in every row) with a value known at creation | [behaviors.md](behaviors.md)                                                                                                         |
-| Add validation                                                           | the [validation recipe](https://github.com/TheAsda/anyshape/blob/master/recipes/validation.ts), [contributions.md](contributions.md) |
-| Apply a rule only under a condition, or show a section conditionally     | [guards.md](guards.md)                                                                                                               |
-| Rows, with rules per row                                                 | [arrays.md](arrays.md)                                                                                                               |
-| Several reasons for one key (disabled, error)                            | [contributions.md](contributions.md)                                                                                                 |
-| A server check, debouncing, a "checking…" state                          | [async.md](async.md)                                                                                                                 |
-| Bind inputs and components                                               | [react.md](react.md)                                                                                                                 |
-| When an error shows, server errors, parsing, submitting                  | [your-side.md](your-side.md)                                                                                                         |
-| Write your own reusable key and helpers                                  | [writing-a-recipe.md](writing-a-recipe.md)                                                                                           |
+| Task                                                                     | Read                                                                                                |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Declare a form, its fields and rows                                      | [shape.md](shape.md), [arrays.md](arrays.md)                                                        |
+| Read, write, load, reset or watch values                                 | [store.md](store.md)                                                                                |
+| Add a meta key beside a value (such as `error`, `visible` or `edited`)   | [meta-keys.md](meta-keys.md)                                                                        |
+| Compute a field from others, or keep two fields consistent               | [behaviors.md](behaviors.md)                                                                        |
+| Start a key (at the root or in every row) with a value known at creation | [behaviors.md](behaviors.md)                                                                        |
+| Add validation                                                           | `anyshape/recipes` ([POLICIES.md](../../recipes/POLICIES.md)), [contributions.md](contributions.md) |
+| Check whether a default policy fits, or change one                       | [POLICIES.md](../../recipes/POLICIES.md), the [recipes README](../../recipes/README.md)             |
+| Apply a rule only under a condition, or show a section conditionally     | [guards.md](guards.md)                                                                              |
+| Rows, with rules per row                                                 | [arrays.md](arrays.md)                                                                              |
+| Several reasons for one key (disabled, error)                            | [contributions.md](contributions.md)                                                                |
+| A server check, debouncing, a "checking…" state                          | [async.md](async.md)                                                                                |
+| Bind inputs and components                                               | [react.md](react.md)                                                                                |
+| When an error shows, server errors, parsing, submitting                  | [your-side.md](your-side.md)                                                                        |
+| Write your own reusable key and helpers                                  | [writing-a-recipe.md](writing-a-recipe.md)                                                          |
 
 Words used across the docs are defined in the [glossary](../../GLOSSARY.md).

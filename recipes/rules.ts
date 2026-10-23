@@ -28,8 +28,8 @@ import {
   type Contribution,
 } from "anyshape";
 
-import type { Disableable } from "./disabling";
-import { rule, type RulePart, type Validatable } from "./validation";
+import type { Disableable } from "./disabling.js";
+import { rule, type RulePart, type Validatable } from "./validation.js";
 
 export type Message<V = any> = string | ((value: V) => string);
 

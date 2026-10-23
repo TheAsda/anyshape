@@ -1,8 +1,11 @@
 // ============================================================
-// The public surface of both entries, as a snapshot: adding, removing or
+// The public surface of every entry, as a snapshot: adding, removing or
 // renaming a public name shows up as a reviewed diff. Values are the names an
 // entry exports at runtime; types are the rest of what TypeScript sees.
 // The agent page's API tables are checked against the same lists.
+// The core's tests import no recipe (principle 7), so the recipe entries are
+// read through TypeScript alone: their values are the exports TypeScript
+// sees as values, a split checked against the runtime on the core entries.
 // ============================================================
 
 import { readFileSync } from "node:fs";
@@ -18,7 +21,9 @@ import * as core from "../src/index";
 import * as react from "../src/react/index";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const entries = { anyshape: "src/index.ts", "anyshape/react": "src/react/index.ts" };
+const coreEntries = { anyshape: "src/index.ts", "anyshape/react": "src/react/index.ts" };
+const recipeEntries = { "anyshape/recipes": "recipes/index.ts", "anyshape/recipes/react": "recipes/react/index.ts" };
+const entries = { ...coreEntries, ...recipeEntries };
 
 const program = ts.createProgram(
   Object.values(entries).map((file) => resolve(root, file)),
@@ -29,6 +34,11 @@ const program = ts.createProgram(
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     noEmit: true,
+    // The recipes import the core entries by name, as recipes/tsconfig.json resolves them.
+    paths: {
+      anyshape: [resolve(root, coreEntries.anyshape)],
+      "anyshape/react": [resolve(root, coreEntries["anyshape/react"])],
+    },
   },
 );
 const checker = program.getTypeChecker();
@@ -47,6 +57,34 @@ function surface(file: string, runtime: object) {
   return { values, types };
 }
 
+/**
+ * The same split, read from TypeScript alone: a value is an export that
+ * resolves to a value declaration through no type-only export (`export type
+ * { Behavior }` ships a class's type, not the class).
+ */
+function typedSurface(file: string) {
+  const source = program.getSourceFile(resolve(root, file))!;
+  const exported = checker.getExportsOfModule(checker.getSymbolAtLocation(source)!);
+  const typeOnly = (s: ts.Symbol) =>
+    (s.declarations ?? []).some((d) => ts.isExportSpecifier(d) && (d.isTypeOnly || d.parent.parent.isTypeOnly));
+  const isValue = (s: ts.Symbol): boolean => {
+    if (typeOnly(s)) return false;
+    if (!(s.flags & ts.SymbolFlags.Alias)) return (s.flags & ts.SymbolFlags.Value) !== 0;
+    const next = checker.getImmediateAliasedSymbol(s);
+    return next ? isValue(next) : false;
+  };
+  return {
+    values: exported
+      .filter(isValue)
+      .map((s) => s.name)
+      .sort(),
+    types: exported
+      .filter((s) => !isValue(s))
+      .map((s) => s.name)
+      .sort(),
+  };
+}
+
 test("the core entry's public names", () => {
   expect(surface(entries.anyshape, core)).toMatchSnapshot();
 });
@@ -55,12 +93,26 @@ test("the React entry's public names", () => {
   expect(surface(entries["anyshape/react"], react)).toMatchSnapshot();
 });
 
+test("the recipe entry's public names", () => {
+  expect(typedSurface(recipeEntries["anyshape/recipes"])).toMatchSnapshot();
+});
+
+test("the React recipe entry's public names", () => {
+  expect(typedSurface(recipeEntries["anyshape/recipes/react"])).toMatchSnapshot();
+});
+
+test("reading values from TypeScript alone splits the core entries as their runtime does", () => {
+  // Guards typedSurface, which the recipe entries are read with.
+  expect(typedSurface(coreEntries.anyshape)).toEqual(surface(coreEntries.anyshape, core));
+  expect(typedSurface(coreEntries["anyshape/react"])).toEqual(surface(coreEntries["anyshape/react"], react));
+});
+
 test("the TypeScript view of each entry includes every runtime export", () => {
   // Guards the split above: a runtime name TypeScript doesn't see would be
   // listed as a value but missing from the types it ships.
   for (const [file, runtime] of [
-    [entries.anyshape, core],
-    [entries["anyshape/react"], react],
+    [coreEntries.anyshape, core],
+    [coreEntries["anyshape/react"], react],
   ] as const) {
     expect(exportNames(file)).toEqual(expect.arrayContaining(Object.keys(runtime)));
   }

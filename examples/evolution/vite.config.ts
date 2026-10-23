@@ -7,14 +7,17 @@ import { defineConfig } from "vite";
 const here = dirname(fileURLToPath(import.meta.url));
 // The library source, consumed directly (no build step): examples/evolution -> <repo>/src
 const lib = resolve(here, "../../src");
+const recipes = resolve(here, "../../recipes");
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
-      // More specific entry first.
-      { find: "anyshape/react", replacement: resolve(lib, "react/index.ts") },
-      { find: "anyshape", replacement: resolve(lib, "index.ts") },
+      // Exact matches: each entry to its source.
+      { find: /^anyshape\/recipes\/react$/, replacement: resolve(recipes, "react/index.ts") },
+      { find: /^anyshape\/recipes$/, replacement: resolve(recipes, "index.ts") },
+      { find: /^anyshape\/react$/, replacement: resolve(lib, "react/index.ts") },
+      { find: /^anyshape$/, replacement: resolve(lib, "index.ts") },
     ],
   },
   server: {

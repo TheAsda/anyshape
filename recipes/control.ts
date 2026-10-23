@@ -14,7 +14,7 @@
 
 import { metaKey, initialOf } from "anyshape";
 
-import { validation } from "./validation";
+import { validation } from "./validation.js";
 
 /** true once the user changed the value (origin "user"); stays true. Counted per subtree. */
 export const editedKey = metaKey(false)
