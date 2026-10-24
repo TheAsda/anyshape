@@ -68,6 +68,10 @@ _Avoid_: source, silent write
 The value a node is compared against for `dirty` and returned to on reset: the initial value, or the last value written as initial.
 _Avoid_: default, original, pristine
 
+**Start**:
+The value a meta key takes when the form is created and when it is reset, in place of its default. A value has no start of its own: its baseline plays that part.
+_Avoid_: initial value (that is the baseline)
+
 **Contribution**:
 A declaration that supplies one input to the single behavior owning a meta key, without writing the key itself. The key decides how its contributions combine; a contribution whose guard is false is absent.
 _Avoid_: provider, source, partial writer
