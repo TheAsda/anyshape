@@ -20,7 +20,7 @@
 
 import { FIELDS, META_DEFS, META, CREATE, ID, LENS, PATH, PARENT, TYPE, HAS_CREATE } from "./internal.js";
 import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
-import { type MetaKeyDef, type Meta, type MetaValues, type MergeMetaRefs } from "./meta.js";
+import { MetaKeyDef, type Meta, type MetaValues, type MergeMetaRefs } from "./meta.js";
 import { KIND, type RefKind } from "./refs/kind.js";
 import { MetaRef } from "./refs/meta.js";
 import { valueKind } from "./refs/value.js";
@@ -132,7 +132,10 @@ export abstract class ShapeNode<T = unknown> {
     const defs: Record<string, MetaKeyDef<any>> = { ...this[META_DEFS] };
     for (const input of inputs) {
       assertPlainBag(input, (key) => `"${key}" is a reserved name and cannot be used as a meta key`);
-      for (const [key, raw] of Object.entries(input)) {
+      for (const [key, def] of Object.entries(input)) {
+        if (!(def instanceof MetaKeyDef)) {
+          throw new Error(`"${key}" is not a key definition – make it with metaKey()`);
+        }
         if (RESERVED.has(key)) {
           throw new Error(`"${key}" is a reserved name and cannot be used as a meta key`);
         }
@@ -147,7 +150,7 @@ export abstract class ShapeNode<T = unknown> {
           const kind = this instanceof ObjectNode ? "object" : this instanceof ArrayNode ? "array" : "field";
           throw new Error(`Meta key "${key}" is already declared on this ${kind} – a node declares each key once`);
         }
-        defs[key] = raw;
+        defs[key] = def;
       }
     }
 

@@ -43,6 +43,8 @@ export function typeOnlyChecks() {
   min(t.text, 1);
   // @ts-expect-error – pattern needs a string field
   pattern(t.count, /x/);
+  // @ts-expect-error – a meta group is a function: call it (.meta(visible()))
+  t.plain.meta({ visible });
   // @ts-expect-error – visibleWhen needs `visible`
   visibleWhen(t.text, [t.plain], () => true);
   // @ts-expect-error – exclusive needs `disabled` on every field

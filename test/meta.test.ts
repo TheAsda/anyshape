@@ -72,6 +72,12 @@ export function typeOnlyChecks() {
 }
 
 describe("Declarations", () => {
+  test("an entry that is not a key definition throws", () => {
+    // An untyped caller (JS, or a cast) cannot hit the compile error.
+    const untyped = { label: "Name" } as never;
+    expect(() => field<string>().meta(untyped)).toThrow(`"label" is not a key definition – make it with metaKey()`);
+  });
+
   test("defaults from the key definitions", () => {
     const s = createStore(shape, values());
     const n = shape.name;
