@@ -1,18 +1,20 @@
 // ============================================================
 // Meta declarations
 // ------------------------------------------------------------
-// An entry in .meta() is either
-//   • a plain value – a key with a default, free for one user behavior, or
-//   • a key definition (metaKey) – a default plus optional capabilities.
-// A meta group is a function returning a plain object of key definitions
-// (see recipes/control.ts).
+// An entry in .meta() is a key definition (metaKey): a default plus optional
+// capabilities. A meta group is a function returning a plain object of key
+// definitions (see recipes/control.ts).
 // ============================================================
 
 import type { BehaviorConfig, Contribution, OwnerConfig } from "./behaviors.js";
 import type { MetaRef } from "./refs/meta.js";
 import type { ShapeNode } from "./shape.js";
 
-export type Meta = Record<string, unknown>;
+/** The key definitions one input of `.meta()` carries: an inline object or a meta group's result. */
+export type Meta = Record<string, AnyMetaKeyDef>;
+
+/** @internal Live meta values of one node, keyed by name, seeded from the definitions' defaults. */
+export type MetaValues = Record<string, unknown>;
 
 declare const NoPayloadBrand: unique symbol;
 /**
@@ -166,7 +168,7 @@ export function metaKey<V, P = NoPayload>(defaultValue: V, options?: MetaKeyOpti
 // Type mapping: declarations → meta references
 // ============================================================
 type RefsOf<T> = {
-  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : MetaRef<T[K], NoPayload>;
+  readonly [K in keyof T]: T[K] extends MetaKeyDef<infer V, infer P, any> ? MetaRef<V, P> : never;
 };
 
 /** Meta references declared by all inputs of one .meta(a, b, c) call, typed with their payloads. */

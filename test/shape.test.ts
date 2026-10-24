@@ -2,7 +2,7 @@
 
 import { test, describe, expect } from "vitest";
 
-import { form, object, array, field, createStore, parentOf, pathOf } from "../src/index";
+import { form, object, array, field, metaKey, createStore, parentOf, pathOf } from "../src/index";
 import { ID, LENS } from "../src/internal";
 import { userShape } from "./support/fixtures/user";
 
@@ -37,7 +37,7 @@ describe("Nodes", () => {
         _hasCreate: field<string>(),
         item: field<string>(),
         toString: field<string>(),
-      }).meta({ hint: "x" }),
+      }).meta({ hint: metaKey("x") }),
     );
     const initial = {
       id: "a",
@@ -56,7 +56,7 @@ describe("Nodes", () => {
     expect(s.get(shape.hint)).toBe("x");
     expect(pathOf(shape)).toBe("");
     expect(pathOf(object({ id: field<string>() })), "a template is unnamed").toBe("");
-    const named = field<string>().meta({ id: 1, path: "", item: 1, toString: "x" });
+    const named = field<string>().meta({ id: metaKey(1), path: metaKey(""), item: metaKey(1), toString: metaKey("x") });
     const namedShape = form(object({ name: named }));
     const namedStore = createStore(namedShape, { name: "v" });
     expect(namedStore.get(namedShape.name.id)).toBe(1);
@@ -96,7 +96,7 @@ describe("Nodes", () => {
   });
 
   test(".meta() after form() rejected", () => {
-    expect(() => userShape.name.meta({ x: 1 })).toThrow(/before form/);
+    expect(() => userShape.name.meta({ x: metaKey(1) })).toThrow(/before form/);
   });
 });
 

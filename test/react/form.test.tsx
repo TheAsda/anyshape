@@ -25,7 +25,7 @@ const shape = form(
   object({
     name: field<string>().meta(control()),
     code: field<string>().meta(control()),
-    note: field<string>().meta(control(), { hint: "" }),
+    note: field<string>().meta(control(), { hint: metaKey("") }),
     lines: array(
       object({
         qty: field<number>().meta(control(), { maxQty: metaKey<number | undefined>(undefined, { keepOnReset: true }) }),

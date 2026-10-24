@@ -44,13 +44,13 @@ const shape = form(
     total: field<number>(),
     name: field<string>().meta(control()),
     type: field<"person" | "company">(),
-    vat: field<string>().meta({ visible, disabled, note: "" }),
+    vat: field<string>().meta({ visible, disabled, note: metaKey("") }),
     lines: array(
       object({
         price: field<number>(),
         qty: field<number>().meta(control()),
         lineTotal: field<number>().meta(control()),
-        sku: field<string>().meta({ disabled, hint: "" }),
+        sku: field<string>().meta({ disabled, hint: metaKey("") }),
         notes: array(object({ text: field<string>(), len: field<number>() })),
       }),
       { create: () => ({ price: 0, qty: 1, lineTotal: 0, sku: "", notes: [] }) },

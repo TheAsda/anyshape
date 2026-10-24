@@ -298,7 +298,7 @@ try {
         object({
           destination: field<string>(),
           travelers: array(line, { create: () => ({ sku: "", qty: 1 }) }),
-        }).meta({ title: "Booking" }),
+        }).meta({ title: metaKey("Booking") }),
       );
 
       export const bookingStore = createStore(booking, { destination: "", travelers: [] });

@@ -1,7 +1,17 @@
 import { useEffect } from "react";
 import { test, expect } from "vitest";
 
-import { form, object, array, field, createStore, countIn, type InferValue, type ItemStore } from "../../src/index";
+import {
+  form,
+  object,
+  array,
+  field,
+  metaKey,
+  createStore,
+  countIn,
+  type InferValue,
+  type ItemStore,
+} from "../../src/index";
 import { StoreProvider, useStore, useValue, useField, useArray } from "../../src/react/index";
 import { control, error } from "../support/features";
 import { watchOrigins } from "../support/harness";
@@ -14,7 +24,7 @@ const shape = form(
     agree: field<boolean>().meta(control()),
     age: field<number>().meta(control()),
     note: field<string>(),
-    label: field<string>().meta({ hint: "tip" }),
+    label: field<string>().meta({ hint: metaKey("tip") }),
     discount: field<number>(),
     shipping: object({ city: field<string>().meta(control()) }),
     lines: array(object({ sku: field<string>().meta(control()), qty: field<number>().meta(control()) }), {

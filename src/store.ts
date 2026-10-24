@@ -61,7 +61,7 @@ import {
   countSlotOf,
   concretePath,
 } from "./internal.js";
-import type { Meta, MetaKeyDef } from "./meta.js";
+import type { MetaValues, MetaKeyDef } from "./meta.js";
 import type { CountRef } from "./refs/count.js";
 import type { InitialRef } from "./refs/initial.js";
 import { kindOf } from "./refs/kind.js";
@@ -312,7 +312,7 @@ function check(sub: Sub, calls: Calls, log: readonly WriteEntry[] | undefined, f
 // ============================================================
 export abstract class BaseStore<N extends ContainerNode> {
   /** @internal live meta per node owned by this store */
-  readonly _metaMap = new Map<AnyNode, Meta>();
+  readonly _metaMap = new Map<AnyNode, MetaValues>();
   /** @internal */ readonly _valueSubs = new Map<AnyNode, Set<Sub>>();
   /** @internal single-key subscriptions, registered on every source node */ readonly _keySubs = new Map<
     AnyNode,
@@ -466,7 +466,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   /** @internal replace a node's meta object: counts, dirty marks, log */
-  _commitMeta(node: AnyNode, current: Meta, next: Meta, origin: Origin): void {
+  _commitMeta(node: AnyNode, current: MetaValues, next: MetaValues, origin: Origin): void {
     const host = this.scopeStore;
     const changed: string[] = [];
     for (const key of Object.keys(next)) {
@@ -487,10 +487,10 @@ export abstract class BaseStore<N extends ContainerNode> {
   }
 
   /** @internal */
-  _metaOf(node: AnyNode): Meta {
+  _metaOf(node: AnyNode): MetaValues {
     let live = this._metaMap.get(node);
     if (!live) {
-      const seeded: Meta = { ...node[META] };
+      const seeded: MetaValues = { ...node[META] };
       this._metaMap.set(node, seeded);
       live = seeded;
     }
@@ -508,7 +508,7 @@ export abstract class BaseStore<N extends ContainerNode> {
 
   /** @internal one key of a node's live meta; no scope check (get() and subscribe check it) */
   _readMetaRef(ref: MetaRef<any>): any {
-    return (this._ownerOf(ref.node)._metaOf(ref.node) as Meta)[ref.key];
+    return (this._ownerOf(ref.node)._metaOf(ref.node) as MetaValues)[ref.key];
   }
 
   private _resetMeta(node: AnyNode): void {
@@ -528,7 +528,7 @@ export abstract class BaseStore<N extends ContainerNode> {
   _resetEntry(node: AnyNode): void {
     const current = this._metaMap.get(node);
     if (!current) return;
-    const next: Meta = { ...node[META] };
+    const next: MetaValues = { ...node[META] };
     for (const [key, def] of Object.entries(node[META_DEFS])) {
       if (def.options.keepOnReset) next[key] = current[key];
     }

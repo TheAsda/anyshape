@@ -6,14 +6,14 @@ import { control, submitting, disabled } from "../../index";
 
 export const shape = form(
   object({
-    name: field<string>().meta(control(), { note: "" }),
+    name: field<string>().meta(control(), { note: metaKey("") }),
     code: field<string>().meta(control(), { minCode: metaKey<number | undefined>(undefined, { keepOnReset: true }) }),
     flag: field<boolean>().meta(disabled()),
     lines: array(
       object({
         qty: field<number>().meta(control(), {
           maxQty: metaKey<number | undefined>(undefined, { keepOnReset: true }),
-          hint: "",
+          hint: metaKey(""),
         }),
         notes: array(object({ text: field<string>().meta(control()) })),
       }),

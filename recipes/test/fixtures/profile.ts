@@ -1,14 +1,14 @@
 // A profile form with a field for each ready-made rule and behavior: string,
 // array and number values, a `visible` section, `disabled` fields for
 // exclusive, and rows. Used by the rule and behavior recipe tests.
-import { form, object, array, field, type InferValue } from "anyshape";
+import { form, object, array, field, metaKey, type InferValue } from "anyshape";
 
 import { control, visible, disabled } from "../../index";
 
 export const shape = form(
   object({
     type: field<"person" | "company">(),
-    name: field<string>().meta(control(), { label: "Full name" }),
+    name: field<string>().meta(control(), { label: metaKey("Full name") }),
     tags: field<string[]>().meta(control()),
     age: field<number | undefined>().meta(control()),
     email: field<string>().meta(control()),
@@ -21,10 +21,10 @@ export const shape = form(
     end: field<number>(),
     plain: field<string>(),
     company: object({ vat: field<string>().meta(control()), phone: field<string>() }).meta(visible()),
-    price: field<number | undefined>().meta(control(), disabled(), { label: "Price" }),
-    discount: field<number | undefined>().meta(control(), disabled(), { label: "Discount" }),
-    promo: field<string>().meta(control(), disabled(), { label: "Promo code" }),
-    note: field<string>().meta({ hint: "" }, disabled()),
+    price: field<number | undefined>().meta(control(), disabled(), { label: metaKey("Price") }),
+    discount: field<number | undefined>().meta(control(), disabled(), { label: metaKey("Discount") }),
+    promo: field<string>().meta(control(), disabled(), { label: metaKey("Promo code") }),
+    note: field<string>().meta({ hint: metaKey("") }, disabled()),
     lines: array(object({ qty: field<number>().meta(control()), sku: field<string>().meta(control()) })),
   }),
 );

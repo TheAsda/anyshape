@@ -36,11 +36,11 @@ const shape = form(
   object({
     tagged: field<string>().meta({ tags }),
     type: field<"person" | "company">(),
-    name: field<string>().meta(control(), { hint: "" }),
+    name: field<string>().meta(control(), { hint: metaKey("") }),
     phone: field<string>().meta(control()),
     vat: field<string>().meta(control()),
     note: field<string>().meta({ disabled }),
-    lines: array(object({ qty: field<number>().meta(control(), { hint: "" }) })),
+    lines: array(object({ qty: field<number>().meta(control(), { hint: metaKey("") }) })),
   }),
 );
 type Values = InferValue<typeof shape>;
