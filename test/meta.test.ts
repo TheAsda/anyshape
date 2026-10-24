@@ -28,7 +28,7 @@ const address = object({
 const shape = form(
   object({
     note: field<string>(),
-    name: field<string>().meta(control(), { label: "Name" }),
+    name: field<string>().meta(control(), { label: metaKey("Name") }),
     company: object({ vat: field<string>().meta(control()) }).meta({ visible, disabled }),
     shipping: address,
     billing: address,
@@ -72,7 +72,13 @@ export function typeOnlyChecks() {
 }
 
 describe("Declarations", () => {
-  test("defaults from plain values and key definitions", () => {
+  test("an entry that is not a key definition throws", () => {
+    // An untyped caller (JS, or a cast) cannot hit the compile error.
+    const untyped = { label: "Name" } as never;
+    expect(() => field<string>().meta(untyped)).toThrow(`"label" is not a key definition – make it with metaKey()`);
+  });
+
+  test("defaults from the key definitions", () => {
     const s = createStore(shape, values());
     const n = shape.name;
     expect([s.get(n.error), s.get(n.touched), s.get(n.dirty), s.get(n.revealed), s.get(n.label)]).toEqual([
@@ -92,38 +98,56 @@ describe("Declarations", () => {
   });
 
   test("variadic and chained .meta() merge", () => {
-    const a = field<string>().meta(validation(), { hint: "x" }).meta({ touched });
+    const a = field<string>()
+      .meta(validation(), { hint: metaKey("x") })
+      .meta({ touched });
     expect(Object.keys(a[META_DEFS]).sort()).toEqual(["error", "hint", "touched"]);
   });
 
-  test("a node declares each key once: a second declaration throws, plain value or key definition", () => {
+  test("a node declares each key once: a second declaration throws, however either is declared", () => {
     const alreadyDeclared = (key: string, kind: string) =>
       `Meta key "${key}" is already declared on this ${kind} – a node declares each key once`;
-    expect(() => field<string>().meta({ hint: "a" }).meta({ hint: 1 })).toThrow(alreadyDeclared("hint", "field"));
-    expect(() => field<string>().meta({ hint: "a" }, { hint: "b" })).toThrow(alreadyDeclared("hint", "field"));
+    expect(() =>
+      field<string>()
+        .meta({ hint: metaKey("a") })
+        .meta({ hint: metaKey("b") }),
+    ).toThrow(alreadyDeclared("hint", "field"));
+    expect(() => field<string>().meta({ hint: metaKey("a") }, { hint: metaKey("b") })).toThrow(
+      alreadyDeclared("hint", "field"),
+    );
     expect(() => field<string>().meta(validation()).meta(validation())).toThrow(alreadyDeclared("error", "field"));
     expect(() => field<string>().meta(control(), { touched })).toThrow(alreadyDeclared("touched", "field"));
-    expect(() => field<string>().meta({ error: "" }).meta(validation())).toThrow(alreadyDeclared("error", "field"));
-    expect(() => field<string>().meta(validation()).meta({ error: "" })).toThrow(alreadyDeclared("error", "field"));
-    expect(() => object({ a: field<string>() }).meta({ hint: "" }).meta({ hint: "" })).toThrow(
-      alreadyDeclared("hint", "object"),
-    );
+    expect(() =>
+      field<string>()
+        .meta({ error: metaKey("") })
+        .meta(validation()),
+    ).toThrow(alreadyDeclared("error", "field"));
+    expect(() =>
+      field<string>()
+        .meta(validation())
+        .meta({ error: metaKey("") }),
+    ).toThrow(alreadyDeclared("error", "field"));
+    expect(() =>
+      object({ a: field<string>() })
+        .meta({ hint: metaKey("") })
+        .meta({ hint: metaKey("") }),
+    ).toThrow(alreadyDeclared("hint", "object"));
     expect(() =>
       array(object({ a: field<string>() }))
-        .meta({ hint: "" })
-        .meta({ hint: "" }),
+        .meta({ hint: metaKey("") })
+        .meta({ hint: metaKey("") }),
     ).toThrow(alreadyDeclared("hint", "array"));
   });
 
   test("reserved meta keys are rejected", () => {
     // @ts-expect-error – "meta" is reserved and rejected at compile time
-    expect(() => field<string>().meta({ meta: 1 })).toThrow(/reserved/);
+    expect(() => field<string>().meta({ meta: metaKey(1) })).toThrow(/reserved/);
     // @ts-expect-error – "constructor" is reserved and rejected at compile time
-    expect(() => field<string>().meta({ constructor: 1 })).toThrow(/reserved/);
+    expect(() => field<string>().meta({ constructor: metaKey(1) })).toThrow(/reserved/);
     // @ts-expect-error – "__proto__" is reserved and rejected at compile time
-    expect(() => field<string>().meta({ ["__proto__"]: 1 })).toThrow(/reserved/);
-    // The plain literal never creates the key: for an object value it swaps
-    // the bag's prototype, which the core rejects instead of dropping it.
+    expect(() => field<string>().meta({ ["__proto__"]: metaKey(1) })).toThrow(/reserved/);
+    // A literal `__proto__` never creates the key: in an object literal it
+    // swaps the bag's prototype, which the core rejects instead of dropping it.
     // @ts-expect-error – "__proto__" is reserved and rejected at compile time
     expect(() => field<string>().meta({ __proto__: metaKey(true) })).toThrow(/reserved/);
   });
@@ -132,9 +156,9 @@ describe("Declarations", () => {
     // .meta() runs before form(), so the node is still a template and its
     // path label is "<root>".
     const message = `"item" is the item of "<root>" and cannot also be a meta key`;
-    expect(() => array(object({ x: field<string>() })).meta({ item: 1 })).toThrow(message);
-    expect(() => field<string>().meta({ item: 1 })).not.toThrow();
-    expect(() => object({ a: field<string>() }).meta({ item: 1 })).not.toThrow();
+    expect(() => array(object({ x: field<string>() })).meta({ item: metaKey(1) })).toThrow(message);
+    expect(() => field<string>().meta({ item: metaKey(1) })).not.toThrow();
+    expect(() => object({ a: field<string>() }).meta({ item: metaKey(1) })).not.toThrow();
   });
 });
 
@@ -169,7 +193,7 @@ describe("Meta references", () => {
     expect(() => object({ error: field<string>() }).meta(validation())).toThrow(
       `"error" is a field of "<root>" and cannot also be a meta key`,
     );
-    expect(() => object({ label: field<string>() }).meta({ label: "Group" })).toThrow(/"label" is a field of/);
+    expect(() => object({ label: field<string>() }).meta({ label: metaKey("Group") })).toThrow(/"label" is a field of/);
   });
 
   test(".meta() leaves the original node untouched", () => {
@@ -227,18 +251,20 @@ describe("Reserved names, table-driven", () => {
   test("every reserved name is rejected as a field name and as a meta key", () => {
     for (const name of RESERVED) {
       expect(() => object({ [name]: field<string>() }), `field "${name}"`).toThrow(/reserved name/);
-      expect(() => field<string>().meta({ [name]: 1 }), `meta key "${name}"`).toThrow(/reserved name/);
+      expect(() => field<string>().meta({ [name]: metaKey(1) }), `meta key "${name}"`).toThrow(/reserved name/);
     }
   });
 
   test("`item` is free as a field name and as a meta key off arrays", () => {
     expect(() => object({ item: field<string>() })).not.toThrow();
-    expect(() => field<string>().meta({ item: 1 })).not.toThrow();
+    expect(() => field<string>().meta({ item: metaKey(1) })).not.toThrow();
   });
 
   test("_fields, _meta and _metaDefs are ordinary field names", () => {
     const f = form(
-      object({ _fields: field<string>(), _meta: field<number>(), _metaDefs: field<boolean>() }).meta({ hint: "h" }),
+      object({ _fields: field<string>(), _meta: field<number>(), _metaDefs: field<boolean>() }).meta({
+        hint: metaKey("h"),
+      }),
     );
     const s = createStore(f, { _fields: "a", _meta: 1, _metaDefs: true });
     s.set(f._meta, 2);
@@ -249,7 +275,11 @@ describe("Reserved names, table-driven", () => {
   test("_fields, _meta and _metaDefs are ordinary meta keys", () => {
     const f = form(
       object({
-        group: object({ x: field<string>() }).meta({ _fields: 1, _meta: "m", _metaDefs: false }),
+        group: object({ x: field<string>() }).meta({
+          _fields: metaKey(1),
+          _meta: metaKey("m"),
+          _metaDefs: metaKey(false),
+        }),
       }),
     );
     const s = createStore(f, { group: { x: "a" } });

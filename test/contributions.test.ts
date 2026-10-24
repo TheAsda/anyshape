@@ -57,7 +57,7 @@ const shape = form(
     mode: field<string>(),
     other: field<string>(),
     a: field<string>().meta({ tags }),
-    b: field<string>().meta({ note: "" }),
+    b: field<string>().meta({ note: metaKey("") }),
     rows: array(object({ x: field<number>().meta({ tags }) }), { create: () => ({ x: 0 }) }),
   }),
 );

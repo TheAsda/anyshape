@@ -1,22 +1,29 @@
 import { test as base, describe, expect } from "vitest";
 
-import { form, object, array, field, createStore, defineBehavior, type InferValue } from "../src/index";
+import { form, object, array, field, metaKey, createStore, defineBehavior, type InferValue } from "../src/index";
 import * as company from "./support/fixtures/company";
 
 const address = object({
   street: field<string>(),
-  city: field<string>().meta({ error: undefined as string | undefined }),
+  city: field<string>().meta({ error: metaKey<string | undefined>(undefined) }),
 });
 
 const shape = form(
   object({
-    name: field<string>().meta({ required: true, touched: false, error: undefined as string | undefined }),
+    name: field<string>().meta({
+      required: metaKey(true),
+      touched: metaKey(false),
+      error: metaKey<string | undefined>(undefined),
+    }),
     total: field<number>(),
     shipping: address,
     billing: address,
     lines: array(
       object({
-        sku: field<string>().meta({ touched: false, error: undefined as string | undefined }),
+        sku: field<string>().meta({
+          touched: metaKey(false),
+          error: metaKey<string | undefined>(undefined),
+        }),
         price: field<number>(),
         qty: field<number>(),
         notes: array(object({ text: field<string>() })),

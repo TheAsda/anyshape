@@ -3,7 +3,7 @@
 // Each step is a section with submitting(), so its Next button is
 // handleSubmit on the step's substore. Rows (defined() on their sku) are
 // created empty. Used by the `defined`, submit and checked-type tests.
-import { form, object, array, field, defineBehavior, type InferValue } from "anyshape";
+import { form, object, array, field, metaKey, defineBehavior, type InferValue } from "anyshape";
 
 import { control, submitting, defined } from "../../index";
 
@@ -16,7 +16,7 @@ export const shape = form(
       email: field<string>().meta(control()),
     }).meta(submitting()),
     items: object({
-      sku: field<string | undefined>().meta(control(), defined(), { skuOptions: [] as readonly string[] }),
+      sku: field<string | undefined>().meta(control(), defined(), { skuOptions: metaKey<readonly string[]>([]) }),
       note: field<string | undefined>().meta(control()),
       lines: array(
         object({

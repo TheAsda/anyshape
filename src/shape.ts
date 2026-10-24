@@ -9,8 +9,8 @@
 //   • array()      – object shapes only; optional `create` factory for new rows
 //   • object()     – rejects the names the node itself needs (`meta`, and the
 //                    names JavaScript treats specially on every object)
-//   • .meta(...)   – plain values and/or key definitions (metaKey, meta groups);
-//                    variadic; must be called before form()
+//   • .meta(...)   – key definitions only (metaKey(...), meta groups); variadic;
+//                    must be called before form()
 //   • meta refs    – every declared meta key is exposed on the node:
 //                    form.name        → the value
 //                    form.name.error  → the `error` meta key (MetaRef)
@@ -20,7 +20,7 @@
 
 import { FIELDS, META_DEFS, META, CREATE, ID, LENS, PATH, PARENT, TYPE, HAS_CREATE } from "./internal.js";
 import { type Lens, identityLens, propLens, composeLens } from "./lens.js";
-import { MetaKeyDef, type Meta, type MergeMetaRefs } from "./meta.js";
+import { MetaKeyDef, type Meta, type MetaValues, type MergeMetaRefs } from "./meta.js";
 import { KIND, type RefKind } from "./refs/kind.js";
 import { MetaRef } from "./refs/meta.js";
 import { valueKind } from "./refs/value.js";
@@ -87,7 +87,7 @@ export abstract class ShapeNode<T = unknown> {
   declare readonly [TYPE]: T;
 
   /** @internal Default values of all declared meta keys. Live meta lives in the stores. */
-  declare readonly [META]: Meta;
+  declare readonly [META]: MetaValues;
   /** @internal Normalized declarations, one per meta key. */
   declare readonly [META_DEFS]: Readonly<Record<string, MetaKeyDef<any>>>;
 
@@ -111,12 +111,13 @@ export abstract class ShapeNode<T = unknown> {
   }
 
   /**
-   * Declare meta keys. Accepts plain objects, such as a meta group returns, e.g.
-   *   field<string>().meta(control(), { label: "Name" })
+   * Declare meta keys. Each entry of every input is a key definition (metaKey):
+   * an inline object, such as a meta group returns, e.g.
+   *   field<string>().meta(control(), { label: metaKey("Name") })
    * Returns a new node; the original stays reusable.
    *
-   * A node declares each key once: declaring it again throws, whether as a
-   * plain value or a key definition (metaKey, or through a meta group).
+   * A node declares each key once: declaring it again throws, however it is
+   * declared (inline, or through a meta group).
    */
   meta<Is extends readonly Meta[]>(
     ...inputs: { [K in keyof Is]: Is[K] & NoReserved<Is[K]> }
@@ -131,7 +132,10 @@ export abstract class ShapeNode<T = unknown> {
     const defs: Record<string, MetaKeyDef<any>> = { ...this[META_DEFS] };
     for (const input of inputs) {
       assertPlainBag(input, (key) => `"${key}" is a reserved name and cannot be used as a meta key`);
-      for (const [key, raw] of Object.entries(input)) {
+      for (const [key, def] of Object.entries(input)) {
+        if (!(def instanceof MetaKeyDef)) {
+          throw new Error(`"${key}" is not a key definition – make it with metaKey()`);
+        }
         if (RESERVED.has(key)) {
           throw new Error(`"${key}" is a reserved name and cannot be used as a meta key`);
         }
@@ -146,7 +150,7 @@ export abstract class ShapeNode<T = unknown> {
           const kind = this instanceof ObjectNode ? "object" : this instanceof ArrayNode ? "array" : "field";
           throw new Error(`Meta key "${key}" is already declared on this ${kind} – a node declares each key once`);
         }
-        defs[key] = raw instanceof MetaKeyDef ? raw : new MetaKeyDef(raw);
+        defs[key] = def;
       }
     }
 
@@ -171,7 +175,7 @@ export function parentOf(node: AnyNode): ContainerNode | undefined {
 
 /** Set a node's declarations and the defaults derived from them. */
 function setMeta(node: AnyNode, defs: Record<string, MetaKeyDef<any>>): void {
-  const defaults: Meta = {};
+  const defaults: MetaValues = {};
   for (const [key, def] of Object.entries(defs)) defaults[key] = def.defaultValue;
   (node as any)[META_DEFS] = defs;
   (node as any)[META] = defaults;

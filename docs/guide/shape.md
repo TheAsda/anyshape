@@ -68,8 +68,8 @@ const error = metaKey<string | undefined>(undefined);
 
 const booking = form(
   object({
-    email: field<string>().meta({ error, label: "Email" }),
-    car: object({ license: field<string>() }).meta({ visible: true }),
+    email: field<string>().meta({ error, label: metaKey("Email") }),
+    car: object({ license: field<string>() }).meta({ visible: metaKey(true) }),
   }),
 );
 
@@ -80,9 +80,8 @@ const label: string = emailStore.get(booking.email.label);
 type EmailMeta = InferMeta<typeof booking.email>; // { error: string | undefined; label: string }
 ```
 
-- A plain value (`label: "Email"`, `visible: true`) declares a key with that default.
-- A key definition made with `metaKey` (`error`) carries a default and can add capabilities: counting, a default behavior, combining several inputs ([meta-keys.md](meta-keys.md)).
-- A [meta group](../../GLOSSARY.md) is a function that returns key definitions; call it inside `.meta()` beside the rest: `field<string>().meta(control(), { label: "Email" })`.
+- Each entry is a key definition made with `metaKey`; it carries a default and can add capabilities: counting, a default behavior, combining several inputs ([meta-keys.md](meta-keys.md)).
+- A [meta group](../../GLOSSARY.md) is a function that returns key definitions; call it inside `.meta()` beside the rest: `field<string>().meta(control(), { label: metaKey("Email") })`.
 - `.meta()` is called before `form()`, and it returns a new node: the one it was called on is unchanged. For meta on the root, call it on the root object: `form(object({ ... }).meta({ ... }))`.
 - A node declares each key once, and a key can't share its name with a child (an array's child is its `item`).
 
@@ -96,7 +95,7 @@ const address = object({ street: field<string>(), city: field<string>() });
 const order = form(
   object({
     billing: address,
-    shipping: address.meta({ visible: true }),
+    shipping: address.meta({ visible: metaKey(true) }),
   }),
 );
 

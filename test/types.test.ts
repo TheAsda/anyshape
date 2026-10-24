@@ -48,7 +48,7 @@ const t = form(
     grid: array(object({ cells: array(object({ v: field<number>() })) })),
     optional: field<string | undefined>(),
     text: field<string>().meta(control(), {
-      hint: "",
+      hint: metaKey(""),
       seats: metaKey<number | undefined>(undefined),
     }),
     count: field<number>().meta(control()),
@@ -71,7 +71,7 @@ type _v4 = Expect<Equal<V["optional"], string | undefined>>;
 type _v5 = Expect<Equal<InferValue<typeof t.grid.item.cells.item.v>, number>>;
 
 // ---------------------------------------------------------------------------
-// Meta: features, plain values and key definitions merge
+// Meta: features and key definitions merge
 type M = InferMeta<typeof t.text>;
 type _m1 = Expect<Equal<M["hint"], string>>;
 type _m2 = Expect<Equal<M["seats"], number | undefined>>;
@@ -134,6 +134,14 @@ export function typeOnlyChecks(s: RootStore<typeof t>) {
   // @ts-expect-error – `plain` has no validation()
   rule(t.plain, () => undefined);
 
+  // .meta() takes key definitions only: a plain value is not a key.
+  // @ts-expect-error – a string is not a definition
+  t.text.meta({ note: "x" });
+  // @ts-expect-error – undefined is not a definition: state the type on metaKey
+  t.text.meta({ note: undefined });
+  // @ts-expect-error – a meta group is a function: call it (.meta(control()))
+  t.text.meta({ control });
+
   return [n, e, c];
 }
 
@@ -163,7 +171,7 @@ const reasons = metaKey<readonly string[], string>([]).combine((_self, key) => (
     ),
 }));
 const ok = metaKey(false);
-const c = form(object({ n: field<number>().meta({ total, reasons, ok, plain: 0 }) }));
+const c = form(object({ n: field<number>().meta({ total, reasons, ok, plain: metaKey(0) }) }));
 
 type _c1 = Expect<Equal<RefValue<typeof c.n.total>, number>>;
 type _c2 = Expect<Equal<typeof c.n.total extends MetaRef<any, infer P> ? P : never, { weight: number }>>;

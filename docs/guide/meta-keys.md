@@ -14,7 +14,7 @@ const options = metaKey<string[]>([], { keepOnReset: true });
 
 const shape = form(
   object({
-    destination: field<string>().meta({ error, options, label: "Destination" }),
+    destination: field<string>().meta({ error, options, label: metaKey("Destination") }),
     nights: field<number>().meta({ error }),
   }),
 );
@@ -24,10 +24,7 @@ store.set(shape.destination.options, ["Lisbon", "Porto"]);
 store.get(shape.nights.error); // undefined, the default
 ```
 
-A node declares keys in `.meta({ ... })` ([shape.md](shape.md)), in two ways:
-
-- **A plain value**, such as `label: "Destination"`: a key with that default, on that node only.
-- **A key definition**, made with `metaKey(default, options)`. One definition can be declared on many nodes, under any name. Code that sweeps or counts a key across the form finds it by its definition, never by its name, so it works whatever each node calls it.
+A node declares keys in `.meta({ ... })` ([shape.md](shape.md)): each entry is a key definition, made with `metaKey(default, options)`. A definition can be declared on many nodes, under any name. Code that sweeps or counts a key across the form finds it by its definition, never by its name, so it works whatever each node calls it.
 
 The only option is `keepOnReset`: `store.reset()` leaves the key's value alone. Use it for state fed from outside the form, such as `options` above, which React keeps in sync with `useSync` ([react.md](react.md)). Every other key returns to its default on reset.
 
@@ -56,7 +53,7 @@ const control = () => ({ error, edited: editedKey, revealed: revealedKey });
 
 const signup = form(
   object({
-    email: field<string>().meta(control(), { label: "Email" }),
+    email: field<string>().meta(control(), { label: metaKey("Email") }),
     name: field<string>().meta(control()),
   }),
 );

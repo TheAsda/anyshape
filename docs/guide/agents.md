@@ -7,7 +7,7 @@ Read this page before writing anyshape code. It ships inside the package, so it 
 - **Reach everything through references.** A value is `shape.trip.return`, a [meta key](../../GLOSSARY.md) on it is `shape.trip.return.error`. Reads, writes, subscriptions and [behaviors](../../GLOSSARY.md) take these references, never string paths. The one exception is `store.resolvePath(path)`, for paths that come from a server ([your-side.md](your-side.md)).
 - **No code finds a meta key by its name.** Code that needs a key is handed the [node](../../GLOSSARY.md)'s reference (`node.error`) or, to sweep a subtree, the key's definition (`store.collect(node, errorKey)`). Don't index a node with a string or list its keys.
 - **The [core](../../GLOSSARY.md) declares no meta key.** There is no built-in `error`, `edited`, `visible` or `disabled` in `anyshape`. Import them from the [default recipes](../../GLOSSARY.md): `anyshape/recipes` (validation, rules, input state, visibility, disabling, submit, focus) and `anyshape/recipes/react` (`useControl` and the input adapters). Their policies (when an error shows, what counts as empty, what a submit does) are listed in [`recipes/POLICIES.md`](../../recipes/POLICIES.md). Declare your own keys for anything else ([meta-keys.md](meta-keys.md)).
-- **Declare keys through meta groups:** `field<string>().meta(control(), defined())`, `object({ ... }).meta(visible(), submitting())`. A bare `{ visible }` declares a key holding the function `visible`, which compiles. The definitions, with a `Key` suffix (`errorKey`, `revealedKey`), are for sweeps and counts only: `countIn(shape, errorKey)`.
+- **Declare keys through meta groups:** `field<string>().meta(control(), defined())`, `object({ ... }).meta(visible(), submitting())`. Definitions, with a `Key` suffix (`errorKey`, `revealedKey`), are for sweeps and counts only: `countIn(shape, errorKey)`.
 - **To change a default policy, copy the whole set.** Copy `node_modules/anyshape/recipes/` into the project, edit the copy, and switch every recipe import to the copy at once. Keys are matched by definition, so a copied `validate` or `handleSubmit` doesn't see the keys the shipped `control()` declares, and a form that mixes the two is checked wrongly without a compile error ([recipes README](../../recipes/README.md#customizing-copy-the-whole-set)).
 - **Build a form from an object node:** `form(object({ ... }))`.
 - **A behavior declares every reference it touches** in `triggers`, `reads`, `writes` or a [guard](../../GLOSSARY.md). `ctx.get` or `ctx.set` on anything else throws ([behaviors.md](behaviors.md)).
@@ -224,9 +224,8 @@ if (chosen !== undefined) chosen.toLowerCase();
 
 - reading or writing a meta key the node doesn't declare, such as `store.get(shape.price.error)` here;
 - writing a value of the wrong type, such as `store.set(shape.code.error, 42)`;
-- passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`.
-
-**Declaring a recipe key without its meta group.** `.meta({ visible })` compiles: it declares a plain key whose value is the function `visible`, and `visibleWhen(node, …)` then fails to compile because `node.visible` isn't a boolean key. Call the meta group: `.meta(visible())`.
+- passing a node without the keys a recipe needs to that recipe, such as a `disableWhen` target without `disabled`;
+- declaring a key without `metaKey`, such as `.meta({ visible })` for the recipe key — every entry is a definition, so call the meta group: `.meta(visible())`.
 
 **Mixing the shipped recipes with a copy.** A recipe that sweeps a subtree finds keys by its own set's definitions. On a form declared with the shipped `control()` and `submitting()`, a copied `validate` finds no `error` key and reports an invalid form as valid, and a copied `handleSubmit` throws that the root doesn't declare `submitting()`. It compiles, because both sets' nodes have the same shape. Import every recipe from one place: the package or the copy.
 
