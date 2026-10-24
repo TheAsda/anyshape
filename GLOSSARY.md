@@ -5,7 +5,7 @@ A form state library: a typed shape, a store holding values and metadata, and be
 ## Language
 
 **Core**:
-The published library: the mechanism every form needs, and no opinion about what any particular metadata key means.
+The mechanism every form needs, with no opinion about what any particular metadata key means: the `anyshape` and `anyshape/react` entries, beside the default recipes.
 _Avoid_: base, kernel
 
 **Recipe**:
