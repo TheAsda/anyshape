@@ -93,27 +93,21 @@ A synchronous behavior has finished by the time `store.set` returns. If it throw
 
 ## Starting a key with a value known at creation
 
-A [meta key](../../GLOSSARY.md) starts at its default, and behaviors run at creation — so a key whose first value can be computed from the data is already computed when the store exists. Give it a start behavior: no triggers, just the write. It runs inside `createStore`, before anything can read the key.
+A [meta key](../../GLOSSARY.md) starts at its default, and behaviors run at creation — so a key whose start is known when the store is created can hold it from the start. The default recipes ship this as `startWith(ref, value)`: no triggers, just the write. It runs inside `createStore`, before anything can read the key. That write makes `startWith` the key's writer, so a key that already has one — a key its own behavior writes (`dirty`), or one contributions combine into (`error`) — is rejected at registration, like any second writer.
 
 ```ts
 import { metaKey } from "anyshape";
+import { startWith } from "anyshape/recipes";
 
 const editor = form(object({ title: field<string>() }).meta({ mode: metaKey<"create" | "edit">("create") }));
 
-// A form created with content opens in edit mode, an empty one in create mode.
-const startMode = (start: "create" | "edit") =>
-  defineBehavior({
-    name: "startMode",
-    writes: [editor.mode],
-    run: (ctx) => ctx.set(editor.mode, start),
-  });
-
-const editorStore = createStore(editor, { title: "Hello" }, { behaviors: startMode("edit") });
+// A form created with content opens in edit mode.
+const editorStore = createStore(editor, { title: "Hello" }, { behaviors: startWith(editor.mode, "edit") });
 ```
 
-The behavior has no triggers, so only the creation run and `reset()` run it. Declaration order doesn't matter: one that writes what another reads runs first, so a behavior that reads `mode` on its own first run sees `"edit"`, never the default.
+`startWith` runs again for every row that is added later (when it is registered for rows through the builder's `each`), and again after `reset()` — a key it started returns to its start, not its default. It does not run on a load (`{ as: "initial" }`): the start is fixed at mount. Declaration order doesn't matter: a behavior that reads `mode` triggers on it, so `startWith`'s write runs it again — what a behavior computes from `mode` is computed from `"edit"`, never from the default.
 
-The same pattern works deep in the form. A key whose start comes from the row's own data — a "same as name" checkbox born from whether the values already match — gets a factory, and the factory is registered for the root and for every row:
+A start computed from the row's own data — a "same as name" checkbox born from whether the values already match — takes more than a fixed value, so it stays a hand-written behavior. The factory is registered for the root and for every row:
 
 ```ts
 import { array, type MetaRef } from "anyshape";
@@ -169,7 +163,7 @@ const contactsStore = createStore(
 
 Three things to know:
 
-**The start and the rules are one behavior.** The creation branch and the copy branch live in the same `run` because the checkbox and the value it follows form a loop: while checked, the behavior writes the value; unchecked or not, it triggers on it. Split in two, each behavior would trigger on what the other writes, and the store rejects the cycle at registration. One behavior that triggers on all three and writes both targets has no cycle — its own writes never re-trigger it.
+**The start and the rules are one behavior.** The creation branch and the copy branch live in the same `run` because the checkbox and the value it follows form a loop: while checked, the behavior writes the value; unchecked or not, it triggers on it. Split in two, each behavior would trigger on what the other writes, and the store rejects the cycle at registration. One behavior that triggers on all three and writes both targets has no cycle — its own writes never re-trigger it. `startWith` cannot express this: it takes a fixed value and writes once, so a computed start that also reacts stays one hand-written behavior.
 
 **`reset()` restores the start.** Behaviors covering their targets re-run after `reset()` as if the store were just created, from the restored values — for every row that still exists. A start needs no `keepOnReset` and nothing to recompute by hand.
 

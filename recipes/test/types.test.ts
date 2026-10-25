@@ -17,6 +17,7 @@ import {
   visibleWhen,
   disableWhen,
   exclusive,
+  startWith,
   handleSubmit,
   type InferChecked,
 } from "../index";
@@ -50,6 +51,11 @@ export function typeOnlyChecks() {
   // @ts-expect-error – exclusive needs `disabled` on every field
   exclusive([t.text, t.off]);
   exclusive([t.off, t.other]);
+  // @ts-expect-error – startWith takes a meta key, not a node
+  startWith(t.text, "");
+  // @ts-expect-error – the start must match the key's value type
+  startWith(t.text.error, 0);
+  startWith(t.text.revealed, true);
 }
 
 test("recipes state the keys they need through ref properties", () => {

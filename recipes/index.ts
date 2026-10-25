@@ -41,6 +41,6 @@ export {
 export { editedKey, dirtyKey, revealedKey, edited, dirty, revealed, control } from "./control.js";
 export { visibleKey, visible, visibleWhen } from "./visibility.js";
 export { disabledKey, disabled, disableWhen, type Disableable } from "./disabling.js";
-export { calculate, link, clearWhen, type LinkOptions } from "./values.js";
+export { calculate, link, clearWhen, startWith, type LinkOptions } from "./values.js";
 export { submittingKey, submitting, handleSubmit, type Submittable, type FormSubmitHandler } from "./submit.js";
 export { registerFocus, focusFirst, type FocusTarget, type FocusEntry } from "./focus.js";

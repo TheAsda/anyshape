@@ -1,8 +1,9 @@
 // ============================================================
-// Values – behaviors that write values: calculate, link, clearWhen.
+// Values – behaviors that write values: calculate, link, clearWhen, and
+// startWith, which gives a meta key its start.
 // ------------------------------------------------------------
-// Built on the core's defineBehavior(). Each writes the value of the nodes
-// it takes, so it is that value's one writer.
+// Built on the core's defineBehavior(). Each writes the target it takes, so
+// it is that target's one writer.
 // ============================================================
 
 import {
@@ -14,6 +15,7 @@ import {
   type Behavior,
   type AnyRef,
   type RefValue,
+  type MetaRef,
 } from "anyshape";
 
 type Values<Rs extends readonly AnyRef[]> = { -readonly [K in keyof Rs]: RefValue<Rs[K]> };
@@ -88,5 +90,24 @@ export function clearWhen<N extends AnyNode, const Rs extends readonly AnyRef[]>
       const next = ctx.get(initial);
       if (!Object.is(ctx.get(target), next)) ctx.set(target, next);
     },
+  });
+}
+
+/**
+ * A meta key's start: the value it holds when the store is created, in every
+ * row that is added, and again after reset(), in place of the key's default.
+ *   startWith(field.revealed, true)
+ *
+ * The start is fixed at mount: a load (`{ as: "initial" }`) does not rerun
+ * it, so a key the form changed keeps its value through one. Takes a meta
+ * key only – a value's start is its baseline – and only a fixed value: when
+ * the start is computed, start the key and the rule over it as one behavior.
+ * A key that is combined or has its own behavior is rejected at registration.
+ */
+export function startWith<T>(ref: MetaRef<T>, value: NoInfer<T>, options: { name?: string } = {}): Behavior {
+  return defineBehavior({
+    name: options.name ?? `startWith(${pathOf(ref)})`,
+    writes: [ref],
+    run: (ctx) => ctx.set(ref, value),
   });
 }
