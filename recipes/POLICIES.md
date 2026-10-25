@@ -34,7 +34,7 @@ A change to any policy on this page is a breaking change of the package, release
 
 **Why.** Leaving a required field empty is the mistake the message is there for, and a user who tabs past it should hear about it.
 
-**Where to change it.** The `onBlur` callback in `react/control.ts`, for example to write `revealed` only when `edited` is true.
+**Where to change it.** The `onBlur` callback in `react/control.ts`, for example to write `revealed` only when `edited` is true. To reveal before any interaction, give the key a start: `startWith(field.revealed, true)`, or through the builder's `each` for every row of an array.
 
 ## `edited` means the user changed the value
 
@@ -48,7 +48,7 @@ A change to any policy on this page is a breaking change of the package, release
 
 ## `reset()` clears `edited` and `revealed`
 
-**What the default recipes do.** `store.reset()` puts every value back to its baseline and every meta key back to its default: `edited`, `dirty` and `revealed` turn false, and so the form shows no errors until it is revealed again.
+**What the default recipes do.** `store.reset()` puts every value back to its baseline and every meta key back to its default: `edited`, `dirty` and `revealed` turn false, and so the form shows no errors until it is revealed again. A key given a start with `startWith` returns to its start, not its default.
 
 **The main alternative.** Keep `revealed` across a reset, so the errors of a reset form stay visible.
 
@@ -171,3 +171,13 @@ A change to any policy on this page is a breaking change of the package, release
 **Why.** The baseline is the value the form started with, so clearing means "as if never filled".
 
 **Where to change it.** `const initial = initialOf(target)` in `clearWhen` in `values.ts`.
+
+## `startWith` is reapplied on reset
+
+**What the default recipes do.** `startWith(ref, value)` runs at creation, for every row that is added, and again after `reset()`. A load (`{ as: "initial" }`, or `useForm`'s `values`) does not run it: what the key holds then stays.
+
+**The main alternative.** Apply the start at creation only, so `reset()` returns the key to its default instead.
+
+**Why.** Reset means "back to how the form started": a key that holds a start when the store is created should hold it after a reset too, for every row that still exists.
+
+**Where to change it.** `startWith` in `values.ts`. Creation only is not a flag: with no triggers, every run of the behavior is a creation or reset run, and `runOn: { init: false }` skips the creation run too, so the start would never be written. To start a key at creation and let `reset()` return it to the default, make the start the key's default instead.

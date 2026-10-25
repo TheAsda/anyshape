@@ -1,8 +1,8 @@
-// The value behaviors (recipes/values.ts): calculate, link, clearWhen.
-import { form, object, array, field, createStore } from "anyshape";
+// The value behaviors (recipes/values.ts): calculate, link, clearWhen, startWith.
+import { form, object, array, field, createStore, metaKey, defineBehavior, defineBehaviors } from "anyshape";
 import { describe, expect, test } from "vitest";
 
-import { calculate, link, clearWhen, visibleWhen } from "../index";
+import { calculate, link, clearWhen, visibleWhen, startWith, rule, submitting, handleSubmit, control } from "../index";
 import { shape, initial } from "./fixtures/profile";
 
 // Compile-time only – never called.
@@ -93,5 +93,101 @@ describe("clearWhen", () => {
     expect(s.get(shape.company.phone), "not restored when shown again").toBe("123");
     s.set(shape.company.phone, "777");
     expect(s.get(shape.company.phone), "shown: edits stay").toBe("777");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// startWith – a meta key's start, known at creation
+// ---------------------------------------------------------------------------
+describe("startWith", () => {
+  test("the key holds its start from creation; a program write replaces it; reset returns the start", () => {
+    const s = createStore(shape, initial(), { behaviors: startWith(shape.note.hint, "Your note") });
+    expect(s.get(shape.note.hint)).toBe("Your note");
+    s.set(shape.note.hint, "mine");
+    expect(s.get(shape.note.hint), "a later write wins").toBe("mine");
+    s.reset();
+    expect(s.get(shape.note.hint), "reset returns the start, not the default").toBe("Your note");
+  });
+
+  test("a behavior that reads the key on its own first run sees the start, never the default", () => {
+    const modeKey = metaKey("view");
+    const f = form(object({ echo: field<string>() }).meta({ mode: modeKey }));
+    const s = createStore(
+      f,
+      { echo: "" },
+      { behaviors: [startWith(f.mode, "edit"), calculate(f.echo, [f.mode], (mode) => mode)] },
+    );
+    expect(s.get(f.echo), "the first run computed from the start").toBe("edit");
+  });
+
+  test("rows: every row gets the start, appended ones included", () => {
+    const f = form(
+      object({ rows: array(object({ qty: field<number>().meta(control()) }), { create: () => ({ qty: 0 }) }) }),
+    );
+    const behaviors = defineBehaviors(f, (b) => b.each(f.rows, (b, item) => b.add(startWith(item.qty.revealed, true))));
+    const s = createStore(f, { rows: [{ qty: 1 }] }, { behaviors });
+    const rows = s.substore(f.rows);
+    expect(rows.itemAt(0).get(f.rows.item.qty.revealed)).toBe(true);
+    expect(rows.append().get(f.rows.item.qty.revealed), "a row added later starts too").toBe(true);
+  });
+
+  test("a start on `revealed` shows a rule's error at once and leaves the submit working", async () => {
+    const submittable = form(object({ name: field<string>().meta(control()) }).meta(submitting()));
+    const s = createStore(
+      submittable,
+      { name: "Ann" },
+      {
+        behaviors: [
+          startWith(submittable.name.revealed, true),
+          rule(submittable.name, (v) => (v.length > 2 ? undefined : "Too short")),
+        ],
+      },
+    );
+    expect(s.get(submittable.name.revealed), "revealed from the start").toBe(true);
+    s.set(submittable.name, "Jo");
+    expect(s.get(submittable.name.error), "an edit shows at once, no blur needed").toBe("Too short");
+    s.set(submittable.name, "Joanna");
+    let calls = 0;
+    await handleSubmit(s, async () => void calls++)();
+    expect(calls, "the submit is not blocked by the started key").toBe(1);
+  });
+
+  test('a load ({ as: "initial" }) does not rerun the start', () => {
+    const s = createStore(shape, initial(), { behaviors: startWith(shape.note.hint, "Your note") });
+    s.set(shape.note.hint, "mine");
+    s.set(shape, { ...initial(), title: "Loaded" }, { as: "initial" });
+    expect(s.get(shape.title)).toBe("Loaded");
+    expect(s.get(shape.note.hint), "the start is fixed at mount; the load leaves the key alone").toBe("mine");
+  });
+
+  test("a key with its own behavior, a combined key and a second start are rejected at registration", () => {
+    expect(
+      () => createStore(shape, initial(), { behaviors: startWith(shape.name.dirty, true) }),
+      "dirty declares its own behavior",
+    ).toThrow(/declares its own behavior/);
+    expect(
+      () => createStore(shape, initial(), { behaviors: startWith(shape.name.error, "nope") }),
+      "error is combined",
+    ).toThrow(/combined/);
+    expect(
+      () =>
+        createStore(shape, initial(), {
+          behaviors: [startWith(shape.note.hint, "a"), startWith(shape.note.hint, "b")],
+        }),
+      "one writer per target",
+    ).toThrow(/one writer per target/);
+  });
+
+  test("the default name is startWith(<path>); { name } overrides it", () => {
+    const hand = defineBehavior({ writes: [shape.note.hint], run: (ctx) => ctx.set(shape.note.hint, "hand") });
+    expect(
+      () => createStore(shape, initial(), { behaviors: [startWith(shape.note.hint, "a"), hand] }),
+      "the default name names the key",
+    ).toThrow(/is already written by "startWith\(note#hint\)"/);
+    expect(
+      () =>
+        createStore(shape, initial(), { behaviors: [startWith(shape.note.hint, "a", { name: "hint start" }), hand] }),
+      "a custom name replaces it",
+    ).toThrow(/is already written by "hint start"/);
   });
 });

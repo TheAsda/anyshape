@@ -172,6 +172,7 @@ exports[`the recipe entry's public names 1`] = `
     "revealed",
     "revealedKey",
     "rule",
+    "startWith",
     "submitting",
     "submittingKey",
     "validate",
