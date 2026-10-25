@@ -1,5 +1,31 @@
 # anyshape
 
+## 0.4.0
+
+### Minor Changes
+
+- 78db213: **Breaking:** `.meta()` now takes key definitions only — each entry must be made with `metaKey`. A plain value (`label: "Name"`, `visible: true`) is a compile error; the same key declares as `label: metaKey("Name")`. At run time, an entry that is not a key definition throws with the fix in the message; the old wrapping silently accepted it. `metaKey(default, options?)` is unchanged and is now the only way to declare a key, so every key can carry the definition-only capabilities (`countIn`, a default behavior, contributions) and be swept by definition, whatever name a node declares it under. The `Meta` type now describes one `.meta()` input — a bag of key definitions — instead of the live values per node. Meta groups are unchanged.
+
+  ```ts
+  // before
+  field<string>().meta({ label: "Name", visible });
+  // after
+  field<string>().meta({ label: metaKey("Name"), visible: visibleKey });
+  ```
+
+### Patch Changes
+
+- 453fd74: New value-behavior recipe: `startWith(ref, value)` gives a meta key its start — the value it holds when the store is created, in every row that is added, and again after `reset()`, in place of the key's default. A load (`{ as: "initial" }`) does not run it: the start is fixed at mount. Takes a meta key only (a value's start is its baseline) and a fixed value; a start computed from the row's own data, or one that also reacts, stays a hand-written behavior, as the guide's behaviors page shows. A key that is combined or has its own behavior is rejected at registration, like any second writer.
+
+  ```ts
+  import { startWith } from "anyshape/recipes";
+
+  createStore(editor, values, {
+    // A form opened over existing content starts in edit mode.
+    behaviors: startWith(editor.mode, "edit"),
+  });
+  ```
+
 ## 0.3.1
 
 ### Patch Changes
