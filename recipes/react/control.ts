@@ -13,14 +13,14 @@
 //     a ref, and then flags every other read of `x` during render.
 // ============================================================
 
-import { pendingOf, type AnyNode, type BaseStore, type InferValue, type MetaRef } from "anyshape";
+import { pendingOf, type BaseStore, type MetaRef, type ShapeNode } from "anyshape";
 import { useField, useValue, type HookOptions } from "anyshape/react";
 import { useCallback, useRef } from "react";
 
 import { registerFocus, type FocusTarget } from "../focus.js";
 
-/** A node with the control() keys. */
-export type ControlNode = AnyNode & {
+/** A node with the control() keys. `ControlNode<T>` is one whose value type is `T`. */
+export type ControlNode<T = any> = ShapeNode<T> & {
   readonly error: MetaRef<string | undefined>;
   readonly requiredNow: MetaRef<boolean>;
   readonly edited: MetaRef<boolean>;
@@ -28,10 +28,10 @@ export type ControlNode = AnyNode & {
   readonly revealed: MetaRef<boolean>;
 };
 
-export interface ControlBinding<N extends ControlNode> {
-  value: InferValue<N>;
+export interface ControlBinding<T = any> {
+  value: T;
   /** Stable; writes with origin "user". */
-  onChange: (value: InferValue<N>) => void;
+  onChange: (value: T) => void;
   /** Stable; marks the field revealed. Pass it to the input's onBlur. */
   onBlur: () => void;
   error: string | undefined;
@@ -52,7 +52,7 @@ export interface ControlBinding<N extends ControlNode> {
 }
 
 /** A node with control(): its value, onChange, onBlur, the control keys, showError and focusRef. Destructure it. */
-export function useControl<N extends ControlNode>(node: N, options?: HookOptions): ControlBinding<N> {
+export function useControl<T>(node: ControlNode<T>, options?: HookOptions): ControlBinding<T> {
   const { value, onChange, store } = useField(node, options);
   const error = useValue(node.error, { store });
   const requiredNow = useValue(node.requiredNow, { store });

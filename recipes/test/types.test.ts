@@ -21,7 +21,7 @@ import {
   handleSubmit,
   type InferChecked,
 } from "../index";
-import type { useControl } from "../react";
+import type { useControl, ControlNode, ControlBinding } from "../react";
 import * as order from "./fixtures/order";
 import type { DeliveryType } from "./fixtures/order";
 
@@ -114,4 +114,15 @@ test("InferChecked drops undefined only where `defined` is declared", () => {
     nested: { deep: { y: boolean } };
     rows: { z: string }[];
   }>();
+});
+
+test("ControlNode is parameterized by the node's value type", () => {
+  expectTypeOf(t.text).toExtend<ControlNode<string>>();
+  expectTypeOf(t.count).toExtend<ControlNode<number>>();
+  expectTypeOf(t.text).not.toExtend<ControlNode<number>>();
+  expectTypeOf(t.hidden.x).not.toExtend<ControlNode<string>>(); // string value, no control() keys
+  expectTypeOf<ControlBinding<string>["value"]>().toEqualTypeOf<string>();
+  expectTypeOf<ControlBinding<string>["onChange"]>().toEqualTypeOf<(value: string) => void>();
+  expectTypeOf<ControlBinding<string>["error"]>().toEqualTypeOf<string | undefined>();
+  expectTypeOf<ReturnType<typeof useControl<string>>>().toEqualTypeOf<ControlBinding<string>>();
 });
