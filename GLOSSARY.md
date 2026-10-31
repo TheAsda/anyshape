@@ -52,6 +52,10 @@ _Avoid_: flag, attribute, status
 A set of meta keys declared together on a node by calling one function inside `.meta()`, each under its usual name: `control()` declares the keys an input needs, `defined()` just one.
 _Avoid_: feature, bundle, trait, plugin, mixin
 
+**Control node**:
+A node that declares the keys an input needs through `control()`. `ControlNode<T>` is one whose value type is `T`.
+_Avoid_: bound node, input node
+
 **Behavior**:
 A declared rule that runs when one of its triggers changes, reads only the references it lists, and writes its targets. Each target has exactly one behavior writing it.
 _Avoid_: effect, watcher, listener, reaction

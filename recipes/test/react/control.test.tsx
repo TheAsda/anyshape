@@ -5,11 +5,11 @@
 
 import { form, object, array, field, createStore, defineBehaviors, type BaseStore, type InferValue } from "anyshape";
 import { StoreProvider } from "anyshape/react";
-import { test, expect } from "vitest";
+import { test, expect, expectTypeOf } from "vitest";
 
 import { control } from "../../control";
 import { focusFirst, type FocusTarget } from "../../focus";
-import { useControl, fromInput, fromCheckbox } from "../../react";
+import { useControl, fromInput, fromCheckbox, type ControlBinding } from "../../react";
 import { required } from "../../rules";
 import { handleSubmit, submitting } from "../../submit";
 import { rule, asyncRule } from "../../validation";
@@ -66,7 +66,7 @@ test("useControl: state, user writes set edited/dirty, errors", async () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")),
   });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  let c!: ControlBinding<InferValue<typeof shape.name>>;
   function C() {
     c = useControl(shape.name);
     return <span data-testid="c">{`${c.value}|${c.error ?? "-"}|${c.edited}|${c.dirty}`}</span>;
@@ -88,7 +88,7 @@ test("useControl: onBlur reveals, showError once revealed", async () => {
   const s = createStore(shape, initial(), {
     behaviors: rule(shape.name, (v) => (v.length > 2 ? undefined : "Too short")),
   });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  let c!: ControlBinding<InferValue<typeof shape.name>>;
   function C() {
     c = useControl(shape.name);
     return <span data-testid="c">{`${c.error ?? "-"}|${c.revealed}|${c.showError}`}</span>;
@@ -121,7 +121,7 @@ test("useControl: requiredNow follows a guarded required(), e.g. for an asterisk
       );
     }),
   });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  let c!: ControlBinding<InferValue<typeof shape.name>>;
   function C() {
     c = useControl(shape.name);
     return <label data-testid="c">{`Name${c.requiredNow ? " *" : ""}`}</label>;
@@ -149,7 +149,7 @@ function gate() {
 test("useControl: pending while a check runs; the error shows when revealed and not pending", async () => {
   const lookup = gate();
   const s = createStore(shape, initial(), { behaviors: asyncRule(shape.name, lookup.check) });
-  let c!: ReturnType<typeof useControl<typeof shape.name>>;
+  let c!: ControlBinding<InferValue<typeof shape.name>>;
   function C() {
     c = useControl(shape.name);
     return <span data-testid="c">{`${c.pending}|${c.error ?? "-"}|${c.showError}`}</span>;
@@ -175,7 +175,7 @@ test("useControl: onBlur after its row was removed does nothing", async () => {
   const s = createStore(shape, initial());
   const lines = s.substore(shape.lines);
   const row = lines.items()[1];
-  let c!: ReturnType<typeof useControl<typeof L.sku>>;
+  let c!: ControlBinding<InferValue<typeof L.sku>>;
   function Sku() {
     c = useControl(L.sku);
     return <span data-testid="sku">{c.value ?? "-"}</span>;
@@ -269,4 +269,18 @@ test("fromInput / fromCheckbox with real events; handlers are cached", async () 
   expect(s.get(shape.agree)).toBe(true);
   await expect.element(screen.getByTestId("agree")).toBeChecked();
   expect(fromInput(nameOnChange)).toBe(fromInput(nameOnChange));
+});
+
+test("useControl infers the binding's value type from the node", async () => {
+  const s = createStore(shape, initial());
+  function C() {
+    // T comes from the node, with no explicit type argument.
+    expectTypeOf(useControl(shape.name).value).toEqualTypeOf<string>();
+    return <span data-testid="c" />;
+  }
+  await render(
+    <StoreProvider store={s}>
+      <C />
+    </StoreProvider>,
+  );
 });
