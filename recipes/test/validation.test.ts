@@ -14,7 +14,7 @@ import {
 } from "anyshape";
 import { test as base, describe, expect, vi, onTestFinished } from "vitest";
 
-import { rule, asyncRule, required, validate, errorKey, control, validation, visible } from "../index";
+import { rule, asyncRule, required, validate, errorKey, control, validation, visible, defined } from "../index";
 import { shape, L, initial, lookup } from "./fixtures/account";
 import * as orderFixture from "./fixtures/order";
 import { flush, sleep } from "./harness";
@@ -435,19 +435,100 @@ describe("A check that throws", () => {
 
   test("a check that throws because it was cancelled is not a failure", async () => {
     const logged = spyConsole();
+    const failure = vi.fn<() => string>(() => "Custom failure");
     const s = createStore(shape, initial(), {
       behaviors: asyncRule(
         shape.email,
         (_v, { signal }) =>
           new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")))),
+        { failure },
       ),
     });
     s.set(shape.email, "a@x.io", { origin: "user" });
     s.set(shape.email, "b@x.io", { origin: "user" });
     await flush();
     expect(logged).not.toHaveBeenCalled();
+    expect(failure).not.toHaveBeenCalled();
     expect(s.get(shape.email.error)).toBe(undefined);
     expect(s.get(pendingOf(shape.email.error))).toBe(true);
+  });
+
+  test("failure option on rule: string or lazy getter, called only when the check throws", () => {
+    const logged = spyConsole();
+    let locale = "en";
+    let shouldThrow = false;
+    const failure = vi.fn<() => string>(() => (locale === "en" ? "Check broke" : "Ошибка проверки"));
+    const s = createStore(shape, initial(), {
+      behaviors: [
+        rule(
+          shape.name,
+          (v) => {
+            if (shouldThrow) throw new Error("boom");
+            return v ? undefined : "Empty";
+          },
+          { failure },
+        ),
+        rule(
+          shape.email,
+          () => {
+            throw new Error("static boom");
+          },
+          { failure: "Static failure" },
+        ),
+      ],
+    });
+    expect(s.get(shape.email.error)).toBe("Static failure");
+    expect(failure, "not called when passing or returning an error").not.toHaveBeenCalled();
+
+    shouldThrow = true;
+    s.set(shape.name, "Ada", { origin: "user" });
+    expect(s.get(shape.name.error)).toBe("Check broke");
+    expect(failure).toHaveBeenCalledTimes(1);
+
+    locale = "ru";
+    s.set(shape.name, "Bob", { origin: "user" });
+    expect(s.get(shape.name.error), "called again on the next failure").toBe("Ошибка проверки");
+    expect(failure).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledTimes(3);
+  });
+
+  test("failure option on asyncRule: per-rule getter, preserved when kept work is reused", async ({
+    lookup: { calls, check },
+  }) => {
+    const logged = spyConsole();
+    const firstFailure = vi.fn<() => string>(() => "First broke");
+    let locale = "en";
+    const secondFailure = vi.fn<() => string>(() => (locale === "en" ? "Second broke" : "Вторая ошибка"));
+    const s = createStore(shape, initial(), {
+      behaviors: [
+        rule(shape.email, (_v, ctx) => (ctx.get(shape.name) === "block" ? "Blocked" : undefined), {
+          triggers: [shape.name],
+        }),
+        asyncRule(shape.email, async () => undefined, { failure: firstFailure }),
+        asyncRule(shape.email, check, { failure: secondFailure }),
+      ],
+    });
+    expect(firstFailure).not.toHaveBeenCalled();
+    expect(secondFailure).not.toHaveBeenCalled();
+
+    s.set(shape.email, "a@x.io", { origin: "user" });
+    await flush();
+    // Unrelated trigger reruns the owner while keeping the in-flight check.
+    s.set(shape.name, "Ann", { origin: "user" });
+    calls[0].d.reject(new Error("net"));
+    await flush();
+    expect(s.get(shape.email.error)).toBe("Second broke");
+    expect(firstFailure).not.toHaveBeenCalled();
+    expect(secondFailure).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledTimes(1);
+
+    locale = "ru";
+    s.set(shape.email, "b@x.io", { origin: "user" });
+    await flush();
+    calls[1].d.reject(new Error("net2"));
+    await flush();
+    expect(s.get(shape.email.error)).toBe("Вторая ошибка");
+    expect(secondFailure).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -652,5 +733,52 @@ describe("`defined`: the Required backstop", () => {
     const s = createStore(order, empty());
     const row = s.substore(order.items.lines).append();
     expect(row.get(Line.sku.error)).toBe("Required");
+    expect(row.get(Line.sku.requiredNow)).toBe(true);
+  });
+
+  test("defined() turns on requiredNow without a required() rule", () => {
+    const s = createStore(order, empty());
+    expect(s.get(D.deliveryType.requiredNow)).toBe(true);
+    expect(s.get(D.email.requiredNow), "a field without defined() or required() stays false").toBe(false);
+    s.set(D.deliveryType, "Printed", { origin: "user" });
+    expect(s.get(D.deliveryType.requiredNow), "stays required after being filled").toBe(true);
+  });
+
+  test("defined({ message }) supports a string or lazy getter called only on failure", () => {
+    let locale = "en";
+    const getter = vi.fn<() => string>(() => (locale === "en" ? "Must choose" : "Выберите значение"));
+    const f = form(
+      object({
+        staticMsg: field<string | undefined>().meta(control(), defined({ message: "Pick one" })),
+        lazyMsg: field<string | undefined>().meta(control(), defined({ message: getter })),
+      }),
+    );
+    expect(getter, "not called at shape declaration").not.toHaveBeenCalled();
+
+    const s = createStore(f, { staticMsg: undefined, lazyMsg: "ok" });
+    expect(s.get(f.staticMsg.error)).toBe("Pick one");
+    expect(s.get(f.staticMsg.requiredNow)).toBe(true);
+    expect(s.get(f.lazyMsg.error)).toBeUndefined();
+    expect(s.get(f.lazyMsg.requiredNow)).toBe(true);
+    expect(getter, "not called while value is defined").not.toHaveBeenCalled();
+
+    s.set(f.lazyMsg, undefined, { origin: "user" });
+    expect(s.get(f.lazyMsg.error)).toBe("Must choose");
+    expect(getter).toHaveBeenCalledTimes(1);
+
+    locale = "ru";
+    s.set(f.lazyMsg, "ok", { origin: "user" });
+    expect(getter, "not called when passing").toHaveBeenCalledTimes(1);
+    s.set(f.lazyMsg, undefined, { origin: "user" });
+    expect(s.get(f.lazyMsg.error), "called again on next failure").toBe("Выберите значение");
+    expect(getter).toHaveBeenCalledTimes(2);
+  });
+
+  test("defined({ message }) getter is not called when an earlier sync rule fails", () => {
+    const getter = vi.fn<() => string>(() => "Backstop");
+    const f = form(object({ pick: field<string | undefined>().meta(control(), defined({ message: getter })) }));
+    const s = createStore(f, { pick: undefined }, { behaviors: [required(f.pick, { message: "Rule first" })] });
+    expect(s.get(f.pick.error)).toBe("Rule first");
+    expect(getter).not.toHaveBeenCalled();
   });
 });

@@ -10,7 +10,7 @@ import {
   countIn,
   type BehaviorBuilder,
 } from "anyshape";
-import { test as base, describe, expect } from "vitest";
+import { test as base, describe, expect, vi } from "vitest";
 
 import {
   control,
@@ -208,6 +208,112 @@ describe("Messages", () => {
 
     const d = createStore(shape, initial(), { behaviors: exclusive([shape.price, shape.promo], { required: true }) });
     expect(d.get(shape.price.error), "last path segments, not `label`").toBe("One of price, promo is required");
+  });
+
+  test("limit rules pass { limit } to message getters, following ref limits and running only on failure", () => {
+    const { shape: lim, L: limL, initial: limInit } = limits;
+    let locale = "en";
+    const maxMsg = vi.fn<(v: number, params: { limit: number }) => string>((v, { limit }) =>
+      locale === "en" ? `${v} > ${limit}` : `Максимум ${limit}`,
+    );
+    const minLenMsg = vi.fn<(_v: string, params: { limit: number }) => string>((_v, { limit }) =>
+      locale === "en" ? `Min ${limit}` : `Минимум ${limit}`,
+    );
+    const s = createStore(
+      lim,
+      { ...limInit(), code: "" },
+      {
+        behaviors: [
+          max(limL.qty, limL.qty.maxQty, { message: maxMsg }),
+          minLength(lim.code, 4, { message: minLenMsg }),
+        ],
+      },
+    );
+    const row = s.substore(lim.lines).itemAt(1);
+    expect(maxMsg, "not called while limit is undefined").not.toHaveBeenCalled();
+    expect(minLenMsg, "not called on empty value").not.toHaveBeenCalled();
+
+    row.set(limL.qty.maxQty, 3);
+    expect(row.get(limL.qty.error)).toBe("5 > 3");
+    expect(maxMsg).toHaveBeenCalledTimes(1);
+
+    locale = "ru";
+    row.set(limL.qty.maxQty, 2);
+    expect(row.get(limL.qty.error), "re-evaluated with the new resolved limit and locale").toBe("Максимум 2");
+    expect(maxMsg).toHaveBeenCalledTimes(2);
+
+    s.set(lim.code, "ab", { origin: "user" });
+    expect(s.get(lim.code.error)).toBe("Минимум 4");
+    expect(minLenMsg).toHaveBeenCalledTimes(1);
+  });
+
+  test("exclusive accepts lazy message getters receiving { labels }, called only on failure", () => {
+    let locale = "en";
+    const tooMany = vi.fn<(params: { labels: readonly string[] }) => string>(({ labels }) =>
+      locale === "en" ? `Too many: ${labels.join("/")}` : `Лишние: ${labels.join(", ")}`,
+    );
+    const missing = vi.fn<(params: { labels: readonly string[] }) => string>(({ labels }) =>
+      locale === "en" ? `Need one of: ${labels.join("/")}` : `Нужно одно из: ${labels.join(", ")}`,
+    );
+    const behaviors = exclusive([shape.price, shape.discount, shape.promo], {
+      required: true,
+      message: { tooMany, missing },
+    });
+    expect(tooMany, "not called at declaration").not.toHaveBeenCalled();
+    expect(missing, "not called at declaration").not.toHaveBeenCalled();
+
+    const s = createStore(shape, { ...initial(), price: 10 }, { behaviors });
+    expect(tooMany, "not called when valid").not.toHaveBeenCalled();
+    expect(missing, "not called when valid").not.toHaveBeenCalled();
+
+    s.set(shape.price, undefined, { origin: "user" });
+    expect(s.get(shape.price.error)).toBe("Need one of: price/discount/promo");
+    expect(missing).toHaveBeenCalled();
+    expect(tooMany).not.toHaveBeenCalled();
+
+    locale = "ru";
+    s.batch(() => {
+      s.set(shape.price, 10, { origin: "user" });
+      s.set(shape.promo, "SAVE", { origin: "user" });
+    });
+    expect(s.get(shape.price.error)).toBe("Лишние: price, discount, promo");
+    expect(tooMany).toHaveBeenCalled();
+  });
+
+  test("required, pattern and email message getters run only on failure and pick up changes", () => {
+    let locale = "en";
+    const reqMsg = vi.fn<() => string>(() => (locale === "en" ? "Req" : "Обязательно"));
+    const patMsg = vi.fn<(v: string) => string>((v) => `${locale}:${v}`);
+    const emailMsg = vi.fn<() => string>(() => (locale === "en" ? "Bad email" : "Плохой email"));
+    const s = createStore(
+      shape,
+      { ...initial(), name: "Ada", zip: "LV-1010", email: "a@b.co" },
+      {
+        behaviors: [
+          required(shape.name, { message: reqMsg }),
+          pattern(shape.zip, /^LV-\d{4}$/, { message: patMsg }),
+          email(shape.email, { message: emailMsg }),
+        ],
+      },
+    );
+    expect(reqMsg).not.toHaveBeenCalled();
+    expect(patMsg).not.toHaveBeenCalled();
+    expect(emailMsg).not.toHaveBeenCalled();
+
+    s.set(shape.name, "", { origin: "user" });
+    s.set(shape.zip, "123", { origin: "user" });
+    s.set(shape.email, "nope", { origin: "user" });
+    expect(s.get(shape.name.error)).toBe("Req");
+    expect(s.get(shape.zip.error)).toBe("en:123");
+    expect(s.get(shape.email.error)).toBe("Bad email");
+
+    locale = "ru";
+    s.set(shape.name, " ", { origin: "user" });
+    s.set(shape.zip, "456", { origin: "user" });
+    s.set(shape.email, "still-bad", { origin: "user" });
+    expect(s.get(shape.name.error)).toBe("Обязательно");
+    expect(s.get(shape.zip.error)).toBe("ru:456");
+    expect(s.get(shape.email.error)).toBe("Плохой email");
   });
 });
 

@@ -6,16 +6,14 @@
 //     queue – runs the node's rules in registration order: the sync rules
 //     until the first error, then the `defined` backstop, then, if they
 //     pass, the async rules.
-//   • `requiredNow` is true while a required() on the node is present, so a
-//     guard around required() switches the rule and the key together. The
-//     `defined` backstop doesn't feed it: a field with only `defined` says
-//     "Required" with `requiredNow` false. Feeding it would need a key's
-//     default behavior to return two contributions, a core change that waits
-//     for a second user (principle 8).
-//   • `defined` on a field that starts empty (`field<T | undefined>()`)
-//     contributes the backstop: "Required" while the value is undefined,
-//     whatever rules the author registered. InferChecked<N> drops undefined
-//     from such fields; handleSubmit hands fn that checked type.
+//   • `requiredNow` is true while a required() or defined() is on the node,
+//     so a guard around required() switches the rule and the key together, and
+//     a defined() field shows as required on its own.
+//   • `defined({ message })` on a field that starts empty
+//     (`field<T | undefined>()`) contributes the backstop (default "Required")
+//     while the value is undefined, whatever rules the author registered, and
+//     feeds `requiredNow`. InferChecked<N> drops undefined from such fields;
+//     handleSubmit hands fn that checked type.
 //   • Nothing is skipped implicitly: a rule that applies only while a field
 //     is shown or enabled is guarded (b.when). A false guard makes
 //     the rule absent; with no rule present the error is undefined.
@@ -35,8 +33,9 @@
 //     pendingOf(node.error) is true while one runs. A "can submit" UI reads
 //     countIn(form, errorKey) === 0 && !pendingIn(form, errorKey).
 //   • A check that throws is a bug or an unhandled failure (expected
-//     failures return a message): "Validation failed" is written, the
-//     thrown value goes to console.error, and nothing is remembered.
+//     failures return a message): the rule's `failure` message (default
+//     "Validation failed") is written, the thrown value goes to console.error,
+//     and nothing is remembered.
 //   • validate(store, node) forces the idle fields of the subtree (no
 //     debounce, whatever the start rule), waits for every check, and
 //     returns { valid, errors } in shape order.
@@ -71,15 +70,30 @@ export interface AsyncRuleContext extends RuleContext {
   readonly signal: AbortSignal;
 }
 
-type SyncPart = { kind: "sync"; check: (value: any, ctx: RuleContext) => string | undefined };
+type TextOrGetter = string | (() => string);
+
+type SyncPart = {
+  kind: "sync";
+  check: (value: any, ctx: RuleContext) => string | undefined;
+  failure?: TextOrGetter;
+};
 type AsyncPart = {
   kind: "async";
   check: (value: any, ctx: AsyncRuleContext) => Promise<string | undefined>;
   start: AsyncStart;
   debounce: number;
+  failure?: TextOrGetter;
 };
 
-type DefinedPart = { kind: "defined" };
+type DefinedPart = { kind: "defined"; message?: TextOrGetter };
+
+type AsyncOutcome =
+  | { ok: true; found: string | undefined }
+  | { ok: false; thrown: unknown; failure: TextOrGetter | undefined };
+
+function resolveText(value: TextOrGetter | undefined, fallback: string): string {
+  return value === undefined ? fallback : typeof value === "function" ? value() : value;
+}
 
 /** What a rule, or the `defined` key, contributes to `error`. */
 export type RulePart = SyncPart | AsyncPart | DefinedPart;
@@ -157,10 +171,10 @@ export const errorKey = metaKey<string | undefined, RulePart>(undefined)
       };
       // A check that throws is a bug or a failure it didn't handle (expected
       // failures return a message). Never remembered as checked.
-      const failed = (thrown: unknown) => {
+      const failed = (thrown: unknown, failure?: TextOrGetter) => {
         if (ctx.signal.aborted) throw thrown;
         console.error(thrown);
-        result("Validation failed");
+        result(resolveText(failure, "Validation failed"));
       };
 
       const value = ctx.get(self);
@@ -170,11 +184,22 @@ export const errorKey = metaKey<string | undefined, RulePart>(undefined)
         try {
           found = p.payload.check(value, ctx);
         } catch (thrown) {
-          return failed(thrown);
+          return failed(thrown, p.payload.failure);
         }
         if (found !== undefined) return result(found);
       }
-      if (value === undefined && ctx.parts.some((p) => p.payload.kind === "defined")) return result("Required");
+      if (value === undefined) {
+        const backstop = ctx.parts.find((p): p is Part<DefinedPart> => p.payload.kind === "defined");
+        if (backstop) {
+          let found: string;
+          try {
+            found = resolveText(backstop.payload.message, "Required");
+          } catch (thrown) {
+            return failed(thrown);
+          }
+          return result(found);
+        }
+      }
 
       const asyncParts = ctx.parts.filter((p): p is Part<AsyncPart> => p.payload.kind === "async");
       if (!asyncParts.length) return result(undefined);
@@ -192,36 +217,76 @@ export const errorKey = metaKey<string | undefined, RulePart>(undefined)
       const debounce = isForced ? 0 : Math.max(...asyncParts.map((p) => p.payload.debounce));
       const get = frozenGet([self, ...asyncParts.flatMap((p) => p.inputs)], [value, ...inputs.slice(1)]);
       return ctx
-        .keep([...ids, ...inputs], async (signal) => {
+        .keep([...ids, ...inputs], async (signal): Promise<AsyncOutcome> => {
           if (debounce > 0) await sleep(debounce, signal);
-          let found: string | undefined;
           for (const p of asyncParts) {
-            found = await p.payload.check(value, { get, signal });
-            if (found !== undefined) break;
+            let found: string | undefined;
+            try {
+              found = await p.payload.check(value, { get, signal });
+            } catch (thrown) {
+              if (signal.aborted) throw thrown;
+              return { ok: false, thrown, failure: p.payload.failure };
+            }
+            if (found !== undefined) return { ok: true, found };
           }
-          return found;
+          return { ok: true, found: undefined };
         })
-        .then((found) => {
-          ctx.state.checked = { ids, inputs, error: found } satisfies Checked;
-          result(found);
-        }, failed);
+        .then(
+          (outcome) => {
+            if (!outcome.ok) return failed(outcome.thrown, outcome.failure);
+            ctx.state.checked = { ids, inputs, error: outcome.found } satisfies Checked;
+            result(outcome.found);
+          },
+          (thrown) => failed(thrown),
+        );
     },
   }));
+
+/**
+ * Whether the node is required now: true while any required() or defined() is
+ * on it, e.g. for an asterisk on the label. The payload names where it came
+ * from, as a `disabled` reason does.
+ */
+export const requiredNowKey = metaKey<boolean, string>(false).combine((self, key) => ({
+  name: `${pathOf(self) || "<root>"}#requiredNow`,
+  writes: [key],
+  run: (ctx) => ctx.set(key, ctx.parts.length > 0),
+}));
 
 declare const DefinedBrand: unique symbol;
 /** The value type of `defined`: the mark InferChecked looks for. */
 export type Defined = true & { readonly [DefinedBrand]: true };
 
-/** The field's value is not undefined: a "Required" backstop in its `error`, after its sync rules. */
-export const definedKey = metaKey<Defined>(true as Defined)
-  .uses(errorKey)
-  .behavior((_self, _key, [err]) => contribute(err, { kind: "defined" }));
+export interface DefinedOptions {
+  /** Message written while the value is undefined (default "Required"). */
+  message?: TextOrGetter;
+}
+
+function makeDefinedKey(message?: TextOrGetter) {
+  return metaKey<Defined>(true as Defined)
+    .uses(errorKey)
+    .behavior((_self, _key, [err]) => contribute(err, { kind: "defined", message }));
+}
+
+const defaultDefinedKey = makeDefinedKey();
+
+/** Feeds `requiredNow` so a `defined()` field shows as required on its own. */
+const definedRequiredKey = metaKey(true)
+  .uses(requiredNowKey)
+  .behavior((self, _key, [reqNow]) => contribute(reqNow, `defined(${pathOf(self)})`));
 
 /**
  * The `defined` meta group, for a field that starts empty
- * (`field<T | undefined>()`): its checked type has no undefined.
+ * (`field<T | undefined>()`): its checked type has no undefined, it turns on
+ * `requiredNow`, and it adds a "Required" backstop (or `options.message`)
+ * while the value is undefined.
  */
-export const defined = () => ({ defined: definedKey });
+export function defined(options?: DefinedOptions) {
+  return {
+    defined: options?.message === undefined ? defaultDefinedKey : makeDefinedKey(options.message),
+    definedRequired: definedRequiredKey,
+  };
+}
 
 /** True when some property of N, under any name, is a ref to a `Defined` key. */
 type HasDefined<N> = true extends {
@@ -254,18 +319,7 @@ type Walk<N> =
 /** What the node holds once its checks pass: its stored type, without undefined where `defined` is declared. */
 export type InferChecked<N> = HasDefined<N> extends true ? Exclude<Walk<N>, undefined> : Walk<N>;
 
-/**
- * Whether the node is required now: true while any required() on it is
- * present (its guard holds), e.g. for an asterisk on the label. The payload
- * names the required() it came from, as a `disabled` reason does.
- */
-export const requiredNowKey = metaKey<boolean, string>(false).combine((self, key) => ({
-  name: `${pathOf(self) || "<root>"}#requiredNow`,
-  writes: [key],
-  run: (ctx) => ctx.set(key, ctx.parts.length > 0),
-}));
-
-/** `error`, written by the field's rules, `checkForced` for validate(), and `requiredNow`, fed by required(). */
+/** `error`, written by the field's rules, `checkForced` for validate(), and `requiredNow`, fed by required() and defined(). */
 export const validation = () => ({ error: errorKey, checkForced: checkForcedKey, requiredNow: requiredNowKey });
 
 /** A node with validation(), whose value is `V`. */
@@ -280,6 +334,8 @@ export interface RuleOptions {
   triggers?: readonly AnyRef[];
   /** References the rule reads without being triggered by them. */
   reads?: readonly AnyRef[];
+  /** Message written when the check throws (default "Validation failed"). */
+  failure?: TextOrGetter;
 }
 
 /** A synchronous rule: return an error message, or undefined when valid. */
@@ -288,10 +344,11 @@ export function rule<V>(
   check: (value: V, ctx: RuleContext) => string | undefined,
   options: RuleOptions = {},
 ): Contribution<RulePart> {
+  const { failure, ...decl } = options;
   return contribute(
     errorOf(node),
-    { kind: "sync", check },
-    { ...options, name: options.name ?? `rule(${pathOf(node) || "<root>"})` },
+    { kind: "sync", check, failure },
+    { ...decl, name: decl.name ?? `rule(${pathOf(node) || "<root>"})` },
   );
 }
 
@@ -313,10 +370,10 @@ export function asyncRule<V>(
   check: (value: V, ctx: AsyncRuleContext) => Promise<string | undefined>,
   options: AsyncRuleOptions = {},
 ): Contribution<RulePart> {
-  const { start = "user", debounce = 0, ...decl } = options;
+  const { start = "user", debounce = 0, failure, ...decl } = options;
   return contribute(
     errorOf(node),
-    { kind: "async", check, start, debounce },
+    { kind: "async", check, start, debounce, failure },
     { ...decl, name: decl.name ?? `asyncRule(${pathOf(node) || "<root>"})` },
   );
 }
