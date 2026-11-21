@@ -49,7 +49,7 @@ A named piece of state a node declares beside its value (such as `error`, `visib
 _Avoid_: flag, attribute, status
 
 **Meta group**:
-A set of meta keys declared together on a node by calling one function inside `.meta()`, each under its usual name: `control()` declares the keys an input needs, `defined()` just one.
+A set of meta keys declared together on a node by calling one function inside `.meta()`, each under its usual name: `control()` declares the keys an input needs, `visible()` just one.
 _Avoid_: feature, bundle, trait, plugin, mixin
 
 **Control node**:

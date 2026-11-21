@@ -3,7 +3,7 @@
 // These assertions are checked by `npm run typecheck` (tsc), not by vitest.
 // ============================================================
 
-import { form, object, array, field, metaKey, createStore, defineBehavior } from "anyshape";
+import { form, object, array, field, metaKey, createStore, defineBehavior, type InferValue } from "anyshape";
 import { test, expectTypeOf } from "vitest";
 
 import {
@@ -13,13 +13,22 @@ import {
   defined,
   required,
   min,
+  minLength,
   pattern,
   visibleWhen,
   disableWhen,
   exclusive,
   startWith,
+  emptyToUndefined,
   handleSubmit,
   type InferChecked,
+  type Validatable,
+  type Lengthy,
+  type Numeric,
+  type Textual,
+  type Limit,
+  type MessageOptions,
+  type DefinedOptions,
 } from "../index";
 import type { useControl, ControlNode, ControlBinding } from "../react";
 import * as order from "./fixtures/order";
@@ -33,6 +42,9 @@ const t = form(
     hidden: object({ x: field<string>() }).meta(visible()),
     off: field<string>().meta(control(), disabled()),
     other: field<string>().meta(control(), disabled()),
+    optText: field<string | undefined>().meta(control()),
+    optTags: field<string[] | undefined>().meta(control()),
+    optCount: field<number | undefined>().meta(control()),
   }),
 );
 
@@ -56,6 +68,38 @@ export function typeOnlyChecks() {
   // @ts-expect-error – the start must match the key's value type
   startWith(t.text.error, 0);
   startWith(t.text.revealed, true);
+  // @ts-expect-error – emptyToUndefined requires undefined in the node's value type
+  emptyToUndefined(t.text);
+  // @ts-expect-error – emptyToUndefined only accepts string or array nodes
+  emptyToUndefined(t.optCount);
+  emptyToUndefined(t.optText);
+  emptyToUndefined(t.optTags);
+}
+
+// Wrappers in user code type cleanly using the exported node & option types. Never called.
+export function wrapperTypeChecks() {
+  const myRequired = <N extends Validatable>(node: N, options: MessageOptions<InferValue<N>> = {}) =>
+    required(node, { message: () => "Req", ...options });
+  const myMinLength = <N extends Lengthy>(
+    node: N,
+    length: Limit,
+    options: MessageOptions<InferValue<N>, { limit: number }> = {},
+  ) => minLength(node, length, { message: (_v, { limit }) => `Min ${limit}`, ...options });
+  const myMin = <N extends Numeric>(
+    node: N,
+    limit: Limit,
+    options: MessageOptions<InferValue<N>, { limit: number }> = {},
+  ) => min(node, limit, { message: (_v, { limit: l }) => `>= ${l}`, ...options });
+  const myPattern = <N extends Textual>(node: N, regex: RegExp, options: MessageOptions<InferValue<N>> = {}) =>
+    pattern(node, regex, { message: () => "Bad", ...options });
+  const myDefined = (options?: DefinedOptions) => defined({ message: () => "Req", ...options });
+
+  myRequired(t.text);
+  myMinLength(t.text, 3);
+  myMin(t.count, 1);
+  myPattern(t.text, /x/);
+  const f = form(object({ pick: field<string | undefined>().meta(control(), myDefined()) }));
+  expectTypeOf<InferChecked<typeof f>>().toEqualTypeOf<{ pick: string }>();
 }
 
 test("recipes state the keys they need through ref properties", () => {

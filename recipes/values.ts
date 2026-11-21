@@ -1,6 +1,6 @@
 // ============================================================
-// Values – behaviors that write values: calculate, link, clearWhen, and
-// startWith, which gives a meta key its start.
+// Values – behaviors that write values: calculate, link, clearWhen,
+// emptyToUndefined, and startWith, which gives a meta key its start.
 // ------------------------------------------------------------
 // Built on the core's defineBehavior(). Each writes the target it takes, so
 // it is that target's one writer.
@@ -10,6 +10,7 @@ import {
   defineBehavior,
   initialOf,
   pathOf,
+  type ShapeNode,
   type AnyNode,
   type InferValue,
   type Behavior,
@@ -109,5 +110,31 @@ export function startWith<T>(ref: MetaRef<T>, value: NoInfer<T>, options: { name
     name: options.name ?? `startWith(${pathOf(ref)})`,
     writes: [ref],
     run: (ctx) => ctx.set(ref, value),
+  });
+}
+
+/**
+ * Turns an empty string (`""`) or empty array (`[]`) written by the user or
+ * program into `undefined`, so a field typed `T | undefined` with `defined()`
+ * returns to `undefined` when cleared. Whitespace-only strings stay strings,
+ * and creation/loads (`{ as: "initial" }`) are ignored so a loaded `""`
+ * doesn't make the form dirty.
+ */
+export function emptyToUndefined<N extends ShapeNode<string | readonly unknown[] | null | undefined>>(
+  target: N & (undefined extends InferValue<N> ? unknown : never),
+  options: { name?: string } = {},
+): Behavior {
+  return defineBehavior({
+    name: options.name ?? `emptyToUndefined(${pathOf(target)})`,
+    triggers: [target],
+    writes: [target],
+    origins: ["user", "program"],
+    runOn: { init: false },
+    run(ctx) {
+      const value = ctx.get(target);
+      if (value === "" || (Array.isArray(value) && value.length === 0)) {
+        ctx.set(target, undefined as InferValue<N>);
+      }
+    },
   });
 }

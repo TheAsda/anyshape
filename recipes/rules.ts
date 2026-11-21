@@ -31,16 +31,27 @@ import {
 import type { Disableable } from "./disabling.js";
 import { rule, type RulePart, type Validatable } from "./validation.js";
 
-export type Message<V = any> = string | ((value: V) => string);
+export type Message<V = any, P = undefined> = [P] extends [undefined]
+  ? string | ((value: V) => string)
+  : string | ((value: V, params: P) => string);
 
 /** The options of a ready rule: its message, and its name for diagnostics. */
-export interface MessageOptions<V = any> {
-  message?: Message<V>;
+export interface MessageOptions<V = any, P = undefined> {
+  message?: Message<V, P>;
   name?: string;
 }
 
 function message<V>(m: Message<V> | undefined, fallback: string, value: V): string {
   return m === undefined ? fallback : typeof m === "function" ? m(value) : m;
+}
+
+function limitMessage<V>(
+  m: Message<V, { limit: number }> | undefined,
+  fallback: (limit: number) => string,
+  value: V,
+  limit: number,
+): string {
+  return m === undefined ? fallback(limit) : typeof m === "function" ? m(value, { limit }) : m;
 }
 
 /** undefined, null, whitespace-only strings and empty arrays are empty. */
@@ -78,7 +89,7 @@ function limitRule<N extends Validatable>(
   fails: (value: any, limit: number) => boolean,
   fallback: (limit: number) => string,
   label: string,
-  options: MessageOptions<InferValue<N>>,
+  options: MessageOptions<InferValue<N>, { limit: number }>,
 ): Contribution<RulePart> {
   const ref = typeof limit === "number" ? undefined : limit;
   return rule(
@@ -86,7 +97,7 @@ function limitRule<N extends Validatable>(
     (v, ctx) => {
       const resolved = ref === undefined ? (limit as number) : (ctx.get(ref) as number | undefined);
       if (resolved === undefined || !fails(v, resolved)) return undefined;
-      return message(options.message, fallback(resolved), v);
+      return limitMessage(options.message, fallback, v, resolved);
     },
     {
       name: options.name ?? `${label}(${pathOf(node)}, ${ref === undefined ? limit : pathOf(ref)})`,
@@ -95,12 +106,13 @@ function limitRule<N extends Validatable>(
   );
 }
 
-type Lengthy = Validatable & ShapeNode<string | readonly unknown[] | null | undefined>;
+/** A validatable node whose value has a length (string or array). */
+export type Lengthy = Validatable & ShapeNode<string | readonly unknown[] | null | undefined>;
 
 export function minLength<N extends Lengthy>(
   node: N,
   length: Limit,
-  options: MessageOptions<InferValue<N>> = {},
+  options: MessageOptions<InferValue<N>, { limit: number }> = {},
 ): Contribution<RulePart> {
   return limitRule(
     node,
@@ -115,7 +127,7 @@ export function minLength<N extends Lengthy>(
 export function maxLength<N extends Lengthy>(
   node: N,
   length: Limit,
-  options: MessageOptions<InferValue<N>> = {},
+  options: MessageOptions<InferValue<N>, { limit: number }> = {},
 ): Contribution<RulePart> {
   return limitRule(
     node,
@@ -127,12 +139,13 @@ export function maxLength<N extends Lengthy>(
   );
 }
 
-type Numeric = Validatable & ShapeNode<number | null | undefined>;
+/** A validatable node whose value is a number. */
+export type Numeric = Validatable & ShapeNode<number | null | undefined>;
 
 export function min<N extends Numeric>(
   node: N,
   limit: Limit,
-  options: MessageOptions<InferValue<N>> = {},
+  options: MessageOptions<InferValue<N>, { limit: number }> = {},
 ): Contribution<RulePart> {
   return limitRule(
     node,
@@ -147,7 +160,7 @@ export function min<N extends Numeric>(
 export function max<N extends Numeric>(
   node: N,
   limit: Limit,
-  options: MessageOptions<InferValue<N>> = {},
+  options: MessageOptions<InferValue<N>, { limit: number }> = {},
 ): Contribution<RulePart> {
   return limitRule(
     node,
@@ -159,7 +172,8 @@ export function max<N extends Numeric>(
   );
 }
 
-type Textual = Validatable & ShapeNode<string | null | undefined>;
+/** A validatable node whose value is a string. */
+export type Textual = Validatable & ShapeNode<string | null | undefined>;
 
 export function pattern<N extends Textual>(
   node: N,
@@ -179,16 +193,18 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function email<N extends Textual>(node: N, options: MessageOptions<InferValue<N>> = {}): Contribution<RulePart> {
   return pattern(node, EMAIL, {
-    message: "Invalid email address",
     ...options,
+    message: options.message ?? "Invalid email address",
     name: options.name ?? `email(${pathOf(node)})`,
   });
 }
 
+type ExclusiveMessage = string | ((params: { labels: readonly string[] }) => string);
+
 export interface ExclusiveOptions {
   /** Exactly one must be filled. Default false (at most one). */
   required?: boolean;
-  message?: { tooMany?: string; missing?: string };
+  message?: { tooMany?: ExclusiveMessage; missing?: ExclusiveMessage };
   name?: string;
 }
 
@@ -205,9 +221,9 @@ type ExclusiveField = Validatable & Disableable;
 export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveOptions = {}): AnyBehavior[] {
   if (fields.length < 2) throw new Error("exclusive() needs at least two fields");
   const name = options.name ?? `exclusive(${fields.map(pathOf).join(", ")})`;
-  const labels = fields.map(labelOf).join(", ");
-  const tooMany = options.message?.tooMany ?? `Only one of ${labels} can be set`;
-  const missing = options.message?.missing ?? `One of ${labels} is required`;
+  const labels = fields.map(labelOf);
+  const resolveExclusive = (m: ExclusiveMessage | undefined, fallback: () => string) =>
+    m === undefined ? fallback() : typeof m === "function" ? m({ labels }) : m;
 
   const disablers = fields.map((field, i) =>
     contribute(field.disabled, name, {
@@ -224,8 +240,12 @@ export function exclusive(fields: readonly ExclusiveField[], options: ExclusiveO
       field,
       (value, ctx) => {
         const count = fields.filter((f) => !isEmpty(f === field ? value : ctx.get(f))).length;
-        if (count > 1 && !isEmpty(value)) return tooMany;
-        if (options.required && count === 0) return missing;
+        if (count > 1 && !isEmpty(value)) {
+          return resolveExclusive(options.message?.tooMany, () => `Only one of ${labels.join(", ")} can be set`);
+        }
+        if (options.required && count === 0) {
+          return resolveExclusive(options.message?.missing, () => `One of ${labels.join(", ")} is required`);
+        }
         return undefined;
       },
       { name: `${name}:${pathOf(field)}`, triggers: fields.filter((f) => f !== field) },

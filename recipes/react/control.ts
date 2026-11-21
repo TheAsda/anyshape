@@ -4,7 +4,7 @@
 //   Built on useField: the value, a user onChange and the node's own
 //   control() keys, read and written through the node's refs.
 //   • `pending` while a check of the field runs (pendingOf(node.error)).
-//   • `requiredNow` while a required() on the field is present, e.g. for an
+//   • `requiredNow` while a required() or defined() is on the field, e.g. for an
 //     asterisk on the label.
 //   • showError: an error is shown once the field is revealed – on blur
 //     (onBlur), by a submit or by code – and no check is pending.

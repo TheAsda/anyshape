@@ -2,7 +2,19 @@
 import { form, object, array, field, createStore, metaKey, defineBehavior, defineBehaviors } from "anyshape";
 import { describe, expect, test } from "vitest";
 
-import { calculate, link, clearWhen, visibleWhen, startWith, rule, submitting, handleSubmit, control } from "../index";
+import {
+  calculate,
+  link,
+  clearWhen,
+  visibleWhen,
+  startWith,
+  emptyToUndefined,
+  defined,
+  rule,
+  submitting,
+  handleSubmit,
+  control,
+} from "../index";
 import { shape, initial } from "./fixtures/profile";
 
 // Compile-time only – never called.
@@ -189,5 +201,89 @@ describe("startWith", () => {
         createStore(shape, initial(), { behaviors: [startWith(shape.note.hint, "a", { name: "hint start" }), hand] }),
       "a custom name replaces it",
     ).toThrow(/is already written by "hint start"/);
+  });
+});
+
+describe("emptyToUndefined", () => {
+  const opt = form(
+    object({
+      name: field<string | undefined>().meta(control(), defined()),
+      tags: field<string[] | undefined>().meta(control(), defined()),
+      rows: array(object({ label: field<string | undefined>().meta(control(), defined()) }), {
+        create: () => ({ label: undefined }),
+      }),
+    }),
+  );
+
+  test('turns "" and [] into undefined on user and program writes; leaves whitespace and non-empty values alone', () => {
+    const s = createStore(
+      opt,
+      { name: "Ada", tags: ["a"], rows: [] },
+      { behaviors: [emptyToUndefined(opt.name), emptyToUndefined(opt.tags)] },
+    );
+    s.set(opt.name, " ", { origin: "user" });
+    expect(s.get(opt.name), "whitespace stays a string so typing a leading space is not wiped").toBe(" ");
+
+    s.set(opt.name, "", { origin: "user" });
+    expect(s.get(opt.name)).toBeUndefined();
+    expect(s.get(opt.name.error), "defined() sees undefined in the same flush").toBe("Required");
+
+    s.set(opt.name, "Bob");
+    expect(s.get(opt.name)).toBe("Bob");
+    s.set(opt.name, ""); // program write
+    expect(s.get(opt.name)).toBeUndefined();
+
+    s.set(opt.tags, [], { origin: "user" });
+    expect(s.get(opt.tags)).toBeUndefined();
+    expect(s.get(opt.tags.error)).toBe("Required");
+    s.set(opt.tags, ["x"], { origin: "user" });
+    expect(s.get(opt.tags)).toEqual(["x"]);
+    s.set(opt.tags, []); // program write
+    expect(s.get(opt.tags)).toBeUndefined();
+  });
+
+  test('ignores initial values and loads ({ as: "initial" }), so a loaded "" stays clean', () => {
+    const s = createStore(
+      opt,
+      { name: "", tags: [], rows: [] },
+      { behaviors: [emptyToUndefined(opt.name), emptyToUndefined(opt.tags)] },
+    );
+    expect(s.get(opt.name)).toBe("");
+    expect(s.get(opt.name.dirty)).toBe(false);
+    expect(s.get(opt.tags)).toEqual([]);
+    expect(s.get(opt.tags.dirty)).toBe(false);
+
+    s.set(opt, { name: "", tags: [], rows: [] }, { as: "initial" });
+    expect(s.get(opt.name)).toBe("");
+    expect(s.get(opt.name.dirty)).toBe(false);
+    expect(s.get(opt.tags)).toEqual([]);
+    expect(s.get(opt.tags.dirty)).toBe(false);
+  });
+
+  test("works on rows via b.each", () => {
+    const behaviors = defineBehaviors(opt, (b) => b.each(opt.rows, (b, item) => b.add(emptyToUndefined(item.label))));
+    const s = createStore(opt, { name: "Ada", tags: ["a"], rows: [{ label: "x" }] }, { behaviors });
+    const row = s.substore(opt.rows).itemAt(0);
+    row.set(opt.rows.item.label, "", { origin: "user" });
+    expect(row.get(opt.rows.item.label)).toBeUndefined();
+    expect(row.get(opt.rows.item.label.error)).toBe("Required");
+  });
+
+  test("is the target's one writer; default name is emptyToUndefined(<path>) and { name } overrides it", () => {
+    const other = calculate(opt.name, [opt.tags], () => "x");
+    expect(() =>
+      createStore(
+        opt,
+        { name: undefined, tags: undefined, rows: [] },
+        { behaviors: [emptyToUndefined(opt.name), other] },
+      ),
+    ).toThrow(/is already written by "emptyToUndefined\(name\)"/);
+    expect(() =>
+      createStore(
+        opt,
+        { name: undefined, tags: undefined, rows: [] },
+        { behaviors: [emptyToUndefined(opt.name, { name: "blank name" }), other] },
+      ),
+    ).toThrow(/is already written by "blank name"/);
   });
 });

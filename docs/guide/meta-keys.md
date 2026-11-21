@@ -59,7 +59,7 @@ const signup = form(
 );
 ```
 
-The meta group returns definitions declared once, outside it. If it created new definitions on each call, every node would get a different key, and nothing could count or sweep them as one. The default recipes declare every key through a meta group: `control()` and `validation()` declare several, `visible()`, `defined()` or `submitting()` one each, and their definitions carry a `Key` suffix (`editedKey`), for sweeps and counts ([ADR 0007](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0007-keys-are-declared-through-meta-groups.md), [source](../../recipes/control.ts)).
+A meta group returns a shared definition declared once, outside it, for every key that code reaches by its definition: a count (`countIn`), a sweep (`store.collect`), or another key's `.uses()`. Creating a new definition per call for such a key would give every node a different key, and nothing could count, sweep or `.uses()` them as one. A key reached only through its node's reference — or whose default behavior carries per-field data such as `defined({ message })` in the default recipes — may be defined per call. The default recipes declare every key through a meta group: `control()` and `validation()` declare several, `visible()` or `submitting()` one each, and the shared definitions carry a `Key` suffix (`editedKey`), for sweeps and counts ([ADR 0007](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0007-keys-are-declared-through-meta-groups.md), [ADR 0009](https://github.com/TheAsda/anyshape/blob/master/docs/adr/0009-per-call-message-overrides-and-defined-options.md), [source](../../recipes/control.ts)).
 
 ## A key's default behavior
 
@@ -152,7 +152,7 @@ const messages = tripStore
 ## Common mistakes
 
 - **Looking a key up by its name**, as `node["error"]` or by listing a node's keys. Take the node typed with the key you need, or sweep by definition with `collect`.
-- **A meta group that creates its definitions inside the function.** Each call makes new keys; declare the definitions once.
+- **A meta group that creates definitions inside the function for a key reached by definition.** If anything counts, sweeps or `.uses()` the key, each call makes an unrelated key; declare shared definitions once, outside the meta group.
 - **`isCounted` true for the default.** `.aggregate()` throws: untouched nodes must count as zero.
 - **Counting a key no node under the counted node declares.** `countIn` throws. Count from a node whose subtree declares the key.
 - **Writing a combined key from a behavior.** Registration rejects it; contribute to the key instead ([contributions.md](contributions.md)).

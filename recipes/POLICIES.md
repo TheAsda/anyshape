@@ -86,15 +86,15 @@ A change to any policy on this page is a breaking change of the package, release
 
 **Where to change it.** The rule's check in `rules.ts`, such as the `!isEmpty(v)` in `minLength`.
 
-## `defined` adds a "Required" check
+## `defined` adds a "Required" check and turns on `requiredNow`
 
-**What the default recipes do.** A field declared with `defined()` (a field that starts empty, typed `field<T | undefined>()`) gets the error "Required" while its value is `undefined`, without a rule written for it. It runs after the field's sync rules, so a `required()` with its own message speaks first. It doesn't feed `requiredNow`: a field with only `defined()` says "Required" with `requiredNow` false. The submit's `fn` receives such a field's value without `undefined` in its type.
+**What the default recipes do.** A field declared with `defined()` (a field that starts empty, typed `field<T | undefined>()`) gets the error "Required" (or `options.message`) while its value is `undefined`, without a rule written for it, and turns on `requiredNow` so the UI can show it as required on its own. The check runs after the field's sync rules, so a `required()` with its own message speaks first. The submit's `fn` receives such a field's value without `undefined` in its type.
 
-**The main alternative.** Leave the check to an explicit `required()`, or treat `null` as empty too.
+**The main alternative.** Leave the check or `requiredNow` to an explicit `required()`, or treat `null` as empty too.
 
-**Why.** A field whose checked type has no `undefined` must never be submitted while it holds one, whatever rules the author remembered to add.
+**Why.** A field whose checked type has no `undefined` must never be submitted while it holds one, whatever rules the author remembered to add, and turning on `requiredNow` means you don't have to duplicate `required()` beside `defined()` just to show an asterisk.
 
-**Where to change it.** The `"Required"` string and the `value === undefined` test in `errorKey`'s owner in `validation.ts`. To treat `null` the same way, change both, and the `Exclude<…, undefined>` in `InferChecked` beside them.
+**Where to change it.** Pass `{ message }` per call (or wrap `defined` once in your own module; see [Messages in your language](README.md#messages-in-your-language)). To change what counts as empty or stop feeding `requiredNow`, edit `defined` and the `value === undefined` test in `errorKey`'s owner in `validation.ts`, plus the `Exclude<…, undefined>` in `InferChecked` beside them.
 
 ## A field shows one message: its first failing rule
 
@@ -118,13 +118,13 @@ A change to any policy on this page is a breaking change of the package, release
 
 ## A check that throws writes "Validation failed"
 
-**What the default recipes do.** A sync check that throws, or an async check that rejects, is treated as a bug: the field's `error` becomes "Validation failed", the thrown value goes to `console.error`, and the result is not remembered, so the next run checks again. A failure you expect, such as an unavailable server, should return a message instead.
+**What the default recipes do.** A sync check that throws, or an async check that rejects, is treated as a bug: the field's `error` becomes the rule's `failure` message (default "Validation failed"), the thrown value goes to `console.error`, and the result is not remembered, so the next run checks again. A failure you expect, such as an unavailable server, should return a message instead.
 
 **The main alternative.** Treat a throwing check as passing, or let the error escape to the store's `onError`.
 
 **Why.** A check that fails open lets bad data through, and a field that keeps its last good state hides the bug ([principle 18](../docs/principles.md#18-errors-are-never-swallowed-or-replaced-checks-fail-closed)).
 
-**Where to change it.** `failed` in `errorKey`'s owner in `validation.ts`.
+**Where to change it.** Pass `failure` (a string or `() => string`, called only when the check throws) to `rule` or `asyncRule`, or edit `failed` in `errorKey`'s owner in `validation.ts` in a copy.
 
 ## What a submit does
 
@@ -144,13 +144,21 @@ A change to any policy on this page is a breaking change of the package, release
 
 ## Messages are fixed English strings
 
-**What the default recipes do.** The messages are English: "Required", "At least 3 characters", "At most 3 characters", "Must be at least 3", "Must be at most 3", "Invalid format", "Invalid email address", "Only one of a, b can be set", "One of a, b is required" and "Validation failed". `exclusive` names its fields by the last segment of their paths.
+**What the default recipes do.** The default messages are English: "Required", "At least 3 characters", "At most 3 characters", "Must be at least 3", "Must be at most 3", "Invalid format", "Invalid email address", "Only one of a, b can be set", "One of a, b is required" and "Validation failed". `exclusive` names its fields by the last segment of their paths.
 
-**The main alternative.** A translation hook, or keys looked up in a message catalog.
+**The main alternative.** A translation hook, a global message setter, or error codes translated at render.
 
-**Why.** A hook would be an option every copy carries ([principle 9](../docs/principles.md#9-a-recipe-has-no-policy-options-a-team-edits-its-copy)), and passing a message where a rule is declared already covers it.
+**Why.** A hook or catalog factory would be an option every copy carries ([principle 9](../docs/principles.md#9-a-recipe-has-no-policy-options-a-team-edits-its-copy)), a global setter introduces ambient state ([principle 4](../docs/principles.md#4-reusable-logic-is-plain-functions-with-explicit-parameters)), and per-call message getters cover localization without leaving the default recipes ([ADR 0009](../docs/adr/0009-per-call-message-overrides-and-defined-options.md)).
 
-**Where to change it.** Per rule, pass `message`: a string, or a function of the value (`required(node, { message: t("required") })`). `exclusive` takes `message.tooMany` and `message.missing`. The `defined` check's "Required" and the "Validation failed" of a throwing check are in `validation.ts`; the fallbacks of the ready rules are in `rules.ts`.
+**Where to change it.** Every message accepts a string or a lazy getter called only when the check fails:
+
+- `required`, `pattern`, `email`: `message` (`string | ((value) => string)`);
+- `minLength`, `maxLength`, `min`, `max`: `message` (`string | ((value, { limit }) => string)`);
+- `exclusive`: `message.tooMany` and `message.missing` (`string | (({ labels }) => string)`);
+- `defined`: `message` (`string | (() => string)`);
+- `rule`, `asyncRule`: `failure` (`string | (() => string)`).
+
+To set defaults for a whole project without copying the recipes, wrap these in one small module in your project — see [Messages in your language](README.md#messages-in-your-language). To store error codes and re-translate errors already on screen when the language changes, copy the recipes and change `errorKey`'s type in `validation.ts`.
 
 ## A calculated value follows its sources
 
@@ -181,3 +189,13 @@ A change to any policy on this page is a breaking change of the package, release
 **Why.** Reset means "back to how the form started": a key that holds a start when the store is created should hold it after a reset too, for every row that still exists.
 
 **Where to change it.** `startWith` in `values.ts`. Creation only is not a flag: with no triggers, every run of the behavior is a creation or reset run, and `runOn: { init: false }` skips the creation run too, so the start would never be written. To start a key at creation and let `reset()` return it to the default, make the start the key's default instead.
+
+## `emptyToUndefined` drops `""` and `[]` on user and program writes
+
+**What the default recipes do.** `emptyToUndefined(target)` writes `undefined` whenever a `"user"` or `"program"` write sets `target` to `""` or `[]`. Whitespace-only strings stay strings, and creation and loads (`{ as: "initial" }`) are ignored, so a loaded `""` stays equal to its baseline and leaves `dirty` false.
+
+**The main alternative.** Treat whitespace-only strings as empty (like `isEmpty`), or normalize initial and loaded values too.
+
+**Why.** Wiping whitespace would eat a leading space on the first keystroke, and rewriting a loaded value would disagree with its baseline and mark the form dirty straight after loading.
+
+**Where to change it.** `emptyToUndefined` in `values.ts`: its `origins`, `runOn` and emptiness test.
